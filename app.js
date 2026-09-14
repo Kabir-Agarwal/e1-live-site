@@ -306,10 +306,22 @@
     '<th class="num">Worst losing run</th><th class="num">Total</th><th class="num">In rupees</th></tr></thead>';
   function renderBacktest() {
     var B = S.backtest; if (!B || !B.summary) return;
-    var s = B.summary;
+    var s = B.summary, p = B.performance || {};
     $("bt-kpis").innerHTML = kpi("Finished simulated calls", inr0.format(s.N)) + kpi("Won", s.win_pct + "%") +
-      kpi("Profit factor", s.profit_factor, "gains ÷ losses") + kpi("Worst losing run", s.max_dd_R + "R") +
-      kpi("Total", rR(s.total_R), rupees(s.total_rupees)) + kpi("Average per call", rR(s.avg_R));
+      kpi("Profit factor", s.profit_factor, "gains ÷ losses") +
+      kpi("Sharpe", p.sharpe == null ? dash : p.sharpe, "annualised, risk-free 0") +
+      kpi("Sortino", p.sortino == null ? dash : p.sortino, "downside risk only") +
+      kpi("CAGR", p.cagr_pct == null ? dash : p.cagr_pct + "%", "paper, geometric") +
+      kpi("Max drawdown", p.max_dd_pct == null ? (s.max_dd_R + "R") : p.max_dd_pct + "%", p.max_dd_rupees != null ? rupees(p.max_dd_rupees) : "") +
+      kpi("Average holding", p.avg_hold_days == null ? dash : p.avg_hold_days + " days") +
+      kpi("Average positions open", p.exposure == null ? dash : p.exposure) +
+      kpi("Total", rR(s.total_R), rupees(s.total_rupees));
+    if (p.capital) $("bt-cap").textContent = "Sharpe, Sortino, CAGR and the returns below are measured on a stated notional capital of ₹" +
+      inr0.format(p.capital) + " (paper). Sharpe and Sortino are annualised from daily returns with a risk-free rate of 0.";
+    var months = (p.by_month || []);
+    $("bt-month").innerHTML = months.length ? ("<thead><tr><th>Month</th><th class='num'>Paper P&L</th><th class='num'>Return</th></tr></thead><tbody>" +
+      months.map(function (m) { return "<tr><td>" + esc(m.month) + "</td><td class='num'>" + rupees(m.pnl_rupees) + "</td><td class='num'>" + signed(m.return_pct, "%") + "</td></tr>"; }).join("") + "</tbody>") :
+      "<tbody><tr><td class='empty'>No monthly data yet.</td></tr></tbody>";
     $("bt-book").innerHTML = STAT_HEAD + "<tbody>" + B.by_book.map(function (b) { return statRow(b.book, b); }).join("") + "</tbody>";
     $("bt-year").innerHTML = STAT_HEAD + "<tbody>" + B.by_year.map(function (y) { return statRow(y.year, y); }).join("") + "</tbody>";
     $("bt-dl").innerHTML = '<a href="E1-BLOTTER.csv">Every call (CSV)</a> · <a href="E1-BLOTTER.xlsx">Every call (Excel)</a> · ' +
