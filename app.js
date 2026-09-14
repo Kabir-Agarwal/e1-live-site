@@ -162,13 +162,15 @@
     $("pf-closed").hidden = m.open;
     $("pf-closed").innerHTML = m.open ? "" : closedBanner(m);
     $("pf-kpis").innerHTML =
+      kpi("Paper capital", rupees(st.capital), "1R = ₹" + inr0.format(st.one_R_rupees) + " = 0.5%") +
       kpi("Today's paper result", m.open ? (st.day_R == null ? loading : rR(st.day_R)) : '<span class="muted">Market closed</span>',
-          m.open && st.day_rupees != null ? rupees(st.day_rupees) : "") +
-      kpi("Total paper result", st.closed ? rR(st.cum_R) : '<span class="muted">No closed trades</span>', st.closed ? rupees(st.cum_rupees) : "") +
+          m.open && st.day_pct != null ? signed(st.day_pct, "%") + " · " + rupees(st.day_rupees) : "") +
+      kpi("Total paper result", st.closed ? rR(st.cum_R) : '<span class="muted">No closed trades</span>',
+          st.closed ? signed(st.cum_pct, "%") + " · " + rupees(st.cum_rupees) : "") +
       kpi("Won", st.win_pct == null ? dash : st.win_pct + "%", st.closed ? st.closed + " closed trades" : "") +
       kpi("Profit factor", st.profit_factor == null ? dash : st.profit_factor, "gains ÷ losses") +
-      kpi("Worst losing run", st.closed ? st.max_drawdown_R + "R" : dash, "deepest drop from a high") +
-      kpi("Money at risk now", rupees(st.exposure_rupees), st.open + " open · " + st.queued + " waiting");
+      kpi("Money at risk now", rupees(st.exposure_rupees),
+          signed(st.exposure_pct, "%") + " of capital · " + st.open + " open · " + st.queued + " waiting");
     drawCurve(P.curve);
     $("pf-open").innerHTML = tradeTable(P.open, m.open ? "No open paper positions." : "No open positions — the market is closed.", false);
     $("pf-queued").innerHTML = tradeTable(L.calls.filter(function (c) { return c.status === "queued"; }), "Nothing waiting to fill.", false);
