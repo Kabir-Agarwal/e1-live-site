@@ -1,20 +1,162 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live — E1</title><style>
-:root{--ink:#15181d;--dim:#666;--line:#e3e6ea;--bg:#fbfbfc;--up:#157f3d;--dn:#b4232a;--warn:#8a6d00}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
-font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif}
-header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}
-h1{font-size:19px;margin:0 0 2px}nav a{margin-right:14px;color:#1a4f9c;text-decoration:none;font-size:14px}
-nav a.on{font-weight:700;color:var(--ink)}main{max-width:1060px;margin:0 auto;padding:18px 20px 60px}
-h2{font-size:16px;margin:26px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
-.banner{background:#fff8e6;border:1px solid #efd98a;border-radius:8px;padding:9px 13px;font-size:13px;margin:12px 0}
-.badges{color:var(--warn);font-size:12px;margin:6px 0 0}
-.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-.card{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 13px;min-width:130px}
-.card b{display:block;font-size:17px;margin-top:3px}
-table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;margin-top:8px;display:block;overflow-x:auto}
-td,th{border:1px solid var(--line);padding:5px 8px;text-align:left;white-space:nowrap}
-th{background:#eef1f5}td.s{white-space:normal;min-width:320px}
-.up{color:var(--up);font-weight:600}.dn{color:var(--dn);font-weight:600}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
-small,footer{color:var(--dim);font-size:12px}footer{margin-top:30px;border-top:1px solid var(--line);padding-top:10px}
-</style></head><body><header><h1>Pattern engine — live paper book</h1><nav><a href="index.html" class="on">Live</a> <a href="calls.html" class="">Calls</a> <a href="patterns.html" class="">Patterns</a> <a href="backtest.html" class="">Backtest</a> <a href="engines.html" class="">Engines</a> <a href="method.html" class="">Method</a></nav></header><main><p class="banner">PAPER ONLY — every position on this site is simulated. No real money, no broker orders, no order-placing code anywhere in the system.</p><div class="cards"><div class="card"><small>session</small><b>closed</b></div><div class="card"><small>signals today</small><b>0</b></div><div class="card"><small>paper positions taken</small><b>0</b></div><div class="card"><small>open now</small><b>0</b></div><div class="card"><small>waiting for the next open</small><b>5</b></div><div class="card"><small>today&#x27;s paper result</small><b>0R</b></div><div class="card"><small>instruments watched</small><b>210</b></div></div><h2>The book right now</h2><table><tr><th>date</th><th>stock</th><th>what it says</th><th>state</th><th>result</th></tr><tr><td>nan</td><td>SHREECEM</td><td class="s">SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</td><td>queued</td><td><span class="">+nanR</span></td></tr><tr><td>nan</td><td>BDL</td><td class="s">BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.</td><td>queued</td><td><span class="">+nanR</span></td></tr><tr><td>nan</td><td>JSWENERGY</td><td class="s">JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.</td><td>queued</td><td><span class="">+nanR</span></td></tr><tr><td>nan</td><td>HINDUNILVR</td><td class="s">HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</td><td>queued</td><td><span class="">+nanR</span></td></tr><tr><td>nan</td><td>DABUR</td><td class="s">DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</td><td>queued</td><td><span class="">+nanR</span></td></tr></table><p><small>The moment check (is there really a price to trade at) is not wired to live depth for that fire yet, so it is reported as not checked. From Tuesday's session the live loop reads the real two-sided market (quote and depth) at each fire and a signal with no fillable market does not fill.</small></p><footer>Last updated 14 Sep 2026 18:14 IST · <span class="badges">conditioned on G13-bias-2 (survivorship) · DEFF-uncorrected · FILL-LAW-UNVERIFIED · COLD-START</span></footer></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E1 Terminal — live paper trading desk</title>
+<meta name="description" content="A live, paper-only research desk: every call, position and pattern, in plain words. No real money.">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">E1</span><span class="brand-name">Terminal</span>
+    <span class="pill paper" title="Every position here is simulated">PAPER ONLY</span>
+  </div>
+  <div class="status">
+    <span id="mkt" class="pill mkt">Loading…</span>
+    <span id="countdown" class="muted"></span>
+    <span id="clock" class="clock"></span>
+  </div>
+</header>
+
+<div class="tape" aria-label="Ticker tape"><div id="tape" class="tape-track">Loading prices…</div></div>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" data-tab="live">Live desk</button>
+  <button role="tab" data-tab="portfolio">Portfolio</button>
+  <button role="tab" data-tab="screener">Screener</button>
+  <button role="tab" data-tab="patterns">Patterns</button>
+  <button role="tab" data-tab="backtest">Backtest</button>
+  <button role="tab" data-tab="how">How it works</button>
+  <button role="tab" data-tab="engines">Engines</button>
+</nav>
+
+<main>
+  <p id="stale" class="notice warn" hidden></p>
+
+  <section id="tab-live" class="panel" hidden>
+    <div id="live-closed" class="closed" hidden></div>
+    <div id="live-kpis" class="kpis"></div>
+    <h2>Three lights — what must be green before a paper trade</h2>
+    <p class="sub">A call becomes a paper trade only when all three are on: the pattern passed its exam
+      (<b>board</b>), its edge beats the fees (<b>money</b>), and a real price is there to trade at
+      (<b>moment</b>).</p>
+    <div class="scroll"><table id="lights" class="grid"></table></div>
+    <h2>Live calls</h2>
+    <p class="sub">Every call the system makes, newest first. Queued calls fill at the next open.</p>
+    <div class="scroll"><table id="calls" class="grid"></table></div>
+  </section>
+
+  <section id="tab-portfolio" class="panel" hidden>
+    <div id="pf-closed" class="closed" hidden></div>
+    <div id="pf-kpis" class="kpis"></div>
+    <h2>Equity curve — cumulative paper result, in R</h2>
+    <p class="sub">One R is the amount risked on each call (₹<span id="one-r">1,000</span>).</p>
+    <div id="curve" class="curve"></div>
+    <h2>Open paper positions</h2>
+    <div class="scroll"><table id="pf-open" class="grid"></table></div>
+    <h2>Waiting to fill</h2>
+    <div class="scroll"><table id="pf-queued" class="grid"></table></div>
+    <h2>Closed paper trades</h2>
+    <div class="scroll"><table id="pf-closedtrades" class="grid"></table></div>
+  </section>
+
+  <section id="tab-screener" class="panel" hidden>
+    <div id="weather" class="weather"></div>
+    <div class="filters">
+      <input id="scr-q" type="search" placeholder="Find a stock…" aria-label="Find a stock">
+      <select id="scr-trend" aria-label="Trend"><option value="">Any trend</option><option value="up">Rising</option><option value="down">Falling</option></select>
+      <select id="scr-vol" aria-label="Volatility"><option value="">Any volatility</option><option value="calm">Calm</option><option value="rough">Rough</option><option value="storm">Storm</option></select>
+      <span id="scr-count" class="muted"></span>
+    </div>
+    <div class="scroll"><table id="screener" class="grid sortable"></table></div>
+    <p class="sub" id="scr-notes"></p>
+  </section>
+
+  <section id="tab-patterns" class="panel" hidden>
+    <p class="sub">Each row is one behaviour that repeated often enough, in enough stocks, to pass a locked
+      final exam on data the search never saw. <b>Breadth</b> is how many stock-and-timeframe combinations
+      it holds on. <b>Edge</b> is how many percentage points more often it happened than it normally does.
+      <b>Final-exam hit rate</b> is how often the predicted outcome came true in that locked period.
+      Tap a row to see the stocks.</p>
+    <div class="filters">
+      <input id="pat-q" type="search" placeholder="Search patterns…" aria-label="Search patterns">
+      <select id="pat-sort" aria-label="Sort"><option value="breadth">Most widespread first</option><option value="edge">Biggest edge first</option><option value="hit">Highest hit rate first</option></select>
+      <span id="pat-count" class="muted"></span>
+    </div>
+    <div id="patterns" class="plist">Loading patterns…</div>
+  </section>
+
+  <section id="tab-backtest" class="panel" hidden>
+    <p class="notice">Paper results. Every row below is a SIMULATED call — no real money was ever at risk,
+      and a simulated fill assumes a price someone would have given us.</p>
+    <div id="bt-kpis" class="kpis"></div>
+    <h2>By book</h2><div class="scroll"><table id="bt-book" class="grid"></table></div>
+    <h2>By year</h2><div class="scroll"><table id="bt-year" class="grid"></table></div>
+    <h2>Downloads</h2><p id="bt-dl"></p>
+    <h2>Every simulated call</h2>
+    <div class="scroll"><table id="bt-rows" class="grid"></table></div>
+    <p><button id="bt-more" class="btn">Show more</button></p>
+  </section>
+
+  <section id="tab-how" class="panel" hidden>
+    <h2>How it works, in one picture</h2>
+    <ol class="flow" aria-label="From data to paper trades">
+      <li><b>Data</b><span>Minute-by-minute prices for every stock</span></li>
+      <li><b>Rulers</b><span>41 measures: momentum, volatility, volume, trend…</span></li>
+      <li><b>Hunt</b><span>Search the oldest 70% of history for repeats</span></li>
+      <li><b>Test</b><span>Re-check survivors on the next 20%</span></li>
+      <li><b>Exam</b><span>One look at the locked newest 10%</span></li>
+      <li><b>Signals</b><span>A passed pattern fires on today's prices</span></li>
+      <li><b>Three lights</b><span>Board · money · moment</span></li>
+      <li><b>Paper trade</b><span>Simulated entry, stop and target</span></li>
+    </ol>
+    <div class="prose">
+      <p><b>1. It measures.</b> For each stock, the system turns raw prices into 41 simple measures — how fast
+        price is moving, how jumpy it is, how busy trading is — at eight speeds, from one minute to one week.</p>
+      <p><b>2. It hunts, but only in the past.</b> It splits each stock's history in time order. It searches only
+        the oldest 70% for situations that were followed by the same outcome more often than normal.</p>
+      <p><b>3. It tests without peeking.</b> Anything it finds is re-checked on the next 20%, which the search
+        never saw. Most ideas die here, and that is the point.</p>
+      <p><b>4. It sits one exam.</b> The newest 10% is locked away. It is opened once, never used to adjust
+        anything, and every opening is logged. What survives is a validated pattern.</p>
+      <p><b>5. It trades on paper, with three lights.</b> When a validated pattern fires on today's prices, it only
+        becomes a paper trade if the pattern passed its exam, its edge beats the fees, and a real price is there.
+        Every trade has a stop and a target fixed at entry.</p>
+    </div>
+    <h2>The honesty rules</h2>
+    <ul class="rules">
+      <li>Nothing on this site is typed in by hand — every number is read from the system's own files.</li>
+      <li>Anything not yet known says “loading”; when the market is shut, the live panels say so.</li>
+      <li>Fees are subtracted before anything is called profitable.</li>
+      <li>The locked exam data is opened once per round and never used to tune.</li>
+      <li>Failures are published, not hidden — including the system's own mistakes.</li>
+    </ul>
+    <div class="notclaimed">
+      <h3>What this site does NOT claim</h3>
+      <ul>
+        <li><b>Paper only.</b> No real money. No broker orders. There is no order-placing code in the system.</li>
+        <li><b>No live track record yet.</b> The first live paper session is Tuesday 15 September 2026.</li>
+        <li><b>No capital.</b> Nothing here is an offer, a recommendation, or investment advice.</li>
+        <li><b>Today's list only.</b> Results are measured on stocks that still trade, which flatters them.</li>
+        <li><b>Linked stocks counted separately.</b> When many related stocks fire together, the evidence is
+          thinner than the count suggests.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="tab-engines" class="panel" hidden>
+    <p class="sub">One card per engine. Grey means not running — nothing is described as live until it is.</p>
+    <div id="engines" class="cards"></div>
+  </section>
+</main>
+
+<footer>
+  <p><b>Paper only.</b> Every position is simulated. No real money, no broker orders, no order-placing code.
+    Not investment advice.</p>
+  <p class="muted" id="published"></p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
