@@ -90,6 +90,9 @@
 
   function renderLive() {
     var L = S.live; if (!L) return;
+    var au = L.audit || {};
+    $("audit").hidden = !au.banner;
+    if (au.banner) $("audit").innerHTML = "<b>" + (au.mode === "RECORD-ONLY" ? "RECORD-ONLY · " : "") + "Audit correction.</b> " + esc(au.banner);
     var m = L.market;
     $("live-closed").hidden = m.open;
     $("live-closed").innerHTML = m.open ? "" : closedBanner(m);
