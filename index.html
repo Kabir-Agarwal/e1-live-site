@@ -37,6 +37,7 @@
   <p id="stale" class="notice warn" hidden></p>
 
   <section id="tab-live" class="panel" hidden>
+    <div id="e7-experiment" class="notice" style="border:1px solid #1f6feb;border-radius:10px;padding:10px 14px;margin-bottom:14px;background:#0d1117" hidden></div>
     <div id="live-closed" class="closed" hidden></div>
     <div id="live-kpis" class="kpis"></div>
     <h2>Three lights — what must be green before a paper trade</h2>
@@ -184,5 +185,37 @@
   <p class="muted" id="published"></p>
 </footer>
 <script src="app.js"></script>
+<script>
+/* R-E1-ARB-DAY part 4: the LIVE tab leads with the E7-EXPERIMENT today. Self-contained; polls its own
+   JSON and never interferes with app.js. */
+(function () {
+  var el = document.getElementById("e7-experiment");
+  if (!el) return;
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function paint() {
+    fetch("data/e7_experiment.json?cb=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) { el.hidden = true; return; }
+        var alarmsOnly = d.quotes_absent;
+        el.hidden = false;
+        el.innerHTML =
+          '<b>E7-EXPERIMENT</b> — <i>' + esc(d.banner || "experiment") + '</i><br>' +
+          (alarmsOnly
+            ? 'Recording <b>alarms only</b> today — no live option/future quote feed (broker login needed). '
+            : '') +
+          'Alarms: ' + esc(d.alarms || 0) +
+          ' · capturable yes/no: ' + esc(d.capturable_yes || 0) + '/' + esc(d.capturable_no || 0) +
+          ' · paper attempts: ' + esc(d.attempts || 0) +
+          ' · open: ' + esc(d.open || 0) +
+          ' · P&L today: ₹' + esc((d.pnl_rupees || 0).toLocaleString ? d.pnl_rupees.toLocaleString() : d.pnl_rupees) +
+          ' &nbsp; <a href="E7-BACKTEST-v2.md">backtest v2</a> · <a href="E7-OFFICE.md">one-pager</a>';
+      })
+      .catch(function () { el.hidden = true; });
+  }
+  paint();
+  setInterval(paint, 60000);
+})();
+</script>
 </body>
 </html>
