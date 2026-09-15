@@ -1,5 +1,5 @@
 # E7 — the arbitrage desk, in one page
-_Updated 2026-09-16 00:14:34 IST. Paper only — no real money, no orders. For the office._
+_Updated 2026-09-16 00:43:26 IST. Paper only — no real money, no orders. For the office._
 
 ## What this desk does
 It watches index and stock options against their own futures and looks for a price that does not add up. A call, a put and the future are tied together by a fixed relationship; when the three drift apart by more than it costs to trade both option legs, that gap is a chance to lock in the difference. The desk pays for both legs, holds until the gap closes, and books the difference. It never guesses direction — it only trades the gap.
@@ -14,7 +14,10 @@ It watches index and stock options against their own futures and looks for a pri
 - **No gate.** Now a trade is only taken if the gap **beats the cost** with a cushion, and **both legs actually traded in the same minute** with real volume.
 
 ## What the backtest says (v2, on real history)
-_The v2 backtest is running tonight; this section fills in automatically when it finishes._
+- Trades taken: **1500** across 14 names with futures.
+- Win rate **0.041**, profit factor **0.014**, expectancy **-0.3827 R** per trade, net **-574.1 R**.
+- Where the money went: the market gave **Rs 25,900** before costs; costs took **Rs 600,000**; **net Rs -574,100**.
+- **Verdict:** negative after real costs (published as found; no re-tuning)
 
 - **Every trade is downloadable:** `E7-BLOTTER-v2.csv` (time, legs, gap, cost, fill, exit, result).
 
