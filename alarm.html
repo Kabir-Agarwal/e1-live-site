@@ -251,6 +251,23 @@
     ackStaleStamp = null;        // make sure this (new) stale stamp is not pre-muted
     render();
   });
+
+  // R-E1-SIREN-WINDOW: EVENT MODE. The laptop opens this page in its own always-on-top window for a
+  // specific event (🙋 / session finished / stall) — so it auto-arms and rings IMMEDIATELY, offline,
+  // with STOP + SNOOZE right here. No sound ever plays without this visible window to stop it.
+  (function initEvent() {
+    var m = /(?:^|[#&])event=([^&]+)/.exec(location.hash || "");
+    if (!m) return;
+    var reason = decodeURIComponent(m[1]).replace(/\+/g, " ") || "E1 event";
+    armed = true;                          // skip the ARM tap — the window was opened BY an event
+    $("arm").disabled = true; $("arm").textContent = "✓ RINGING";
+    panel.hidden = false;
+    requestWake();
+    ensureAudio();                         // Chrome --app is launched with autoplay allowed
+    startAlarm(reason);
+    checkedEl.textContent = "Event ring — press STOP or SNOOZE. This window stays until you do.";
+    document.title = "🚨 E1 ALARM";
+  })();
 })();
 </script>
 </body>
