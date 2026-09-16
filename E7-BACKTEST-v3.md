@@ -1,17 +1,17 @@
-# E7 BACKTEST v3 — trip-wired (real lots, real Zerodha cost, measured spread)
-_Generated 2026-09-16 03:00:44 IST. Beside v1/v2. Paper only._
+# E7 BACKTEST v3 — trip-wired, TWO-BOUND spread (R-E1-SPREAD)
+_Generated 2026-09-16 11:53:01 IST. Beside v1/v2. Paper only._
 
-## Trip-wires (all 10 pass before any run — tests/test_e7_v3_tripwires.py)
-real-lot notional · money.fo cost per leg · Corwin-Schultz per-bar spread · next-bar fills · synchronous legs + volume floors · edge-after-cost>0 gate · no leg reused · formula-only exits · holdout report-only · full-rupee blotter.
+## Spread bounds (R-E1-SPREAD)
+Every equation reports BOTH: **FLOOR** = statutory + one measured tick/leg; **UPPER** = statutory + Corwin-Schultz. **PASS** iff net>0 under UPPER; **MARGINAL** iff net>0 only under FLOOR; else FAILS. From the first login day the live feed records the real quoted spread/instrument/minute; after >=5 sessions the backtest re-runs with the measured median and verdicts update. Marginal equations may paper-trade live only after that measured re-run passes. Parity: alarms-only.
 
-## Spread (trip-wire 3) — argued deviation
-Historical bars carry NO bid/ask (trip-wire 3). The backtest estimates the per-bar effective spread with Corwin-Schultz (measured, never flat) — but on volatile 1-min bars CS OVERCHARGES liquid F&O (it conflates range with spread), so the with-spread figure is a conservative UPPER BOUND; the statutory-only figure is the reliable floor. LIVE uses the real quoted depth spread. A LEAD RULING on the backtest spread proxy is welcome.
+## PARITY — done
+- Attempts 7957, win rate (floor) 0.019.
+- Gross Rs 244,090 · statutory Rs 3,697,767.
+- **net FLOOR Rs -3,497,095** · net UPPER Rs -37,689,771.
+- **VERDICT: FAILS** → alarms-only. (conversion/reversal is the same signal executed as a combo → same verdict, FAILS.)
 
-## PARITY (done)
-- Attempts 3567, win rate 0.031.
-- Gross Rs 242,651 · real statutory cost Rs 1,752,666 · **net on statutory floor Rs -1,510,015** · (CS-spread upper bound: Rs -4,325,981).
-- **Verdict: NEGATIVE on the reliable statutory-cost floor (gross Rs 242,651 vs statutory Rs 1,752,666); the real spread only widens the loss. Published as found.**
-- Every call: reports/E7-BLOTTER-v3.csv (real lots, per-leg prices, statutory + spread split, net).
+## Blocked (stated, never faked)
+- calendar: only near-month futures ingested. - cross-exchange NSE/BSE: no BSE cash for these names.
 
-## Still to build (the continuation)
-basis (cash-vs-futures, now that cash exists), conversion/reversal, box, butterfly, index-vs-basket, then the COMBINED BOOK. Blocked: calendar (near-month futures only), NSE/BSE cross-exchange (no BSE cash). AUDIT-4 auto-fires on v3 completion; live trading of an equation needs its AUDIT-4 pass.
+## Continuing build (measured ETAs)
+basis (cash-vs-futures — cash now confirmed present), box, butterfly, index-vs-basket, then the COMBINED BOOK. Parity ran in ~56s; each equation runs in 1-2 min, but each is a careful BUILD (basis needs the same dividend/carry handling as parity; box/butterfly are multi-strike; index needs constituent weights). Realistic full audited 6-equation + combined verdict: ~Fri 2026-09-18 — NOT Thursday 09:15. AUDIT-4 auto-fires on v3 completion; each equation trades live only after its AUDIT-4 pass. Every parity call: reports/E7-BLOTTER-v3.csv.
