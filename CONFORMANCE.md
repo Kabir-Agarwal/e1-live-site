@@ -25,6 +25,7 @@ designed, not built · **wall** = blocked by data or this laptop's compute (stat
 | Per-regime + per-direction scorecards folded into certification | — | **missing** — the re-scan produces patterns; scorecards not wired |
 | Three lights incl. real depth (moment) | `paper.three_lights` (moment fail-closed) | **partial** — real-depth moment is live-only |
 | Two-key gate (builder cert + AUDIT-2) | `gate.py` · test_gate (5) | **conforms** |
+| Post-fire netting (pattern-first; merge same stock+bucket into one strength-weighted order) | `desk.net_orders` · test_desk (single=byte-identical, several=one order + fewer fees) — paper §5.11 | **partial** — BUILT + tested; not yet in the live/backtest order path (stage 1) |
 
 ## E7 — arbitrage
 | Designed | Built now | Status |
