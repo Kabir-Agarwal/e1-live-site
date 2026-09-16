@@ -83,6 +83,13 @@
       it holds on. <b>Edge</b> is how many percentage points more often it happened than it normally does.
       <b>Final-exam hit rate</b> is how often the predicted outcome came true in that locked period.
       Tap a row to see the stocks.</p>
+    <details id="phenomena-323" style="margin-bottom:16px;border:1px solid #30363d;border-radius:10px;background:#0d1117;padding:8px 14px" hidden>
+      <summary style="cursor:pointer;font-weight:600"></summary>
+      <p class="sub" style="margin:.4em 0">The distinct behaviours found across the whole universe, in plain
+        words, sorted by breadth (how many stock×timeframe combinations they hold on). Simplified-build
+        numbers — not a verdict. Full list: <a href="E1-PHENOMENA-323.md">E1-PHENOMENA-323.md</a>.</p>
+      <div class="scroll"><table id="phen-table" class="grid"></table></div>
+    </details>
     <div class="filters">
       <input id="pat-q" type="search" placeholder="Search patterns…" aria-label="Search patterns">
       <select id="pat-sort" aria-label="Sort"><option value="breadth">Most widespread first</option><option value="edge">Biggest edge first</option><option value="hit">Highest hit rate first</option></select>
@@ -194,6 +201,28 @@
   <p class="muted" id="published"></p>
 </footer>
 <script src="app.js"></script>
+<script>
+/* R-E1-LIST-323: the full distinct-phenomena list on the PATTERNS tab. Self-contained; polls its own JSON. */
+(function () {
+  var wrap = document.getElementById("phenomena-323");
+  if (!wrap) return;
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  fetch("data/phenomena.json?cb=" + Date.now(), { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || !d.phenomena || !d.phenomena.length) { wrap.hidden = true; return; }
+      wrap.hidden = false;
+      wrap.querySelector("summary").textContent = "The " + d.count + " distinct phenomena (full list) ▸";
+      var head = "<tr><th>#</th><th>Phenomenon</th><th>Breadth</th><th>Median margin</th><th>Outcome</th></tr>";
+      var body = d.phenomena.map(function (p, i) {
+        return "<tr><td>" + (i + 1) + "</td><td>" + esc(p.sentence) + "</td><td>" + esc(p.breadth) +
+          "</td><td>" + esc(p.median_margin) + "</td><td>" + esc(p.outcome_type) + "</td></tr>";
+      }).join("");
+      document.getElementById("phen-table").innerHTML = head + body;
+    })
+    .catch(function () { wrap.hidden = true; });
+})();
+</script>
 <script>
 /* R-E1-ARB-DAY part 4: the LIVE tab leads with the E7-EXPERIMENT today. Self-contained; polls its own
    JSON and never interferes with app.js. */
