@@ -44,9 +44,13 @@
       <button class="snooze" data-min="15">Snooze 15m</button>
       <button class="snooze" data-min="30">Snooze 30m</button>
     </div>
-    <button id="test" class="muted snooze" style="margin-top:14px;flex:0 0 auto;">Test sound</button>
+    <div class="row" style="margin-top:14px;">
+      <button id="simstall" class="muted snooze">Simulate stall</button>
+      <button id="test" class="muted snooze">Test sound</button>
+    </div>
   </div>
 
+  <div id="checked" style="font-size:.82rem;color:#8aa0b6;margin-top:14px;min-height:1.2em"></div>
   <small id="hint"></small>
 
 <script>
@@ -59,13 +63,24 @@
   var armed = false, alarming = false, snoozeUntil = 0;
   var ackSummon = null, ackFinished = null, ackStaleStamp = null;
   var audio = null, beepTimer = null, wakeLock = null;
+  var lastHb = null;          // ms of the last heartbeat we read (updates every 60s poll)
+  var lastChecked = null;     // ms of the last successful poll (for "last checked HH:MM:SS")
+  var simStallSince = 0;      // when >0, pretend the heartbeat froze at this time (Simulate stall)
 
   var $ = function (id) { return document.getElementById(id); };
-  var statusEl = $("status"), reasonEl = $("reason"), panel = $("panel"), hint = $("hint");
+  var statusEl = $("status"), reasonEl = $("reason"), panel = $("panel"), hint = $("hint"),
+      checkedEl = $("checked");
 
   hint.textContent = "This page rings when the E1 machine stops sending progress for 6 minutes, "
-    + "when it needs you (🙋), or when a session finishes. Keep it open on a spare phone or tab. "
-    + "It also polls every 60s and keeps the screen awake.";
+    + "when it needs you (🙋), or when a session finishes. The counter ticks every second and it "
+    + "re-checks every 60s on its own — no refresh needed. Keep it open on a spare phone or tab; "
+    + "the screen stays awake. 'Simulate stall' proves the ring without waiting.";
+
+  function hhmmss(ms) {
+    var d = new Date(ms);
+    function z(n) { return (n < 10 ? "0" : "") + n; }
+    return z(d.getHours()) + ":" + z(d.getMinutes()) + ":" + z(d.getSeconds());
+  }
 
   function ensureAudio() {
     if (!audio) {
@@ -125,6 +140,17 @@
     return m + "m " + s + "s";
   }
 
+  var lastHbStamp = null;     // the heartbeat_ist string, for muting a handled stale until it advances
+
+  function effectiveAge(now) {
+    if (simStallSince) return now - simStallSince;      // Simulate stall: age grows from the fake freeze
+    return lastHb ? now - lastHb : null;
+  }
+  function curStaleStamp() {
+    return simStallSince ? ("SIM:" + simStallSince) : lastHbStamp;
+  }
+
+  // POLL (every 60s): fetch the heartbeat, update state, and ring on a NEW summon / session-finished.
   async function poll() {
     if (!armed) return;
     var hb;
@@ -133,51 +159,55 @@
       if (!r.ok) throw new Error("HTTP " + r.status);
       hb = await r.json();
     } catch (e) {
-      statusEl.innerHTML = '<span class="dot warn"></span>Cannot read the heartbeat file (' +
-        String(e.message || e) + "). Retrying…";
-      return;   // a transient fetch error is NOT a death signal — do not ring on it
+      checkedEl.textContent = "Last check FAILED at " + hhmmss(Date.now()) +
+        " (" + String(e.message || e) + ") — retrying in 60s.";
+      return;                 // a transient fetch error is NOT a death signal — do not ring on it
     }
-
-    var now = Date.now();
-    var hbTime = hb.heartbeat_ist ? Date.parse(hb.heartbeat_ist) : null;
-    var age = hbTime ? now - hbTime : null;
-
-    // decide triggers
+    lastChecked = Date.now();
+    if (hb.heartbeat_ist) { lastHb = Date.parse(hb.heartbeat_ist); lastHbStamp = hb.heartbeat_ist; }
     var reasons = [];
     if (hb.summon_ist && hb.summon_ist !== ackSummon) reasons.push("🙋 The machine needs you.");
     if (hb.session_finished_ist && hb.session_finished_ist !== ackFinished) reasons.push("✅ A session finished.");
-    var stale = (age !== null && age > STALE_MS && hb.heartbeat_ist !== ackStaleStamp);
-    if (stale) reasons.push("⏱ No progress for " + fmtAge(age) + " — the machine may be down.");
+    if (reasons.length && Date.now() >= snoozeUntil) startAlarm(reasons.join("  "));
+    render();
+  }
 
+  // RENDER (every 1s): tick the live "last progress" counter and ring the moment a stall crosses 6 min —
+  // no refresh, no waiting for the next poll.
+  function render() {
+    if (!armed) return;
+    var now = Date.now();
+    var age = effectiveAge(now);
     var snoozed = now < snoozeUntil;
-    if (reasons.length && !snoozed) {
-      startAlarm(reasons.join("  "));
+    var stale = (age !== null && age > STALE_MS && curStaleStamp() !== ackStaleStamp);
+    if (stale && !snoozed && !alarming) {
+      startAlarm("⏱ No progress for " + fmtAge(age) + " — the machine may be down."
+        + (simStallSince ? " (SIMULATED)" : ""));
     }
-
-    // status line (when not actively alarming)
     if (!alarming) {
       if (snoozed) {
-        statusEl.innerHTML = '<span class="dot warn"></span>Snoozed for ' +
-          fmtAge(snoozeUntil - now) + ". Armed and watching.";
+        statusEl.innerHTML = '<span class="dot warn"></span>Snoozed for ' + fmtAge(snoozeUntil - now) +
+          ". Armed and watching.";
       } else if (age === null) {
         statusEl.innerHTML = '<span class="dot idle"></span>Armed. Waiting for the first heartbeat…';
       } else {
         var cls = age > STALE_MS ? "bad" : (age > STALE_MS * 0.6 ? "warn" : "");
         statusEl.innerHTML = '<span class="dot ' + cls + '"></span>Armed. Last progress <span class="big">' +
-          fmtAge(age) + "</span> ago.";
+          fmtAge(age) + "</span> ago." + (simStallSince ? " <b>(simulating)</b>" : "");
       }
     }
+    checkedEl.textContent = (lastChecked ? "Last checked " + hhmmss(lastChecked) : "Not polled yet") +
+      " · polling every 60s · next tick every 1s";
   }
 
   function acknowledgeAll() {
-    // fetch-free ack from the last known status: re-read on next poll; here mark current DOM state seen
     return fetch(HEARTBEAT_URL + "?cb=" + Date.now(), { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : {}; })
       .catch(function () { return {}; })
       .then(function (hb) {
         ackSummon = hb.summon_ist || ackSummon;
         ackFinished = hb.session_finished_ist || ackFinished;
-        ackStaleStamp = hb.heartbeat_ist || ackStaleStamp;   // mute this stale stamp until it advances
+        ackStaleStamp = curStaleStamp();     // mute the current stale stamp until it advances
       });
   }
 
@@ -189,26 +219,38 @@
     ensureAudio();
     await requestWake();
     await acknowledgeAll();   // don't fire on events that already existed at arm time
-    poll();
-    setInterval(poll, POLL_MS);
+    await poll();
+    setInterval(poll, POLL_MS);   // re-poll every 60s WITHOUT a page refresh
+    setInterval(render, 1000);    // tick the counter + evaluate the stall every second
+    render();
   });
 
   $("stop").addEventListener("click", async function () {
     stopSound();
     snoozeUntil = 0;
-    await acknowledgeAll();   // this event is handled; mute until a NEW one appears
-    poll();
+    simStallSince = 0;            // clear a simulated stall on STOP
+    await acknowledgeAll();       // this event is handled; mute until a NEW one appears
+    render();
   });
 
   document.querySelectorAll(".snooze[data-min]").forEach(function (b) {
     b.addEventListener("click", function () {
       snoozeUntil = Date.now() + parseInt(b.dataset.min, 10) * 60000;
       stopSound();
-      poll();
+      render();
     });
   });
 
   $("test").addEventListener("click", function () { ensureAudio(); beepOnce(); });
+
+  // Simulate stall: pretend the heartbeat froze 6m 1s ago -> the 1s tick rings it EXACTLY as a real
+  // 6-minute stall would, proving the ring path without waiting. STOP clears it.
+  $("simstall").addEventListener("click", function () {
+    ensureAudio();
+    simStallSince = Date.now() - (STALE_MS + 1000);
+    ackStaleStamp = null;        // make sure this (new) stale stamp is not pre-muted
+    render();
+  });
 })();
 </script>
 </body>
