@@ -12,11 +12,11 @@ designed, not built · **wall** = blocked by data or this laptop's compute (stat
 ## E1 — equity patterns
 | Designed (paper + rulings) | Built now (file · test) | Status |
 |---|---|---|
-| Per-pattern horizons + exits | `money.TEMPLATES` (stop1_tgt1.5 / stop1_tgt2 / time5); blotter uses them | **partial** — fixed templates, not per-pattern horizons; 20/60-bar slow-wrapper not in the backtest path |
+| Per-pattern horizons + exits (holding = the pattern's OWN horizon) | `desk.holding_bars` (pattern's own horizon), `desk.is_intraday`, `desk.eod_carry_gate` · test_desk (R-E1-PATTERN-HORIZON) | **partial** — the rule is BUILT + tested; still to REPLACE the flat `money.TEMPLATES` holding in the backtest path (stage 1) |
 | Trailing stop | `desk.manage_stop` (trailing) · test_desk | **partial** — in desk.py, MANAGEMENT-UNTESTED, NOT in the backtest path |
 | Break-even move | `desk.manage_stop` · test_desk | **partial** — not in the backtest path |
 | Partial profit-taking | `desk.manage_stop` (partial) · test_desk | **partial** — not in the backtest path |
-| Overnight insurance (protective put) | `desk.carry_decision` · test_desk | **partial** — in desk.py, not in the backtest path |
+| Overnight insurance (protective put) + EOD carry gate (loss→close; profit+edge+affordable put→carry; intraday→bell) | `desk.eod_carry_gate` / `desk.carry_decision` · test_desk (R-E1-PATTERN-HORIZON) | **partial** — BUILT + tested; not yet in the backtest path |
 | Pattern-first sizing (fractional-Kelly capped by own drawdown) | `desk.position_risk_rupees` · test_desk | **partial** — built, not in the backtest path (backtest sizes 1R flat) |
 | Correlation-cluster sizing (trailing-250, weekly, cluster=one position) | — | **missing** (R-E1-THREE-ENGINE item 3, not built) |
 | PCA "one-bet" alarm | — | **missing** |
