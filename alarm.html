@@ -61,7 +61,7 @@
   var POLL_MS = 60 * 1000;          // poll every 60 s
 
   var armed = false, alarming = false, snoozeUntil = 0;
-  var ackSummon = null, ackFinished = null, ackStaleStamp = null;
+  var ackSummon = null, ackFinished = null, ackStaleStamp = null, ackFrozen = null;
   var audio = null, beepTimer = null, wakeLock = null;
   var lastHb = null;          // ms of the last heartbeat we read (updates every 60s poll)
   var lastChecked = null;     // ms of the last successful poll (for "last checked HH:MM:SS")
@@ -168,6 +168,9 @@
     var reasons = [];
     if (hb.summon_ist && hb.summon_ist !== ackSummon) reasons.push("🙋 The machine needs you.");
     if (hb.session_finished_ist && hb.session_finished_ist !== ackFinished) reasons.push("✅ A session finished.");
+    // R-E1-PROOF-OF-WORK: a frozen build (3 identical ⏱ counter+commit) rings like a stall.
+    if (hb.proof_frozen && hb.proof_signature && hb.proof_signature !== ackFrozen)
+      reasons.push("⏱ Progress FROZEN — same counter and commit 3× in a row.");
     if (reasons.length && Date.now() >= snoozeUntil) startAlarm(reasons.join("  "));
     render();
   }
@@ -207,6 +210,7 @@
       .then(function (hb) {
         ackSummon = hb.summon_ist || ackSummon;
         ackFinished = hb.session_finished_ist || ackFinished;
+        ackFrozen = hb.proof_signature || ackFrozen;   // mute this frozen signature until it changes
         ackStaleStamp = curStaleStamp();     // mute the current stale stamp until it advances
       });
   }
