@@ -78,3 +78,30 @@ Walls stated, not closed: all-NSE cash history (absent), minute-pair compute (th
 Only after the audit session stamps an engine **CONFORMS** does ONE full backtest run exactly as
 designed (every call, holdout report-only, costs-vs-market split, by regime) with an independent audit —
 those are the first verdicts. Until then, live is RECORD-ONLY.
+
+## The owner's eight acceptance criteria (R-E1-OWNER-CRITERIA — verbatim)
+
+**The audit session must tick EACH of these, with proof, before stamping ANY engine CONFORMS. No
+engine is CONFORMS — and no real verdict is published — until all eight are ticked for it.**
+
+1. built as designed, no improvisation;
+2. backtest with no peeking;
+3. slippage and fees calculated correctly, neither over- nor under-estimated;
+4. cost checked before every trade, trade only if it allows;
+5. live trade management: trailing stop, break-even, partial, protective-put carry, hedge-by-cause;
+6. measure the market and let it dictate (regime rulers + per-regime scorecards, data-measured thresholds);
+7. Sharpe and full stats;
+8. pattern accuracy vs base rate.
+
+| # | Criterion | Where it is proven / what still deviates (audit to tick) |
+|---|---|---|
+| 1 | Built as designed, no improvisation | The DESIGNED/BUILT/STATUS table above — every "partial"/"missing" is an open tick. |
+| 2 | Backtest with no peeking | Trip-wire 9 (holdout report-only) + point-in-time signals (poison test, AUDIT-3/4). |
+| 3 | Slippage + fees, neither over- nor under-estimated | money.fo_parity_roundtrip_cost (E7) vs Zerodha calculator (E7-COST-PROOF); E1/E4 still on the equity/fraction cost path — open. Spread = R-E1-SPREAD two bounds; measured-median re-run pending live. |
+| 4 | Cost checked before every trade | E7 cost gate proven per-attempt (E7-ARB-PROOF: 0/8,842 violate gap>cost). E1/E4 gate on the fo cost path — open. |
+| 5 | Live trade management (trailing/break-even/partial/put-carry/hedge-by-cause) | desk.py built (MANAGEMENT-UNTESTED) but NOT in the backtest path; hedge-by-cause MISSING — open. |
+| 6 | Measure the market and let it dictate | regime.py rulers CONFORM; per-regime + per-direction scorecards NOT wired — open. Thresholds data-measured (no naked numbers). |
+| 7 | Sharpe + full stats | stats_perf (Sharpe/Sortino/CAGR/DD/monthly/by-year) exists; must run on the as-designed backtest — open until that run. |
+| 8 | Pattern accuracy vs base rate | E1-ACCURACY-SPLIT computes it; the reliable per-pattern TEST hit-rate vs base rate lands with the re-scan certificate — open. |
+
+_Every row with an open tick is why no engine is CONFORMS yet. The audit session closes them with proof._
