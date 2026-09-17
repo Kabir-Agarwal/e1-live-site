@@ -37,7 +37,6 @@
   <p id="stale" class="notice warn" hidden></p>
 
   <section id="tab-live" class="panel" hidden>
-    <div id="e7-experiment" class="notice" style="border:1px solid #1f6feb;border-radius:10px;padding:10px 14px;margin-bottom:14px;background:#0d1117" hidden></div>
     <div id="live-closed" class="closed" hidden></div>
     <div id="live-kpis" class="kpis"></div>
     <h2>Three lights — what must be green before a paper trade</h2>
@@ -51,7 +50,6 @@
   </section>
 
   <section id="tab-portfolio" class="panel" hidden>
-    <div id="e7-experiment-pf" class="notice" style="border:1px solid #1f6feb;border-radius:10px;padding:10px 14px;margin-bottom:14px;background:#0d1117" hidden></div>
     <div id="pf-closed" class="closed" hidden></div>
     <div id="pf-kpis" class="kpis"></div>
     <h2>Equity curve — cumulative paper result, in R</h2>
@@ -115,21 +113,21 @@
   <section id="tab-how" class="panel" hidden>
     <div class="prose" style="border:1px solid #d29922;border-radius:10px;padding:12px 16px;margin-bottom:16px;background:#1a1206;">
       <p style="margin:.2em 0"><b>VERDICT RESET (16 Sep 2026, R-E1-CONFORMANCE).</b> Every engine result
-        published so far — E1 "−27.5%", the arbitrage "fails", options "negative" — is re-labelled a
+        published so far — E1 "−27.5%", options "negative" — is re-labelled a
         <b>verdict on a SIMPLIFIED build; the designed architecture is untested</b>. No verdict stands
         against an engine until an independent audit stamps its build <b>CONFORMS</b> and one full
         backtest runs exactly as designed. Live trading stays record-only until then. What is built vs
         what was designed, part by part: <a href="CONFORMANCE.md">CONFORMANCE.md</a>.</p>
     </div>
     <div class="prose" style="border:1px solid #30363d;border-radius:10px;padding:12px 16px;margin-bottom:16px;background:#0d1117;">
-      <p style="margin:.2em 0"><b>AUDIT-3 (hostile self-check, 15 Sep 2026).</b> The options (E4) and arbitrage (E7)
-        backtests were audited assuming they cheated. Findings, published as found:
+      <p style="margin:.2em 0"><b>AUDIT-3 (hostile self-check, 15 Sep 2026).</b> The options (E4)
+        backtest was audited assuming it cheated. Findings, published as found:
         signals are point-in-time and the runs are deterministic (grade A); but fills are same-bar and costs
         are not sourced from one place (grade D each), and the money-math tests catch only 43% of injected
-        errors. Both engines' results are <b>negative</b> and stay published un-retuned — the flaws all make
-        results look <i>better</i>, so the negatives are robust. E7's parity "gaps" are a model artifact
-        (dividend yield omitted), not real arbitrage. Full report:
-        <a href="AUDIT-3.md">AUDIT-3.md</a>.</p>
+        errors. The result is <b>negative</b> and stays published un-retuned — the flaws all make
+        results look <i>better</i>, so the negative is robust. Full report:
+        <a href="AUDIT-3.md">AUDIT-3.md</a>. (The arbitrage engine E7 was removed — see
+        <a href="E7-REMOVED.md">E7-REMOVED.md</a>.)</p>
     </div>
     <h2>How it works, in one picture</h2>
     <ol class="flow" aria-label="From data to paper trades">
@@ -221,46 +219,6 @@
       document.getElementById("phen-table").innerHTML = head + body;
     })
     .catch(function () { wrap.hidden = true; });
-})();
-</script>
-<script>
-/* R-E1-ARB-DAY part 4: the LIVE tab leads with the E7-EXPERIMENT today. Self-contained; polls its own
-   JSON and never interferes with app.js. */
-(function () {
-  var els = [document.getElementById("e7-experiment"), document.getElementById("e7-experiment-pf")].filter(Boolean);
-  if (!els.length) return;
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
-  function inr(n) { n = Number(n || 0); return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 }); }
-  function paint() {
-    fetch("data/e7_experiment.json?cb=" + Date.now(), { cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        if (!d) { els.forEach(function (e) { e.hidden = true; }); return; }
-        var alarmsOnly = d.quotes_absent;
-        var open = (d.open_positions || []);
-        var rows = open.map(function (o) {
-          return "&nbsp;&nbsp;• " + esc(o.underlying) + " " + esc(o.strike) +
-            " — at risk " + inr(o.r_at_risk) + ", mark " + inr(o.mtm_rupees);
-        }).join("<br>");
-        var html =
-          '<b>E7-EXPERIMENT</b> — <i>' + esc(d.banner || "experiment") + '</i><br>' +
-          (alarmsOnly ? 'Recording <b>alarms only</b> today — no live quote feed (broker login needed).<br>' : '') +
-          'Capital: ' + inr(d.start_capital) + ' → <b>' + inr(d.current_capital) + '</b>' +
-          ' · today ' + inr(d.pnl_rupees) + ' (' + esc((d.pnl_pct || 0)) + '%)<br>' +
-          'Exposure ' + inr(d.exposure_rupees) + ' (' + esc((d.exposure_pct || 0)) + '% of capital)' +
-          ' · cash free ' + inr(d.cash_free) + '<br>' +
-          'Alarms ' + esc(d.alarms || 0) + ' · attempts ' + esc(d.attempts || 0) +
-          ' · open ' + esc(d.open || 0) + ' · capturable yes/no ' +
-          esc(d.capturable_yes || 0) + '/' + esc(d.capturable_no || 0) +
-          (rows ? '<br>Open:<br>' + rows : '') +
-          ' &nbsp;<br><a href="E7-BACKTEST-v2.md">backtest v2</a> · ' +
-          '<a href="E7-BLOTTER-v2.csv">every call (CSV)</a> · <a href="E7-OFFICE.md">one-pager</a>';
-        els.forEach(function (e) { e.hidden = false; e.innerHTML = html; });
-      })
-      .catch(function () { els.forEach(function (e) { e.hidden = true; }); });
-  }
-  paint();
-  setInterval(paint, 60000);
 })();
 </script>
 </body>

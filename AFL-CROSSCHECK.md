@@ -13,9 +13,10 @@ line-by-line against an independent Python recomputation. **The two backtesters 
 
 ## Measured run time
 
-- DB build (COM quote injection, 114 series, 43,395 daily bars): **~5 min** (18:27:23 → 18:32:18 IST).
+- DB build (COM quote injection): indices + futures + NIFTY/BankNifty option series = **238 series, 46,997
+  daily bars**, with 217 dividend ex-date flags baked into OpenInt (~5–6 min).
 - Each AFL backtest + export: **seconds**.
-- Bar-count verification: **0 mismatches** across all 114 series (`reports/AFL-DB-VERIFY.csv`).
+- Bar-count verification: **0 mismatches** across all series (`reports/AFL-DB-VERIFY.csv`).
 
 ## 1. DATA — the separate database (verified, ready to import)
 
@@ -67,8 +68,8 @@ a Python recomputation of the identical rule on the same daily bars.
 |---|---|---|---|
 | **E10 GAP** (fade gap ≥ threshold, open→close, mid fill) | 461 trades exported | **Entry prices exact (max abs diff 0.0000)**; direction-adjusted gross move agrees to export rounding (**max 0.005%**); commission = **0.13% ≈ the 0.10% mid round-trip** designed. | **AGREE** (mechanics) |
 | **E1 same-stock** (MA-cross entry + required-move gate; MAE-stop / trailing exits) | 186 trades exported, exits tagged `(trail)` / `(max loss)` | **186 / 186 entries (100%)** match the Python MA-cross + required-move gate exactly. Exits run AmiBroker's **own** ApplyStop engine (an independent stop implementation — the point of the cross-check). | **AGREE** (entries; exits = independent stop engine) |
-| **E3 events** | not run this pass | Needs per-symbol event-date injection (StaticVar) into AFL before the run; wired in the harness, not executed this pass. | **NOT-RUN** (injection step) |
-| **Arbitrage parity** | not run this pass | Needs the option series imported into the DB (only indices + futures were injected); parity is a daily-close reproduction of the FAILS verdict, not a per-trade tie-out (Python uses minute bars). | **NOT-RUN** (option import) |
+| **E3 events** (dividend run-up t-6→t-1) | 61 trades exported | ex-dates baked into each future's OpenInt at bar-creation (editing existing bars does not persist via OLE — a real AmiBroker quirk found and worked around); **all 61 entries match** the Python recomputation (entry prices exact 0.0000, gross move to rounding max 0.005%). 61 of 211 signals taken (same 100%-equity one-position model as E10-GAP). | **AGREE** (mechanics) |
+| **Arbitrage parity** (NIFTY 24000 / 29SEP2026, daily) | 0 signals | option series imported into the DB; parity residual on 45 overlapping daily closes ranges [-141, +80] and never exceeds the ~292 round-trip cost, so **both AmiBroker and Python fire 0 arb trades** — an independent reproduction of the Python **FAILS** verdict (no arb after cost). Daily-close reproduction, not a minute per-trade tie-out. | **AGREE** (verdict) |
 | E4 options / cross-stock population | — | **NOT-EXPRESSIBLE** (BS IV inversion + HAR OLS; selection across 70,943 pairs) — see §2. | NOT-EXPRESSIBLE |
 
 **One documented DISAGREEMENT, explained (not smoothed):** the E10-GAP trade **count** differs — AmiBroker
@@ -83,8 +84,10 @@ converge; the mechanics verdict is unchanged.
 
 The Python backtester's **price/fill/fee arithmetic is not a self-consistent illusion** — a second,
 independently-authored engine (AmiBroker, its own AFL, its own stop engine) reproduces the same per-trade
-entries, moves and costs on the same data. The two families that are cleanly expressible (E10-GAP, E1
-architecture entries) **AGREE**; the rest are NOT-EXPRESSIBLE or NOT-RUN with the reason named, never
-smoothed. No number here was stated without an actual AmiBroker run.
+entries, moves and costs on the same data. **Four families now AGREE**: E10-GAP (exact), E1 architecture
+entries (186/186), E3 dividend events (61/61), and arbitrage parity (both find no arb after cost — the
+FAILS verdict reproduced). E4 options and the cross-stock population remain NOT-EXPRESSIBLE, with the
+reason named. Every count difference (AmiBroker's 100%-equity one-position model vs the Python all-signals
+reference) is documented, never smoothed. No number here was stated without an actual AmiBroker run.
 
 _RECORD-ONLY; orders HELD. Audit queued._
