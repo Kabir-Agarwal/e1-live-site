@@ -1,6 +1,6 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-18 04:16 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-18 04:30 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
@@ -13,5 +13,19 @@ _Generated 2026-09-18 04:16 IST. Each lane keeps a point-in-time store + manifes
 All lanes are recorder-fed and activate on the owner's Kite login. Currently RED (0 units): **E4 options, E7 arbitrage-tick, E12 cross-exchange, E13 microstructure** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
 
 Queued this run: **none**.
+
+## Graveyard diaries — failed strategies logged live vs flat (R-GRAVEYARD-DIARY)
+
+| Diary | live fires | live net-R (cross) | vs flat/fire | beats flat > noise? |
+|---|---|---|---|---|
+| e9-pairs | 0 | 0 | 0.0 | no |
+| slow-trend | 0 | 0 | 0.0 | no |
+| vol-sizing | 0 | 0 | 0.0 | no |
+| gap-fade | 0 | 0 | 0.0 | no |
+| shape-sweep-reverse | 0 | 0 | 0.0 | no |
+| shape-order-block | 0 | 0 | 0.0 | no |
+| shape-breakout-consolidation | 0 | 0 | 0.0 | no |
+
+_A diary is proposed for paper orders only when it beats flat live beyond noise AND passes a fresh walk-forward backtest. Detail: reports/GRAVEYARD-DIARY.md. Diaries fill on login._
 
 _RECORD-ONLY. The live book, roof, E10/E11 logs, season and expiry-week shadows are untouched._
