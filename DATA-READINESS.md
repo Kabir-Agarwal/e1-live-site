@@ -1,6 +1,6 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-18 10:51 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-18 10:54 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
@@ -28,6 +28,10 @@ Queued this run: **none**.
 | shape-sweep-reverse | 0 | 0 | 0.0 | no |
 | shape-order-block | 0 | 0 | 0.0 | no |
 | shape-breakout-consolidation | 0 | 0 | 0.0 | no |
+| breadth-ad-balance | 0 | 0 | 0.0 | no |
+| breadth-above-ma50 | 0 | 0 | 0.0 | no |
+| breadth-above-ma200 | 0 | 0 | 0.0 | no |
+| breadth-nh-nl | 0 | 0 | 0.0 | no |
 
 _A diary is proposed for paper orders only when it beats flat live beyond noise AND passes a fresh walk-forward backtest. Detail: reports/GRAVEYARD-DIARY.md. Diaries fill on login._
 
