@@ -1,6 +1,6 @@
 # ROOF — SCOREBOARD ONLY (R-SYSTEM-FINAL 4)
 
-_Generated 2026-09-18 10:25 IST. The roof SCORES the engines side by side; it does NO netting, NO order edits, NO capital splitting. RECORD-ONLY._
+_Generated 2026-09-18 10:26 IST. The roof SCORES the engines side by side; it does NO netting, NO order edits, NO capital splitting. RECORD-ONLY._
 
 ## Cumulative book vs each engine
 
