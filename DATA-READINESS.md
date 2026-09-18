@@ -1,6 +1,6 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-18 04:30 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-18 06:04 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
@@ -9,8 +9,11 @@ _Generated 2026-09-18 04:30 IST. Each lane keeps a point-in-time store + manifes
 | E12 cross-exchange | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `xchange` |
 | E13 microstructure | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `depth5` |
 | E14 retail positioning | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-17 | `e1_positioning_store` |
+| L14 public flows | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L14_public_flows` |
+| L15 macro & overnight | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L15_macro` |
+| L16 breadth | 🟢 green | 892 market-days hunted | 30 | 0.44 | reached | `reports` |
 
-All lanes are recorder-fed and activate on the owner's Kite login. Currently RED (0 units): **E4 options, E7 arbitrage-tick, E12 cross-exchange, E13 microstructure** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
+All lanes are recorder-fed and activate on the owner's Kite login. Currently RED (0 units): **E4 options, E7 arbitrage-tick, E12 cross-exchange, E13 microstructure, L14 public flows, L15 macro & overnight** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
 
 Queued this run: **none**.
 
