@@ -1,6 +1,6 @@
 # RESULTS — every engine, every variant (R-RESULTS-PAGE)
 
-_Generated 2026-09-19 17:15:31 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY; the live 20-day book is HELD._
+_Generated 2026-09-19 17:20:45 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY; the live 20-day book is HELD._
 
 | Engine | Test | Period | Calls | Win% / Acc% | Sharpe (mid/cross) | Sortino (mid/cross) | maxDD R (mid/cross) | Total R (mid/cross) | End cap mid (P/L) | End cap cross (P/L) | Fees | Blotter |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
