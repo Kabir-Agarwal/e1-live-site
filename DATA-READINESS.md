@@ -1,6 +1,6 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-20 20:17 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-20 20:22 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
@@ -15,7 +15,7 @@ _Generated 2026-09-20 20:17 IST. Each lane keeps a point-in-time store + manifes
 
 All lanes are recorder-fed and activate on the owner's Kite login. Currently RED (0 units): **E4 options, E7 arbitrage-tick, E12 cross-exchange, E13 microstructure, E14 retail positioning, L14 public flows, L15 macro & overnight** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
 
-Queued this run: **L16 breadth**.
+Queued this run: **none**.
 
 ## Graveyard diaries — failed strategies logged live vs flat (R-GRAVEYARD-DIARY)
 
