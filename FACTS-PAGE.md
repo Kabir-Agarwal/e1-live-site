@@ -1,6 +1,6 @@
 # E1 — THE 323 FACTS, live (R-E1-FACTS-PAGE)
 
-_Generated 2026-09-21 02:23:54 IST. Every distinct fact by family, routed DIRECTION → the E1 required-move book, SIZE → the E4 options log, GAP → scored only, each with its live fires, hits, misses and cost-gate status. Refreshed daily. Paper only, RECORD-ONLY._
+_Generated 2026-09-21 02:29:10 IST. Every distinct fact by family, routed DIRECTION → the E1 required-move book, SIZE → the E4 options log, GAP → scored only, each with its live fires, hits, misses and cost-gate status. Refreshed daily. Paper only, RECORD-ONLY._
 
 ## Live summary by route
 
