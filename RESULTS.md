@@ -1,6 +1,6 @@
 # RESULTS — every engine, every variant (R-RESULTS-PAGE)
 
-_Generated 2026-09-20 19:04:46 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY; the live 20-day book is HELD._
+_Generated 2026-09-20 19:10:02 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY; the live 20-day book is HELD._
 
 | Engine | Test | Period | Calls | Win% / Acc% | Sharpe (mid/cross) | Sortino (mid/cross) | maxDD R (mid/cross) | Total R (mid/cross) | End cap mid (P/L) | End cap cross (P/L) | Fees | Blotter |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -27,9 +27,5 @@ _Generated 2026-09-20 19:04:46 IST. Every number is COMPUTED FROM the linked blo
 | Roof | Combined signal copybook | 2026-01-12 → 2026-09-11 | 937 | 69.1% / — | mid 0.77 / cross 0.77 | mid 1.65 / cross 1.65 | mid -13.95 / cross -13.95 | mid 15.45 / cross 15.45 | ₹215,450 (+₹15,450, 7.72%) | ₹215,450 (+₹15,450, 7.72%) | — | `ROOF-COMBINED-LEDGER.csv` |
 | Index (NIFTY/BANKNIFTY fut) | Intraday-only, 1/5/15-min | 2026-07-10 → 2026-07-15 | 11 | 54.5% / 54.5% | mid -0.96 / cross -1.4 | mid -109.79 / cross -2.79 | mid -3.2 / cross -3.83 | mid -2.61 / cross -3.81 | ₹197,390 (₹-2,610, -1.31%) | ₹196,190 (₹-3,810, -1.91%) | ₹2,414 | `INDEX-INTRADAY-BLOTTER.csv` |
 | Index (NIFTY/BANKNIFTY fut) | Daily-hold, roll-aware | — | 0 | — | — | — | — | — | — | — | — | `INDEX-DAILY-BLOTTER.csv` |
-| Engine 1 sizing | Flat 1R (base) (single fill) | 2026-01-12 → 2026-09-11 | 937 | 69.1% / — | mid 0.77 / cross 0.77 | mid 1.65 / cross 1.65 | mid -46.1 / cross -46.1 | mid 15.45 / cross 15.45 | ₹215,450 (+₹15,450, 7.72%) | ₹215,450 (+₹15,450, 7.72%) | — | `SIZING-FLAT-BLOTTER.csv` |
-| Engine 1 sizing | 3-layer (pattern/book/account) (single fill) | 2026-01-12 → 2026-09-11 | 937 | 69.1% / — | mid -1.41 / cross -1.41 | mid -1.48 / cross -1.48 | mid -21.83 / cross -21.83 | mid -10.19 / cross -10.19 | ₹189,810 (₹-10,190, -5.1%) | ₹189,810 (₹-10,190, -5.1%) | — | `SIZING-3LAYER-BLOTTER.csv` |
-| Engine 17 state weighting | E17 normal (single fill) | 2026-01-12 → 2026-09-11 | 937 | 68.7% / — | mid 1.12 / cross 1.12 | mid 1.88 / cross 1.88 | mid -29.35 / cross -29.35 | mid 17.22 / cross 17.22 | ₹217,220 (+₹17,220, 8.61%) | ₹217,220 (+₹17,220, 8.61%) | — | `SIZING-E17-NORMAL-BLOTTER.csv` |
-| Engine 17 state weighting | E17 inverse (single fill) | 2026-01-12 → 2026-09-11 | 937 | 69.1% / — | mid 0.52 / cross 0.52 | mid 0.97 / cross 0.97 | mid -62.84 / cross -62.84 | mid 13.69 / cross 13.69 | ₹213,690 (+₹13,690, 6.84%) | ₹213,690 (+₹13,690, 6.84%) | — | `SIZING-E17-INVERSE-BLOTTER.csv` |
 
 _Starting capital every book: ₹200,000 (money.NOTIONAL_CAPITAL, stated). Ending capital = start + total_R × ₹1,000. A market-level ruler (breadth) is priced in return-fractions, not 1R, so its rupee columns are n/a — never estimated. Fees are shown only where the blotter records them. Every row's source blotter is named; open site/blotters/<key>.csv for every call. RECORD-ONLY._
