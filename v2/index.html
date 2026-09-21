@@ -16,7 +16,7 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
   font-family:'IBM Plex Mono';font-size:12.5px;color:var(--ink2);white-space:nowrap}
 main{max-width:1180px;margin:0 auto;padding:16px}
 h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
 .gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
@@ -27,37 +27,11 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
 .pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
-.updated{color:var(--ink3);font-size:12px;margin:6px 0}
-</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html' class='on'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Leaderboard</h1><div class='cards' id='top'></div><h2>The desk</h2><div class='panel'><div id='deskrow' class='sub'>loading…</div><div id='chart' style='margin-top:10px'></div></div><div class='grid2' style='margin-top:16px'><div><h2>Traders</h2><table id='board'><tr><th>Engine</th><th>Account</th><th>Return</th><th>P&L</th><th>Win rate</th><th>Trades</th><th>Status</th></tr></table><h2>Latest signals</h2><div id='signals' class='panel sub'>loading…</div></div><div><h2>Engine chat</h2><div class='panel chat' id='chat'>loading…</div></div></div></main><p class='updated' id='updated'>loading…</p><script>
-window.v2reload=function(){
- fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
-  var a=d.audit||{},p=d.portfolio||{},st=p.stats||{};
-  var allow=(a.mode||'').toLowerCase().indexOf('held')>=0?"NO":"YES";
-  $('top').innerHTML=
-   card('Desk value',rup(200000*3+(st.cum_rupees||0)))+
-   card('Today',(d.fires_today||0)+' signals seen')+
-   card('Trading allowed',allow+' \u2014 '+esc((a.mode||'').replace(/^HELD\s*\(?/i,'').replace(/\)$/,'')||'open'),allow=='YES'?'gain':'warn')+
-   card('Unrealised now',rup(st.exposure_R!=null?0:0));
-  $('deskrow').innerHTML='made '+fmtR(st.cum_R)+' \u00b7 max drawdown '+fmtR(st.max_drawdown_R)+' \u00b7 win rate '+(st.win_pct!=null?st.win_pct+'%':'\u2014')+' \u00b7 trades '+(st.closed||0);
-  var eng=d.engines||[];
-  $('board').innerHTML="<tr><th>Engine</th><th>Account</th><th>Return</th><th>P&L</th><th>Win rate</th><th>Trades</th><th>Status</th></tr>"+
-   eng.map(function(e){return "<tr class='click' onclick=\"location.href='engines.html'\"><td>"+esc(e.name)+"</td><td class='n'>"+rup(200000)+"</td><td>\u2014</td><td>\u2014</td><td>\u2014</td><td>0</td><td class='sub'>"+esc(e.state||'')+"</td></tr>";}).join('');
-  $('signals').innerHTML=(d.calls||[]).slice(0,8).map(function(c){return "<div class='m'>"+esc(c.when||c.date||'')+" \u2014 <b>"+esc(c.stock||'')+"</b> \u00b7 "+esc(c.sentence||c.pattern||'')+"</div>";}).join('')||'no signals today';
- }).catch(function(){});
- fetch('../data/messages.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
-  $('chat').innerHTML=(d.messages||[]).slice(0,40).map(function(m){return "<div class='m'>"+esc(m.text)+"</div>";}).join('')||'no messages yet';
- }).catch(function(){});
-};
-function card(k,v,cls){return "<div class='card'><div class='k'>"+esc(k)+"</div><div class='big "+(cls||'')+"'>"+v+"</div></div>";}
-function fmtR(x){if(x==null||isNaN(x))return '\u2014';return (x>=0?'+':'')+Number(x).toFixed(1)+' R';}
-window.v2reload();
-</script><script>
-var $=function(i){return document.getElementById(i)};
-function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
-function rup(x){if(x==null||isNaN(x))return '\u2014';var s=x<0?'-':'';var n=Math.abs(Math.round(x)).toString();
- if(n.length>3){var h=n.slice(0,-3),t=n.slice(-3),p=[];while(h.length>2){p.unshift(h.slice(-2));h=h.slice(0,-2);}if(h)p.unshift(h);n=p.join(',')+','+t;}return '\u20b9'+s+n}
-function loadTick(){fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
- var t=(d.tape||[]).map(function(x){var c=(x.change||0)>=0?'gain':'loss';return "<span>"+esc(x.stock||x.symbol||'')+" <b class='"+c+"'>"+esc(x.last||x.ltp||'')+"</b> "+esc((x.change_pct!=null?(x.change_pct+'%'):''))+"</span>";}).join('');
- if(t)$('tick').innerHTML=t; if($('updated'))$('updated').textContent='last updated '+new Date(d.published||Date.now()).toLocaleString()+' \u00b7 refreshes every 2 minutes';}).catch(function(){})}
-loadTick();setInterval(function(){loadTick();if(window.v2reload)window.v2reload();},120000);
-</script></body></html>
+.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.tabs button.on{background:var(--card);color:var(--ink)}
+.tabpane{display:none}.tabpane.on{display:block}
+.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
+</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html' class='on'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick'><span>DABUR <b class='gain'>388.1</b> +3.22%</span><span>HINDUNILVR <b class='gain'>1951.0</b> +0.83%</span><span>JSWENERGY <b class='loss'>516.05</b> -1.67%</span><span>BDL <b class='loss'>1174.5</b> -1.30%</span><span>SHREECEM <b class='loss'>22520.0</b> -0.40%</span></div><main><h1>Leaderboard</h1><div class='cards'><div class='card'><div class='k'>Desk value</div><div class='big '>₹6,00,000</div></div><div class='card'><div class='k'>Signals seen today</div><div class='big '>0</div></div><div class='card'><div class='k'>Trading allowed</div><div class='big gain'>YES</div></div><div class='card'><div class='k'>Made so far</div><div class='big gain'>+0.0 R</div></div></div><div class='grid2' style='margin-top:16px'><div><h2>Traders</h2><table><thead><tr><th>Engine</th><th>Account</th><th>Status</th></tr></thead><tbody><tr><td>E1</td><td class='n'>₹2,00,000</td><td class='sub'>Live, paper only</td></tr><tr><td>E10</td><td class='n'>₹2,00,000</td><td class='sub'>paper only</td></tr><tr><td>E11</td><td class='n'>₹2,00,000</td><td class='sub'>paper only</td></tr></tbody></table><h2>Latest signals</h2><div class='panel'><div class='m'>Filled 2026-09-21 &mdash; <b>DABUR</b> · DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</div><div class='m'>Filled 2026-09-21 &mdash; <b>HINDUNILVR</b> · HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</div><div class='m'>Filled 2026-09-21 &mdash; <b>JSWENERGY</b> · JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.</div><div class='m'>Filled 2026-09-21 &mdash; <b>BDL</b> · BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.</div><div class='m'>Filled 2026-09-21 &mdash; <b>SHREECEM</b> · SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.</div></div></div><div><h2>Engine chat</h2><div class='panel chat'><div class='m'>[CODE] session finished — come back</div><div class='m'>🙋 [E1] Engine deep-dive — the E1 page is live for your review (give it a minute to refresh): https://kabir-agarwal.github.io/e1-live-site/engine-e1.html  It has: the one-line job + account + open trades; the pattern score cards (cases, win rate, confidence-adjusted win rate, avg move after costs, stage); the validation funnel with plain-word captions (found → sealed exam → walk-forward → luck correction → certified → live paper); and the calls + Download-Excel. The 210-stock × every-metric GRID (section 2) and the stock drill-down/timeline are placeheld — say yes and I wire the grid.</div><div class='m'>[CODE] session finished — come back</div><div class='m'>🙋 [E1] Three new tabs are live on the main site (give the page a minute to refresh): Deliverables — https://kabir-agarwal.github.io/e1-live-site/#deliverables (Requested line, index-test sentences, calls table, Download Excel). Messages — https://kabir-agarwal.github.io/e1-live-site/#messages (every desk message, newest first, 30 days, search by stock). Recording — https://kabir-agarwal.github.io/e1-live-site/#recording (every data lane from disk: status today, rows today, last time, 30-day green/red strip; red = missed today).</div></div></div></div></main><p class='updated'>last updated 2026-09-22T01:50:37.218173+05:30 · the tape refreshes every 2 minutes</p><script>function refreshTick(){fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&&d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)>=0?'gain':'loss';var ch=s.change_pct!=null?((s.change_pct>=0?'+':'')+s.change_pct+'%'):'';return "<span>"+s.stock+" <b class='"+c+"'>"+s.last+"</b> "+ch+"</span>";}).join('');var el=document.querySelector('.tick');if(el&&h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll('[data-g="'+g+'"]');ps.forEach(function(p,j){p.classList.toggle('on',j==i);});var bs=document.querySelectorAll('[data-tb="'+g+'"]');bs.forEach(function(b,j){b.classList.toggle('on',j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||'').toUpperCase();document.querySelectorAll('#'+tid+' tbody tr').forEach(function(r){r.style.display=r.getAttribute('data-k').indexOf(q)>=0?'':'none';});}</script></body></html>
