@@ -35,7 +35,7 @@
   }
 
   /* ---------------- tabs ---------------- */
-  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines"];
+  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines", "results", "deliverables"];
   function show(tab) {
     if (TABS.indexOf(tab) < 0) tab = "live";
     S.tab = tab;
@@ -45,6 +45,11 @@
     if (tab === "patterns" && !S.patterns) loadPatterns();
     if (tab === "screener" && !S.screener) loadScreener();
     if (tab === "backtest" && !S.backtest) loadBacktest();
+    if (tab === "deliverables") {                       // graceful state if the generator has not filled it yet
+      var d = $("tab-deliverables");
+      if (d && d.innerHTML.indexOf("__DELIVERABLES__") >= 0)
+        d.innerHTML = "<p class='sub'>Deliverables is refreshing — open the <a href='results.html'>results page</a> meanwhile.</p>";
+    }
   }
   document.querySelectorAll(".tabs button").forEach(function (b) {
     b.addEventListener("click", function () { location.hash = b.dataset.tab; }); });
