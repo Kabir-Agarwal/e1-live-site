@@ -1,0 +1,40 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Ask the desk — E1 desk</title><link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap' rel='stylesheet'><style>
+:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
+  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.5}
+.num,td.n,.big{font-family:'IBM Plex Mono',ui-monospace,monospace}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+  background:#0c0e12;position:sticky;top:0;z-index:5}
+.nav .logo{font-family:'IBM Plex Mono';font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
+  padding:2px 8px;margin-right:8px}
+.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
+.nav a.on{background:var(--card);color:var(--ink)}
+.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
+.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
+  font-family:'IBM Plex Mono';font-size:12.5px;color:var(--ink2);white-space:nowrap}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
+.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
+tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
+.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
+.updated{color:var(--ink3);font-size:12px;margin:6px 0}
+</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Ask the desk</h1><p class='sub'>Ask the desk a question — the existing box, restyled.</p><div class='panel'>This section is being rebuilt to the new design; the data is already live on the current desk while the v2 layout lands. <a href='../index.html#ask'>Open it on the current desk →</a></div></main><p class='updated' id='updated'>loading…</p><script>
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function rup(x){if(x==null||isNaN(x))return '\u2014';var s=x<0?'-':'';var n=Math.abs(Math.round(x)).toString();
+ if(n.length>3){var h=n.slice(0,-3),t=n.slice(-3),p=[];while(h.length>2){p.unshift(h.slice(-2));h=h.slice(0,-2);}if(h)p.unshift(h);n=p.join(',')+','+t;}return '\u20b9'+s+n}
+function loadTick(){fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
+ var t=(d.tape||[]).map(function(x){var c=(x.change||0)>=0?'gain':'loss';return "<span>"+esc(x.stock||x.symbol||'')+" <b class='"+c+"'>"+esc(x.last||x.ltp||'')+"</b> "+esc((x.change_pct!=null?(x.change_pct+'%'):''))+"</span>";}).join('');
+ if(t)$('tick').innerHTML=t; if($('updated'))$('updated').textContent='last updated '+new Date(d.published||Date.now()).toLocaleString()+' \u00b7 refreshes every 2 minutes';}).catch(function(){})}
+loadTick();setInterval(function(){loadTick();if(window.v2reload)window.v2reload();},120000);
+</script></body></html>
