@@ -35,7 +35,7 @@
   }
 
   /* ---------------- tabs ---------------- */
-  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines", "results", "deliverables"];
+  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines", "results", "deliverables", "messages"];
   function show(tab) {
     if (TABS.indexOf(tab) < 0) tab = "live";
     S.tab = tab;
@@ -50,6 +50,26 @@
       if (d && d.innerHTML.indexOf("__DELIVERABLES__") >= 0)
         d.innerHTML = "<p class='sub'>Deliverables is refreshing — open the <a href='results.html'>results page</a> meanwhile.</p>";
     }
+    if (tab === "messages" && !S.messages) loadMessages();
+  }
+
+  /* ---------------- messages (amendment 3): the desk's sent messages, newest-first, searchable ---------- */
+  function msgTs(ts) { try { return new Date(ts).toLocaleString("en-GB"); } catch (e) { return ts; } }
+  function renderMessages() {
+    var q = (($("msg-q") && $("msg-q").value) || "").trim().toLowerCase();
+    var rows = (S.messages || []).filter(function (m) { return !q || (m.text || "").toLowerCase().indexOf(q) >= 0; });
+    $("messages").innerHTML = rows.length
+      ? rows.map(function (m) {
+          return "<div style='padding:6px 0;border-bottom:1px solid #e3e6ea;font-size:13px'>" +
+                 "<span style='color:#5c6672'>" + esc(msgTs(m.ts)) + "</span> — " + esc(m.text) + "</div>"; }).join("")
+      : "<p class='sub'>No messages" + (q ? " match “" + esc(q) + "”." : " in the last 30 days.") + "</p>";
+  }
+  function loadMessages() {
+    fetch("data/messages.json?_=" + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
+      S.messages = (d && d.messages) || [];
+      renderMessages();
+      var box = $("msg-q"); if (box && !box._wired) { box._wired = true; box.addEventListener("input", renderMessages); }
+    }).catch(function () { $("messages").innerHTML = "<p class='sub'>Could not load messages.</p>"; });
   }
   document.querySelectorAll(".tabs button").forEach(function (b) {
     b.addEventListener("click", function () { location.hash = b.dataset.tab; }); });
