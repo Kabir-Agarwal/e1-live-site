@@ -28,7 +28,17 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
 .chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
 .pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
 .updated{color:var(--ink3);font-size:12px;margin:6px 0}
-</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html' class='on'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Data</h1><p class='sub'>What the desk is recording right now, and how much came in today. Green means it recorded today; amber means nothing yet.</p><div id='lanes'>loading…</div></main><p class='updated' id='updated'>loading…</p><script>window.v2reload=function(){
+</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html' class='on'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Data</h1><p class='sub'>What the desk is recording right now, and how much came in today. Green means it recorded today; amber means nothing yet.</p><div id='lanes'>loading…</div><h2>Live diaries</h2><p class='sub'>Every fixed-rule engine runs its rule live from day one — scored daily on real prices, after real costs, no real money. A diary is promoted to a paper account only after it earns a margin and the owner says so.</p><div id='diaries'>loading…</div></main><p class='updated' id='updated'>loading…</p><script>window.v2reload=function(){
+ fetch('../data/diaries.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
+  $('diaries').innerHTML=(d.diaries||[]).map(function(x){var t=x.totals||{};var v=x.verdict||{};
+   return "<div class='panel' style='margin:10px 0'><div style='display:flex;gap:10px;align-items:baseline'>"+
+    "<b>"+esc(x.engine)+"</b><span class='pill'>diary: day "+esc(x.day)+"</span>"+
+    "<span class='sub' style='margin-left:auto'>"+esc(t.trades||0)+" trades \u00b7 "+
+    ((t.net_R!=null?(t.net_R>=0?'+':'')+t.net_R+' R':'\u2014'))+"</span></div>"+
+    "<p class='sub' style='margin:6px 0 0'>"+esc(x.rule||'')+"</p>"+
+    "<p class='sub' style='margin:4px 0 0'>"+esc(v.state=='gathering'?('gathering evidence — '+(v.trades||0)+' of '+(v.need_trades||0)+' trades'):(v.state||''))+"</p></div>";
+  }).join('')||'no diaries yet';
+ }).catch(function(){});
  fetch('../data/recording.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
   $('lanes').innerHTML=(d.lanes||[]).map(function(l){
    var on=String(l.status||'').toLowerCase().indexOf('recorded')>=0||String(l.status||'').toLowerCase().indexOf('recording')>=0;
