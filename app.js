@@ -55,51 +55,80 @@
   }
 
   /* ---------------- recording (amendment 4): every data lane, from disk, 30-day history --------------- */
+  function recStatusColor(L) {
+    if ((L.status || "").indexOf("Recording now") === 0) return "#137a3f";
+    if (L.nothing_today) return "#b23b3b";
+    return "#a86800";
+  }
   function loadRecording() {
     fetch("data/recording.json?_=" + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
       S.recording = d || {};
       var today = d.today || "";
-      // build the last-30-days date list so a MISSING day (no manifest row) shows red too
       var days = [], t = new Date(today + "T00:00:00");
-      for (var i = 29; i >= 0; i--) { var x = new Date(t); x.setDate(t.getDate() - i);
-        days.push(x.toISOString().slice(0, 10)); }
-      var head = "<tr><th>Lane</th><th>Status</th><th>Rows today</th><th>Last time</th><th>Covers</th>" +
-                 "<th>Last 30 days</th></tr>";
-      var body = (d.lanes || []).map(function (L) {
+      for (var i = 29; i >= 0; i--) { var x = new Date(t); x.setDate(t.getDate() - i); days.push(x.toISOString().slice(0, 10)); }
+      var lanes = d.lanes || [];
+      var head = "<tr><th>Lane</th><th>Status</th><th>Rows today</th><th>Last time</th><th>Covers</th><th>Last 30 days</th></tr>";
+      var body = lanes.map(function (L, i) {
         var byday = {}; (L.history || []).forEach(function (h) { byday[h.date] = h.rows; });
-        var strip = days.map(function (dd) {
-          var has = byday[dd] > 0;
+        var strip = days.map(function (dd) { var has = byday[dd] > 0;
           return "<span title='" + esc(dd) + (has ? (": " + byday[dd] + " rows") : ": none") +
-                 "' style='display:inline-block;width:6px;height:12px;margin-right:1px;background:" +
-                 (has ? "#137a3f" : "#e0b0b0") + "'></span>"; }).join("");
-        var stCol = L.status === "RECORDING" ? "#137a3f" : (L.nothing_today ? "#b23b3b" : "#a86800");
-        return "<tr" + (L.nothing_today ? " style='background:#fdf0f0'" : "") + ">" +
-               "<td>" + esc(L.lane) + "</td>" +
-               "<td style='color:" + stCol + ";font-weight:600'>" + esc(L.status) + "</td>" +
+                 "' style='display:inline-block;width:6px;height:12px;margin-right:1px;background:" + (has ? "#137a3f" : "#e0b0b0") + "'></span>"; }).join("");
+        var lane = "<tr class='rec-lane' data-i='" + i + "' style='cursor:pointer" + (L.nothing_today ? ";background:#fdf0f0" : "") + "'>" +
+               "<td>" + esc(L.lane) + " ▾</td>" +
+               "<td style='color:" + recStatusColor(L) + ";font-weight:600'>" + esc(L.status) + "</td>" +
                "<td>" + (L.rows_today || 0).toLocaleString() + "</td>" +
                "<td style='color:#5c6672;font-size:12px'>" + esc((L.last_ts || "—").slice(0, 19).replace("T", " ")) + "</td>" +
                "<td>" + esc(L.coverage || "—") + "</td>" +
-               "<td>" + strip + "</td></tr>"; }).join("");
+               "<td>" + strip + "</td></tr>";
+        var detail = "<tr class='rec-detail' data-d='" + i + "' hidden><td colspan='6' style='background:#f6f7f9'>" +
+               "<div style='padding:6px 4px'><b>Today:</b> " + (L.rows_today || 0).toLocaleString() + " rows" +
+               (L.snapshots_today ? (", " + L.snapshots_today.toLocaleString() + " snapshots") : "") +
+               ", last time " + esc((L.last_ts || "—").slice(11, 19) || "—") + ", covers " + esc(L.coverage || "—") +
+               ".<div style='margin-top:6px;font-size:12px'>Per-day (newest last): " +
+               (L.history || []).slice().reverse().map(function (h) {
+                 return "<div>" + esc(h.date) + " — " + (h.rows || 0).toLocaleString() + " rows" +
+                        (h.snapshots ? (", " + h.snapshots.toLocaleString() + " snapshots") : "") + "</div>"; }).join("") +
+               "</div></div></td></tr>";
+        return lane + detail; }).join("");
       $("recording").innerHTML = "<table class='grid' style='font-size:13px'>" + head + body + "</table>";
+      document.querySelectorAll("#recording .rec-lane").forEach(function (row) {
+        row.addEventListener("click", function () {
+          var det = document.querySelector("#recording .rec-detail[data-d='" + row.dataset.i + "']");
+          if (det) det.hidden = !det.hidden; }); });
     }).catch(function () { $("recording").innerHTML = "<p class='sub'>Could not load the recording status.</p>"; });
   }
 
   /* ---------------- messages (amendment 3): the desk's sent messages, newest-first, searchable ---------- */
   function msgTs(ts) { try { return new Date(ts).toLocaleString("en-GB"); } catch (e) { return ts; } }
+  function msgEngine(text) {                             // the engine tag notify() carries: [E1]/[E10]/[E11]
+    var t = text || "";
+    if (t.indexOf("[E10]") >= 0) return "E10";
+    if (t.indexOf("[E11]") >= 0) return "E11";
+    if (t.indexOf("[E1]") >= 0) return "E1";
+    return "Desk";                                       // everything else (roof/code/other)
+  }
   function renderMessages() {
     var q = (($("msg-q") && $("msg-q").value) || "").trim().toLowerCase();
-    var rows = (S.messages || []).filter(function (m) { return !q || (m.text || "").toLowerCase().indexOf(q) >= 0; });
+    var eng = S.msgEng || "all";
+    var rows = (S.messages || []).filter(function (m) {
+      return (!q || (m.text || "").toLowerCase().indexOf(q) >= 0) && (eng === "all" || msgEngine(m.text) === eng); });
     $("messages").innerHTML = rows.length
       ? rows.map(function (m) {
-          return "<div style='padding:6px 0;border-bottom:1px solid #e3e6ea;font-size:13px'>" +
+          return "<div style='padding:6px 0;border-bottom:1px solid #e3e6ea;font-size:13px;word-break:break-word;" +
+                 "overflow-wrap:anywhere;white-space:pre-wrap'>" +
                  "<span style='color:#5c6672'>" + esc(msgTs(m.ts)) + "</span> — " + esc(m.text) + "</div>"; }).join("")
-      : "<p class='sub'>No messages" + (q ? " match “" + esc(q) + "”." : " in the last 30 days.") + "</p>";
+      : "<p class='sub'>No messages" + (q || eng !== "all" ? " match this filter." : " in the last 30 days.") + "</p>";
   }
   function loadMessages() {
     fetch("data/messages.json?_=" + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
-      S.messages = (d && d.messages) || [];
+      S.messages = (d && d.messages) || []; if (!S.msgEng) S.msgEng = "all";
       renderMessages();
       var box = $("msg-q"); if (box && !box._wired) { box._wired = true; box.addEventListener("input", renderMessages); }
+      var bar = $("msg-eng"); if (bar && !bar._wired) { bar._wired = true;
+        bar.querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () {
+          S.msgEng = b.dataset.eng;
+          bar.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+          renderMessages(); }); }); }
     }).catch(function () { $("messages").innerHTML = "<p class='sub'>Could not load messages.</p>"; });
   }
   document.querySelectorAll(".tabs button").forEach(function (b) {
