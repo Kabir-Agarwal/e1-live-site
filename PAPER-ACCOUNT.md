@@ -4,13 +4,16 @@ _Each account starts at ₹2,00,000, set once on 2026-09-21; 1R = ₹1,000. Equi
 
 ## Every account, current equity
 
+- **E1:** ₹2,00,000
+- **E10:** ₹2,00,000
+- **E11:** ₹2,00,000
 - **E1-FLAT:** ₹2,00,000
 - **E1-ADAPTIVE:** ₹2,00,000
-- **desk:** ₹2,00,000
+- **desk:** ₹6,00,000
 
 ## Desk
 
-- **Current equity:** ₹2,00,000
+- **Current equity:** ₹6,00,000
 - **Realised P&L (all time):** ₹0
 - **Open positions:** 0 (risk deployed ₹0)
 - **Trades settled:** 0 · win rate —
