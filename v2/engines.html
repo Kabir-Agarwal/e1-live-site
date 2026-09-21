@@ -28,7 +28,20 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
 .chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
 .pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
 .updated{color:var(--ink3);font-size:12px;margin:6px 0}
-</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html' class='on'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Engines</h1><p class='sub'>Every engine in order with its stage, the pattern funnel, and a click-through to each engine's page.</p><div class='panel'>This section is being rebuilt to the new design; the data is already live on the current desk while the v2 layout lands. <a href='../index.html#engines'>Open it on the current desk →</a></div></main><p class='updated' id='updated'>loading…</p><script>
+</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html' class='on'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Engines</h1><p class='sub'>Each engine is a separate trader with its own account. Where it is now, what it does, and how many ideas made it through the exam. Click one to open its page.</p><div id='engines'>loading…</div></main><p class='updated' id='updated'>loading…</p><script>window.v2reload=function(){
+ fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
+  var eng=d.engines||[];
+  $('engines').innerHTML=eng.map(function(e){
+   var cov=(e.coverage||[]).map(function(c){return "<li>"+esc(c)+"</li>";}).join('');
+   var nm=esc(e.name);var q=encodeURIComponent(e.name);
+   return "<div class='panel' style='margin:12px 0'><div style='display:flex;align-items:baseline;gap:10px'>"+
+    "<a href='engine.html?e="+q+"' style='font-size:16px;font-weight:600'>"+nm+"</a>"+
+    "<span class='pill'>"+esc(e.state||'')+"</span></div>"+
+    "<p class='sub' style='margin:6px 0'>"+esc(e.does||'')+"</p>"+
+    (e.waiting_for?"<p class='sub'>Waiting for: "+esc(e.waiting_for)+"</p>":"")+
+    "<ul class='sub' style='margin:6px 0 0'>"+cov+"</ul></div>";
+  }).join('')||'no engines';
+ }).catch(function(){});};window.v2reload();</script><script>
 var $=function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
 function rup(x){if(x==null||isNaN(x))return '\u2014';var s=x<0?'-':'';var n=Math.abs(Math.round(x)).toString();

@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Results — E1 desk</title><link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap' rel='stylesheet'><style>
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Engine — E1 desk</title><link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap' rel='stylesheet'><style>
 :root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
   --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
 *{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
@@ -28,14 +28,15 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
 .chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
 .pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
 .updated{color:var(--ink3);font-size:12px;margin:6px 0}
-</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html' class='on'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><h1>Results</h1><p class='sub'>What the desk has measured so far, after costs. Paper and history only.</p><div class='panel' id='sum'>loading…</div><h2>By book</h2><table id='books'><tr><th>Book</th><th>Trades</th><th>After costs</th></tr></table><h2>The execution reality test</h2><div class='panel'><p style='margin:0 0 6px'>The certified book re-run as if it had to cross a real order book — measured spread, market impact and fees on every trade.</p><p style='margin:0'><a href='../execution-checklist.xlsx' download>Download the execution workbook →</a> · <a href='../results.html#execution-checklist'>Read the plain summary →</a></p></div></main><p class='updated' id='updated'>loading…</p><script>window.v2reload=function(){
- fetch('../data/backtest.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
-  var s=d.summary||{};var perf=d.performance||{};
-  $('sum').innerHTML="<p style='margin:0'>"+esc(d.digest||'The full backtest, after costs.')+"</p>";
-  var bb=d.by_book||{};var rows=Object.keys(bb).map(function(k){var b=bb[k]||{};
-   return "<tr><td>"+esc(k)+"</td><td class='n'>"+esc(b.trades!=null?b.trades:'\u2014')+"</td><td class='n'>"+
-    esc(b.net_R!=null?b.net_R+' R':(b.total_R!=null?b.total_R+' R':'\u2014'))+"</td></tr>";}).join('');
-  if(rows)$('books').innerHTML="<tr><th>Book</th><th>Trades</th><th>After costs</th></tr>"+rows;
+</style></head><body><div class='nav'><span class='logo'>E1</span><a href='index.html'>Leaderboard</a><a href='engines.html' class='on'>Engines</a><a href='stocks.html'>Stocks</a><a href='patterns.html'>Patterns</a><a href='deliverables.html'>Deliverables</a><a href='data.html'>Data</a><a href='results.html'>Results</a><a href='how.html'>How it works</a><a class='ask' href='ask.html'>Ask the desk</a></div><div class='tick' id='tick'>loading prices…</div><main><p class='sub'><a href='engines.html'>← all engines</a></p><h1 id='enm'>loading…</h1><span class='pill' id='est'></span><p class='sub' id='edoes'></p><p class='sub' id='ewait'></p><h2>The funnel — how many ideas got through</h2><ul class='sub' id='ecov'></ul><h2>Signals this engine has made</h2><div class='panel sub' id='ecalls'>loading…</div></main><p class='updated' id='updated'>loading…</p><script>window.v2reload=function(){
+ var q=new URLSearchParams(location.search).get('e')||'';
+ fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()}).then(function(d){
+  var e=(d.engines||[]).filter(function(x){return x.name==q;})[0]||(d.engines||[])[0]||{};
+  $('enm').textContent=e.name||'engine';$('est').textContent=e.state||'';
+  $('edoes').textContent=e.does||'';$('ewait').textContent=e.waiting_for?('Waiting for: '+e.waiting_for):'';
+  $('ecov').innerHTML=(e.coverage||[]).map(function(c){return "<li>"+esc(c)+"</li>";}).join('')||'<li>—</li>';
+  var mine=(d.calls||[]).filter(function(c){return !e.name||String(c.engine||'').indexOf(String(e.name).split(' ')[0])>=0;});
+  $('ecalls').innerHTML=mine.slice(0,40).map(function(c){return "<div class='m'>"+esc(c.when||c.date||'')+" — <b>"+esc(c.stock||'')+"</b> · "+esc(c.sentence||c.pattern||'')+"</div>";}).join('')||'no signals yet';
  }).catch(function(){});};window.v2reload();</script><script>
 var $=function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
