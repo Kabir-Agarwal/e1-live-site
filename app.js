@@ -35,7 +35,7 @@
   }
 
   /* ---------------- tabs ---------------- */
-  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines", "results", "deliverables", "messages"];
+  var TABS = ["live", "portfolio", "screener", "patterns", "backtest", "how", "engines", "results", "deliverables", "messages", "recording"];
   function show(tab) {
     if (TABS.indexOf(tab) < 0) tab = "live";
     S.tab = tab;
@@ -51,6 +51,37 @@
         d.innerHTML = "<p class='sub'>Deliverables is refreshing — open the <a href='results.html'>results page</a> meanwhile.</p>";
     }
     if (tab === "messages" && !S.messages) loadMessages();
+    if (tab === "recording" && !S.recording) loadRecording();
+  }
+
+  /* ---------------- recording (amendment 4): every data lane, from disk, 30-day history --------------- */
+  function loadRecording() {
+    fetch("data/recording.json?_=" + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
+      S.recording = d || {};
+      var today = d.today || "";
+      // build the last-30-days date list so a MISSING day (no manifest row) shows red too
+      var days = [], t = new Date(today + "T00:00:00");
+      for (var i = 29; i >= 0; i--) { var x = new Date(t); x.setDate(t.getDate() - i);
+        days.push(x.toISOString().slice(0, 10)); }
+      var head = "<tr><th>Lane</th><th>Status</th><th>Rows today</th><th>Last time</th><th>Covers</th>" +
+                 "<th>Last 30 days</th></tr>";
+      var body = (d.lanes || []).map(function (L) {
+        var byday = {}; (L.history || []).forEach(function (h) { byday[h.date] = h.rows; });
+        var strip = days.map(function (dd) {
+          var has = byday[dd] > 0;
+          return "<span title='" + esc(dd) + (has ? (": " + byday[dd] + " rows") : ": none") +
+                 "' style='display:inline-block;width:6px;height:12px;margin-right:1px;background:" +
+                 (has ? "#137a3f" : "#e0b0b0") + "'></span>"; }).join("");
+        var stCol = L.status === "RECORDING" ? "#137a3f" : (L.nothing_today ? "#b23b3b" : "#a86800");
+        return "<tr" + (L.nothing_today ? " style='background:#fdf0f0'" : "") + ">" +
+               "<td>" + esc(L.lane) + "</td>" +
+               "<td style='color:" + stCol + ";font-weight:600'>" + esc(L.status) + "</td>" +
+               "<td>" + (L.rows_today || 0).toLocaleString() + "</td>" +
+               "<td style='color:#5c6672;font-size:12px'>" + esc((L.last_ts || "—").slice(0, 19).replace("T", " ")) + "</td>" +
+               "<td>" + esc(L.coverage || "—") + "</td>" +
+               "<td>" + strip + "</td></tr>"; }).join("");
+      $("recording").innerHTML = "<table class='grid' style='font-size:13px'>" + head + body + "</table>";
+    }).catch(function () { $("recording").innerHTML = "<p class='sub'>Could not load the recording status.</p>"; });
   }
 
   /* ---------------- messages (amendment 3): the desk's sent messages, newest-first, searchable ---------- */
