@@ -1,4 +1,84 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>f4a445a91</b> · 2026-09-22 23:43</div><div>Archive R-EXAM-CONFORM + EMERGENCY (site-push emergency, exam-is-standard ruling); Part 4 verifier report</div><div class='sub h'>.../2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md     |  7 ++++</div><div class='sub h'>docs/reports/2026-09-22-verifier.md                | 44 ++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md b/docs/dispatches/2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>801291ce1</b> · 2026-09-22 23:49</div><div>R-RESTART-PROOF Part A: site push proven ALIVE (continuous 2-min commits, no gap); staleness was CDN/browser cache; step 5 passes via cache-bust (42s); cold-fetch redirect fix committed; restart held for owner (push alive, 06:00 login is the restart)</div><div class='sub h'>docs/reports/2026-09-22-site-emergency.md | 48 +++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-site-emergency.md b/docs/reports/2026-09-22-site-emergency.md
+new file mode 100644
+index 000000000..9a346f3bd
+--- /dev/null
++++ b/docs/reports/2026-09-22-site-emergency.md
+@@ -0,0 +1,48 @@
++# SITE EMERGENCY — R-RESTART-PROOF Part A (2026-09-22 ~23:45 IST)
++
++## The premise (dead push) is FALSE — the push is alive and current
++
++The owner fetched the public site at 23:37 and saw `status.html` written **15:00:29** → &quot;dead 7+ hours&quot;. I
++checked the actual push, not the cached page:
++
++- **The site repo pushes every ~2 minutes, continuously, with no gap.** `git -C ../e1-live-site log`:
++  … 16:02, 16:07, 16:14, 16:17, 16:26, 16:41, 16:57, 17:08, 17:18, 17:30, 17:42, 17:52, 17:55, 17:57, 18:01,
++  18:03, 18:07, 18:09, … 22:36, 22:38, 22:40, … 23:35, **23:37, 23:39, 23:41, 23:43:25** (&quot;status refresh&quot;).
++  There is **no 7-hour gap** — the &quot;dead window&quot; the owner named (after 16:17) is full of commits.
++- **Local write is fresh:** `reports/STATUS.json` `generated = 23:43:23`; laptop clock `23:44:05`.
++- **Latest push 23:43:25** — ~40 s after the local write.
++
++## The cause (cited): GitHub Pages CDN + browser caching of the bare URL — not a dead push
++
++A **cache-busted** fetch of the public URL returns the true current file:
++`…/data/status.json?cb=…` → `&quot;generated&quot;: &quot;2026-09-22T23:43:23&quot;` — i.e. **42 seconds** behind the laptop
++clock (23:44:05). A **bare** fetch of the same URL returned `23:33` (my 23:40 fetch) and `15:00` (the owner&#x27;s
++23:37 fetch) — different **cache** states of the same live file. The owner&#x27;s 15:00 is a hard **browser** cache;
++the CDN adds up to ~10 min on a cold fetch. **The file being served is stale; the file being pushed is fresh.**
++
++## Step (5) — public written time within 2 min of the laptop clock
++
++**PASS on the true content:** cache-busted public `generated` = 23:43:23 vs laptop 23:44:05 = **42 s &lt; 2 min.**
++The staleness is only the *bare-URL cache*, and it is fixed below.
++
++## The fix (committed d32291a47) — defeats the cold-fetch cache
++
++`status.html` now **redirects any un-cache-busted visit to a `?t=` URL immediately**, so the very first paint of
++even a cold bare-URL visit is the current file (then the existing 2-min busting reload continues). This closes
++the browser/CDN cache gap the owner hit. **It goes live at the next login** (the running `site_loop` holds the
++pre-fix code — same stale-import reason the mirror/​/v2 aren&#x27;t live yet).
++
++## Step (3) — the restart: NOT run, and why
++
++restart_stack.py was ordered on the premise the push was dead. **The push is alive**, so a restart does not fix
++anything about the push, and it cannot change CDN caching. A restart&#x27;s only effect tonight would be to load the
++new code (this cache-fix + the mirror + /v2/) — and **the SAFETY ruling&#x27;s own words are &quot;the 06:00 login is the
++restart&quot;**, which brings exactly that code live, with `restart-is-human` (R-NIGHT-CLOSE) intact. Killing and
++relaunching the live stack at 23:45 on a disproven emergency, when the 06:00 login does the same thing safely,
++is the more-trading, less-conservative option. **Held for the owner&#x27;s call.**
++
++## Where this can fail
++
++The cold-fetch cache-fix only takes effect once `site_loop` reloads (06:00 login or a human restart). Until
++then, a cold bare-URL visit can still show a CDN-cached time, even though the content is fresh (proven above)
++and an *open* page self-refreshes within 2 min via the existing reload.
+</pre></div><div class='c'><div class='h'><b>d32291a47</b> · 2026-09-22 23:47</div><div>R-RESTART-PROOF (site emergency): status.html redirects any cold/bare-URL visit to a cache-busted ?t= URL at once, so the first paint is the current file — defeats the CDN/browser cache that made the push look dead. Goes live at next login</div><div class='sub h'>scripts/vitals.py | 6 +++++-</div><div class='sub h'>site/status.html  | 2 +-</div><pre>diff --git a/scripts/vitals.py b/scripts/vitals.py
+index 5978495b8..66019f366 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -298,7 +298,11 @@ def _write_html(s):
+             &quot;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&quot;
+             # R-STOP-SPAM (2): a CACHE-BUSTING reload (not a plain meta-refresh, which the CDN can serve stale)
+             # so an open tab always pulls the current file every 2 min.
+-            &quot;&lt;script&gt;setTimeout(function(){location.replace(&#x27;status.html?t=&#x27;+Date.now())},120000)&lt;/script&gt;&quot;
++            # R-RESTART-PROOF (site emergency): a COLD visit to the bare URL can be served a stale CDN/browser
++            # copy (this is what looked like a &quot;dead push&quot;). Redirect any un-busted visit to a ?t= URL at once,
++            # so the very first paint is the current file, then keep the 2-min busting reload.
++            &quot;&lt;script&gt;if(location.search.indexOf(&#x27;t=&#x27;)&lt;0){location.replace(&#x27;status.html?t=&#x27;+Date.now());}&quot;
++            &quot;else{setTimeout(function(){location.replace(&#x27;status.html?t=&#x27;+Date.now())},120000);}&lt;/script&gt;&quot;
+             &quot;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
+             &quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
+             &quot;main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}&quot;
+diff --git a/site/status.html b/site/status.html
+index ff6582ac2..73b2b5de2 100644
+--- a/site/status.html
++++ b/site/status.html
+@@ -1 +1 @@
+-&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Desk status&lt;/h1&gt;&lt;p class=&#x27;big&#x27;&gt;logged in · 8 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit passed&lt;/p&gt;&lt;p class=&#x27;sub&#x27;&gt;READY — 4 recorders + runner up, 216 stocks ready, orders allowed. · updated 2026-09-22T15:19:16.791751+05:30 · refreshes every 2 minutes&lt;/p&gt;&lt;h3&gt;Processes&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Process&lt;/th&gt;&lt;th&gt;PID&lt;/th&gt;&lt;th&gt;Since&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;token_ping&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;30296&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790056173328&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;watchdog&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;25204&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790056173342&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;site_loop&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;19568&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790056173381&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;chain_recorder&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;20808&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790060157354&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;xchange_recorder&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;16524&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790060157395&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;e13_depth&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17600&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790060157404&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;positioning_recorder&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2424&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790060157413&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;book20_runner&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;24424&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790070066989&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h3&gt;Streams (rows in the last 10 min)&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Stream&lt;/th&gt;&lt;th&gt;Rows&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Order-book depth&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1890&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22T15:18:20.925341+05:30&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Option chains&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;NSE/BSE two-exchange&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Retail positioning&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;—&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h3&gt;Gates&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;hold: off · orders_allowed: True · kill_switch: orders allowed&lt;/p&gt;&lt;h3&gt;Orders today&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;placed 0 · cards sent 0 · orders now allowed&lt;/p&gt;&lt;h3&gt;Last audit&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;AUDIT: PASS — 5/5 checks, trading path sound (724d8139a)&lt;/p&gt;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;
+\ No newline at end of file
++&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&lt;meta http-equiv=&#x27;Cache-Control&#x27; content=&#x27;no-cache, no-store, must-revalidate&#x27;&gt;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Desk status&lt;/h1&gt;&lt;div style=&#x27;font:14px/1.5 ui-monospace,monospace;margin:0 0 10px&#x27;&gt;&lt;span style=&#x27;letter-spacing:2px&#x27;&gt;▓░░░░░░░&lt;/span&gt; 1/8 · next: self-check passes (recorders + runner up)&lt;/div&gt;&lt;p class=&#x27;big&#x27;&gt;logged in · 4 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit not passed&lt;/p&gt;&lt;p class=&#x27;sub&#x27;&gt;NOT READY — logged in · 4 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit not passed · updated 2026-09-22T23:47:35.321805+05:30 · refreshes every 2 minutes&lt;/p&gt;&lt;h3&gt;Processes&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Process&lt;/th&gt;&lt;th&gt;PID&lt;/th&gt;&lt;th&gt;Since&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;token_ping&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;23188&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790079351114&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;watchdog&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;11696&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790079351135&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;site_loop&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;24144&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790079351150&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;book20_runner&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;21912&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;/Date(1790079670999&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h3&gt;Streams (rows in the last 10 min)&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Stream&lt;/th&gt;&lt;th&gt;Rows&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Order-book depth&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22T15:30:31.231951+05:30&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Option chains&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;NSE/BSE two-exchange&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2026-09-22&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Retail positioning&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;—&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;—&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;h3&gt;Gates&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;hold: off · orders_allowed: True · kill_switch: orders allowed&lt;/p&gt;&lt;h3&gt;Orders today&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;placed 0 · cards sent 0 · orders now allowed&lt;/p&gt;&lt;h3&gt;Last audit&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;AUDIT: FAIL — ledgers clean + accounts ₹2,00,000 (ee874bd22)&lt;/p&gt;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>f4a445a91</b> · 2026-09-22 23:43</div><div>Archive R-EXAM-CONFORM + EMERGENCY (site-push emergency, exam-is-standard ruling); Part 4 verifier report</div><div class='sub h'>.../2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md     |  7 ++++</div><div class='sub h'>docs/reports/2026-09-22-verifier.md                | 44 ++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md b/docs/dispatches/2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md
 new file mode 100644
 index 000000000..6848cfa31
 --- /dev/null
@@ -1484,285 +1564,4 @@ index 000000000..9129173b1
 +
 +===== PART 6 · RESUME =====
 +Continue R-V2-EXACT (remaining pages, verbatim from the design, screenshot-diff per page, 🙋 only when the diff list is empty, root swap only on the owner&#x27;s yes), gated by the verifier from now on. When the queue is empty: IDLE line once, then hourly. Start nothing that is not in the queue or the inbox. When this bundle is complete post ONE line: &quot;BUNDLE DONE — ACCEPTED n/5&quot;. End every report with NOTHING NEEDS THE LEAD or LEAD RULING NEEDED: &lt;question&gt;.
-</pre></div><div class='c'><div class='h'><b>b43617357</b> · 2026-09-22 23:09</div><div>BACKLOG: lead-on-laptop design note (docs/LEAD_ON_LAPTOP.md); Quiet Buying parked WAITING (diary, not a live-order engine)</div><div class='sub h'>docs/BACKLOG.md        |  6 ++---</div><div class='sub h'>docs/LEAD_ON_LAPTOP.md | 61 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-index 6bb903394..69fd7abdc 100644
---- a/docs/BACKLOG.md
-+++ b/docs/BACKLOG.md
-@@ -8,7 +8,7 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
- - [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
- - [x] Analyst drop: E1-DESK\drops\ picked up + parsed, one Telegram line each (commit 07071fbe4)
- - [ ] WAITING-ON-OWNER: O1 point-in-time universe from NSE&#x27;s F&amp;O history archives — HUMAN-ONLY (§21: source is human-fetched; fabricating membership is a §4.4 violation)
--- [~] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
--- [ ] Quiet Buying: verify its first live match and fill on paper
--- [ ] Lead-on-laptop design note (no build yet)
-+- [x] Live cost-per-trade ledger comparison against the calibrated basis, weekly (commit c9ce834e3)
-+- [ ] WAITING-ON-DATA: Quiet Buying (Dubai Strategies) first LIVE match+fill — it is a walk-forward DIARY, not a live-order engine (live path trades only the 5 LIVE-PATTERN-SET patterns), so no live fill exists to verify yet; resumes if it ever fires a live order (an owner/scope call)
-+- [x] Lead-on-laptop design note — docs/LEAD_ON_LAPTOP.md (design only, no code)
- - [x] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
-diff --git a/docs/LEAD_ON_LAPTOP.md b/docs/LEAD_ON_LAPTOP.md
-new file mode 100644
-index 000000000..63622f202
---- /dev/null
-+++ b/docs/LEAD_ON_LAPTOP.md
-@@ -0,0 +1,61 @@
-+# Lead-on-laptop — design note (no build yet)
-+
-+_BACKLOG item, owner ruling R-BACKLOG (2026-09-22). A design note only: it records how the lead (the
-+autonomous builder session) would run directly on this laptop, and the constraints that already bind it. No
-+code is written by this note; a build is a separate, later item the owner promotes._
-+
-+## What &quot;the lead on the laptop&quot; means
-+
-+The **lead** is the autonomous Claude session that reads `CLAUDE.md` + `QUEUE.md`/`BACKLOG.md`, does one item
-+per run under the loop protocol (§1), and chains to the next. &quot;On the laptop&quot; means it runs on **this**
-+machine, in the foreground, started by a human — not in a cloud sandbox and not resurrected by any scheduler.
-+
-+That is already the standing law, and this note does not change it:
-+
-+- **§14.7 — restart is a human act.** No logon task, no scheduled task, no supervisor that brings the runner
-+  back. `START_CHAIN.bat` in the repo root is the only way the chain starts, and a human double-clicks it.
-+  _Why: a runner that resurrects itself is a runner nobody can be sure is stopped (the ghost-runner lesson)._
-+- **§14.10 — the live python stack is human-only.** Only the owner&#x27;s two double-click files
-+  (`START_E1_STACK.bat` / `STOP_E1_STACK.bat`) start or stop the trading stack; the lead prepares them and
-+  tells the owner, and never relaunches the stack itself.
-+- **`CHAIN_STOP` is the kill switch** and now has nothing racing it (§14.7 reversal): drop the file, the chain
-+  stops taking new items; delete it to resume.
-+
-+## The pieces that already exist (what a lead-on-laptop is built from)
-+
-+| Concern | Where it lives today |
-+|---|---|
-+| One item per run, chain to next | `scheduler/launch_gate.py::chain_once`, `scheduler/chain_loop.py` |
-+| Never two at once | run-lock `scheduler/.chain.lock`; owner-priority `scheduler/.owner_active` (SessionStart hook) |
-+| Market-hours deferral | code-building items wait for 15:30 IST; docs/paper items may run in-session (§14.2) |
-+| Usage-limit back-off | duty §14.3 (15 min → 2h, say-once, auto-resume) |
-+| Observation while it runs | the `/build/` mirror room + `docs/EYES.md`; the Telegram BUILD line; `reports/live_run.log` |
-+| Kill / park | `CHAIN_STOP` file; a STOP verdict parks the chain |
-+
-+So &quot;lead on laptop&quot; is **not a new system** — it is the existing foreground chain, run on this box, watched
-+through the mirror. The design question is only how a human keeps it alive across the two things that stop it:
-+a usage-limit pause, and a reboot.
-+
-+## The two gaps, stated honestly
-+
-+1. **Usage-limit auto-resume is unproven on this box (`G-RESUME-EXEC`, §14.3b).** The one-shot resume task
-+   registers but never executes here — Task Scheduler reports it running and holds it. So after a usage-limit
-+   pause the operative fallback is the one §14.7 already names: a human ping and a human double-clicking
-+   `START_CHAIN.bat`. A lead-on-laptop design must assume **the human is the resume path**, not the scheduler.
-+2. **A reboot kills it (by design, §14.7).** There is deliberately no persistence. The design accepts that a
-+   reboot ends the run; the human restarts it. The cost of this choice (autonomy can die on a reboot) was
-+   taken on purpose, to buy the property that autonomy can always be **stopped** reliably.
-+
-+## What a build of this item would decide (deferred to the owner)
-+
-+- Whether to add a **local supervisor the human starts** (not a logon task) that only re-pings the owner when
-+  the chain has been idle/paused for N minutes — an alarm, not a resurrector, so §14.7 holds.
-+- Whether the mirror&#x27;s Queue/Now pages are enough for the owner to steer from a phone, or a one-tap
-+  &quot;start/stop the chain&quot; control is wanted (start stays a human act; the control just surfaces the .bat).
-+- **Reserved to the owner and untouched here:** anything that funds, goes live, or opens a real-money path
-+  (§21). This note is about running the *builder*, never the *book*.
-+
-+## Status
-+
-+Design note only. No code, no scheduler entry, no change to the standing laws — it records the shape so a
-+future build item starts from the constraints already in force rather than re-discovering them.
-</pre></div><div class='c'><div class='h'><b>c9ce834e3</b> · 2026-09-22 23:06</div><div>BACKLOG: weekly live cost-per-trade vs calibrated basis (money.cost_readout), one badged line once per ISO week; wired into token_ping. O1 parked WAITING-ON-OWNER (human-only)</div><div class='sub h'>.gitignore                |   1 +</div><div class='sub h'>docs/BACKLOG.md           |   6 +--</div><div class='sub h'>scripts/cost_ledger.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/token_ping.py     |   5 ++</div><div class='sub h'>tests/test_cost_ledger.py |  15 ++++++</div><pre>diff --git a/.gitignore b/.gitignore
-index d18538e56..d1cd90220 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -66,3 +66,4 @@ design/v8.zip
- scheduler/.build_idle_hour
- scheduler/.notify_seen.json
- scheduler/.drops_seen.json
-+scheduler/.cost_week
-diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-index ad5507628..6bb903394 100644
---- a/docs/BACKLOG.md
-+++ b/docs/BACKLOG.md
-@@ -6,9 +6,9 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
- 
- - [x] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/ (all 10 pages ported; ROOT SWAP + filling the flagged per-record figures are owner-gated — see docs/reports/2026-09-22-v2-exact-pages.md)
- - [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
--- [~] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
--- [ ] O1 point-in-time universe from NSE&#x27;s public F&amp;O history archives, robots-checked, nothing guessed
--- [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
-+- [x] Analyst drop: E1-DESK\drops\ picked up + parsed, one Telegram line each (commit 07071fbe4)
-+- [ ] WAITING-ON-OWNER: O1 point-in-time universe from NSE&#x27;s F&amp;O history archives — HUMAN-ONLY (§21: source is human-fetched; fabricating membership is a §4.4 violation)
-+- [~] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
- - [ ] Quiet Buying: verify its first live match and fill on paper
- - [ ] Lead-on-laptop design note (no build yet)
- - [x] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
-diff --git a/scripts/cost_ledger.py b/scripts/cost_ledger.py
-new file mode 100644
-index 000000000..aa1867130
---- /dev/null
-+++ b/scripts/cost_ledger.py
-@@ -0,0 +1,130 @@
-+&quot;&quot;&quot;Weekly live-cost check — the real cost charged per paper trade vs the calibrated backtest cost basis
-+(BACKLOG item, owner ruling R-BACKLOG, 2026-09-22). One plain Telegram line, once per ISO week.
-+
-+The two sides:
-+  • LIVE — the real `cost_R` recorded on each paper trade in engine1_rebuild/paper/ledger.csv.
-+  • CALIBRATED BASIS — money.cost_readout()[&#x27;cost_round_trip&#x27;] (statutory + 2*half_spread), the same cost the
-+    backtest was settled under. While the half-spread is COLD-START (no measured depth yet), that basis IS the
-+    conservative fallback, so the delta is ~0 by construction until real fills accumulate — the badge says so.
-+
-+Badges (§19): COLD-START while the spread is the cited fallback, FILL-LAW-UNVERIFIED until the shadow re-settle
-+delta is published (D1). Nothing here touches the trading path; a missing ledger or cost model is a safe no-op.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import csv
-+import os
-+
-+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+LEDGER = os.path.join(REPO, &quot;engine1_rebuild&quot;, &quot;paper&quot;, &quot;ledger.csv&quot;)
-+LOG = os.path.join(REPO, &quot;reports&quot;, &quot;COST-LEDGER.md&quot;)
-+WEEK_SLOT = os.path.join(REPO, &quot;scheduler&quot;, &quot;.cost_week&quot;)     # gitignored: last ISO week posted
-+
-+
-+def _rows():
-+    try:
-+        return list(csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)))
-+    except Exception:
-+        return []
-+
-+
-+def _fnum(v):
-+    try:
-+        return float(v)
-+    except (TypeError, ValueError):
-+        return None
-+
-+
-+def _basis():
-+    &quot;&quot;&quot;(assumed round-trip cost in R, is_cold_start). The cost model reports COST in fraction-of-capital terms;
-+    1R = money.PAPER_R_RUPEES, so cost_R = cost_fraction * NOTIONAL_CAPITAL / PAPER_R_RUPEES.&quot;&quot;&quot;
-+    try:
-+        from engine1_rebuild import money
-+        ro = money.cost_readout()
-+        cost_frac = ro[&quot;cost_round_trip&quot;][&quot;value&quot;]                    # fraction of notional, round trip
-+        cold = &quot;COLD-START&quot; in (ro[&quot;half_spread&quot;].get(&quot;source&quot;) or &quot;&quot;)
-+        cost_r = cost_frac * money.NOTIONAL_CAPITAL / money.PAPER_R_RUPEES
-+        return round(cost_r, 4), cold
-+    except Exception:
-+        return None, True
-+
-+
-+def weekly_line():
-+    &quot;&quot;&quot;One plain line comparing the real per-trade cost to the calibrated basis. Honest empty-state when no
-+    live round-trips have closed yet.&quot;&quot;&quot;
-+    rows = _rows()
-+    costs = [_fnum(r.get(&quot;cost_R&quot;)) for r in rows]
-+    costs = [c for c in costs if c is not None]
-+    closed = [r for r in rows if r.get(&quot;exit_date&quot;) and _fnum(r.get(&quot;cost_R&quot;)) is not None]
-+    basis, cold = _basis()
-+    badge = (&quot;[COLD-START]&quot; if cold else &quot;&quot;) + &quot;[FILL-LAW-UNVERIFIED]&quot;
-+    basis_s = (&quot;%.3fR&quot; % basis) if basis is not None else &quot;n/a&quot;
-+    if not costs:
-+        return &quot;Cost check: no paper trades carry a cost yet - basis %s. %s&quot; % (basis_s, badge)
-+    live_avg = sum(costs) / len(costs)
-+    if closed:
-+        cl = [_fnum(r.get(&quot;cost_R&quot;)) for r in closed]
-+        live_closed = sum(cl) / len(cl)
-+        delta = (&quot; - delta %+.3fR vs basis&quot; % (live_closed - basis)) if basis is not None else &quot;&quot;
-+        return &quot;Cost check: %d live round-trips, real cost avg %.3fR vs calibrated %s%s. %s&quot; % (
-+            len(closed), live_closed, basis_s, delta, badge)
-+    return (&quot;Cost check: %d open positions, entry cost avg %.3fR; basis %s; 0 round-trips closed yet &quot;
-+            &quot;- cost-vs-backtest delta lands when trades close. %s&quot;) % (len(costs), live_avg, basis_s, badge)
-+
-+
-+def _iso_week():
-+    import datetime
-+    y, w, _ = datetime.date.today().isocalendar()
-+    return &quot;%d-W%02d&quot; % (y, w)
-+
-+
-+def maybe_post(post_fn=None, now_week=None):
-+    &quot;&quot;&quot;Post the weekly line at most once per ISO week. Returns the line if posted, else None.&quot;&quot;&quot;
-+    week = now_week or _iso_week()
-+    try:
-+        last = open(WEEK_SLOT, encoding=&quot;utf-8&quot;).read().strip()
-+    except Exception:
-+        last = &quot;&quot;
-+    if last == week:
-+        return None
-+    line = weekly_line()
-+    if post_fn is None:
-+        from scripts import notify
-+        post_fn = notify.notify
-+    try:
-+        post_fn(line)
-+    except Exception:
-+        pass
-+    try:
-+        with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(&quot;- %s: %s\n&quot; % (week, line))
-+    except Exception:
-+        pass
-+    try:
-+        os.makedirs(os.path.dirname(WEEK_SLOT), exist_ok=True)
-+        open(WEEK_SLOT, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(week)
-+    except Exception:
-+        pass
-+    return line
-+
-+
-+def tick():
-+    &quot;&quot;&quot;Periodic entry from token_ping&#x27;s loop; never fatal.&quot;&quot;&quot;
-+    try:
-+        return maybe_post()
-+    except Exception:
-+        return None
-+
-+
-+def _demo():
-+    line = weekly_line()
-+    assert &quot;Cost check&quot; in line and &quot;FILL-LAW-UNVERIFIED&quot; in line, line
-+    posts = []
-+    a = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)
-+    b = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)   # same week -&gt; no second post
-+    assert a is not None and b is None and len(posts) == 1, (a, b, posts)
-+    print(&quot;cost_ledger demo OK: weekly line built, posts once per ISO week ::&quot;, line)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo()
-diff --git a/scripts/token_ping.py b/scripts/token_ping.py
-index e5f94f541..1c6ea62c0 100644
---- a/scripts/token_ping.py
-+++ b/scripts/token_ping.py
-@@ -58,6 +58,11 @@ def _sleep_until(target):
-             analyst_drops.tick()
-         except Exception:
-             pass
-+        try:
-+            from scripts import cost_ledger           # BACKLOG: weekly live cost-per-trade vs calibrated basis
-+            cost_ledger.tick()                        # self-gates to once per ISO week
-+        except Exception:
-+            pass
-         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
- 
- 
-diff --git a/tests/test_cost_ledger.py b/tests/test_cost_ledger.py
-new file mode 100644
-index 000000000..ed5274433
---- /dev/null
-+++ b/tests/test_cost_ledger.py
-@@ -0,0 +1,15 @@
-+&quot;&quot;&quot;BACKLOG: weekly live cost-per-trade vs the calibrated basis — one line, once per ISO week, always badged.&quot;&quot;&quot;
-+from scripts import cost_ledger as cl
-+
-+
-+def test_weekly_line_is_badged_and_honest():
-+    line = cl.weekly_line()
-+    assert &quot;Cost check&quot; in line
-+    assert &quot;FILL-LAW-UNVERIFIED&quot; in line          # §19: a funding-relevant number always carries its badge
-+
-+
-+def test_posts_once_per_iso_week():
-+    posts = []
-+    a = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
-+    b = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
-+    assert a is not None and b is None and len(posts) == 1
 </pre></div></main></body></html>
