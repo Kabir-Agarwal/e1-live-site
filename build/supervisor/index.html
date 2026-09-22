@@ -5,21 +5,23 @@
 2026-09-22 16:34 checked 16:34 — on course
 2026-09-22 16:49 checked 16:49 — on course
 2026-09-22 17:00 checked 17:00 — on course
-2026-09-22 17:23 checked 17:23 — on course</pre><h3>Last check (scrubbed)</h3><pre>I'll judge the two commits since the last check against the seven checks.
+2026-09-22 17:23 checked 17:23 — on course
+2026-09-22 17:33 checked 17:33 — on course</pre><h3>Last check (scrubbed)</h3><pre>I reviewed the single commit since last check (8272c89c4) — its diff, the transcript, and STATUS.json — against the seven checks.
 
-**Diffs reviewed:**
-- `d65e4bfe8` — R-VITALS-STALE fix: caches the 216-stock green count (`_GREEN_TTL = 900`) and moves the heavy transcript-scrubbing `build_journal.build()` off the 2-min light cycle onto the 10-min full cycle, so `status.html` refreshes every 2 min again.
-- `9c8c9b5bd` — adds the stack's runtime modules to `restart_stack.py`'s `LAUNCH_PATHS` so a vitals/site_build fix is a legitimate restart trigger.
+**1. Scope.** The commit bounds `build_journal`'s transcript scrub (last 1500 events / 500KB) and commit diffs (14 commits, 20KB/diff before scrub). This is a direct fix for a regression the builder itself introduced two commits earlier (moving `build_journal` into the full cycle), which had the running `site_loop` burning ~270s CPU. Legitimate stabilization of the live site room (R-EYES-FULL / R-VITALS-STALE lineage), not self-authored new scope. The v2 tabs ("next") have correctly not been started yet — the builder is closing the stability proof first.
 
-**Against the checks:**
-1. **SCOPE** — Both commits fix a regression in the status/eyes machinery that R-EYES-FULL/R-VITALS already established (the public status page had gone stale, refreshing only on the ~10-min cycle). Repairing broken, owner-mandated infrastructure is maintenance, not run-authored scope. Not a §20.6 breach.
-2. **NO SELF-AUDIT** — The `AUDIT: PASS` line in STATUS.json is the machine audit, not the builder grading its own work. OK.
-3. **NO TYPED NUMBERS** — `_GREEN_TTL = 900` is an operational cache TTL with a written rationale (count changes on the scale of days; scan takes ~60s), not a strategy/trading constant fit to performance. §4.1 not engaged.
-4. **DEMOS INERT** — No ledger write, no Telegram send in these diffs.
-5. **TRADING-PATH** — Untouched; these are site/status/build-room only.
-6. **NO SECRETS** — None in diffs; `reports/_green_count.json` correctly gitignored.
-7. **ORDERING** — No next-before-X item pending that these jump.
+**2. No self-audit.** The only grading was the `test_build_scrub` unit test — a real test, not the builder grading its own work as an independent check.
 
-One note, not a violation: the ruling in force names "four v2 tabs" as next, and these are R-VITALS-STALE fixes instead — but fixing a live regression in the status page before continuing tab work is legitimate and does not invent scope.
+**3. Typed numbers.** The new constants (1500, 500000, 14, 20000) are performance/display caps on a published page, each carrying an explaining comment. They are not trading/strategy walls, so §4.1's naked-number law does not bite them.
+
+**4. Demos inert.** `live_bar.maybe_post` was called with a null notifier; `restart_stack --demo` refused before 15:30; no live ledger written, no real Telegram sent. `orders_written_today: 0`, `orders_allowed_now: false`.
+
+**5. Trading path.** Untouched — `build_journal` is site-building only.
+
+**6. Secrets.** The scrub still runs (only the input is capped first); no key, token, id or user path appears in the diff or STATUS.json.
+
+**7. Ordering.** No pending next-before-X item; v2 tabs remain queued as "next," not jumped.
+
+No breach of any check.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
