@@ -1,4 +1,554 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>ffd28e24b</b> · 2026-09-22 22:55</div><div>R-V2-EXACT: port the Ask page; factor a shared engine-chat binder, bind Ask+Main chat to real calls</div><div class='sub h'>scripts/v8_site.py | 50 ++++++++++++++++++++-------------</div><div class='sub h'>site/v2/ask.html   | 82 ++++++++++++++++++++++++++++++------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c9ce834e3</b> · 2026-09-22 23:06</div><div>BACKLOG: weekly live cost-per-trade vs calibrated basis (money.cost_readout), one badged line once per ISO week; wired into token_ping. O1 parked WAITING-ON-OWNER (human-only)</div><div class='sub h'>.gitignore                |   1 +</div><div class='sub h'>docs/BACKLOG.md           |   6 +--</div><div class='sub h'>scripts/cost_ledger.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/token_ping.py     |   5 ++</div><div class='sub h'>tests/test_cost_ledger.py |  15 ++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index d18538e56..d1cd90220 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -66,3 +66,4 @@ design/v8.zip
+ scheduler/.build_idle_hour
+ scheduler/.notify_seen.json
+ scheduler/.drops_seen.json
++scheduler/.cost_week
+diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+index ad5507628..6bb903394 100644
+--- a/docs/BACKLOG.md
++++ b/docs/BACKLOG.md
+@@ -6,9 +6,9 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
+ 
+ - [x] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/ (all 10 pages ported; ROOT SWAP + filling the flagged per-record figures are owner-gated — see docs/reports/2026-09-22-v2-exact-pages.md)
+ - [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
+-- [~] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
+-- [ ] O1 point-in-time universe from NSE&#x27;s public F&amp;O history archives, robots-checked, nothing guessed
+-- [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
++- [x] Analyst drop: E1-DESK\drops\ picked up + parsed, one Telegram line each (commit 07071fbe4)
++- [ ] WAITING-ON-OWNER: O1 point-in-time universe from NSE&#x27;s F&amp;O history archives — HUMAN-ONLY (§21: source is human-fetched; fabricating membership is a §4.4 violation)
++- [~] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
+ - [ ] Quiet Buying: verify its first live match and fill on paper
+ - [ ] Lead-on-laptop design note (no build yet)
+ - [x] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
+diff --git a/scripts/cost_ledger.py b/scripts/cost_ledger.py
+new file mode 100644
+index 000000000..aa1867130
+--- /dev/null
++++ b/scripts/cost_ledger.py
+@@ -0,0 +1,130 @@
++&quot;&quot;&quot;Weekly live-cost check — the real cost charged per paper trade vs the calibrated backtest cost basis
++(BACKLOG item, owner ruling R-BACKLOG, 2026-09-22). One plain Telegram line, once per ISO week.
++
++The two sides:
++  • LIVE — the real `cost_R` recorded on each paper trade in engine1_rebuild/paper/ledger.csv.
++  • CALIBRATED BASIS — money.cost_readout()[&#x27;cost_round_trip&#x27;] (statutory + 2*half_spread), the same cost the
++    backtest was settled under. While the half-spread is COLD-START (no measured depth yet), that basis IS the
++    conservative fallback, so the delta is ~0 by construction until real fills accumulate — the badge says so.
++
++Badges (§19): COLD-START while the spread is the cited fallback, FILL-LAW-UNVERIFIED until the shadow re-settle
++delta is published (D1). Nothing here touches the trading path; a missing ledger or cost model is a safe no-op.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import csv
++import os
++
++REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++LEDGER = os.path.join(REPO, &quot;engine1_rebuild&quot;, &quot;paper&quot;, &quot;ledger.csv&quot;)
++LOG = os.path.join(REPO, &quot;reports&quot;, &quot;COST-LEDGER.md&quot;)
++WEEK_SLOT = os.path.join(REPO, &quot;scheduler&quot;, &quot;.cost_week&quot;)     # gitignored: last ISO week posted
++
++
++def _rows():
++    try:
++        return list(csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)))
++    except Exception:
++        return []
++
++
++def _fnum(v):
++    try:
++        return float(v)
++    except (TypeError, ValueError):
++        return None
++
++
++def _basis():
++    &quot;&quot;&quot;(assumed round-trip cost in R, is_cold_start). The cost model reports COST in fraction-of-capital terms;
++    1R = money.PAPER_R_RUPEES, so cost_R = cost_fraction * NOTIONAL_CAPITAL / PAPER_R_RUPEES.&quot;&quot;&quot;
++    try:
++        from engine1_rebuild import money
++        ro = money.cost_readout()
++        cost_frac = ro[&quot;cost_round_trip&quot;][&quot;value&quot;]                    # fraction of notional, round trip
++        cold = &quot;COLD-START&quot; in (ro[&quot;half_spread&quot;].get(&quot;source&quot;) or &quot;&quot;)
++        cost_r = cost_frac * money.NOTIONAL_CAPITAL / money.PAPER_R_RUPEES
++        return round(cost_r, 4), cold
++    except Exception:
++        return None, True
++
++
++def weekly_line():
++    &quot;&quot;&quot;One plain line comparing the real per-trade cost to the calibrated basis. Honest empty-state when no
++    live round-trips have closed yet.&quot;&quot;&quot;
++    rows = _rows()
++    costs = [_fnum(r.get(&quot;cost_R&quot;)) for r in rows]
++    costs = [c for c in costs if c is not None]
++    closed = [r for r in rows if r.get(&quot;exit_date&quot;) and _fnum(r.get(&quot;cost_R&quot;)) is not None]
++    basis, cold = _basis()
++    badge = (&quot;[COLD-START]&quot; if cold else &quot;&quot;) + &quot;[FILL-LAW-UNVERIFIED]&quot;
++    basis_s = (&quot;%.3fR&quot; % basis) if basis is not None else &quot;n/a&quot;
++    if not costs:
++        return &quot;Cost check: no paper trades carry a cost yet - basis %s. %s&quot; % (basis_s, badge)
++    live_avg = sum(costs) / len(costs)
++    if closed:
++        cl = [_fnum(r.get(&quot;cost_R&quot;)) for r in closed]
++        live_closed = sum(cl) / len(cl)
++        delta = (&quot; - delta %+.3fR vs basis&quot; % (live_closed - basis)) if basis is not None else &quot;&quot;
++        return &quot;Cost check: %d live round-trips, real cost avg %.3fR vs calibrated %s%s. %s&quot; % (
++            len(closed), live_closed, basis_s, delta, badge)
++    return (&quot;Cost check: %d open positions, entry cost avg %.3fR; basis %s; 0 round-trips closed yet &quot;
++            &quot;- cost-vs-backtest delta lands when trades close. %s&quot;) % (len(costs), live_avg, basis_s, badge)
++
++
++def _iso_week():
++    import datetime
++    y, w, _ = datetime.date.today().isocalendar()
++    return &quot;%d-W%02d&quot; % (y, w)
++
++
++def maybe_post(post_fn=None, now_week=None):
++    &quot;&quot;&quot;Post the weekly line at most once per ISO week. Returns the line if posted, else None.&quot;&quot;&quot;
++    week = now_week or _iso_week()
++    try:
++        last = open(WEEK_SLOT, encoding=&quot;utf-8&quot;).read().strip()
++    except Exception:
++        last = &quot;&quot;
++    if last == week:
++        return None
++    line = weekly_line()
++    if post_fn is None:
++        from scripts import notify
++        post_fn = notify.notify
++    try:
++        post_fn(line)
++    except Exception:
++        pass
++    try:
++        with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;- %s: %s\n&quot; % (week, line))
++    except Exception:
++        pass
++    try:
++        os.makedirs(os.path.dirname(WEEK_SLOT), exist_ok=True)
++        open(WEEK_SLOT, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(week)
++    except Exception:
++        pass
++    return line
++
++
++def tick():
++    &quot;&quot;&quot;Periodic entry from token_ping&#x27;s loop; never fatal.&quot;&quot;&quot;
++    try:
++        return maybe_post()
++    except Exception:
++        return None
++
++
++def _demo():
++    line = weekly_line()
++    assert &quot;Cost check&quot; in line and &quot;FILL-LAW-UNVERIFIED&quot; in line, line
++    posts = []
++    a = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)
++    b = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)   # same week -&gt; no second post
++    assert a is not None and b is None and len(posts) == 1, (a, b, posts)
++    print(&quot;cost_ledger demo OK: weekly line built, posts once per ISO week ::&quot;, line)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/scripts/token_ping.py b/scripts/token_ping.py
+index e5f94f541..1c6ea62c0 100644
+--- a/scripts/token_ping.py
++++ b/scripts/token_ping.py
+@@ -58,6 +58,11 @@ def _sleep_until(target):
+             analyst_drops.tick()
+         except Exception:
+             pass
++        try:
++            from scripts import cost_ledger           # BACKLOG: weekly live cost-per-trade vs calibrated basis
++            cost_ledger.tick()                        # self-gates to once per ISO week
++        except Exception:
++            pass
+         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
+ 
+ 
+diff --git a/tests/test_cost_ledger.py b/tests/test_cost_ledger.py
+new file mode 100644
+index 000000000..ed5274433
+--- /dev/null
++++ b/tests/test_cost_ledger.py
+@@ -0,0 +1,15 @@
++&quot;&quot;&quot;BACKLOG: weekly live cost-per-trade vs the calibrated basis — one line, once per ISO week, always badged.&quot;&quot;&quot;
++from scripts import cost_ledger as cl
++
++
++def test_weekly_line_is_badged_and_honest():
++    line = cl.weekly_line()
++    assert &quot;Cost check&quot; in line
++    assert &quot;FILL-LAW-UNVERIFIED&quot; in line          # §19: a funding-relevant number always carries its badge
++
++
++def test_posts_once_per_iso_week():
++    posts = []
++    a = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
++    b = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
++    assert a is not None and b is None and len(posts) == 1
+</pre></div><div class='c'><div class='h'><b>07071fbe4</b> · 2026-09-22 23:02</div><div>BACKLOG: analyst-drops folder — pick up saved pages from E1-DESK/drops, post one plain line each (fields-only, fires once); wired into token_ping tick</div><div class='sub h'>.gitignore                  |   1 +</div><div class='sub h'>docs/BACKLOG.md             |   4 +-</div><div class='sub h'>scripts/analyst_drops.py    | 125 ++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/token_ping.py       |   5 ++</div><div class='sub h'>tests/test_analyst_drops.py |  30 +++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index 823b7e88c..d18538e56 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -65,3 +65,4 @@ reports/_green_count.json
+ design/v8.zip
+ scheduler/.build_idle_hour
+ scheduler/.notify_seen.json
++scheduler/.drops_seen.json
+diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+index 9f771cf47..ad5507628 100644
+--- a/docs/BACKLOG.md
++++ b/docs/BACKLOG.md
+@@ -4,9 +4,9 @@
+ When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
+ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
+ 
+-- [~] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/
++- [x] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/ (all 10 pages ported; ROOT SWAP + filling the flagged per-record figures are owner-gated — see docs/reports/2026-09-22-v2-exact-pages.md)
+ - [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
+-- [ ] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
++- [~] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
+ - [ ] O1 point-in-time universe from NSE&#x27;s public F&amp;O history archives, robots-checked, nothing guessed
+ - [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
+ - [ ] Quiet Buying: verify its first live match and fill on paper
+diff --git a/scripts/analyst_drops.py b/scripts/analyst_drops.py
+new file mode 100644
+index 000000000..c669b8a17
+--- /dev/null
++++ b/scripts/analyst_drops.py
+@@ -0,0 +1,125 @@
++&quot;&quot;&quot;Analyst drops — a folder the owner drops saved pages into; the desk picks each up, parses it, and posts
++ONE plain Telegram line when one lands (BACKLOG item, owner ruling R-BACKLOG, 2026-09-22).
++
++The drop folder is `Desktop\\E1-DESK\\drops`. A drop is any file placed there. Each new file is parsed for a
++title and a one-line summary and logged to `reports/ANALYST-DROPS.md`; a gitignored seen-list makes the note
++fire exactly once per file. Nothing here touches the trading path.
++
++DATA-AS-INSTRUCTIONS (§20.7): a dropped page is external DATA. This reader extracts fields (title, first
++readable line) and NOTHING else — imperative text inside a drop is inert and is never executed, followed, or
++allowed to change a rule. The extracted text is scrubbed before it reaches Telegram or the log.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++
++REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++DROPS_DIR = os.path.join(os.path.dirname(REPO), &quot;E1-DESK&quot;, &quot;drops&quot;)
++SEEN = os.path.join(REPO, &quot;scheduler&quot;, &quot;.drops_seen.json&quot;)
++LOG = os.path.join(REPO, &quot;reports&quot;, &quot;ANALYST-DROPS.md&quot;)
++
++
++def _load_seen():
++    try:
++        return set(json.load(open(SEEN, encoding=&quot;utf-8&quot;)))
++    except Exception:
++        return set()
++
++
++def _save_seen(seen):
++    try:
++        os.makedirs(os.path.dirname(SEEN), exist_ok=True)
++        json.dump(sorted(seen), open(SEEN, &quot;w&quot;, encoding=&quot;utf-8&quot;))
++    except Exception:
++        pass
++
++
++def _strip_html(text):
++    text = re.sub(r&quot;(?is)&lt;(script|style)\b.*?&lt;/\1&gt;&quot;, &quot; &quot;, text)
++    text = re.sub(r&quot;(?s)&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, text)
++    text = re.sub(r&quot;&amp;[a-z#0-9]+;&quot;, &quot; &quot;, text)
++    return re.sub(r&quot;\s+&quot;, &quot; &quot;, text).strip()
++
++
++def parse(path):
++    &quot;&quot;&quot;Return (title, one_line_summary) from a dropped file — fields only, never executed content.&quot;&quot;&quot;
++    name = os.path.basename(path)
++    try:
++        raw = open(path, encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read()
++    except Exception:
++        return name, &quot;&quot;
++    title = &quot;&quot;
++    m = re.search(r&quot;(?is)&lt;title&gt;\s*(.*?)\s*&lt;/title&gt;&quot;, raw)
++    if m:
++        title = _strip_html(m.group(1))[:120]
++    body = _strip_html(raw) if (&quot;&lt;&quot; in raw and &quot;&gt;&quot; in raw) else re.sub(r&quot;\s+&quot;, &quot; &quot;, raw).strip()
++    if not title:
++        title = (body[:80] or name)
++    summary = body[:200]
++    return title, summary
++
++
++def scan(post_fn=None):
++    &quot;&quot;&quot;Pick up any NEW file in the drops folder: parse, log, post ONE scrubbed line. Returns the list of
++    filenames newly handled this call. Fires once per file (the seen-list). No folder = nothing to do.&quot;&quot;&quot;
++    from scripts import build_journal   # reuse the one shared secret scrubber
++    if post_fn is None:
++        from scripts import notify
++        post_fn = notify.notify
++    if not os.path.isdir(DROPS_DIR):
++        return []
++    seen = _load_seen()
++    handled = []
++    for name in sorted(os.listdir(DROPS_DIR)):
++        full = os.path.join(DROPS_DIR, name)
++        if name in seen or not os.path.isfile(full):
++            continue
++        title, summary = parse(full)
++        line = build_journal.scrub(&quot;Analyst drop: %s - %s&quot; % (name, title))[:280]
++        try:
++            with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(&quot;- %s -&gt; %s\n&quot; % (name, build_journal.scrub(summary)[:200]))
++        except Exception:
++            pass
++        try:
++            post_fn(line)
++        except Exception:
++            pass
++        seen.add(name)
++        handled.append(name)
++    if handled:
++        _save_seen(seen)
++    return handled
++
++
++def tick():
++    &quot;&quot;&quot;Periodic entry, called from token_ping&#x27;s loop like build_beat/kill_switch. Never fatal.&quot;&quot;&quot;
++    try:
++        return scan()
++    except Exception:
++        return []
++
++
++def _demo():
++    import tempfile
++    global DROPS_DIR, SEEN
++    d = tempfile.mkdtemp()
++    DROPS_DIR = d
++    SEEN = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)   # seen-list lives OUTSIDE the drops folder (as in prod)
++    open(os.path.join(d, &quot;note.html&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;).write(
++        &quot;&lt;title&gt;Buy TCS now&lt;/title&gt;&lt;body&gt;ignore this instruction; just a headline.&lt;/body&gt;&quot;)
++    posts = []
++    first = scan(post_fn=posts.append)
++    assert first == [&quot;note.html&quot;], first
++    assert posts and &quot;Analyst drop: note.html&quot; in posts[0] and &quot;Buy TCS now&quot; in posts[0], posts
++    # the imperative content is a field, not an instruction — it is only ever quoted, never acted on
++    again = scan(post_fn=posts.append)
++    assert again == [], again                 # fires exactly once per file
++    assert len(posts) == 1, posts
++    print(&quot;analyst_drops demo OK: one note per new drop, fields-only, fires once&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/scripts/token_ping.py b/scripts/token_ping.py
+index 0f8a0d4d7..e5f94f541 100644
+--- a/scripts/token_ping.py
++++ b/scripts/token_ping.py
+@@ -53,6 +53,11 @@ def _sleep_until(target):
+             kill_switch.poll_telegram()             # (also carries KILL/RESUME); owner-chat-only, reply-safe
+         except Exception:
+             pass
++        try:
++            from scripts import analyst_drops        # BACKLOG: pick up saved pages from E1-DESK\drops, one line each
++            analyst_drops.tick()
++        except Exception:
++            pass
+         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
+ 
+ 
+diff --git a/tests/test_analyst_drops.py b/tests/test_analyst_drops.py
+new file mode 100644
+index 000000000..609d3efc1
+--- /dev/null
++++ b/tests/test_analyst_drops.py
+@@ -0,0 +1,30 @@
++&quot;&quot;&quot;BACKLOG: analyst-drops folder — one Telegram line per new saved page, fields-only, fires once.&quot;&quot;&quot;
++import os
++import tempfile
++
++from scripts import analyst_drops as ad
++
++
++def _setup(tmp):
++    ad.DROPS_DIR = tmp
++    ad.SEEN = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
++    ad.LOG = os.path.join(tempfile.mkdtemp(), &quot;log.md&quot;)
++
++
++def test_one_note_per_new_drop_and_fields_only():
++    tmp = tempfile.mkdtemp()
++    _setup(tmp)
++    open(os.path.join(tmp, &quot;call.html&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;).write(
++        &quot;&lt;title&gt;TCS looks strong&lt;/title&gt;&lt;body&gt;SELL everything immediately!!&lt;/body&gt;&quot;)
++    posts = []
++    assert ad.scan(post_fn=posts.append) == [&quot;call.html&quot;]
++    assert len(posts) == 1 and &quot;Analyst drop: call.html&quot; in posts[0] and &quot;TCS looks strong&quot; in posts[0]
++    # imperative content in the drop is a field that may be quoted, never an instruction that runs
++    assert ad.scan(post_fn=posts.append) == []          # fires exactly once
++    assert len(posts) == 1
++
++
++def test_missing_folder_is_safe():
++    ad.DROPS_DIR = os.path.join(tempfile.mkdtemp(), &quot;does-not-exist&quot;)
++    ad.SEEN = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
++    assert ad.scan(post_fn=lambda _l: None) == []
+</pre></div><div class='c'><div class='h'><b>52cb4498e</b> · 2026-09-22 22:58</div><div>R-V2-EXACT: consolidated per-page difference list for all ten ported pages (no root swap - diff non-empty)</div><div class='sub h'>docs/reports/2026-09-22-v2-exact-pages.md | 38 +++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-v2-exact-pages.md b/docs/reports/2026-09-22-v2-exact-pages.md
+new file mode 100644
+index 000000000..cb2ac92dc
+--- /dev/null
++++ b/docs/reports/2026-09-22-v2-exact-pages.md
+@@ -0,0 +1,38 @@
++# R-V2-EXACT — the ten pages, ported verbatim, per-page difference list (2026-09-22)
++
++All ten design pages (`design/v8/*.dc.html`) now port through `scripts/v8_port` + `scripts/v8_site`, keeping
++the markup/CSS exactly, with the nav fixed (Deliverables off) and the ticker bound to the real live tape. A
++gate refuses any surviving `937` / `69%` / `[object Object]` / `undefined` / `NaN` / un-bound `{{…}}`; every
++page passes. Each was screenshot-checked against the design where the browser pane was available (How, Data,
++Results, Messages, Main, Patterns, Stocks) and by gate + on-disk grep where it was not (Engine, Ask, Stock).
++
++**The root swap waits for the owner&#x27;s yes, and the difference list below is NOT empty — so no 🙋 is sent.**
++Every &quot;clean&quot; page is bound to real records; every remaining difference is baked illustrative data that needs
++a real record store, flagged here rather than fabricated (§4.4).
++
++| Page | Bound to real data | Still baked (the difference) |
++|---|---|---|
++| **How** | descriptive prose (real system numbers) | none |
++| **Data** | the 4 recorded streams (status/rows/last/days-to-judge/which-engine) | none |
++| **Messages** | the 30 most-recent real sent lines, All/E1/E10/E11/Desk | none |
++| **Results** | the 3 real books (trades/won/₹/avg-R from backtest.json) | none |
++| **Main** | engine-chat + latest-signals bound to real calls | top 4 cards (incl. stale &quot;84 of 210&quot;), 8-stat grid, 15 leaderboard rows |
++| **Patterns** | owner opening line; the real 5 live patterns + net-R | top summary counts, &quot;readings on DABUR&quot; sub-panel, 4 exam sub-steps |
++| **Stocks** | owner title &quot;…watches — 210&quot;; 210 real stocks (volume/trend/signal) | 8 readings the screener doesn&#x27;t carry (RSI/MFI/range/returns/gap) |
++| **Engine** | 17 engine descriptions; pattern rows on the live set | funnel counts, safety-check readings, today-specific step values |
++| **Ask** | engine-chat bound to real calls | the &quot;Example answer&quot; (design&#x27;s labelled illustration) |
++| **Stock** | engine-chat line bound to real calls | DABUR price/readings/per-pattern records, the 30-day chart |
++
++## What every remaining difference has in common
++
++They are all the design&#x27;s per-record illustrative figures — per-engine funnel counts, per-pattern win%/case
++counts, per-stock 35 readings, a stock&#x27;s 30-day range history — for which **no store on disk carries the
++number at the shape the design draws it**. Filling them truthfully needs a real per-engine / per-pattern /
++per-stock record store; inventing them is a §4.4 violation. The four fully-clean pages (How, Data, Messages,
++Results) are the ones whose every field already has a real source.
++
++## Live-site note
++
++`site_loop.py` loaded the porter into memory before these providers existed, so its ~10-min cycle rewrites
++`site/v2/` with the older pages. The ports are built, committed and correct on disk; they appear on the live
++site at the **next stack restart** (a human act, `START_E1_STACK.bat`). No root swap is performed.
+</pre></div><div class='c'><div class='h'><b>54575ef6b</b> · 2026-09-22 22:57</div><div>R-V2-EXACT: port the Stock page (last of ten); bind its engine-chat line to real calls via the shared binder</div><div class='sub h'>scripts/v8_site.py | 10 ++++++++--</div><div class='sub h'>site/v2/stock.html | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index 5bac6e1de..b0702150c 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -128,6 +128,12 @@ def _fix_ask(html):
+     return _bind_engine_chat(html)
+ 
+ 
++def _fix_stock(html):
++    &quot;&quot;&quot;The Stock page is a static single-stock prototype; its only live block is the engine-chat line,
++    bound to the real calls. Price / readings / per-pattern records stay the design&#x27;s illustration.&quot;&quot;&quot;
++    return _bind_engine_chat(html)
++
++
+ def _fix_main(html):
+     &quot;&quot;&quot;Bind the Main page&#x27;s two baked sample blocks to the real recent calls (live.json): the Latest-signals
+     card (3 spans) and the Engine-chat sidebar (6 lines). Keeps the design markup; only the sample text is
+@@ -152,7 +158,7 @@ def _fix_main(html):
+     return _bind_engine_chat(html)
+ 
+ 
+-POST = {&quot;Main.dc.html&quot;: _fix_main, &quot;Ask.dc.html&quot;: _fix_ask}     # per-page post-processor for pages with baked sample sub-trees
++POST = {&quot;Main.dc.html&quot;: _fix_main, &quot;Ask.dc.html&quot;: _fix_ask, &quot;Stock.dc.html&quot;: _fix_stock}     # per-page post-processor for pages with baked sample sub-trees
+ 
+ 
+ # ---------------------------------------------------------------------------------------------------------
+@@ -411,7 +417,7 @@ POST[&quot;Engine.dc.html&quot;] = _fix_engine
+ # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
+ # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
+ # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
+-PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data, &quot;Engine.dc.html&quot;: _engine_data, &quot;Ask.dc.html&quot;: _ask_data}
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data, &quot;Engine.dc.html&quot;: _engine_data, &quot;Ask.dc.html&quot;: _ask_data, &quot;Stock.dc.html&quot;: _ask_data}
+ 
+ 
+ def build(write=True, only=None):
+diff --git a/site/v2/stock.html b/site/v2/stock.html
+new file mode 100644
+index 000000000..58013b158
+--- /dev/null
++++ b/site/v2/stock.html
+@@ -0,0 +1,57 @@
++&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;E1 Terminal - DABUR&lt;/title&gt;&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
++&lt;style&gt;
++body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
++a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
++button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
++button{cursor:pointer}
++&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div style=&quot;width: 1280px; height: 1300px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
++&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
++  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
++    &lt;a href=&quot;index.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
++    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
++  &lt;/div&gt;
++  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
++    &lt;a href=&quot;index.html&quot;&gt;Leaderboard&lt;/a&gt;
++    &lt;a href=&quot;engines.html&quot;&gt;Engines&lt;/a&gt;
++    &lt;a href=&quot;stocks.html&quot; style=&quot;color: #ffffff; border-bottom: 2px solid #5DCAA5; padding-bottom: 4px;&quot;&gt;Stocks&lt;/a&gt;
++    &lt;a href=&quot;patterns.html&quot;&gt;Patterns&lt;/a&gt;
++    
++    &lt;a href=&quot;data.html&quot;&gt;Data&lt;/a&gt;
++    &lt;a href=&quot;results.html&quot;&gt;Results&lt;/a&gt;
++    &lt;a href=&quot;how.html&quot;&gt;How it works&lt;/a&gt;
++    &lt;a href=&quot;ask.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
++  &lt;/div&gt;
++&lt;/div&gt;
++&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
++  &lt;span&gt;DABUR 388.1 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+3.22%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;HINDUNILVR 1951.0 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.83%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;JSWENERGY 516.05 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.67%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;BDL 1174.5 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.3%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;SHREECEM 22520.0 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.4%&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;
++&lt;div style=&quot;padding: 16px 40px 0; display: flex; align-items: center; gap: 14px;&quot;&gt;&lt;a href=&quot;stocks.html&quot; style=&quot;font-size: 14px; color: #9a9a93;&quot;&gt;← Stocks&lt;/a&gt;&lt;div style=&quot;font-size: 20px; font-weight: 600;&quot;&gt;DABUR&lt;/div&gt;&lt;div style=&quot;font-size: 14px; font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #b8b6ae;&quot;&gt;512.30 - today -0.40%&lt;/div&gt;&lt;div style=&quot;font-size: 12px; padding: 3px 9px; border: 1px solid #3a3f4a; border-radius: 999px; color: #5DCAA5;&quot;&gt;signal today - held&lt;/div&gt;&lt;/div&gt;
++&lt;div style=&quot;display: flex; gap: 16px; padding: 14px 40px 0; align-items: flex-start;&quot;&gt;
++ &lt;div style=&quot;flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px;&quot;&gt;
++  &lt;div style=&quot;background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600; margin-bottom: 6px;&quot;&gt;Patterns this stock shows - click a pattern for its rule and record&lt;/div&gt;
++   &lt;div style=&quot;display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 0; font-size: 12px; color: #9a9a93; padding: 8px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div&gt;Pattern&lt;/div&gt;&lt;div&gt;Times seen here&lt;/div&gt;&lt;div&gt;Last seen&lt;/div&gt;&lt;div&gt;Won on this stock&lt;/div&gt;&lt;div&gt;Today&lt;/div&gt;&lt;/div&gt;
++   &lt;a href=&quot;patterns.html&quot; style=&quot;display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 0; font-size: 14px; padding: 10px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;Price sitting in its lowest range for weeks&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[n]&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;today&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[won]&lt;/div&gt;&lt;div style=&quot;color: #5DCAA5;&quot;&gt;signal&lt;/div&gt;&lt;/a&gt;
++   &lt;a href=&quot;patterns.html&quot; style=&quot;display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 0; font-size: 14px; padding: 10px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;Calm stock with steady momentum&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[n]&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[date]&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[won]&lt;/div&gt;&lt;div style=&quot;color: #9a9a93;&quot;&gt;not today&lt;/div&gt;&lt;/a&gt;
++   &lt;a href=&quot;patterns.html&quot; style=&quot;display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 0; font-size: 14px; padding: 10px 0;&quot;&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;Money flowing out while price holds&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[n]&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[date]&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;[won]&lt;/div&gt;&lt;div style=&quot;color: #9a9a93;&quot;&gt;not today&lt;/div&gt;&lt;/a&gt;&lt;/div&gt;
++  &lt;div style=&quot;background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600; margin-bottom: 6px;&quot;&gt;Today&#x27;s readings - all 35, slide sideways&lt;/div&gt;
++   &lt;div style=&quot;overflow-x: auto;&quot;&gt;&lt;div style=&quot;display: grid; grid-template-columns: repeat(12, 110px); gap: 0; font-size: 12px; color: #9a9a93; padding: 8px 0; border-bottom: 1px solid #23262d; width: 1320px;&quot;&gt;&lt;div&gt;Price vs range&lt;/div&gt;&lt;div&gt;Momentum&lt;/div&gt;&lt;div&gt;Calm&lt;/div&gt;&lt;div&gt;Money flow&lt;/div&gt;&lt;div&gt;Volume&lt;/div&gt;&lt;div&gt;Price gap&lt;/div&gt;&lt;div&gt;5-day move&lt;/div&gt;&lt;div&gt;20-day move&lt;/div&gt;&lt;div&gt;Gap today&lt;/div&gt;&lt;div&gt;Trend&lt;/div&gt;&lt;div&gt;Range 60d&lt;/div&gt;&lt;div&gt;... 24 more&lt;/div&gt;&lt;/div&gt;
++   &lt;div style=&quot;display: grid; grid-template-columns: repeat(12, 110px); gap: 0; font-size: 14px; padding: 10px 0; width: 1320px; font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;lowest 12%&lt;/div&gt;&lt;div&gt;44&lt;/div&gt;&lt;div&gt;31&lt;/div&gt;&lt;div&gt;38&lt;/div&gt;&lt;div&gt;1.4x&lt;/div&gt;&lt;div&gt;0.05%&lt;/div&gt;&lt;div&gt;+1.2%&lt;/div&gt;&lt;div&gt;-3.4%&lt;/div&gt;&lt;div&gt;-0.4%&lt;/div&gt;&lt;div&gt;down&lt;/div&gt;&lt;div&gt;lowest&lt;/div&gt;&lt;div style=&quot;color: #6f6f69;&quot;&gt;...&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600; margin-bottom: 2px;&quot;&gt;This stock&#x27;s story - last 30 days&lt;/div&gt;&lt;div style=&quot;font-size: 12px; color: #9a9a93; margin-bottom: 8px;&quot;&gt;Where the price sat in its range each day. Blue = the day a signal fired.&lt;/div&gt;
++   &lt;div style=&quot;display: flex; gap: 4px; align-items: flex-end; height: 90px;&quot;&gt;&lt;div style=&quot;flex-grow: 1; height: 40%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 52%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 47%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 60%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 55%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 49%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 38%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 33%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 28%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 24%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 21%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 19%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 16%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 12%; background: #85B7EB;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;flex-grow: 1; height: 14%; background: #23262d;&quot;&gt;&lt;/div&gt;&lt;/div&gt;
++   &lt;div style=&quot;display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;border: 1px solid #23262d; border-radius: 8px; padding: 8px 10px;&quot;&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Today 09:16&lt;/div&gt;&lt;div&gt;Signal - pattern met&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;border: 1px solid #23262d; border-radius: 8px; padding: 8px 10px;&quot;&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Today 09:16&lt;/div&gt;&lt;div style=&quot;color: #F0997B;&quot;&gt;Paper order held - price gap being measured&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;border: 1px solid #23262d; border-radius: 8px; padding: 8px 10px;&quot;&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;If placed&lt;/div&gt;&lt;div style=&quot;color: #b8b6ae;&quot;&gt;Exit by stop, target, or after 20 days&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600; margin-bottom: 6px;&quot;&gt;Calls on this stock&lt;/div&gt;
++   &lt;div style=&quot;display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; font-size: 12px; color: #9a9a93; padding: 8px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div&gt;Date&lt;/div&gt;&lt;div&gt;Engine&lt;/div&gt;&lt;div&gt;Side&lt;/div&gt;&lt;div&gt;Size ₹&lt;/div&gt;&lt;div&gt;Result ₹&lt;/div&gt;&lt;div&gt;Status&lt;/div&gt;&lt;/div&gt;
++   &lt;div style=&quot;display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; font-size: 14px; padding: 10px 0;&quot;&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;21 Sep&lt;/div&gt;&lt;div&gt;E1 - E10 - E11&lt;/div&gt;&lt;div&gt;buy&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;1,000 - 680 - 2,062&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;-&lt;/div&gt;&lt;div style=&quot;color: #F0997B;&quot;&gt;held&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
++ &lt;/div&gt;
++&lt;div style=&quot;width: 340px; flex-shrink: 0; background: #161920; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;&quot;&gt;
++  &lt;div style=&quot;display: flex; justify-content: space-between; align-items: baseline;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600;&quot;&gt;Engine chat&lt;/div&gt;&lt;a href=&quot;messages.html&quot; style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;all messages&lt;/a&gt;&lt;/div&gt;
++  &lt;div style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;What each engine is thinking, live. Same words as Telegram.&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;DABUR — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #85B7EB; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #85B7EB;&quot;&gt;E10&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;HINDUNILVR — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #FAC775; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #FAC775;&quot;&gt;E11&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;JSWENERGY — E1: when RSI is between 40 and 60 and volatility (ATR) is in its…. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;BDL — E1: when RSI is between 30 and 50 and money-flow (MFI) is betwee…. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:15&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;SHREECEM — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;18:46&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #9a9a93;&quot;&gt;no engine chat yet today&lt;/div&gt;&lt;/div&gt;
++&lt;/div&gt;
++&lt;/div&gt;
++&lt;div style=&quot;margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 14px 40px; border-top: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;font-size: 12px; color: #6f6f69;&quot;&gt;Readings refresh every 2 minutes. Paper only.&lt;/div&gt;&lt;a href=&quot;stock.html&quot; style=&quot;font-size: 14px; padding: 10px 16px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Download Excel - this stock&#x27;s readings and calls&lt;/a&gt;&lt;/div&gt;
++&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>ffd28e24b</b> · 2026-09-22 22:55</div><div>R-V2-EXACT: port the Ask page; factor a shared engine-chat binder, bind Ask+Main chat to real calls</div><div class='sub h'>scripts/v8_site.py | 50 ++++++++++++++++++++-------------</div><div class='sub h'>site/v2/ask.html   | 82 ++++++++++++++++++++++++++++++------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
 index dd2c3db3e..5bac6e1de 100644
 --- a/scripts/v8_site.py
 +++ b/scripts/v8_site.py
@@ -1715,409 +2265,4 @@ index 000000000..b4e9e564d
 +
 +if __name__ == &quot;__main__&quot;:
 +    test_how_ports_clean_and_verbatim(); test_ticker_baked_sample_replaced(); print(&quot;test_v8_site OK&quot;)
-</pre></div><div class='c'><div class='h'><b>2b28ea169</b> · 2026-09-22 21:38</div><div>R-EYES-COMPLETE done (built); queue advances to R-V2-EXACT pages</div><div class='sub h'>reports/BUILD-STATE.json | 6 +++---</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 932a13597..9a1a731b1 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;R-NOW-LINE done&quot;,
-- &quot;item&quot;: &quot;R-EYES-COMPLETE (next in queue)&quot;,
-+ &quot;ruling&quot;: &quot;R-EYES-COMPLETE done (built)&quot;,
-+ &quot;item&quot;: &quot;R-V2-EXACT remaining pages&quot;,
-  &quot;tests&quot;: &quot;all C-series + tabs + fixes tested; full suite last 244 green&quot;,
-- &quot;next&quot;: &quot;R-EYES-COMPLETE, then remaining R-V2-EXACT pages&quot;,
-+ &quot;next&quot;: &quot;R-V2-EXACT verbatim /v2/ page rebuild (Main, Engine, Stocks, etc.)&quot;,
-  &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
- }
-\ No newline at end of file
-</pre></div><div class='c'><div class='h'><b>4829afbae</b> · 2026-09-22 21:37</div><div>R-EYES-COMPLETE (10): report to docs/reports — mirror built, ten pages, ruling inbox, eyes map</div><div class='sub h'>docs/reports/2026-09-22-R-EYES-COMPLETE.md | 34 ++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-R-EYES-COMPLETE.md b/docs/reports/2026-09-22-R-EYES-COMPLETE.md
-new file mode 100644
-index 000000000..5c419b1a4
---- /dev/null
-+++ b/docs/reports/2026-09-22-R-EYES-COMPLETE.md
-@@ -0,0 +1,34 @@
-+# R-EYES-COMPLETE — report (2026-09-22) — BUILT (live once the first → AUDIT report lands)
-+
-+One link — the build room — mirrors everything the owner would otherwise paste, written by the status-writer
-+process, and the lead&#x27;s rulings reach the builder by Telegram without opening a session.
-+
-+## Steps + commits
-+1. One link / mirror pages — the /build/ index links all ten pages: Now (status.html top) · Journal · Commits
-+   · Tests · Supervisor · Messages · Reports · Screenshots · Queue · Eyes. Each page shows its own written
-+   time; the status writer (site_loop&#x27;s halt-proof daemon, via build_journal→mirror) writes them each cycle.
-+   **db81dc744**
-+2. Messages — scripts/msg_log.py records every line sent (notify→outgoing) and command received
-+   (kill_switch→incoming) to reports/MSG-LOG.tsv, scrubbed, newest first. **d696097a9**
-+3. Reports — every end-of-dispatch/audit/supervisor report is written to docs/reports/*.md before posting; the
-+   Reports page renders them newest first (this file included). **db81dc744**
-+4. Screenshots — mirror.record_screenshot(time·ruling·page) → the Screenshots page. **db81dc744**
-+5. Queue — mirror.queue_state derives archived/in-progress/pending/done from docs/dispatches (+ inbox) and the
-+   checklist; next_pending() feeds the beat&#x27;s next, never typed. **db81dc744**
-+6. Ruling inbox — a → BUILD Telegram (owner chat) is archived verbatim to docs/dispatches/inbox/&lt;time&gt;.md and
-+   inserted at the front of the checklist (auto-continue takes it next); a → AUDIT triggers a fresh independent
-+   Opus audit (docs/AUDITOR-TEMPLATE.md, reads repo+mirror) whose report lands on Reports + one Telegram line.
-+   The bot replies &quot;queued: &lt;first words&gt;&quot;. Interactive audit retired. **ef04300cd**
-+7. Every Telegram line ends with the mirror link. **b955569cd**
-+8. Eyes map — docs/EYES.md, linked from status.html: every watcher × (sees what · how old at most · what
-+   freezes it · what still needs the owner). **db81dc744**
-+9. Tests per step, all committed; no test sends a real Telegram line or touches a ledger.
-+
-+## Mirror link
-+https://[redacted]-[redacted].github.io/e1-live-site/build/index.html
-+
-+## BUILT, not live
-+The running token_ping/site_loop still carry the pre-R-EYES-COMPLETE code, so the inbox routing, the mirror
-+pages and the daemon writing them go live on the next stack restart (a human/owner act). The END-TO-END PROOF
-+is the owner&#x27;s first &quot;→ AUDIT&quot; from Telegram: it must appear on Queue, run, and land on Reports without anyone
-+opening a session. Until that report exists on the mirror, this is BUILT, not live.
-</pre></div><div class='c'><div class='h'><b>b955569cd</b> · 2026-09-22 21:36</div><div>R-EYES-COMPLETE (7): every Telegram line ends with the mirror link (build room)</div><div class='sub h'>scripts/notify.py         | 17 ++++++++++-------</div><div class='sub h'>tests/test_mirror_link.py | 18 ++++++++++++++++++</div><pre>diff --git a/scripts/notify.py b/scripts/notify.py
-index c66584d5f..de0927269 100644
---- a/scripts/notify.py
-+++ b/scripts/notify.py
-@@ -62,15 +62,18 @@ def _log_send(message: str, result: str) -&gt; None:
- _SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
- 
- 
-+MIRROR_LINK = &quot;https://[redacted]-[redacted].github.io/e1-live-site/build/index.html&quot;
-+
-+
- def _with_link(message: str) -&gt; str:
--    &quot;&quot;&quot;R-E1-ALERT-OWN + R-E1-THREE-EMOJIS: a summons (🙋), a completion (✅), or a session-finish ([CODE])
--    line carries a tap-to-open link to the live site (which MacroDroid can open). The ⏱ progress lines and
--    other info lines are untouched, and a message that already has the link is not doubled.&quot;&quot;&quot;
-+    &quot;&quot;&quot;R-EYES-COMPLETE §7: EVERY Telegram line ends with the mirror link (the build room — one link that shows
-+    Now/Journal/Commits/Tests/Supervisor/Messages/Reports/Screenshots/Queue/Eyes). A line that already carries
-+    an e1-live-site link (the beat/live-bar carry the status page, which the mirror contains) is not doubled.
-+    (Supersedes the earlier status-only rule for alert lines.)&quot;&quot;&quot;
-     m = str(message)
--    is_alert = (&quot;\U0001f64b&quot; in m) or (&quot;✅&quot; in m) or m.lstrip().startswith(&quot;[CODE]&quot;)
--    if is_alert and _SITE not in m:
--        return m.rstrip() + &quot; — open &quot; + _SITE
--    return m
-+    if &quot;github.io/e1-live-site&quot; in m:
-+        return m
-+    return m.rstrip() + &quot; · &quot; + MIRROR_LINK
- 
- 
- def _creds() -&gt; tuple[str | None, str | None]:
-diff --git a/tests/test_mirror_link.py b/tests/test_mirror_link.py
-new file mode 100644
-index 000000000..d662f51db
---- /dev/null
-+++ b/tests/test_mirror_link.py
-@@ -0,0 +1,18 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (7): every Telegram line ends with the mirror link; not doubled if one is present.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import notify
-+
-+
-+def test_plain_line_gets_mirror_link():
-+    out = notify._with_link(&quot;STACK: restarted 21:00&quot;)
-+    assert out.endswith(notify.MIRROR_LINK) and &quot;/build/index.html&quot; in out
-+
-+
-+def test_line_with_status_link_not_doubled():
-+    out = notify._with_link(&quot;LIVE PAPER done · https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;)
-+    assert out.count(&quot;github.io/e1-live-site&quot;) == 1       # not doubled
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_plain_line_gets_mirror_link(); test_line_with_status_link_not_doubled(); print(&quot;test_mirror_link OK&quot;)
-</pre></div><div class='c'><div class='h'><b>db81dc744</b> · 2026-09-22 21:35</div><div>R-EYES-COMPLETE (1,3,4,5,8): mirror pages — Queue/Reports/Messages/Tests/Screenshots/Eyes</div><div class='sub h'>docs/EYES.md             |  23 ++++++</div><div class='sub h'>scripts/build_journal.py |  13 +++-</div><div class='sub h'>scripts/mirror.py        | 180 +++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py        |   2 +</div><div class='sub h'>tests/test_mirror.py     |  30 ++++++++</div><pre>diff --git a/docs/EYES.md b/docs/EYES.md
-new file mode 100644
-index 000000000..bd753abc4
---- /dev/null
-+++ b/docs/EYES.md
-@@ -0,0 +1,23 @@
-+# EYES — every watcher on the desk (R-EYES-COMPLETE §8)
-+
-+Linked from status.html. For each watcher: what it sees · how old at most (from the writer&#x27;s cadence, not
-+typed) · what freezes it · what still needs the owner.
-+
-+| Watcher | Sees what | How old at most | What freezes it | Still needs the owner |
-+|---|---|---|---|---|
-+| status.html | token, processes, streams, gates, orders, audit, the NOW line | 2 min (status daemon cycle) | the site_loop process dying | nothing — the daemon is halt-proof |
-+| /build/ Now | the current tool scene from now.txt | 2 min (status daemon) | the build session gone (now.txt stops) | nothing |
-+| /build/ Journal | append-only build log | 10 min (full site cycle) | the full cycle stalling | nothing |
-+| /build/ Commits | tonight&#x27;s commits + scrubbed diffs | 10 min (full cycle) | the full cycle stalling | nothing |
-+| /build/ Tests | the last commit&#x27;s test result | when tests are recorded | tests not run | nothing |
-+| /build/ Supervisor | the independent watcher&#x27;s checks | 30 min idle / after every commit | the supervisor process gone | a real HALT reason to look at |
-+| /build/ Messages | every line sent + command received | 10 min (full cycle) | the full cycle stalling | nothing |
-+| /build/ Reports | every end-of-dispatch + audit report | 10 min (full cycle) | the full cycle stalling | nothing |
-+| /build/ Screenshots | every screenshot with time/ruling/page | 10 min (full cycle) | the full cycle stalling | nothing |
-+| /build/ Queue | rulings archived / in progress / pending / done | 10 min (full cycle) | the full cycle stalling | nothing |
-+| supervisor | scope + standing laws, after every commit | 30 min idle | its process gone; token limit | overturn a wrong HALT with one line |
-+| watchdog | recorders + runner + supervisor alive | its own tick | its process gone | restart the stack (human act) |
-+| dead-man (silence alarm) | no supervisor check for 30 min | 5 min (token_ping wake) | token_ping gone | nothing |
-+| Telegram (inbound) | KILL / RESUME / clear halt / now / → BUILD / → AUDIT | 5 min (token_ping wake) | token_ping gone; no token | send the commands |
-+| audit runs | a fresh independent read on demand | on each → AUDIT | claude CLI missing | send → AUDIT |
-+| chat lead (this) | everything above, via the mirror link | one message | a HALT that blocks the build session | the root swap; owner-only doors |
-diff --git a/scripts/build_journal.py b/scripts/build_journal.py
-index 7167599cb..e6be1980a 100644
---- a/scripts/build_journal.py
-+++ b/scripts/build_journal.py
-@@ -354,7 +354,13 @@ def _index_body(slug, have_transcript):
-         &quot;&lt;li&gt;&lt;a href=&#x27;journal.html&#x27;&gt;Journal&lt;/a&gt; — append-only build log&lt;/li&gt;&quot;
-         &quot;%s&quot;
-         &quot;&lt;li&gt;&lt;a href=&#x27;commits.html&#x27;&gt;Commits&lt;/a&gt; — tonight&#x27;s commits with full diffs&lt;/li&gt;&quot;
--        &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&lt;/ul&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;messages.html&#x27;&gt;Messages&lt;/a&gt; — every line sent + command received&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;reports.html&#x27;&gt;Reports&lt;/a&gt; — end-of-dispatch + audit reports, newest first&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;tests.html&#x27;&gt;Tests&lt;/a&gt; — the last recorded test result&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;screenshots.html&#x27;&gt;Screenshots&lt;/a&gt; — with time, ruling, page&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;queue.html&#x27;&gt;Queue&lt;/a&gt; — rulings archived / in progress / pending / done&lt;/li&gt;&quot;
-+        &quot;&lt;li&gt;&lt;a href=&#x27;eyes.html&#x27;&gt;Eyes map&lt;/a&gt; — every watcher on the desk&lt;/li&gt;&lt;/ul&gt;&quot;
-         &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: %s&lt;/p&gt;&quot;
-         % (_html.escape(st.get(&quot;ruling&quot;, &quot;—&quot;)), _html.escape(st.get(&quot;item&quot;, &quot;&quot;)), tlink,
-            _html.escape(st.get(&quot;flag&quot;, &quot;NOTHING NEEDS THE LEAD&quot;))))
-@@ -380,6 +386,11 @@ def build(write=True):
-         for name, content in pages.items():
-             with open(os.path.join(OUT, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-                 f.write(content)
-+        try:
-+            from scripts import mirror                     # R-EYES-COMPLETE: Queue/Reports/Messages/Tests/Shots/Eyes
-+            mirror.build()
-+        except Exception:
-+            pass
-         sup = os.path.join(OUT, &quot;supervisor&quot;, &quot;index.html&quot;)   # placeholder until supervisor.py writes its own
-         if not os.path.exists(sup):
-             os.makedirs(os.path.dirname(sup), exist_ok=True)
-diff --git a/scripts/mirror.py b/scripts/mirror.py
-new file mode 100644
-index 000000000..3edce1ea2
---- /dev/null
-+++ b/scripts/mirror.py
-@@ -0,0 +1,180 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (1,3,4,5,8): the extra mirror pages under /build/, written by the status writer every cycle.
-+
-+  Queue       — rulings archived / in progress / pending / done, from docs/dispatches (+ inbox) and the checklist.
-+  Reports     — every docs/reports/*.md (end-of-dispatch + audit + supervisor verdicts), newest first, scrubbed.
-+  Messages    — the incoming/outgoing Telegram log (scrubbed), newest first.
-+  Tests       — the last recorded test result.
-+  Screenshots — every recorded screenshot with time · ruling · page.
-+  Eyes        — docs/EYES.md, the watcher map.
-+Each page shows its own written time at the top. next_pending() feeds the beat&#x27;s &#x27;next:&#x27; (never typed).&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import glob
-+import html as _h
-+import json
-+import os
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;)
-+SHOTS_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;SCREENSHOTS.tsv&quot;)
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _scrub(s):
-+    try:
-+        from scripts import build_journal
-+        return build_journal.scrub(str(s or &quot;&quot;))
-+    except Exception:
-+        return str(s or &quot;&quot;)
-+
-+
-+def _page(title, body):
-+    stamp = &quot;written %s&quot; % _now().strftime(&quot;%Y-%m-%d %H:%M IST&quot;)   # every page shows its own written time
-+    try:
-+        from scripts import build_journal
-+        return build_journal._page(title, &quot;&lt;p style=&#x27;color:#9a9a93;font-size:12px&#x27;&gt;%s · &lt;a href=&#x27;index.html&#x27;&gt;&quot;
-+                                   &quot;build room&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;%s&lt;/h1&gt;%s&quot; % (stamp, _h.escape(title), body))
-+    except Exception:
-+        return &quot;&lt;!doctype html&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;title&gt;%s&lt;/title&gt;&lt;p&gt;%s&lt;/p&gt;&lt;h1&gt;%s&lt;/h1&gt;%s&quot; % (
-+            title, stamp, title, body)
-+
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# Queue (§5)
-+# ---------------------------------------------------------------------------------------------------------
-+def queue_state():
-+    archived = sorted(os.path.basename(p)[:-3] for p in glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;*.md&quot;)))
-+    inbox = sorted(os.path.basename(p)[:-3] for p in glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;inbox&quot;, &quot;*.md&quot;))
-+                   if not p.endswith(&quot;README.md&quot;))
-+    try:
-+        c = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;), encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        c = {}
-+    pending = [x for x in (c.get(&quot;remaining&quot;) or []) if x]
-+    done = [x for x in (c.get(&quot;done&quot;) or []) if x]
-+    try:
-+        item = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;), encoding=&quot;utf-8&quot;)).get(&quot;item&quot;)
-+    except Exception:
-+        item = None
-+    return {&quot;archived&quot;: archived, &quot;inbox&quot;: inbox, &quot;in_progress&quot;: item, &quot;pending&quot;: pending, &quot;done&quot;: done}
-+
-+
-+def next_pending():
-+    &quot;&quot;&quot;The beat&#x27;s &#x27;next:&#x27; — the first pending checklist item, else the next backlog item. Never typed.&quot;&quot;&quot;
-+    q = queue_state()
-+    if q[&quot;pending&quot;]:
-+        return q[&quot;pending&quot;][0]
-+    try:
-+        from scripts import backlog
-+        return backlog.next_item()
-+    except Exception:
-+        return None
-+
-+
-+def _queue_page():
-+    q = queue_state()
-+    def ul(items):
-+        return &quot;&lt;ul&gt;&quot; + &quot;&quot;.join(&quot;&lt;li&gt;%s&lt;/li&gt;&quot; % _h.escape(str(x)) for x in items) + &quot;&lt;/ul&gt;&quot; if items else &quot;&lt;p class=&#x27;sub&#x27;&gt;none&lt;/p&gt;&quot;
-+    body = (&quot;&lt;h3&gt;In progress&lt;/h3&gt;&lt;p&gt;%s&lt;/p&gt;&lt;h3&gt;Pending (auto-continue takes these in order)&lt;/h3&gt;%s&quot;
-+            &quot;&lt;h3&gt;Inbox rulings (→ BUILD)&lt;/h3&gt;%s&lt;h3&gt;Done&lt;/h3&gt;%s&lt;h3&gt;Archived rulings&lt;/h3&gt;%s&quot;
-+            % (_h.escape(str(q[&quot;in_progress&quot;] or &quot;—&quot;)), ul(q[&quot;pending&quot;]), ul(q[&quot;inbox&quot;]),
-+               ul(q[&quot;done&quot;][-40:]), ul(q[&quot;archived&quot;])))
-+    return _page(&quot;Queue&quot;, body)
-+
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# Reports (§3), Messages (§2 render), Tests, Screenshots (§4), Eyes (§8)
-+# ---------------------------------------------------------------------------------------------------------
-+def _reports_page():
-+    files = sorted(glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;reports&quot;, &quot;*.md&quot;)), reverse=True)   # newest first
-+    blocks = []
-+    for p in files[:40]:
-+        try:
-+            txt = _scrub(open(p, encoding=&quot;utf-8&quot;).read())
-+        except Exception:
-+            continue
-+        blocks.append(&quot;&lt;h3&gt;%s&lt;/h3&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot; % (_h.escape(os.path.basename(p)), _h.escape(txt[:40000])))
-+    return _page(&quot;Reports&quot;, &quot;&quot;.join(blocks) or &quot;&lt;p class=&#x27;sub&#x27;&gt;no reports yet&lt;/p&gt;&quot;)
-+
-+
-+def _messages_page():
-+    try:
-+        from scripts import msg_log
-+        rows = msg_log.recent(400)
-+    except Exception:
-+        rows = []
-+    trs = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+        _h.escape(r[0][:19].replace(&quot;T&quot;, &quot; &quot;)), _h.escape(r[1]), _h.escape(r[2])) for r in rows)
-+    return _page(&quot;Messages&quot;, &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;Text&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
-+                 % (trs or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no messages yet&lt;/td&gt;&lt;/tr&gt;&quot;))
-+
-+
-+def _tests_page():
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;LAST-TESTS.json&quot;), encoding=&quot;utf-8&quot;))
-+        body = &quot;&lt;p&gt;Last recorded suite: &lt;b&gt;%s / %s&lt;/b&gt; at %s.&lt;/p&gt;&quot; % (d.get(&quot;passed&quot;), d.get(&quot;total&quot;), d.get(&quot;at&quot;))
-+    except Exception:
-+        body = &quot;&lt;p class=&#x27;sub&#x27;&gt;no recorded test result yet&lt;/p&gt;&quot;
-+    return _page(&quot;Tests&quot;, body)
-+
-+
-+def record_screenshot(name, ruling, page):
-+    &quot;&quot;&quot;A session records a screenshot it took (R-EYES-COMPLETE §4).&quot;&quot;&quot;
-+    try:
-+        os.makedirs(os.path.dirname(SHOTS_LOG), exist_ok=True)
-+        with open(SHOTS_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(&quot;%s\t%s\t%s\t%s\n&quot; % (_now().isoformat(), _scrub(name), _scrub(ruling), _scrub(page)))
-+    except Exception:
-+        pass
-+
-+
-+def _screenshots_page():
-+    try:
-+        rows = [l.split(&quot;\t&quot;) for l in open(SHOTS_LOG, encoding=&quot;utf-8&quot;).read().splitlines() if l.strip()]
-+        rows = [r for r in rows if len(r) == 4][::-1]
-+    except Exception:
-+        rows = []
-+    trs = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+        _h.escape(r[0][:19]), _h.escape(r[2]), _h.escape(r[3]), _h.escape(r[1])) for r in rows)
-+    return _page(&quot;Screenshots&quot;, &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Ruling&lt;/th&gt;&lt;th&gt;Page&lt;/th&gt;&lt;th&gt;Name&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
-+                 % (trs or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;4&#x27;&gt;no screenshots recorded yet&lt;/td&gt;&lt;/tr&gt;&quot;))
-+
-+
-+def _eyes_page():
-+    try:
-+        txt = open(os.path.join(REPO, &quot;docs&quot;, &quot;EYES.md&quot;), encoding=&quot;utf-8&quot;).read()
-+    except Exception:
-+        txt = &quot;(no EYES.md)&quot;
-+    return _page(&quot;Eyes map&quot;, &quot;&lt;pre&gt;%s&lt;/pre&gt;&quot; % _h.escape(txt))
-+
-+
-+def build(write=True):
-+    pages = {&quot;queue.html&quot;: _queue_page(), &quot;reports.html&quot;: _reports_page(), &quot;messages.html&quot;: _messages_page(),
-+             &quot;tests.html&quot;: _tests_page(), &quot;screenshots.html&quot;: _screenshots_page(), &quot;eyes.html&quot;: _eyes_page()}
-+    if write:
-+        os.makedirs(OUT, exist_ok=True)
-+        for name, html in pages.items():
-+            with open(os.path.join(OUT, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+                f.write(html)
-+    return sorted(pages)
-+
-+
-+def _demo():
-+    for name, html in {&quot;q&quot;: _queue_page(), &quot;r&quot;: _reports_page(), &quot;m&quot;: _messages_page(), &quot;t&quot;: _tests_page(),
-+                       &quot;s&quot;: _screenshots_page(), &quot;e&quot;: _eyes_page()}.items():
-+        assert &quot;written &quot; in html and &quot;&lt;h1&gt;&quot; in html
-+    assert isinstance(next_pending(), (str, type(None)))
-+    print(&quot;mirror demo OK: 6 pages, each with a written time; next_pending() = %s&quot; % (next_pending() or &quot;—&quot;)[:40])
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo() if &quot;--demo&quot; in sys.argv else print(build())
-diff --git a/scripts/vitals.py b/scripts/vitals.py
-index 0d43bb490..5978495b8 100644
---- a/scripts/vitals.py
-+++ b/scripts/vitals.py
-@@ -310,6 +310,8 @@ def _write_html(s):
-             &quot;&lt;p class=&#x27;big&#x27;&gt;&quot; + _h.escape(s[&quot;plain&quot;]) + &quot;&lt;/p&gt;&quot;
-             &quot;&lt;p class=&#x27;sub&#x27;&gt;&quot; + _h.escape(s[&quot;ready_line&quot;]) + &quot; · updated &quot; + _h.escape(s[&quot;generated&quot;]) +
-             &quot; · refreshes every 2 minutes&lt;/p&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;build/index.html&#x27; style=&#x27;color:#7db4ff&#x27;&gt;build room&lt;/a&gt; · &quot;
-+            &quot;&lt;a href=&#x27;build/eyes.html&#x27; style=&#x27;color:#7db4ff&#x27;&gt;eyes map&lt;/a&gt;&lt;/p&gt;&quot;   # R-EYES-COMPLETE §8&quot;
-             &quot;&lt;h3&gt;Processes&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Process&lt;/th&gt;&lt;th&gt;PID&lt;/th&gt;&lt;th&gt;Since&lt;/th&gt;&lt;/tr&gt;&quot; + rows + &quot;&lt;/table&gt;&quot;
-             &quot;&lt;h3&gt;Streams (rows in the last 10 min)&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Stream&lt;/th&gt;&lt;th&gt;Rows&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;/tr&gt;&quot;
-             + streams + &quot;&lt;/table&gt;&quot;
-diff --git a/tests/test_mirror.py b/tests/test_mirror.py
-new file mode 100644
-index 000000000..eece7cdbf
---- /dev/null
-+++ b/tests/test_mirror.py
-@@ -0,0 +1,30 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (1,3,4,5,8): the mirror pages build with a written time; the queue derives next_pending.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import mirror
-+
-+
-+def test_pages_have_written_time():
-+    for fn in (mirror._queue_page, mirror._reports_page, mirror._messages_page, mirror._tests_page,
-+               mirror._screenshots_page, mirror._eyes_page):
-+        html = fn()
-+        assert &quot;written &quot; in html and &quot;&lt;h1&gt;&quot; in html
-+
-+
-+def test_queue_state_and_next_pending():
-+    q = mirror.queue_state()
-+    assert set(q) &gt;= {&quot;archived&quot;, &quot;inbox&quot;, &quot;in_progress&quot;, &quot;pending&quot;, &quot;done&quot;}
-+    assert isinstance(q[&quot;archived&quot;], list) and q[&quot;archived&quot;]      # dispatches exist
-+    assert mirror.next_pending() is None or isinstance(mirror.next_pending(), str)
-+
-+
-+def test_record_screenshot_shows_on_page():
-+    mirror.SHOTS_LOG = os.path.join(tempfile.mkdtemp(), &quot;shots.tsv&quot;)
-+    mirror.record_screenshot(&quot;status.png&quot;, &quot;R-NOW-LINE&quot;, &quot;status.html&quot;)
-+    html = mirror._screenshots_page()
-+    assert &quot;R-NOW-LINE&quot; in html and &quot;status.html&quot; in html
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_pages_have_written_time(); test_queue_state_and_next_pending(); test_record_screenshot_shows_on_page()
-+    print(&quot;test_mirror OK&quot;)
 </pre></div></main></body></html>
