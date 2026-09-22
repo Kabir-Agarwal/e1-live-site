@@ -1,4 +1,20 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3ce5bf858</b> · 2026-09-22 16:16</div><div>R-NO-WINDOWS: one windowless launcher, output to E1-DESK\logs, proven no console windows</div><div class='sub h'>docs/dispatches/2026-09-22_R-NO-WINDOWS.md |  9 +++++</div><div class='sub h'>scripts/deskproc.py                        | 64 ++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kite_login.py                      | 14 ++-----</div><div class='sub h'>scripts/launch_e1.py                       | 12 +++++-</div><div class='sub h'>scripts/restart_stack.py                   |  7 +---</div><div class='sub h'>scripts/supervisor.py                      |  3 +-</div><div class='sub h'>scripts/watchdog.py                        |  6 ++-</div><div class='sub h'>tests/test_no_windows.py                   | 30 ++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-NO-WINDOWS.md b/docs/dispatches/2026-09-22_R-NO-WINDOWS.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>b085eb488</b> · 2026-09-22 16:18</div><div>supervisor: count cache-read tokens in the per-run usage log (R-EYES-FULL measurement)</div><div class='sub h'>scripts/supervisor.py | 5 +++--</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+index 0eb477132..319cde0f6 100644
+--- a/scripts/supervisor.py
++++ b/scripts/supervisor.py
+@@ -154,8 +154,9 @@ def _invoke_claude(prompt):
+                     text.append(b[&quot;text&quot;])
+         if ev.get(&quot;type&quot;) == &quot;result&quot;:
+             u = ev.get(&quot;usage&quot;) or {}
+-            usage = {&quot;input&quot;: u.get(&quot;input_tokens&quot;), &quot;output&quot;: u.get(&quot;output_tokens&quot;),
+-                     &quot;cost_usd&quot;: ev.get(&quot;total_cost_usd&quot;)}
++            in_tot = (u.get(&quot;input_tokens&quot;) or 0) + (u.get(&quot;cache_read_input_tokens&quot;) or 0) + \
++                     (u.get(&quot;cache_creation_input_tokens&quot;) or 0)   # the big prompt is mostly cache-read
++            usage = {&quot;input&quot;: in_tot, &quot;output&quot;: u.get(&quot;output_tokens&quot;), &quot;cost_usd&quot;: ev.get(&quot;total_cost_usd&quot;)}
+     return &quot;\n&quot;.join(text), usage
+ 
+ 
+</pre></div><div class='c'><div class='h'><b>3ce5bf858</b> · 2026-09-22 16:16</div><div>R-NO-WINDOWS: one windowless launcher, output to E1-DESK\logs, proven no console windows</div><div class='sub h'>docs/dispatches/2026-09-22_R-NO-WINDOWS.md |  9 +++++</div><div class='sub h'>scripts/deskproc.py                        | 64 ++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kite_login.py                      | 14 ++-----</div><div class='sub h'>scripts/launch_e1.py                       | 12 +++++-</div><div class='sub h'>scripts/restart_stack.py                   |  7 +---</div><div class='sub h'>scripts/supervisor.py                      |  3 +-</div><div class='sub h'>scripts/watchdog.py                        |  6 ++-</div><div class='sub h'>tests/test_no_windows.py                   | 30 ++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-NO-WINDOWS.md b/docs/dispatches/2026-09-22_R-NO-WINDOWS.md
 new file mode 100644
 index 000000000..83652211a
 --- /dev/null
@@ -8795,88 +8811,4 @@ index 832732723..6d735274a 100644
          # R-NIGHT-CLOSE (2): the 08:30 self-check fires from THIS process (in-process timer, not Task
          # Scheduler). send_once dedupes with the backup Windows task via a per-day marker, so exactly one
          # &#x27;READY / NOT READY&#x27; line goes out.
-</pre></div><div class='c'><div class='h'><b>791fa92cf</b> · 2026-09-22 02:43</div><div>R-MORNING-22 (4): E21 marks captured through the day (idempotent); SPAN already fetched at login</div><div class='sub h'>engine21_overnight/overnight.py | 17 +++++++++++++++--</div><div class='sub h'>scripts/site_build.py           |  5 +++++</div><div class='sub h'>tests/test_e21_marks.py         | 26 ++++++++++++++++++++++++++</div><pre>diff --git a/engine21_overnight/overnight.py b/engine21_overnight/overnight.py
-index d7758d438..1c580026f 100644
---- a/engine21_overnight/overnight.py
-+++ b/engine21_overnight/overnight.py
-@@ -351,16 +351,29 @@ def record_marks(today=None):
-         else pd.Timestamp(today)
-     day = (ist.date() if hasattr(ist, &quot;date&quot;) else ist).isoformat() if today is None else str(today)
-     out = os.path.join(REPO, &quot;reports&quot;, &quot;E21-MARKS.csv&quot;)
-+    # idempotent per (day, instrument): so a loop can call this every cycle through the day and it records the
-+    # 15:25/09:20 marks exactly once, the moment each bar exists (R-MORNING-22 item 4).
-+    have = set()
-+    if os.path.exists(out):
-+        try:
-+            for r in csv.DictReader(open(out, encoding=&quot;utf-8&quot;)):
-+                if r.get(&quot;close_1525&quot;) not in (&quot;&quot;, None):     # a completed row for that (day, instrument)
-+                    have.add((r.get(&quot;date&quot;), r.get(&quot;instrument&quot;)))
-+        except Exception:
-+            pass
-     rows = []
-     for name in INSTRUMENTS:
-+        if (day, name) in have:
-+            continue
-         try:
-             fut = _fut(name)
-             hm = fut.index.strftime(&quot;%H:%M&quot;); dd = fut.index.strftime(&quot;%Y-%m-%d&quot;)
-             entry = fut[(hm == ENTRY_HM) &amp; (dd == day)][&quot;close&quot;]
-             openb = fut[(hm == EXIT_HM) &amp; (dd == day)][&quot;open&quot;]
-+            if not (len(entry) and len(openb)):          # only a COMPLETE row (both marks) — so a through-day
-+                continue                                 # loop writes exactly once, after 15:25, never a partial
-             rows.append({&quot;date&quot;: day, &quot;instrument&quot;: name,
--                         &quot;close_1525&quot;: float(entry.iloc[-1]) if len(entry) else &quot;&quot;,
--                         &quot;open_0920&quot;: float(openb.iloc[-1]) if len(openb) else &quot;&quot;})
-+                         &quot;close_1525&quot;: float(entry.iloc[-1]), &quot;open_0920&quot;: float(openb.iloc[-1])})
-         except Exception:
-             continue
-     if rows:
-diff --git a/scripts/site_build.py b/scripts/site_build.py
-index c7491d5d9..857e35f71 100644
---- a/scripts/site_build.py
-+++ b/scripts/site_build.py
-@@ -690,6 +690,11 @@ def build(snapshot=None):
-         engine_page.build()                             # R-DEEP-DIVE: site/engine-e1.html (deep dive)
-         from scripts import site_v2
-         site_v2.build()                                # R-NIGHT-2 Part B: site/v2/ preview
-+        try:                                           # R-MORNING-22 item 4: capture today&#x27;s E21 15:25/09:20
-+            from engine21_overnight import overnight as _E21   # marks through the day (idempotent, read-only)
-+            _E21.record_marks()
-+        except Exception:
-+            pass
-         from scripts import uncle_page
-         uncle_page.build()                              # R-UNCLE-PAGE: site/for-nikhil.html, plain trader language
-         for mod, call in ((&quot;sizing_test&quot;, &quot;build&quot;),     # R-SIZING-TEST: refresh the sizing diaries + report
-diff --git a/tests/test_e21_marks.py b/tests/test_e21_marks.py
-new file mode 100644
-index 000000000..97f40d2e0
---- /dev/null
-+++ b/tests/test_e21_marks.py
-@@ -0,0 +1,26 @@
-+&quot;&quot;&quot;R-MORNING-22 item 4: E21 marks recording is idempotent per (day, instrument) so a through-day loop is safe.&quot;&quot;&quot;
-+import os
-+import pandas as pd
-+import engine21_overnight.overnight as O
-+
-+
-+def test_record_marks_idempotent(tmp_path, monkeypatch):
-+    marks = tmp_path / &quot;E21-MARKS.csv&quot;
-+    monkeypatch.setattr(O, &quot;REPO&quot;, str(tmp_path))
-+    os.makedirs(str(tmp_path / &quot;reports&quot;), exist_ok=True)
-+
-+    # a fake futures frame with a 15:25 close and a 09:20 open for one day
-+    idx = pd.to_datetime([&quot;2026-09-22 09:20:00&quot;, &quot;2026-09-22 15:25:00&quot;])
-+    fut = pd.DataFrame({&quot;open&quot;: [100.0, 110.0], &quot;close&quot;: [101.0, 111.0]}, index=idx)
-+    monkeypatch.setattr(O, &quot;_fut&quot;, lambda name: fut)
-+    monkeypatch.setattr(O, &quot;INSTRUMENTS&quot;, [&quot;NIFTY&quot;])
-+
-+    r1 = O.record_marks(today=&quot;2026-09-22&quot;)
-+    assert len(r1) == 1 and r1[0][&quot;close_1525&quot;] == 111.0 and r1[0][&quot;open_0920&quot;] == 100.0
-+    # a second call the same day writes nothing (idempotent)
-+    r2 = O.record_marks(today=&quot;2026-09-22&quot;)
-+    assert r2 == []
-+    # exactly one data row on disk
-+    path = os.path.join(str(tmp_path), &quot;reports&quot;, &quot;E21-MARKS.csv&quot;)
-+    rows = [x for x in open(path, encoding=&quot;utf-8&quot;).read().splitlines() if x and not x.startswith(&quot;date&quot;)]
-+    assert len(rows) == 1
 </pre></div></main></body></html>
