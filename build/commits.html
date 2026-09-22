@@ -1,4 +1,36 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>a1bd8ab60</b> · 2026-09-23 01:33</div><div>R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)</div><div class='sub h'>tests/test_build_beat.py   | 5 +++--</div><div class='sub h'>tests/test_mirror_link.py  | 6 ++++--</div><div class='sub h'>tests/test_quiet_buying.py | 3 ++-</div><pre>diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>a5fc77741</b> · 2026-09-23 01:45</div><div>R-VERIFIER standing rule (owner ruling 23 Sep): heavy suite never runs alongside other work; launcher prints free RAM and waits below the 2.0 GB floor (memory_guard.heavy_ok). Recorded in VERIFIER-BRAIN.md after tonight&#x27;s RAM-exhaustion freeze.</div><div class='sub h'>docs/VERIFIER-BRAIN.md | 24 ++++++++++++++++++++++++</div><pre>diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
+index 1475597ef..2df5f9d87 100644
+--- a/docs/VERIFIER-BRAIN.md
++++ b/docs/VERIFIER-BRAIN.md
+@@ -39,3 +39,27 @@ UNAVAILABLE** and the verifier runs on **rung d** tonight.
+ 
+ The active rung is re-read from this file by the verifier launcher every run; this file is the single source
+ of truth for which brain is in force.
++
++## Standing rule (from 2026-09-23, owner ruling) — the heavy suite never competes for RAM
++
++On the night of 22→23 Sep the full R-EXAM-CONFORM suite (~21 min, 330 tests) was run **alongside the
++builder session** on this 7.8 GB laptop. Free RAM fell to ~0.4 GB, child processes could no longer fork
++(`bash: fork: Resource temporarily unavailable`, exit `0xC0000142`), the Monitor task was killed and the
++builder session dropped ~01:01. The site push/loop never died; the cause was RAM exhaustion.
++
++Standing rule, in force from tonight:
++
++1. **The heavy verification suite never runs alongside other work.** Nothing else runs in the session while
++   the suite is running — no builder, no sweep, no second heavy job.
++2. **The launcher prints free RAM before starting, and waits while below the floor.** The floor is the same
++   one the overnight sweep already uses — `scripts/memory_guard.py`: `HEAVY_START_GB = 2.0` GB with the
++   market closed (the weekend window relaxes the *sweep* to `WEEKEND_SWEEP_FLOOR_GB = 0.5` GB, but the
++   verification suite uses the 2.0 GB floor). The gate is `memory_guard.heavy_ok()`; unreadable RAM counts
++   as below (fail-closed). Below the floor → **do not start; print/post the number and stop.**
++3. Enforcement lives in `memory_guard`; the verifier launcher (`scripts/verifier.py` / `_verify_conform.py`)
++   must call `heavy_ok()` (and log the free-RAM number via `memory_guard.log_launch`) immediately before it
++   spawns the suite — a one-line gate, not a new mechanism.
++
++Applied 2026-09-23 ~01:35 IST: free RAM settled at ~1.2–1.4 GB (peak 1.44) with Chrome closed, below the
++2.0 GB floor, so the suite was **held** and the number posted. The 3 stale tests were fixed and committed
++(`a1bd8ab60`) beforehand; conformance stays HELD until the suite runs green above the floor.
+</pre></div><div class='c'><div class='h'><b>a1bd8ab60</b> · 2026-09-23 01:33</div><div>R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)</div><div class='sub h'>tests/test_build_beat.py   | 5 +++--</div><div class='sub h'>tests/test_mirror_link.py  | 6 ++++--</div><div class='sub h'>tests/test_quiet_buying.py | 3 ++-</div><pre>diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
 index c796cf6fe..26ed4d179 100644
 --- a/tests/test_build_beat.py
 +++ b/tests/test_build_beat.py
