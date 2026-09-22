@@ -1,4 +1,312 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>2f4b40d40</b> · 2026-09-22 20:13</div><div>R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)</div><div class='sub h'>scripts/v8_port.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_v8_port.py |  36 ++++++++++++++</div><pre>diff --git a/scripts/v8_port.py b/scripts/v8_port.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>cf31b722b</b> · 2026-09-22 20:18</div><div>R-BACKLOG: standing queue — auto-continue pulls the next item when the checklist empties; IDLE hourly</div><div class='sub h'>.claude/hooks/auto_continue.py |  16 ++++--</div><div class='sub h'>.gitignore                     |   1 +</div><div class='sub h'>docs/BACKLOG.md                |  12 +++++</div><div class='sub h'>scripts/backlog.py             | 112 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/build_beat.py          |  27 ++++++++++</div><div class='sub h'>tests/test_auto_continue.py    |  23 +++++++--</div><div class='sub h'>tests/test_backlog.py          |  41 +++++++++++++++</div><pre>diff --git a/.claude/hooks/auto_continue.py b/.claude/hooks/auto_continue.py
+index db8121e9c..fe074973a 100644
+--- a/.claude/hooks/auto_continue.py
++++ b/.claude/hooks/auto_continue.py
+@@ -39,12 +39,22 @@ def _building():
+ 
+ 
+ def should_continue():
++    &quot;&quot;&quot;Continue while the checklist has work — and, per R-BACKLOG, when it empties, pull the next backlog item
++    into the checklist and keep going. Stop only for a HALT, a LEAD RULING NEEDED flag, the pause window, or an
++    empty checklist AND empty backlog.&quot;&quot;&quot;
+     st = _load(STATE)
+-    nxt = (st.get(&quot;next&quot;) or &quot;&quot;).strip()
+     flag = (st.get(&quot;flag&quot;) or &quot;&quot;).strip()
++    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not _building():
++        return False
+     remaining = [x for x in (_load(CHECKLIST).get(&quot;remaining&quot;) or []) if x]
+-    return bool(nxt) and (not os.path.exists(HALT)) and flag == &quot;NOTHING NEEDS THE LEAD&quot; \
+-        and _building() and bool(remaining)
++    if remaining:
++        return True
++    try:                                              # checklist empty -&gt; pull the next backlog item (R-BACKLOG)
++        sys.path.insert(0, REPO)
++        from scripts import backlog
++        return bool(backlog.pull_next())
++    except Exception:
++        return False
+ 
+ 
+ def main():
+diff --git a/.gitignore b/.gitignore
+index 4637c9e4a..7e85ce406 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -63,3 +63,4 @@ scheduler/.build_beat_halt
+ scheduler/.live_bar_posted
+ reports/_green_count.json
+ design/v8.zip
++scheduler/.build_idle_hour
+diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+new file mode 100644
+index 000000000..c6bd4db02
+--- /dev/null
++++ b/docs/BACKLOG.md
+@@ -0,0 +1,12 @@
++# BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
++
++When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
++logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
++
++- [~] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/
++- [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
++- [ ] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
++- [ ] O1 point-in-time universe from NSE&#x27;s public F&amp;O history archives, robots-checked, nothing guessed
++- [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
++- [ ] Quiet Buying: verify its first live match and fill on paper
++- [ ] Lead-on-laptop design note (no build yet)
+diff --git a/scripts/backlog.py b/scripts/backlog.py
+new file mode 100644
+index 000000000..54af03ab9
+--- /dev/null
++++ b/scripts/backlog.py
+@@ -0,0 +1,112 @@
++&quot;&quot;&quot;R-BACKLOG — the standing queue (docs/BACKLOG.md). When the active checklist empties, the auto-continue
++pulls the TOP unchecked backlog item into the checklist and logs it, so autonomous progress never stalls while
++owner-curated work remains. A run never invents a backlog item (§12/§20.6).&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++LOG = os.path.join(REPO, &quot;reports&quot;, &quot;BACKLOG.log&quot;)
++
++
++def _bl_path():      # read env at CALL time so overrides (and tests) always take effect
++    return os.environ.get(&quot;E1_BACKLOG&quot;) or os.path.join(REPO, &quot;docs&quot;, &quot;BACKLOG.md&quot;)
++
++
++def _cl_path():
++    return os.environ.get(&quot;E1_CHECKLIST&quot;) or os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
++
++_LINE = re.compile(r&quot;^- \[( |~|x)\] (.+?)\s*$&quot;)
++
++
++def items():
++    &quot;&quot;&quot;[(state, text)] in file order; state is &#x27; &#x27; (queued), &#x27;~&#x27; (active) or &#x27;x&#x27; (done).&quot;&quot;&quot;
++    out = []
++    try:
++        for ln in open(_bl_path(), encoding=&quot;utf-8&quot;):
++            m = _LINE.match(ln.rstrip(&quot;\n&quot;))
++            if m:
++                out.append((m.group(1), m.group(2)))
++    except Exception:
++        pass
++    return out
++
++
++def next_item():
++    for state, text in items():
++        if state == &quot; &quot;:
++            return text
++    return None
++
++
++def is_empty():
++    return next_item() is None
++
++
++def _checklist():
++    try:
++        return json.load(open(_cl_path(), encoding=&quot;utf-8&quot;))
++    except Exception:
++        return {&quot;remaining&quot;: [], &quot;done&quot;: []}
++
++
++def pull_next(logger=None):
++    &quot;&quot;&quot;If the checklist is empty of remaining items, move the top queued backlog item into it and mark that
++    backlog line active. Returns the pulled item, or None. Logs the pull.&quot;&quot;&quot;
++    c = _checklist()
++    if [x for x in (c.get(&quot;remaining&quot;) or []) if x]:
++        return None                                   # checklist still has work — nothing to pull
++    nxt = next_item()
++    if not nxt:
++        return None
++    # mark the backlog line active
++    try:
++        lines = open(_bl_path(), encoding=&quot;utf-8&quot;).read().splitlines()
++        for i, ln in enumerate(lines):
++            m = _LINE.match(ln)
++            if m and m.group(1) == &quot; &quot; and m.group(2) == nxt:
++                lines[i] = ln.replace(&quot;- [ ]&quot;, &quot;- [~]&quot;, 1)
++                break
++        open(_bl_path(), &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;\n&quot;.join(lines) + &quot;\n&quot;)
++    except Exception:
++        pass
++    c.setdefault(&quot;remaining&quot;, []).append(nxt)
++    try:
++        json.dump(c, open(_cl_path(), &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++    except Exception:
++        pass
++    line = &quot;%s pulled backlog -&gt; checklist: %s&quot; % (datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;), nxt)
++    try:
++        os.makedirs(os.path.dirname(LOG), exist_ok=True)
++        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++    if logger:
++        try:
++            logger(line)
++        except Exception:
++            pass
++    return nxt
++
++
++def all_empty():
++    &quot;&quot;&quot;True when neither the checklist nor the backlog has any remaining work — the IDLE state.&quot;&quot;&quot;
++    c = _checklist()
++    return not [x for x in (c.get(&quot;remaining&quot;) or []) if x] and is_empty()
++
++
++def _demo():
++    assert isinstance(items(), list) and all(len(t) == 2 for t in items())
++    print(&quot;backlog demo OK: %d items, next=%s&quot; % (len(items()), (next_item() or &quot;—&quot;)[:40]))
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo() if &quot;--demo&quot; in sys.argv else print(&quot;next backlog item:&quot;, next_item())
+diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+index 92fc63ad1..79523d862 100644
+--- a/scripts/build_beat.py
++++ b/scripts/build_beat.py
+@@ -178,6 +178,12 @@ def maybe_post(notifier=None, now=None):
+     now = now or _now()
+     if not build_hours(now):
+         return None
++    try:                                                        # R-BACKLOG: when nothing is queued, IDLE hourly
++        from scripts import backlog
++        if backlog.all_empty():
++            return _idle_tick(notifier, now)
++    except Exception:
++        pass
+     posted = None
+     hl = halt_line(now)                                          # immediate, outside the slot cadence
+     if hl:
+@@ -213,6 +219,27 @@ def _emit(notifier, msg):
+         pass
+ 
+ 
++IDLE_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_idle_hour&quot;)
++
++
++def _idle_tick(notifier, now):
++    &quot;&quot;&quot;R-BACKLOG: &#x27;IDLE — list empty&#x27; once, then hourly, while nothing is queued.&quot;&quot;&quot;
++    hour_key = now.strftime(&quot;%Y-%m-%d %H&quot;)
++    try:
++        last = open(IDLE_MARK, encoding=&quot;utf-8&quot;).read().strip()
++    except Exception:
++        last = &quot;&quot;
++    if hour_key == last:
++        return None
++    _emit(notifier, &quot;IDLE — list empty&quot;)
++    try:
++        os.makedirs(os.path.dirname(IDLE_MARK), exist_ok=True)
++        open(IDLE_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(hour_key)
++    except Exception:
++        pass
++    return &quot;IDLE — list empty&quot;
++
++
+ def _notify(msg):
+     from scripts import notify
+     notify.notify(msg)
+diff --git a/tests/test_auto_continue.py b/tests/test_auto_continue.py
+index 0aa104b5b..b0c9285c4 100644
+--- a/tests/test_auto_continue.py
++++ b/tests/test_auto_continue.py
+@@ -51,18 +51,31 @@ def test_stops_on_lead_ruling_needed():
+     assert m.should_continue() is False
+ 
+ 
+-def test_stops_when_checklist_finished():
++def _empty_backlog():
++    import tempfile
++    d = tempfile.mkdtemp()
++    bl = os.path.join(d, &quot;BACKLOG.md&quot;); open(bl, &quot;w&quot;).write(&quot;- [x] done\n&quot;)
++    os.environ[&quot;E1_BACKLOG&quot;] = bl
++
++
++def test_stops_when_checklist_and_backlog_empty():
+     m = _load_hook(); _set(m, GO, {&quot;remaining&quot;: []})
++    os.environ[&quot;E1_CHECKLIST&quot;] = m.CHECKLIST; _empty_backlog()   # both empty -&gt; stop (R-BACKLOG)
+     assert m.should_continue() is False
+ 
+ 
+-def test_stops_when_no_next_item():
+-    m = _load_hook(); _set(m, {&quot;next&quot;: &quot;&quot;, &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;}, CL)
+-    assert m.should_continue() is False
++def test_pulls_from_backlog_when_checklist_empty():
++    import tempfile, json as _j
++    m = _load_hook(); _set(m, GO, {&quot;remaining&quot;: []})
++    os.environ[&quot;E1_CHECKLIST&quot;] = m.CHECKLIST
++    bl = os.path.join(tempfile.mkdtemp(), &quot;BACKLOG.md&quot;); open(bl, &quot;w&quot;).write(&quot;- [ ] next backlog item\n&quot;)
++    os.environ[&quot;E1_BACKLOG&quot;] = bl
++    assert m.should_continue() is True                          # empty checklist + a backlog item -&gt; pull + go
+ 
+ 
+ if __name__ == &quot;__main__&quot;:
+     for fn in (test_continues_when_work_remains_and_building, test_stops_in_pause_window, test_stops_on_halt,
+-               test_stops_on_lead_ruling_needed, test_stops_when_checklist_finished, test_stops_when_no_next_item):
++               test_stops_on_lead_ruling_needed, test_stops_when_checklist_and_backlog_empty,
++               test_pulls_from_backlog_when_checklist_empty):
+         fn()
+     print(&quot;test_auto_continue OK&quot;)
+diff --git a/tests/test_backlog.py b/tests/test_backlog.py
+new file mode 100644
+index 000000000..88963af6a
+--- /dev/null
++++ b/tests/test_backlog.py
+@@ -0,0 +1,41 @@
++&quot;&quot;&quot;R-BACKLOG: the standing queue — pull the top queued item into an empty checklist, mark it active, and IDLE
++only when both are empty. Isolated via env overrides.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++
++def _setup(backlog_lines, remaining):
++    d = tempfile.mkdtemp()
++    bl = os.path.join(d, &quot;BACKLOG.md&quot;); cl = os.path.join(d, &quot;cl.json&quot;)
++    open(bl, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;\n&quot;.join(backlog_lines) + &quot;\n&quot;)
++    json.dump({&quot;remaining&quot;: remaining, &quot;done&quot;: []}, open(cl, &quot;w&quot;))
++    os.environ[&quot;E1_BACKLOG&quot;] = bl; os.environ[&quot;E1_CHECKLIST&quot;] = cl
++    import importlib
++    from scripts import backlog as B
++    importlib.reload(B)
++    return B, bl, cl
++
++
++def test_pull_next_when_checklist_empty():
++    B, bl, cl = _setup([&quot;- [x] done one&quot;, &quot;- [ ] item two&quot;, &quot;- [ ] item three&quot;], [])
++    pulled = B.pull_next()
++    assert pulled == &quot;item two&quot;
++    assert &quot;item two&quot; in json.load(open(cl))[&quot;remaining&quot;]     # moved into the checklist
++    assert &quot;- [~] item two&quot; in open(bl, encoding=&quot;utf-8&quot;).read()   # marked active in the backlog
++
++
++def test_no_pull_while_checklist_has_work():
++    B, bl, cl = _setup([&quot;- [ ] item two&quot;], [&quot;still doing this&quot;])
++    assert B.pull_next() is None                                # checklist busy -&gt; don&#x27;t pull
++
++
++def test_all_empty_only_when_both_empty():
++    B, bl, cl = _setup([&quot;- [x] done&quot;], [])
++    assert B.all_empty() is True
++    B, bl, cl = _setup([&quot;- [ ] queued&quot;], [])
++    assert B.all_empty() is False
++
++
++if __name__ == &quot;__main__&quot;:
++    test_pull_next_when_checklist_empty(); test_no_pull_while_checklist_has_work(); test_all_empty_only_when_both_empty()
++    print(&quot;test_backlog OK&quot;)
+</pre></div><div class='c'><div class='h'><b>2f4b40d40</b> · 2026-09-22 20:13</div><div>R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)</div><div class='sub h'>scripts/v8_port.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_v8_port.py |  36 ++++++++++++++</div><pre>diff --git a/scripts/v8_port.py b/scripts/v8_port.py
 new file mode 100644
 index 000000000..d8623bdd2
 --- /dev/null
@@ -3219,47 +3527,4 @@ index 9f65ed1b4..f99f869cb 100644
 -    test_measuring_below_three(); test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
 +    test_measuring_only_before_first_finish(); test_rough_eta_from_one_finished()
 +    test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
-</pre></div><div class='c'><div class='h'><b>8272c89c4</b> · 2026-09-22 17:32</div><div>build_journal: bound the transcript scrub + commit diffs so the full cycle can&#x27;t stall the site loop</div><div class='sub h'>scripts/build_journal.py | 11 ++++++-----</div><pre>diff --git a/scripts/build_journal.py b/scripts/build_journal.py
-index f96754983..b1d5bde08 100644
---- a/scripts/build_journal.py
-+++ b/scripts/build_journal.py
-@@ -177,8 +177,9 @@ def _last_commit():
-     return {}
- 
- 
--def _tonight_commits(limit=40):
--    &quot;&quot;&quot;Commits since local midnight, newest first, with their scrubbed full diff.&quot;&quot;&quot;
-+def _tonight_commits(limit=14):
-+    &quot;&quot;&quot;Commits since local midnight, newest first, with their scrubbed full diff (bounded so the full site
-+    cycle can never stall on a big night — R-VITALS-STALE follow-up).&quot;&quot;&quot;
-     since = _now().strftime(&quot;%Y-%m-%dT00:00:00&quot;)
-     hashes = [h for h in _git(&quot;log&quot;, &quot;--since=%s&quot; % since, &quot;--format=%h&quot;).split() if h][:limit]
-     out = []
-@@ -244,7 +245,7 @@ def _flatten_event(ev):
-     return [l for l in lines if l.strip()]
- 
- 
--def transcript_text(max_events=4000):
-+def transcript_text(max_events=1500):
-     p = _transcript_path()
-     if not p:
-         return None
-@@ -330,7 +331,7 @@ def _commits_body():
-         files = &quot;&quot;.join(&quot;&lt;div class=&#x27;sub h&#x27;&gt;%s&lt;/div&gt;&quot; % _html.escape(f) for f in c[&quot;files&quot;])
-         cards.append(&quot;&lt;div class=&#x27;c&#x27;&gt;&lt;div class=&#x27;h&#x27;&gt;&lt;b&gt;%s&lt;/b&gt; · %s&lt;/div&gt;&lt;div&gt;%s&lt;/div&gt;%s&quot;
-                      &quot;&lt;pre&gt;%s&lt;/pre&gt;&lt;/div&gt;&quot; % (_html.escape(c[&quot;hash&quot;]), _html.escape(c[&quot;when&quot;]),
--                     _html.escape(c[&quot;subject&quot;]), files, _html.escape(scrub(c[&quot;diff&quot;])[:60000])))
-+                     _html.escape(c[&quot;subject&quot;]), files, _html.escape(scrub(c[&quot;diff&quot;][:20000]))))  # cap before scrub
-     body = (&quot;&lt;h1&gt;Commits tonight&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Newest first, full diff, scrubbed of secrets. &quot;
-             &quot;&lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot; + (&quot;&quot;.join(cards) or &quot;&lt;p class=&#x27;sub&#x27;&gt;none yet.&lt;/p&gt;&quot;))
-     return _page(&quot;Commits tonight&quot;, body)
-@@ -363,7 +364,7 @@ def build(write=True):
-     pages = {&quot;journal.html&quot;: _journal_body(), &quot;commits.html&quot;: _commits_body()}
-     if txt is not None:
-         try:
--            scrubbed = scrub(txt)                       # if this raises, we do NOT write the transcript
-+            scrubbed = scrub(txt[-500000:])             # cap to last ~500KB before scrub; if this raises, skip
-             pages[slug + &quot;.txt&quot;] = scrubbed
-             have_transcript = True
-         except Exception:
 </pre></div></main></body></html>
