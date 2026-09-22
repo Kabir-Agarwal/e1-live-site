@@ -1,4 +1,129 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>f54ad7308</b> · 2026-09-23 02:05</div><div>R-VERIFIER launcher fix: _run_rung unpacks supervisor._invoke_claude&#x27;s (text, usage) tuple before re.search (was passing the tuple → TypeError, caught as a permanent FAIL, so rung d could never PASS). One-line fix; suite already green (330/330).</div><div class='sub h'>scripts/verifier.py | 3 ++-</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>80b664c5c</b> · 2026-09-23 02:20</div><div>R-VERIFIER launcher fix (owner ruling 23 Sep): rung (a) Codex actually invoked, pre-run suite result trusted, cap raised</div><div class='sub h'>scripts/supervisor.py |  7 +++--</div><div class='sub h'>scripts/verifier.py   | 76 +++++++++++++++++++++++++++++++++++++++++----------</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+index c6dc3f8fb..9d6db827b 100644
+--- a/scripts/supervisor.py
++++ b/scripts/supervisor.py
+@@ -157,13 +157,14 @@ def _prompt(g):
+ # ---------------------------------------------------------------------------------------------------------
+ # INVOKE a fresh Opus run (injectable)
+ # ---------------------------------------------------------------------------------------------------------
+-def _invoke_claude(prompt):
+-    &quot;&quot;&quot;Launch ONE fresh headless Opus run. Returns (text, usage_dict). Never raises.&quot;&quot;&quot;
++def _invoke_claude(prompt, timeout=600):
++    &quot;&quot;&quot;Launch ONE fresh headless Opus run. Returns (text, usage_dict). Never raises. `timeout` is the single-shot
++    cap in seconds (raised by the verifier so a verify can finish — R-VERIFIER owner ruling 23 Sep).&quot;&quot;&quot;
+     if not os.path.isfile(CLAUDE):
+         return &quot;&quot;, {&quot;error&quot;: &quot;claude CLI not found&quot;}
+     try:
+         r = subprocess.run([CLAUDE, &quot;--model&quot;, MODEL, &quot;--output-format&quot;, &quot;stream-json&quot;, &quot;--verbose&quot;, &quot;-p&quot;],
+-                           input=prompt.encode(&quot;utf-8&quot;), capture_output=True, timeout=600, cwd=REPO,
++                           input=prompt.encode(&quot;utf-8&quot;), capture_output=True, timeout=timeout, cwd=REPO,
+                            creationflags=0x08000000)     # R-NO-WINDOWS: CREATE_NO_WINDOW for the Opus sub-run
+         out = r.stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
+     except Exception as e:
+diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 13263ea17..ede6ab60d 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -19,16 +19,22 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ REPORTS = os.path.join(REPO, &quot;docs&quot;, &quot;reports&quot;)
+ BRAIN_DOC = os.path.join(REPO, &quot;docs&quot;, &quot;VERIFIER-BRAIN.md&quot;)
+ E1DESK = os.path.join(os.path.dirname(REPO), &quot;E1-DESK&quot;)
++CODEX = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;codex.cmd&quot;)   # Windows needs the .cmd, not bare &#x27;codex&#x27;
++VERIFY_CAP = 1800                    # R-VERIFIER (owner 23 Sep): single-shot cap raised so a verify can finish
++SUITE_RESULT = os.path.join(REPO, &quot;reports&quot;, &quot;CONFORM-SUITE-RESULT.json&quot;)   # pre-run full suite (run ALONE)
+ 
+ 
+ def active_rung():
+     &quot;&quot;&quot;Read the ladder and return (rung_letter, name, available). Codex(a) only if signed in; (b)/(c) only if
+     an API key file exists in E1-DESK; else the fallback (d) fresh-Claude supervisor run, always available.&quot;&quot;&quot;
+-    # (a) Codex signed in?
++    # (a) Codex signed in?  (use the full codex.cmd path — bare &#x27;codex&#x27; is not resolvable from Python on Windows)
+     try:
+-        out = subprocess.run([&quot;codex&quot;, &quot;login&quot;, &quot;status&quot;], capture_output=True, text=True, timeout=20).stdout.lower()
+-        if &quot;logged in&quot; in out and &quot;not logged in&quot; not in out:
+-            return &quot;a&quot;, &quot;Codex CLI (ChatGPT sign-in)&quot;, True
++        if os.path.isfile(CODEX):
++            r = subprocess.run([CODEX, &quot;login&quot;, &quot;status&quot;], capture_output=True, text=True,
++                               timeout=25, creationflags=0x08000000)
++            out = ((r.stdout or &quot;&quot;) + (r.stderr or &quot;&quot;)).lower()   # codex prints the status to stderr
++            if &quot;logged in&quot; in out and &quot;not logged in&quot; not in out:
++                return &quot;a&quot;, &quot;Codex CLI (ChatGPT sign-in)&quot;, True
+     except Exception:
+         pass
+     # (b)/(c) an API key placed in E1-DESK (never in the repo)?
+@@ -134,19 +140,61 @@ def _read(p):
+         return &quot;&quot;
+ 
+ 
++def _suite_evidence():
++    &quot;&quot;&quot;R-VERIFIER (owner 23 Sep): the pre-run FULL suite result (run ALONE under the RAM gate), with a sha256 so
++    the report pins exactly which result was trusted. The verifier reads this instead of re-running the ~21-min
++    suite (which cannot finish inside a single-shot cap). Returns (summary_line_with_hash, raw_json) or (&#x27;&#x27;,&#x27;&#x27;).&quot;&quot;&quot;
++    import hashlib
++    import json as _json
++    try:
++        raw = open(SUITE_RESULT, &quot;rb&quot;).read()
++        h = hashlib.sha256(raw).hexdigest()
++        d = _json.loads(raw.decode(&quot;utf-8&quot;))
++        line = (&quot;pre-run FULL suite (run ALONE under the RAM gate) sha256=%s: status=%s, %s passed, %s failed, &quot;
++                &quot;min_free=%s GB, peak_used=%s GB&quot; % (h, d.get(&quot;status&quot;), d.get(&quot;passed&quot;), d.get(&quot;failed&quot;),
++                                                     d.get(&quot;min_free_gb&quot;), d.get(&quot;peak_used_gb&quot;)))
++        return line, raw.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++    except Exception:
++        return &quot;&quot;, &quot;&quot;
++
++
++def _run_codex(prompt):
++    &quot;&quot;&quot;Rung (a): run the verify via Codex CLI non-interactively (codex.cmd exec). Returns the reply text, or None
++    on any failure so the caller falls back to rung (d).&quot;&quot;&quot;
++    if not os.path.isfile(CODEX):
++        return None
++    try:
++        # prompt via STDIN (&#x27;-&#x27;): a ~15k-char prompt as a .cmd arg would hit cmd.exe&#x27;s 8191-char limit.
++        r = subprocess.run([CODEX, &quot;exec&quot;, &quot;-&quot;], input=prompt, capture_output=True, text=True,
++                           timeout=VERIFY_CAP, cwd=REPO, creationflags=0x08000000)
++        out = (r.stdout or &quot;&quot;) + ((&quot;\n&quot; + r.stderr) if r.stderr else &quot;&quot;)
++        return out if out.strip() else None
++    except Exception:
++        return None
++
++
+ def _run_rung(rung, inputs):
+-    &quot;&quot;&quot;Production brain: rung (d) launches a fresh independent Claude run via the supervisor mechanism with the
+-    verifier template. (a)/(b)/(c) would shell to codex/an API — not reached while Codex is UNAVAILABLE.&quot;&quot;&quot;
+-    from scripts import supervisor
+-    prompt = (&quot;You are the INDEPENDENT VERIFIER. Follow docs/VERIFIER-TEMPLATE.md exactly and RUN the checks in &quot;
+-              &quot;docs/VERIFY-MAP.md for the touched paths. A claim without a running-evidence line is FAIL. &quot;
+-              &quot;Reply with a first line &#x27;VERDICT: PASS&#x27; or &#x27;VERDICT: FAIL&#x27; then the evidence.\n\n&quot;
+-              &quot;RULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n&quot; %
+-              (inputs[&quot;ruling&quot;][:6000], inputs[&quot;step&quot;], inputs[&quot;commit&quot;], inputs[&quot;diff&quot;]))
+-    out, _usage = supervisor._invoke_claude(prompt)      # returns (text, usage_dict); unpack the text
++    &quot;&quot;&quot;Production brain. rung (a) = Codex (codex.cmd exec); rung (d) = fresh independent Claude (supervisor
++    mechanism); (a) falls back to (d) on any Codex failure. Both are handed the pre-run FULL suite result +
++    its hash and told NOT to re-run the ~21-min suite (it cannot finish in a single shot); they run only the
++    fast TARGETED checks (module demo + touched-module tests) and confirm the suite hash.&quot;&quot;&quot;
++    suite_line, suite_blob = _suite_evidence()
++    prompt = (&quot;You are the INDEPENDENT VERIFIER. Follow docs/VERIFIER-TEMPLATE.md and run ONLY the TARGETED checks &quot;
++              &quot;in docs/VERIFY-MAP.md for the touched paths (the module demo + the touched-module tests). DO NOT &quot;
++              &quot;re-run the full ~21-min suite: its result was produced ALONE under the RAM gate and is given below &quot;
++              &quot;as authoritative evidence — confirm the sha256 matches reports/CONFORM-SUITE-RESULT.json on disk. &quot;
++              &quot;Do NOT modify, stage, or commit any file; run read-only checks only. A claim without a &quot;
++              &quot;running-evidence line is FAIL. Reply with a first line &#x27;VERDICT: PASS&#x27; or &#x27;VERDICT: FAIL&#x27; then the &quot;
++              &quot;evidence.\n\nPRE-RUN SUITE: %s\n%s\n\nRULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n&quot; %
++              (suite_line, suite_blob[:1500], inputs[&quot;ruling&quot;][:6000], inputs[&quot;step&quot;], inputs[&quot;commit&quot;], inputs[&quot;diff&quot;]))
++    out = _run_codex(prompt) if rung == &quot;a&quot; else None
++    if out is None:
++        from scripts import supervisor
++        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -&gt; unpack
+     out = out or &quot;&quot;
+     verdict = &quot;PASS&quot; if re.search(r&quot;(?im)^\s*VERDICT:\s*PASS\b&quot;, out) else &quot;FAIL&quot;
+-    return {&quot;verdict&quot;: verdict, &quot;evidence&quot;: out[:6000]}
++    evidence = ((suite_line + &quot;\n\n&quot;) if suite_line else &quot;&quot;) + out            # pin the suite hash into the report
++    return {&quot;verdict&quot;: verdict, &quot;evidence&quot;: evidence[:6000]}
+ 
+ 
+ def _post(line):
+</pre></div><div class='c'><div class='h'><b>f54ad7308</b> · 2026-09-23 02:05</div><div>R-VERIFIER launcher fix: _run_rung unpacks supervisor._invoke_claude&#x27;s (text, usage) tuple before re.search (was passing the tuple → TypeError, caught as a permanent FAIL, so rung d could never PASS). One-line fix; suite already green (330/330).</div><div class='sub h'>scripts/verifier.py | 3 ++-</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
 index 01f1e7647..13263ea17 100644
 --- a/scripts/verifier.py
 +++ b/scripts/verifier.py
