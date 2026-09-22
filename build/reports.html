@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 03:48 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 04:07 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
 
 VERDICT: PASS
 
@@ -93,6 +93,82 @@ restart, trades correctness for a deadline the fail-safe already covers safely.
    Wednesday is a HELD day (safe, by the fail-safe).
 2. Confirm you want the full order-path re-architecture attempted overnight vs. built and proven in a focused
    next session — the fail-safe means Wednesday is safe either way.
+</pre><h3>2026-09-23-035732-audit.md</h3><pre># Audit 2026-09-23-035732
+
+_Fresh independent audit (→ AUDIT). Reason: → AUDIT read-only, line-cited: does the live gate&#x27;s spread/depth check have a data source for NIFTY near-month futures, or only for the 210 cash stocks? If none, would Overnight Engine&#x27;s 15:25 order b_
+
+**Verdict: PASS — the spread/depth gate is fed only by cash `NSE:` keys (SPREADS.csv, 40,428 rows all `NSE:`, zero futures), so the Overnight and YouTube NIFTY-future orders are correctly HELD fail-closed via `desk.moment_light`/`money.measured_max_spread_frac` (`money.py:139`, `desk.py:50`), with two lead design-calls flagged and no standing-law violation.**
+
+## Full reply
+
+I&#x27;ll audit this read-only. Let me find the live gate&#x27;s spread/depth check and its data sources.
+Let me read the overnight engine, the roof executor (which likely places orders for multiple engines), and money.py&#x27;s spread-frac reader.
+The roof path calls `moment_light(q)` with no key (line 170). Let me confirm money.py&#x27;s spread reader/data source and check the YouTube and Calendar instruments.
+Let me verify the actual on-disk state: the hold gate files, and whether the spread store exists and what keys it holds.
+Running engines is outside my read-only mandate anyway. Let me verify the on-disk state by reading, not executing.
+`_EXTERNAL` = `[redacted]\Desktop\e1_1min_store`. Let me check the gate files there and inspect the actual keys inside SPREADS.csv.
+All 40,428 spread rows are `NSE:` cash keys (216 distinct); zero NIFTY/BANKNIFTY/NFO/FUT keys. Let me read the gate JSONs to state the current hold status precisely.
+I have everything I need. All claims are backed by `file:line` or command output.
+
+---
+
+# AUDIT — spread/depth data source for NIFTY near-month futures vs the cash universe
+
+## 1. The owner&#x27;s question: does the live gate&#x27;s spread/depth check have a data source for NIFTY near-month futures?
+
+**No. The spread/depth check is fed by ONE store, and that store holds cash NSE stocks only — zero futures.**
+
+The chain, end to end:
+
+- The live gate&#x27;s spread/depth rail is `desk.moment_light()` → `money.measured_max_spread_frac(key)` (`engine1_rebuild/desk.py:49`). The ceiling is **per-stock**, the 0.95 quantile of *that key&#x27;s own* readings, and needs `SPREAD_READINGS_MIN = 20` of its **own** readings or it stays `None` — **no desk-wide fallback** (`engine1_rebuild/money.py:133-142`, threshold declared at `money.py:89`).
+- Those readings come from exactly one file: `~/Desktop/E1-DESK/stores/e1_deriv_store/depth5/SPREADS.csv`, keyed by instrument (`engine1_rebuild/money.py:92-111`).
+- That file is written only by the E13 depth recorder, whose universe is hardwired to the frozen **cash** tokens as `&quot;NSE:&lt;symbol&gt;&quot;` — and which **explicitly excludes indices and the `-I` continuous futures**: *&quot;Indices and the continuous &#x27;-I&#x27; future keys are gone — they carry no order book / are not tradeable keys&quot;* (`scripts/e13_depth.py:34-44`, the exclusion at line 42).
+
+**On-disk proof (read-only):** `SPREADS.csv` (2.3 MB, last written 2026-09-22 15:30) holds **40,428 rows, every one prefixed `NSE:`**, across **216 distinct cash keys**, and `grep -iE &#x27;NIFTY|NFO|FUT|-I,&#x27;` returns **nothing**:
+```
+cut -d, -f2 SPREADS.csv | sed &#x27;s/:.*//&#x27; | sort | uniq -c   →  40428 NSE
+grep -iE &#x27;NIFTY|NFO|FUT|-I,&#x27; SPREADS.csv                    →  (no matches)
+```
+So there is **no data source for NIFTY (or BANKNIFTY) near-month futures** in the spread/depth check — only the cash names.
+
+## 2. Would the Overnight Engine&#x27;s 15:25 order be HELD tomorrow, and why?
+
+**Yes — HELD, fail-closed, on the moment-light (recorded-depth) rail.**
+
+First, the current gate state (read from disk), because it decides *which* rail binds:
+- The hard R-HOLD-AND-FIX hold is **LIFTED**: `~/Desktop/e1_1min_store/audit3b_pass.json` says `&quot;passed&quot;: true, &quot;audit&quot;: &quot;AUDIT-3B&quot;`, so `gate.held()` is `False` (`engine1_rebuild/gate.py:123-138`); no `.orders_held_R_HOLD_AND_FIX` flag exists.
+- The two-key gate is **OPEN**: `selection_certified.json` (`train_test_only:true`) + `audit2_pass.json` (`items_1_2_passed:true`) → `gate.orders_allowed()` is `True` (`gate.py:43-58`).
+- That same pass file states the residual rail in its own words: *&quot;Orders REMAIN gated by … the moment light (recorded depth).&quot;* So for a **paper** order the binding gate today is the moment light (`gate.order_ok` at `gate.py:161` drops the verdict rail for paper; the last check is `moment_green is True`, `gate.py:169`).
+
+Now the overnight order itself:
+- E21 hunts the close-to-open drift and its instrument is **&quot;NIFTY near-month future first, BANKNIFTY next&quot;** with entry at the 15:25 bar (`engine21_overnight/overnight.py:5-7`, `INSTRUMENTS = [&quot;NIFTY&quot;, &quot;BANKNIFTY&quot;]` at line 42, `ENTRY_HM = &quot;15:25&quot;` at line 43).
+- E21 is **SHELF-ONLY / RECORD-ONLY — &quot;no broker order anywhere&quot;** (`overnight.py:2`); the path that would place a copy is the roof (`roof_executor.py`, docstring line 1-4).
+- A NIFTY near-month future key has **0 readings** in `SPREADS.csv` (proven above), so `money.measured_max_spread_frac(&lt;NIFTY fut&gt;)` returns `None` (`money.py:139-140`), and `moment_light` returns `(False, &quot;no MEASURED per-stock ceiling yet for … locked, fail-closed&quot;)` (`desk.py:50-52`). → `gate.order_ok(moment_green=False)` = `False` → **HELD**.
+
+**The exact reason string it would log:** *&quot;no MEASURED per-stock ceiling yet for NSE:… (X% spread unverifiable → locked, fail-closed)&quot;* (`desk.py:51`).
+
+There is a **second, independent** reason it is held in the roof path: `roof_executor.execute()` calls `desk.moment_light(q)` **with no `key=` argument** (`scripts/roof_executor.py:170`), so `ceiling` is `None` for *every* instrument regardless (`desk.py:49`). Either way the futures order never goes green. Both are fail-closed (hold more, never less).
+
+## 3. Same question for YouTube Engine and Calendar Trading
+
+- **YouTube Engine — HELD, same reason.** Its seed strategy #1 *is literally* the NIFTY-future overnight trade: `&quot;instrument&quot;: &quot;NIFTY near-month future (BANKNIFTY next)&quot;` (`engine_youtube/pilot.py:32`). Its other seeds trade `&quot;index + liquid stocks&quot;`, `&quot;index options&quot;`, `&quot;index&quot;`, `&quot;US stocks&quot;`, `&quot;F&amp;O stocks&quot;` (`engine_youtube/seed_strategies.py:24-54`) — **none** of which are in the cash depth store either, so all are fail-closed HELD. Separately, YouTube is a research pipeline with **no order path** (`engine_youtube/pipeline.py:3`).
+- **Calendar Trading (E3 calendar) — no order to hold.** `scripts/calendar_daily.py:16` states it *&quot;only feeds the calendar; it promotes nothing to orders. Paper only.&quot;* It is a record-only 07:00 event puller, not an order path, so there is no 15:25-equivalent order. Note the asymmetry the owner should know: **if** its earnings / index-change strategies ever fired, they would be on **cash** stocks (the 210/216 names), which *are* in the depth store — so those could unlock per-name once each accumulates ≥20 readings. The futures engines never can under the current recorder.
+
+## Standing-law checks (§3, §4, §13, §18, §20)
+- **§4.4 no fabricated data:** the `None`/HELD path is honest — a missing futures reading fails closed, it is never guessed (`money.py:139`, `desk.py:50`). PASS.
+- **§4.1 no naked numbers:** the only threshold in the lock is `SPREAD_READINGS_MIN = 20`, declared with its owner ruling (`money.py:86-89`); the ceiling is a declared 0.95 quantile (`money.py:133`). PASS.
+- **Held ≠ trade:** every path here is record-only/shelf; `order_ok` returns `False` and nothing reaches a broker (`gate.py:154-171`, `roof_executor.py:11-14`). PASS.
+- **Provenance:** every behaviour traces to a ruling — R-DAY1-BUNDLE A1 (`money.py:86`, `e13_depth.py:1`), R-OVERNIGHT-AND-YOUTUBE (`overnight.py:1`, `pilot.py:1`), R-HOLD-AND-FIX / R-PAPER-GATE (`gate.py:117,86`), R-ROOF-EXECUTOR (`roof_executor.py:1`). PASS.
+- **No secret** touched on any mirror page in this read. PASS.
+
+## Bottom line for the owner
+The spread/depth gate protects the **cash** book and only the cash book. Every engine that trades index **futures** (Overnight E21, YouTube strategy #1) is **permanently HELD by construction** — not &quot;until 20 readings build up,&quot; but because the recorder never records a futures key at all. That is safe and fail-closed today, but it means those two engines can never place a paper order until someone decides to give futures their own depth lane.
+
+**LEAD RULING NEEDED:**
+1. **Futures depth lane.** Decide whether E21/YouTube&#x27;s NIFTY &amp; BANKNIFTY near-month futures get a five-level-depth recorder writing their keys into `SPREADS.csv` (so their moment light can ever go green), or whether they stay HELD-by-design for the paper phase. Today `e13_depth._universe()` (`scripts/e13_depth.py:34-44`) forecloses the first option silently.
+2. **Roof passes no key to `moment_light`** (`scripts/roof_executor.py:170`): the per-stock ceiling is never consulted in the roof path, so even a fully-unlocked *cash* name is held there. Rule whether the roof should pass `o[&quot;instrument&quot;]` as `key=` (making the per-stock lock actually function for roof orders) or whether the keyless global-hold is the intended belt-and-suspenders.
+
+AUDIT-VERDICT: PASS — the spread/depth gate is fed only by cash `NSE:` keys (SPREADS.csv, 40,428 rows all `NSE:`, zero futures), so the Overnight and YouTube NIFTY-future orders are correctly HELD fail-closed via `desk.moment_light`/`money.measured_max_spread_frac` (`money.py:139`, `desk.py:50`), with two lead design-calls flagged and no standing-law violation.
 </pre><h3>2026-09-22-watchers.md</h3><pre># R-WATCHERS — Part 3 of the END-TO-END BUNDLE (2026-09-22)
 
 Goal: failures that happen while nobody is committing are caught by the machine; new code never runs first at
