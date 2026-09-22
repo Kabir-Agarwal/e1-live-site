@@ -37,8 +37,6 @@ resolve is: `VIOLATION | LEAD RULING NEEDED: <question>`. When in doubt and no l
 R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done
 
 ===== BUILD JOURNAL =====
-checked 18:15 — on course
-checked 18:18 — on course
 2026-09-22 18:25 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b "R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)" (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
 checked 18:48 — on course
 2026-09-22 18:56 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b "R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)" (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
@@ -97,22 +95,96 @@ checked 00:27 — on course
 checked 00:31 — on course
 checked 00:33 — on course
 2026-09-23 00:46 | ruling R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done | R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks) | commit a905edd32 "R-EXAM-CONFORM+R-LIVE-GATE: conforming evaluator (engine1_rebuild/conform) — reuses the exam's evening._fire_today (signal), LB.checklist (six checks), and the EOD path (paper.simulate_trade next-open fill, per-pattern horizon/trail); no second copy. Missing input -> HELD with named check incl warm-up. Order-writing gated on the proof marker (fail-safe). FINDING: LIVE-PATTERN-SET stop_atr:2.0 is inert (simulate_trade ignores stop_atr when manage=False/trail=false) — exam used the stop1_tgt1.5 template; exam is the standard. Tested" (2026-09-23 00:32) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next BLOCKED — the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile
+checked 01:04 — on course
+2026-09-23 01:15 | ruling R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done | R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks) | commit a905edd32 "R-EXAM-CONFORM+R-LIVE-GATE: conforming evaluator (engine1_rebuild/conform) — reuses the exam's evening._fire_today (signal), LB.checklist (six checks), and the EOD path (paper.simulate_trade next-open fill, per-pattern horizon/trail); no second copy. Missing input -> HELD with named check incl warm-up. Order-writing gated on the proof marker (fail-safe). FINDING: LIVE-PATTERN-SET stop_atr:2.0 is inert (simulate_trade ignores stop_atr when manage=False/trail=false) — exam used the stop1_tgt1.5 template; exam is the standard. Tested" (2026-09-23 00:32) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next BLOCKED — the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile
 
 ===== TRANSCRIPT SINCE LAST CHECK =====
 (nothing new)
 
 ===== COMMITS SINCE LAST CHECK =====
-(none)
+a1bd8ab60 01:33 R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)
+
 
 ===== DIFFS SINCE LAST CHECK =====
-(none)
+commit a1bd8ab609e071f771dcbe71e9ef3717ce6f6ba9
+Author: use[redacted]ai-dev <[redacted]>
+Date:   Wed Sep 23 01:33:59 2026 +0530
+
+    R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)
+    
+    test_build_beat: expect the R-EYE-EMOJI 👀/🙈 prefix ahead of "BUILD " (monkeypatched
+    deterministic). test_mirror_link: expect the R-FRESH-LINK ?fresh=HHMMSS tag on the mirror
+    link, not the bare URL. test_quiet_buying: "Quiet Buying" renamed "Dubai Strategies" by
+    ruling; "Index tests" still required on the deliverables page (owner 21 Sep) and is present
+    — page unchanged. 12/12 in the three files pass.
+    
+    Co-Authored-By: Claude Opus 4.8 <[redacted]>
+    Claude-Session: https://claude.ai/code/session_0154CHmUVdhjbjNM5Zj51pZy
+
+diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
+index c796cf6fe..26ed4d179 100644
+--- a/tests/test_build_beat.py
++++ b/tests/test_build_beat.py
+@@ -12,13 +12,14 @@ def test_build_hours_window():
+     assert B.build_hours(now.replace(hour=12, minute=0)) is False
+ 
+ 
+-def test_line_shape_and_supervisor_state():
++def test_line_shape_and_supervisor_state(monkeypatch):
+     tmp = tempfile.mkdtemp()
+     B.JOURNAL = os.path.join(tmp, "j.log")
+     B.HALT = os.path.join(tmp, "HALT")
+     open(B.JOURNAL, "w", encoding="utf-8").write("2026-09-23 20:52 | checked 20:52 — on course\n")
++    monkeypatch.setattr(B, "_eye", lambda: "👀 ")     # R-EYE-EMOJI: the line leads with the freshness eye (👀/🙈)
+     ln = B.line()
+-    assert ln.startswith("BUILD ") and "supervisor" in ln
++    assert ln.startswith("👀 BUILD ") and "supervisor" in ln    # the eye prefix precedes BUILD
+     assert "on course 20:52" in ln
+     # commits branch says 'since HH:MM' and shows tests; no-commits branch says 'no commits'
+     assert (" commit" in ln and " since " in ln) or "no commits" in ln
+diff --git a/tests/test_mirror_link.py b/tests/test_mirror_link.py
+index d662f51db..9af7ef2bb 100644
+--- a/tests/test_mirror_link.py
++++ b/tests/test_mirror_link.py
+@@ -1,12 +1,14 @@
+ """R-EYES-COMPLETE (7): every Telegram line ends with the mirror link; not doubled if one is present."""
+-import os, sys
++import os, re, sys
+ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from scripts import notify
+ 
+ 
+ def test_plain_line_gets_mirror_link():
+     out = notify._with_link("STACK: restarted 21:00")
+-    assert out.endswith(notify.MIRROR_LINK) and "/build/index.html" in out
++    # R-FRESH-LINK: the mirror link is appended but carries a fresh ?fresh=HHMMSS tag (defeats the lead's URL cache)
++    assert notify.MIRROR_LINK + "?fresh=" in out
++    assert re.search(r"/build/index\.html\?fresh=\d{6}$", out)
+ 
+ 
+ def test_line_with_status_link_not_doubled():
+diff --git a/tests/test_quiet_buying.py b/tests/test_quiet_buying.py
+index e73e488e6..26541f469 100644
+--- a/tests/test_quiet_buying.py
++++ b/tests/test_quiet_buying.py
+@@ -21,7 +21,8 @@ def test_accounts_are_two_lakh():
+ 
+ def test_deliverables_page_has_both_sections_and_no_internal_names():
+     page = DS.build(write=False)
+-    assert "Index tests" in page and "Quiet Buying" in page
++    # "Quiet Buying" was renamed "Dubai Strategies" by ruling; "Index tests" must still appear (owner 21 Sep).
++    assert "Index tests" in page and "Dubai Strategies" in page
+     assert not DS._scrub(page)                        # no engine names / research / person names
+ 
+ 
+
 
 ===== ARCHIVED OWNER RULINGS (docs/dispatches) =====
 2026-08-18_ANSWERS-1.md, 2026-08-18_CHAIN-BUILD-ITEM-34-E1-STAGE-4.md, 2026-08-18_CHAIN-BUILD-ITEM-49-E2.md, 2026-08-18_ERA-2.md, 2026-08-18_ERA-2B.md, 2026-08-18_ERA-PREP-1.md, 2026-08-18_RECHECK-1.md, 2026-08-18_RELEASE-1.md, 2026-08-18_RESUME-1.md, 2026-08-19_CHAIN-BUILD-ITEM-56-E3.md, 2026-08-19_CHAIN-BUILD-ITEM-57-E3.md, 2026-08-19_KEYGATE-1.md, 2026-08-19_KITEDATA-1.md, 2026-08-19_POSTQ-2.md, 2026-08-19_RESTART-4.md, 2026-08-19_UNPARK-2.md, 2026-08-20_O1-GUIDE-1.md, 2026-08-20_O1-RULING-1.md, 2026-09-10_E1-REBUILD-1.md, 2026-09-10_E1-REBUILD-2-A1.md, 2026-09-10_E1-REBUILD-2.md, 2026-09-13_E1-FULL-1.md, 2026-09-15_R-E1-DEADMAN.md, 2026-09-15_R-E1-RAM-PRIORITY.md, 2026-09-15_R-E1-THREE-EMOJIS.md, 2026-09-15_R-E1-THREE-ENGINE-COMPLETE-v3.md, 2026-09-15_R-E1-TIMER+CLOCK.md, 2026-09-16_R-E1-ARB-DAY.md, 2026-09-16_R-E1-CONFORMANCE.md, 2026-09-16_R-E1-E7-CARDS.md, 2026-09-16_R-E1-E7-FULL.md, 2026-09-16_R-E1-E7-V3-BUILD.md, 2026-09-16_R-E1-SIREN-WINDOW+PROOF.md, 2026-09-18_E1-LIVE-GATE-1.md, 2026-09-18_R-BOOK20-COMPLETE.md, 2026-09-18_R-BOOK20-FILL_R-RECORDERS-ON.md, 2026-09-18_R-DEPLOY-SANITY.md, 2026-09-18_R-GO-LIVE-SIMPLE.md, 2026-09-18_R-HOLD-AND-FIX.md, 2026-09-18_R-INDEX-FIRST_R-POPUP-FINAL.md, 2026-09-18_R-INDEX-TESTS.md, 2026-09-18_R-KITE-LOGIN-FIX.md, 2026-09-18_R-LOGIN-URL-BUG_R-POPUP-HUNT.md, 2026-09-18_R-NO-DEMO-TELEGRAM_R-TRADE-CARD.md, 2026-09-18_R-RELAUNCH-OLD-CODE.md, 2026-09-18_R-RESTART-RESUME_R-DEPLOY-SANITY.md, 2026-09-18_R-RESULTS-PAGE.md, 2026-09-18_R-ROOF-SITE-PROBATION.md, 2026-09-18_R-SITE-CONSISTENCY.md, 2026-09-18_R-SWEEP-REHOLD.md, 2026-09-18_R-TOKEN-DIAG_R-HIDE-WINDOWS.md, 2026-09-19_R-FIX-3E_R-SIZING-TEST_R-BOOK-SECTION-0.md, 2026-09-19_R-MONDAY-REHEARSAL.md, 2026-09-19_R-ROOF-EXECUTOR.md, 2026-09-19_R-UNCLE-PAGE.md, 2026-09-19_R-WEEKEND.md, 2026-09-20_R-30MIN-CARD.md, 2026-09-20_R-ADAPTIVE-SIZING-LIVE.md, 2026-09-20_R-ASK-THE-DESK_R-DEPTH.md, 2026-09-20_R-AUTO-LOGIN-LINK.md, 2026-09-20_R-CALENDAR-DAILY-ROUTE.md, 2026-09-20_R-CALENDAR-DAILY.md, 2026-09-20_R-CARD-FORMAT.md, 2026-09-20_R-DESKTOP-TIDY-NOW.md, 2026-09-20_R-DESKTOP-TIDY.md, 2026-09-20_R-FIX-3G.md, 2026-09-20_R-HUNT-QUIET.md, 2026-09-20_R-NEW-KITE-APP.md, 2026-09-20_R-PAIRS-TWO-EXCHANGES.md, 2026-09-20_R-PAPER-CAPITAL.md, 2026-09-20_R-PAPER-GATE.md, 2026-09-20_R-ROOF-COPYCAT-NOW.md, 2026-09-21_AUDIT-DAY1-BUNDLE.md, 2026-09-21_AUDIT-DAY1-REAUDIT.md, 2026-09-21_DEPTH-FAULT.md, 2026-09-21_R-DAY1-BUNDLE.md, 2026-09-21_R-EVENING-NOW.md, 2026-09-21_R-MORNING-FIX-EMERGENCY-WRONG-KEY.md, 2026-09-21_R-MORNING-FIX.md, 2026-09-21_R-NIGHT-CLOSE.md, 2026-09-21_R-OVERNIGHT-AND-YOUTUBE.md, 2026-09-21_R-WHY-NO-PAPER-2_TONIGHT-PLAN.md, 2026-09-21_SITE-NOW-COMPLETION.md, 2026-09-21_SITE-NOW.md, 2026-09-22_END-TO-END-BUNDLE.md, 2026-09-22_GUARD-AMENDMENT-buildpause.md, 2026-09-22_R-ALL-ENGINES-TOMORROW.md, 2026-09-22_R-AUTO-CONTINUE.md, 2026-09-22_R-BACKLOG.md, 2026-09-22_R-BUILD-BEAT.md, 2026-09-22_R-BUILD-JOURNAL.md, 2026-09-22_R-BUILD-TRANSCRIPT.md, 2026-09-22_R-CHECKLIST-BAR.md, 2026-09-22_R-CODEX-SETUP.md, 2026-09-22_R-DIARIES-DAY1.md, 2026-09-22_R-E7-STUB.md, 2026-09-22_R-ENGINE-ROOM-ROOTCAUSE.md, 2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md, 2026-09-22_R-ETA.md, 2026-09-22_R-EVENING-22.md, 2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md, 2026-09-22_R-EXAMS-REAL.md, 2026-09-22_R-EYES-FULL.md, 2026-09-22_R-EYES.md, 2026-09-22_R-HALT-FIX.md, 2026-09-22_R-LEAK-PURGE.md, 2026-09-22_R-LIVE-BAR.md, 2026-09-22_R-LIVE-GATE.md, 2026-09-22_R-MORNING-22.md, 2026-09-22_R-NIGHT-3.md, 2026-09-22_R-NIGHT-4.md, 2026-09-22_R-NO-WINDOWS.md, 2026-09-22_R-NOW-22.md, 2026-09-22_R-NOW-LINE.md, 2026-09-22_R-RESTART-TONIGHT-2.md, 2026-09-22_R-RESTART-TONIGHT.md, 2026-09-22_R-ROOT-SWAP-RULING.md, 2026-09-22_R-RUNNER-DOWN.md, 2026-09-22_R-STOP-SPAM.md, 2026-09-22_R-TWIN-TEST.md, 2026-09-22_R-V2-EXACT.md, 2026-09-22_R-V2-FIX.md, 2026-09-22_R-VITALS-STALE.md, 2026-09-22_R-VITALS.md, 2026-09-22_R-YOUTUBE-AMENDMENT.md, 2026-09-22_SAFETY-RESTART-WINDOW.md, 2026-09-23_R-EXAM-CONFORM-AMENDMENT.md, 2026-09-23_R-EYE-EMOJI.md, 2026-09-23_R-FRESH-LINK.md
 
 ===== STATUS.json =====
 {
- "generated": "2026-09-23T01:03:40.808087+05:30",
+ "generated": "2026-09-23T01:33:15.586807+05:30",
  "token": {
   "valid": false,
   "why": "Refused"
@@ -120,18 +192,18 @@ checked 00:33 — on course
  "processes": [
   {
    "name": "token_ping",
-   "pid": 1964,
-   "since": "/Date(1790102803138"
+   "pid": 27804,
+   "since": "/Date(1790106721313"
   },
   {
    "name": "watchdog",
-   "pid": 20236,
-   "since": "/Date(1790102803155"
+   "pid": 12180,
+   "since": "/Date(1790106721326"
   },
   {
    "name": "site_loop",
-   "pid": 25176,
-   "since": "/Date(1790102803168"
+   "pid": 13236,
+   "since": "/Date(1790106721339"
   }
  ],
  "last_runner_poll": "2026-09-23T00:54:28.960578+05:30",
@@ -210,8 +282,6 @@ resolve is: `VIOLATION | LEAD RULING NEEDED: <question>`. When in doubt and no l
 R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done
 
 ===== BUILD JOURNAL =====
-checked 18:15 — on course
-checked 18:18 — on course
 2026-09-22 18:25 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b "R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)" (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
 checked 18:48 — on course
 2026-09-22 18:56 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b "R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)" (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
@@ -270,22 +340,96 @@ checked 00:27 — on course
 checked 00:31 — on course
 checked 00:33 — on course
 2026-09-23 00:46 | ruling R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done | R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks) | commit a905edd32 "R-EXAM-CONFORM+R-LIVE-GATE: conforming evaluator (engine1_rebuild/conform) — reuses the exam's evening._fire_today (signal), LB.checklist (six checks), and the EOD path (paper.simulate_trade next-open fill, per-pattern horizon/trail); no second copy. Missing input -> HELD with named check incl warm-up. Order-writing gated on the proof marker (fail-safe). FINDING: LIVE-PATTERN-SET stop_atr:2.0 is inert (simulate_trade ignores stop_atr when manage=False/trail=false) — exam used the stop1_tgt1.5 template; exam is the standard. Tested" (2026-09-23 00:32) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next BLOCKED — the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile
+checked 01:04 — on course
+2026-09-23 01:15 | ruling R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done | R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks) | commit a905edd32 "R-EXAM-CONFORM+R-LIVE-GATE: conforming evaluator (engine1_rebuild/conform) — reuses the exam's evening._fire_today (signal), LB.checklist (six checks), and the EOD path (paper.simulate_trade next-open fill, per-pattern horizon/trail); no second copy. Missing input -> HELD with named check incl warm-up. Order-writing gated on the proof marker (fail-safe). FINDING: LIVE-PATTERN-SET stop_atr:2.0 is inert (simulate_trade ignores stop_atr when manage=False/trail=false) — exam used the stop1_tgt1.5 template; exam is the standard. Tested" (2026-09-23 00:32) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next BLOCKED — the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile
 
 ===== TRANSCRIPT SINCE LAST CHECK =====
 (nothing new)
 
 ===== COMMITS SINCE LAST CHECK =====
-(none)
+a1bd8ab60 01:33 R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)
+
 
 ===== DIFFS SINCE LAST CHECK =====
-(none)
+commit a1bd8ab609e071f771dcbe71e9ef3717ce6f6ba9
+Author: use[redacted]ai-dev <[redacted]>
+Date:   Wed Sep 23 01:33:59 2026 +0530
+
+    R-EXAM-CONFORM: reconcile 3 stale tests to the rulings (test-only, no code change)
+    
+    test_build_beat: expect the R-EYE-EMOJI 👀/🙈 prefix ahead of "BUILD " (monkeypatched
+    deterministic). test_mirror_link: expect the R-FRESH-LINK ?fresh=HHMMSS tag on the mirror
+    link, not the bare URL. test_quiet_buying: "Quiet Buying" renamed "Dubai Strategies" by
+    ruling; "Index tests" still required on the deliverables page (owner 21 Sep) and is present
+    — page unchanged. 12/12 in the three files pass.
+    
+    Co-Authored-By: Claude Opus 4.8 <[redacted]>
+    Claude-Session: https://claude.ai/code/session_0154CHmUVdhjbjNM5Zj51pZy
+
+diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
+index c796cf6fe..26ed4d179 100644
+--- a/tests/test_build_beat.py
++++ b/tests/test_build_beat.py
+@@ -12,13 +12,14 @@ def test_build_hours_window():
+     assert B.build_hours(now.replace(hour=12, minute=0)) is False
+ 
+ 
+-def test_line_shape_and_supervisor_state():
++def test_line_shape_and_supervisor_state(monkeypatch):
+     tmp = tempfile.mkdtemp()
+     B.JOURNAL = os.path.join(tmp, "j.log")
+     B.HALT = os.path.join(tmp, "HALT")
+     open(B.JOURNAL, "w", encoding="utf-8").write("2026-09-23 20:52 | checked 20:52 — on course\n")
++    monkeypatch.setattr(B, "_eye", lambda: "👀 ")     # R-EYE-EMOJI: the line leads with the freshness eye (👀/🙈)
+     ln = B.line()
+-    assert ln.startswith("BUILD ") and "supervisor" in ln
++    assert ln.startswith("👀 BUILD ") and "supervisor" in ln    # the eye prefix precedes BUILD
+     assert "on course 20:52" in ln
+     # commits branch says 'since HH:MM' and shows tests; no-commits branch says 'no commits'
+     assert (" commit" in ln and " since " in ln) or "no commits" in ln
+diff --git a/tests/test_mirror_link.py b/tests/test_mirror_link.py
+index d662f51db..9af7ef2bb 100644
+--- a/tests/test_mirror_link.py
++++ b/tests/test_mirror_link.py
+@@ -1,12 +1,14 @@
+ """R-EYES-COMPLETE (7): every Telegram line ends with the mirror link; not doubled if one is present."""
+-import os, sys
++import os, re, sys
+ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from scripts import notify
+ 
+ 
+ def test_plain_line_gets_mirror_link():
+     out = notify._with_link("STACK: restarted 21:00")
+-    assert out.endswith(notify.MIRROR_LINK) and "/build/index.html" in out
++    # R-FRESH-LINK: the mirror link is appended but carries a fresh ?fresh=HHMMSS tag (defeats the lead's URL cache)
++    assert notify.MIRROR_LINK + "?fresh=" in out
++    assert re.search(r"/build/index\.html\?fresh=\d{6}$", out)
+ 
+ 
+ def test_line_with_status_link_not_doubled():
+diff --git a/tests/test_quiet_buying.py b/tests/test_quiet_buying.py
+index e73e488e6..26541f469 100644
+--- a/tests/test_quiet_buying.py
++++ b/tests/test_quiet_buying.py
+@@ -21,7 +21,8 @@ def test_accounts_are_two_lakh():
+ 
+ def test_deliverables_page_has_both_sections_and_no_internal_names():
+     page = DS.build(write=False)
+-    assert "Index tests" in page and "Quiet Buying" in page
++    # "Quiet Buying" was renamed "Dubai Strategies" by ruling; "Index tests" must still appear (owner 21 Sep).
++    assert "Index tests" in page and "Dubai Strategies" in page
+     assert not DS._scrub(page)                        # no engine names / research / person names
+ 
+ 
+
 
 ===== ARCHIVED OWNER RULINGS (docs/dispatches) =====
 2026-08-18_ANSWERS-1.md, 2026-08-18_CHAIN-BUILD-ITEM-34-E1-STAGE-4.md, 2026-08-18_CHAIN-BUILD-ITEM-49-E2.md, 2026-08-18_ERA-2.md, 2026-08-18_ERA-2B.md, 2026-08-18_ERA-PREP-1.md, 2026-08-18_RECHECK-1.md, 2026-08-18_RELEASE-1.md, 2026-08-18_RESUME-1.md, 2026-08-19_CHAIN-BUILD-ITEM-56-E3.md, 2026-08-19_CHAIN-BUILD-ITEM-57-E3.md, 2026-08-19_KEYGATE-1.md, 2026-08-19_KITEDATA-1.md, 2026-08-19_POSTQ-2.md, 2026-08-19_RESTART-4.md, 2026-08-19_UNPARK-2.md, 2026-08-20_O1-GUIDE-1.md, 2026-08-20_O1-RULING-1.md, 2026-09-10_E1-REBUILD-1.md, 2026-09-10_E1-REBUILD-2-A1.md, 2026-09-10_E1-REBUILD-2.md, 2026-09-13_E1-FULL-1.md, 2026-09-15_R-E1-DEADMAN.md, 2026-09-15_R-E1-RAM-PRIORITY.md, 2026-09-15_R-E1-THREE-EMOJIS.md, 2026-09-15_R-E1-THREE-ENGINE-COMPLETE-v3.md, 2026-09-15_R-E1-TIMER+CLOCK.md, 2026-09-16_R-E1-ARB-DAY.md, 2026-09-16_R-E1-CONFORMANCE.md, 2026-09-16_R-E1-E7-CARDS.md, 2026-09-16_R-E1-E7-FULL.md, 2026-09-16_R-E1-E7-V3-BUILD.md, 2026-09-16_R-E1-SIREN-WINDOW+PROOF.md, 2026-09-18_E1-LIVE-GATE-1.md, 2026-09-18_R-BOOK20-COMPLETE.md, 2026-09-18_R-BOOK20-FILL_R-RECORDERS-ON.md, 2026-09-18_R-DEPLOY-SANITY.md, 2026-09-18_R-GO-LIVE-SIMPLE.md, 2026-09-18_R-HOLD-AND-FIX.md, 2026-09-18_R-INDEX-FIRST_R-POPUP-FINAL.md, 2026-09-18_R-INDEX-TESTS.md, 2026-09-18_R-KITE-LOGIN-FIX.md, 2026-09-18_R-LOGIN-URL-BUG_R-POPUP-HUNT.md, 2026-09-18_R-NO-DEMO-TELEGRAM_R-TRADE-CARD.md, 2026-09-18_R-RELAUNCH-OLD-CODE.md, 2026-09-18_R-RESTART-RESUME_R-DEPLOY-SANITY.md, 2026-09-18_R-RESULTS-PAGE.md, 2026-09-18_R-ROOF-SITE-PROBATION.md, 2026-09-18_R-SITE-CONSISTENCY.md, 2026-09-18_R-SWEEP-REHOLD.md, 2026-09-18_R-TOKEN-DIAG_R-HIDE-WINDOWS.md, 2026-09-19_R-FIX-3E_R-SIZING-TEST_R-BOOK-SECTION-0.md, 2026-09-19_R-MONDAY-REHEARSAL.md, 2026-09-19_R-ROOF-EXECUTOR.md, 2026-09-19_R-UNCLE-PAGE.md, 2026-09-19_R-WEEKEND.md, 2026-09-20_R-30MIN-CARD.md, 2026-09-20_R-ADAPTIVE-SIZING-LIVE.md, 2026-09-20_R-ASK-THE-DESK_R-DEPTH.md, 2026-09-20_R-AUTO-LOGIN-LINK.md, 2026-09-20_R-CALENDAR-DAILY-ROUTE.md, 2026-09-20_R-CALENDAR-DAILY.md, 2026-09-20_R-CARD-FORMAT.md, 2026-09-20_R-DESKTOP-TIDY-NOW.md, 2026-09-20_R-DESKTOP-TIDY.md, 2026-09-20_R-FIX-3G.md, 2026-09-20_R-HUNT-QUIET.md, 2026-09-20_R-NEW-KITE-APP.md, 2026-09-20_R-PAIRS-TWO-EXCHANGES.md, 2026-09-20_R-PAPER-CAPITAL.md, 2026-09-20_R-PAPER-GATE.md, 2026-09-20_R-ROOF-COPYCAT-NOW.md, 2026-09-21_AUDIT-DAY1-BUNDLE.md, 2026-09-21_AUDIT-DAY1-REAUDIT.md, 2026-09-21_DEPTH-FAULT.md, 2026-09-21_R-DAY1-BUNDLE.md, 2026-09-21_R-EVENING-NOW.md, 2026-09-21_R-MORNING-FIX-EMERGENCY-WRONG-KEY.md, 2026-09-21_R-MORNING-FIX.md, 2026-09-21_R-NIGHT-CLOSE.md, 2026-09-21_R-OVERNIGHT-AND-YOUTUBE.md, 2026-09-21_R-WHY-NO-PAPER-2_TONIGHT-PLAN.md, 2026-09-21_SITE-NOW-COMPLETION.md, 2026-09-21_SITE-NOW.md, 2026-09-22_END-TO-END-BUNDLE.md, 2026-09-22_GUARD-AMENDMENT-buildpause.md, 2026-09-22_R-ALL-ENGINES-TOMORROW.md, 2026-09-22_R-AUTO-CONTINUE.md, 2026-09-22_R-BACKLOG.md, 2026-09-22_R-BUILD-BEAT.md, 2026-09-22_R-BUILD-JOURNAL.md, 2026-09-22_R-BUILD-TRANSCRIPT.md, 2026-09-22_R-CHECKLIST-BAR.md, 2026-09-22_R-CODEX-SETUP.md, 2026-09-22_R-DIARIES-DAY1.md, 2026-09-22_R-E7-STUB.md, 2026-09-22_R-ENGINE-ROOM-ROOTCAUSE.md, 2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md, 2026-09-22_R-ETA.md, 2026-09-22_R-EVENING-22.md, 2026-09-22_R-EXAM-CONFORM-and-EMERGENCY.md, 2026-09-22_R-EXAMS-REAL.md, 2026-09-22_R-EYES-FULL.md, 2026-09-22_R-EYES.md, 2026-09-22_R-HALT-FIX.md, 2026-09-22_R-LEAK-PURGE.md, 2026-09-22_R-LIVE-BAR.md, 2026-09-22_R-LIVE-GATE.md, 2026-09-22_R-MORNING-22.md, 2026-09-22_R-NIGHT-3.md, 2026-09-22_R-NIGHT-4.md, 2026-09-22_R-NO-WINDOWS.md, 2026-09-22_R-NOW-22.md, 2026-09-22_R-NOW-LINE.md, 2026-09-22_R-RESTART-TONIGHT-2.md, 2026-09-22_R-RESTART-TONIGHT.md, 2026-09-22_R-ROOT-SWAP-RULING.md, 2026-09-22_R-RUNNER-DOWN.md, 2026-09-22_R-STOP-SPAM.md, 2026-09-22_R-TWIN-TEST.md, 2026-09-22_R-V2-EXACT.md, 2026-09-22_R-V2-FIX.md, 2026-09-22_R-VITALS-STALE.md, 2026-09-22_R-VITALS.md, 2026-09-22_R-YOUTUBE-AMENDMENT.md, 2026-09-22_SAFETY-RESTART-WINDOW.md, 2026-09-23_R-EXAM-CONFORM-AMENDMENT.md, 2026-09-23_R-EYE-EMOJI.md, 2026-09-23_R-FRESH-LINK.md
 
 ===== STATUS.json =====
 {
- "generated": "2026-09-23T01:03:40.808087+05:30",
+ "generated": "2026-09-23T01:33:15.586807+05:30",
  "token": {
   "valid": false,
   "why": "Refused"
@@ -293,18 +437,18 @@ checked 00:33 — on course
  "processes": [
   {
    "name": "token_ping",
-   "pid": 1964,
-   "since": "/Date(1790102803138"
+   "pid": 27804,
+   "since": "/Date(1790106721313"
   },
   {
    "name": "watchdog",
-   "pid": 20236,
-   "since": "/Date(1790102803155"
+   "pid": 12180,
+   "since": "/Date(1790106721326"
   },
   {
    "name": "site_loop",
-   "pid": 25176,
-   "since": "/Date(1790102803168"
+   "pid": 13236,
+   "since": "/Date(1790106721339"
   }
  ],
  "last_runner_poll": "2026-09-23T00:54:28.960578+05:30",
@@ -344,14 +488,29 @@ checked 00:33 — on course
  "ready_line": "NOT READY YET \u2014 waiting for the login."
 }
 
-assistant: Nothing new since the last check — no transcript, no commits, no diffs. Reviewing the standing state against the six checks:
+assistant: I'll verify the one commit since last check against the seven checks, focusing on provenance of the three test reconciliations.
+tool_use Grep {"pattern": "Dubai Strategies", "output_mode": "files_with_matches"}
+tool_result: Found 8 files
+tests\test_quiet_buying.py
+reports\LEDGER.md
+site\deliverables\index.html
+docs\dispatches\2026-09-22_SAFETY-RESTART-WINDOW.md
+docs\dispatches\2026-09-22_R-ROOT-SWAP-RULING.md
+docs\BACKLOG.md
+scripts\site_build.py
+scripts\deliverables_site.py
+tool_use Grep {"pattern": "Dubai|Quiet Buying", "path": "docs/dispatches", "output_mode": "content", "-i": true}
+tool_result: docs\dispatches\2026-09-22_R-BACKLOG.md:11:backtest, posted weekly; (6) Quiet Buying: verify its first live match and fill on paper; (7) lead-on-laptop
+docs\dispatches\2026-09-22_R-ROOT-SWAP-RULING.md:6:4. Rename the parked item "Quiet Buying first live match" to "Dubai Strategies first live match" — that name is retired everywhere.
+docs\dispatches\2026-09-22_R-HALT-FIX.md:14:the live site immediately; a trade appears only when booked. (6) NAMES: the delivery strategy engine is "Dubai
+docs\dispatches\2026-09-22_R-HALT-FIX.md:15:Strategies" everywhere (engine list on the main site and on the deliverables site); "Quiet Buying" removed;
+docs\dispatches\2026-09-22_SAFETY-RESTART-WINDOW.md:9:4. Rename the parked item "Quiet Buying first live match" to "Dubai Strategies first live match" — that name is retired everywhere, including BACKLOG and the beat.
+assistant: Provenance confirmed for all three test reconciliations:
 
-- **Provenance/scope** — the work in force (R-EXAM-CONFORM, R-LIVE-GATE, R-EYE-EMOJI, R-FRESH-LINK) all trace to owner rulings archived under `docs/dispatches/`. No run-authored scope.
-- **No self-audit** — builder is doing conformance work, not grading its own output as an independent gate.
-- **Trading-path / demos inert** — STATUS.json confirms `orders_written_today: 0`, `cards_sent_today: 0`, `orders_allowed_now: false`; book20_runner HELDs every fire awaiting the R-EXAM-CONFORM proof marker (fail-closed). The order path change stays inside the ruling's scope and nothing live fired.
-- **No typed numbers / no secrets** — nothing new landed to introduce either; the `stop_atr:2.0` note is a reported finding about an inert param, not an added naked constant.
-- **Ordering** — build is correctly BLOCKED on the held restart (A's conformance proof) rather than jumping ahead; fail-safe keeps Wednesday HELD-safe.
+- **R-EYE-EMOJI** (👀/🙈 prefix) — archived owner ruling `docs/dispatches/2026-09-23_R-EYE-EMOJI.md`.
+- **R-FRESH-LINK** (`?fresh=HHMMSS` tag) — archived `docs/dispatches/2026-09-23_R-FRESH-LINK.md`.
+- **"Quiet Buying" → "Dubai Strategies"** — archived owner rulings R-ROOT-SWAP-RULING and R-HALT-FIX both explicitly retire the name "everywhere". "Index tests" retained per owner 21 Sep.
 
-No breach of any check.
+Checks: scope traces to owner rulings (no run-authored scope); this is an independent review, not a self-audit; no naked numbers (the `\d{6}` is a time-format assertion, not a business constant); test-only diff — no ledger write, no Telegram, no order path touched; no secrets; no ordering breach.
 
 SUPERVISOR-VERDICT: ON-COURSE
