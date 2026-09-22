@@ -1,4 +1,338 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>4bd2f7fe3</b> · 2026-09-22 20:04</div><div>R-V2-EXACT: fetch + preserve the approved v8 design (11 *.dc.html + README) from the bot chat</div><div class='sub h'>.gitignore                               |   1 +</div><div class='sub h'>design/v8/Ask.dc.html                    |  66 +++++++++++</div><div class='sub h'>design/v8/Data.dc.html                   |  78 +++++++++++++</div><div class='sub h'>design/v8/Deliverables.dc.html           |  68 +++++++++++</div><div class='sub h'>design/v8/Engine.dc.html                 | 186 +++++++++++++++++++++++++++++++</div><div class='sub h'>design/v8/How.dc.html                    |  58 ++++++++++</div><div class='sub h'>design/v8/Main.dc.html                   | 116 +++++++++++++++++++</div><div class='sub h'>design/v8/Messages.dc.html               | 111 ++++++++++++++++++</div><div class='sub h'>design/v8/Pattern.dc.html                |  95 ++++++++++++++++</div><div class='sub h'>design/v8/README.md                      |  28 +++++</div><div class='sub h'>design/v8/Results.dc.html                |  73 ++++++++++++</div><div class='sub h'>design/v8/Stock.dc.html                  |  78 +++++++++++++</div><div class='sub h'>design/v8/Stocks.dc.html                 |  83 ++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-V2-EXACT.md |  26 +++++</div><pre>diff --git a/.gitignore b/.gitignore
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>2f4b40d40</b> · 2026-09-22 20:13</div><div>R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)</div><div class='sub h'>scripts/v8_port.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_v8_port.py |  36 ++++++++++++++</div><pre>diff --git a/scripts/v8_port.py b/scripts/v8_port.py
+new file mode 100644
+index 000000000..d8623bdd2
+--- /dev/null
++++ b/scripts/v8_port.py
+@@ -0,0 +1,130 @@
++&quot;&quot;&quot;R-V2-EXACT — the porter engine for the approved v8 design (design/v8/*.dc.html).
++
++It ports a .dc.html design file to a server-rendered page VERBATIM: it keeps the head fonts + the helmet
++&lt;style&gt; + the outer content &lt;div&gt; exactly as given, strips the &lt;x-dc&gt;/&lt;helmet&gt; wrapper and the
++&lt;script type=&quot;text/x-dc&quot;&gt; block, and binds the data:
++  {{name}} / {{alias.field}}          → a value from the page&#x27;s data dict (or the loop item)
++  &lt;sc-for list=&quot;{{x}}&quot; as=&quot;v&quot;&gt;…&lt;/sc-for&gt; → repeat the inner template once per record in data[&#x27;x&#x27;], with {{v.f}}
++  &lt;sc-if value=&quot;{{y}}&quot;&gt;…&lt;/sc-if&gt;       → render the inner only when the value is truthy
++
++Markup and CSS are never rewritten — only placeholders and repeated rows change. Per-page data binding lives in
++scripts/site_v2.py; this module is just the engine (and it is what the no-sample-values gate is tested against).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import re
++
++
++def strip_wrapper(dc_html):
++    &quot;&quot;&quot;Return (head_style, body) — the helmet fonts+style, and the outer content &lt;div&gt;…&lt;/div&gt;. Drops the
++    &lt;!doctype&gt;/&lt;head&gt;/support.js, the &lt;x-dc&gt;/&lt;helmet&gt; tags themselves, and the trailing x-dc &lt;script&gt; block.&quot;&quot;&quot;
++    # the helmet holds the &lt;link rel=stylesheet …fonts…&gt; and the &lt;style&gt;…&lt;/style&gt; to keep
++    helmet = re.search(r&quot;&lt;helmet&gt;(.*?)&lt;/helmet&gt;&quot;, dc_html, re.S)
++    head_style = helmet.group(1).strip() if helmet else &quot;&quot;
++    # the body is everything between &lt;/helmet&gt; and &lt;/x-dc&gt;
++    m = re.search(r&quot;&lt;/helmet&gt;(.*?)&lt;/x-dc&gt;&quot;, dc_html, re.S)
++    body = (m.group(1) if m else dc_html).strip()
++    return head_style, body
++
++
++def _find_block(s, tag, start=0):
++    &quot;&quot;&quot;Find the next &lt;tag …&gt;…&lt;/tag&gt; from `start`, honouring nesting of the same tag. Returns
++    (open_start, inner_start, inner_end, close_end, attrs) or None.&quot;&quot;&quot;
++    om = re.compile(r&quot;&lt;%s\b([^&gt;]*)&gt;&quot; % tag)
++    o = om.search(s, start)
++    if not o:
++        return None
++    depth = 1
++    i = o.end()
++    tok = re.compile(r&quot;&lt;%s\b[^&gt;]*&gt;|&lt;/%s&gt;&quot; % (tag, tag))
++    while depth:
++        t = tok.search(s, i)
++        if not t:
++            return None
++        if t.group().startswith(&quot;&lt;/&quot;):
++            depth -= 1
++            if depth == 0:
++                return (o.start(), o.end(), t.start(), t.end(), o.group(1))
++            i = t.end()
++        else:
++            depth += 1
++            i = t.end()
++
++
++def _lookup(ctx, key):
++    key = key.strip()
++    if key in ctx:
++        return ctx[key]
++    if &quot;.&quot; in key:
++        head, rest = key.split(&quot;.&quot;, 1)
++        obj = ctx.get(head)
++        if isinstance(obj, dict):
++            return _lookup(obj, rest) if &quot;.&quot; in rest else obj.get(rest)
++    return None
++
++
++def render(tpl, ctx):
++    &quot;&quot;&quot;Expand sc-for, then sc-if, then {{…}} placeholders, against ctx (a dict; loop items are merged under
++    their alias).&quot;&quot;&quot;
++    # 1) sc-for (outermost; inner is rendered per item, so nested sc-for/sc-if resolve in the recursion)
++    while True:
++        blk = _find_block(tpl, &quot;sc-for&quot;)
++        if not blk:
++            break
++        os_, is_, ie_, ce_, attrs = blk
++        lst = re.search(r&#x27;list=&quot;\{\{\s*([^}]+?)\s*\}\}&quot;&#x27;, attrs)
++        alias = re.search(r&#x27;as=&quot;([^&quot;]+)&quot;&#x27;, attrs)
++        inner = tpl[is_:ie_]
++        items = _lookup(ctx, lst.group(1)) if lst else None
++        a = alias.group(1) if alias else &quot;item&quot;
++        out = []
++        for it in (items or []):
++            child = dict(ctx)
++            child[a] = it
++            out.append(render(inner, child))
++        tpl = tpl[:os_] + &quot;&quot;.join(out) + tpl[ce_:]
++    # 2) sc-if
++    while True:
++        blk = _find_block(tpl, &quot;sc-if&quot;)
++        if not blk:
++            break
++        os_, is_, ie_, ce_, attrs = blk
++        val = re.search(r&#x27;value=&quot;\{\{\s*([^}]+?)\s*\}\}&quot;&#x27;, attrs)
++        inner = tpl[is_:ie_]
++        keep = bool(_lookup(ctx, val.group(1))) if val else False
++        tpl = tpl[:os_] + (render(inner, ctx) if keep else &quot;&quot;) + tpl[ce_:]
++    # 3) placeholders {{name}} / {{alias.field}}
++    def sub(m):
++        v = _lookup(ctx, m.group(1))
++        return &quot;&quot; if v is None else str(v)
++    return re.sub(r&quot;\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}&quot;, sub, tpl)
++
++
++def page(dc_html, ctx, title=None):
++    &quot;&quot;&quot;A full server-rendered HTML page from a design file + its data.&quot;&quot;&quot;
++    head_style, body = strip_wrapper(dc_html)
++    body = render(body, ctx)
++    t = re.search(r&quot;&lt;title&gt;(.*?)&lt;/title&gt;&quot;, dc_html)
++    ttl = title or (t.group(1) if t else &quot;E1 Terminal&quot;)
++    return (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
++            &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
++            &quot;&lt;title&gt;%s&lt;/title&gt;%s&lt;/head&gt;&lt;body&gt;%s&lt;/body&gt;&lt;/html&gt;&quot; % (ttl, head_style, body))
++
++
++def _demo():
++    tpl = (&#x27;&lt;ul&gt;&lt;sc-for list=&quot;{{rows}}&quot; as=&quot;r&quot;&gt;&lt;li&gt;{{r.name}}: {{r.n}}&#x27;
++           &#x27;&lt;sc-if value=&quot;{{r.live}}&quot;&gt; LIVE&lt;/sc-if&gt;&lt;/li&gt;&lt;/sc-for&gt;&lt;/ul&gt; total {{total}}&#x27;)
++    out = render(tpl, {&quot;rows&quot;: [{&quot;name&quot;: &quot;A&quot;, &quot;n&quot;: 1, &quot;live&quot;: True}, {&quot;name&quot;: &quot;B&quot;, &quot;n&quot;: 2, &quot;live&quot;: False}],
++                       &quot;total&quot;: 3})
++    assert out == &quot;&lt;ul&gt;&lt;li&gt;A: 1 LIVE&lt;/li&gt;&lt;li&gt;B: 2&lt;/li&gt;&lt;/ul&gt; total 3&quot;, out
++    # a missing value renders empty, never &#x27;None&#x27;/&#x27;undefined&#x27;
++    assert render(&quot;x{{nope}}y&quot;, {}) == &quot;xy&quot;
++    # strip keeps the style + body, drops the wrapper and the x-dc script
++    hs, body = strip_wrapper(&quot;&lt;x-dc&gt;&lt;helmet&gt;&lt;style&gt;.a{}&lt;/style&gt;&lt;/helmet&gt;&lt;div&gt;hi {{w}}&lt;/div&gt;&lt;/x-dc&gt;&quot;
++                             &quot;&lt;script type=&#x27;text/x-dc&#x27;&gt;junk&lt;/script&gt;&quot;)
++    assert &quot;.a{}&quot; in hs and body == &quot;&lt;div&gt;hi {{w}}&lt;/div&gt;&quot; and &quot;junk&quot; not in body
++    print(&quot;v8_port demo OK: sc-for + sc-if + placeholders bind; wrapper/script stripped; no None leaks.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/tests/test_v8_port.py b/tests/test_v8_port.py
+new file mode 100644
+index 000000000..e7d6a78eb
+--- /dev/null
++++ b/tests/test_v8_port.py
+@@ -0,0 +1,36 @@
++&quot;&quot;&quot;R-V2-EXACT: the porter engine binds the design&#x27;s placeholders/loops/conditionals and strips the wrapper.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import v8_port as V
++
++
++def test_scfor_scif_and_placeholders():
++    tpl = &#x27;&lt;sc-for list=&quot;{{rows}}&quot; as=&quot;r&quot;&gt;&lt;li&gt;{{r.name}}&lt;sc-if value=&quot;{{r.live}}&quot;&gt; LIVE&lt;/sc-if&gt;&lt;/li&gt;&lt;/sc-for&gt;&#x27;
++    out = V.render(tpl, {&quot;rows&quot;: [{&quot;name&quot;: &quot;A&quot;, &quot;live&quot;: True}, {&quot;name&quot;: &quot;B&quot;, &quot;live&quot;: False}]})
++    assert out == &quot;&lt;li&gt;A LIVE&lt;/li&gt;&lt;li&gt;B&lt;/li&gt;&quot;, out
++
++
++def test_missing_value_is_empty_never_none():
++    assert V.render(&quot;x{{missing}}y{{a.b}}z&quot;, {}) == &quot;xyz&quot;
++
++
++def test_strip_keeps_style_drops_wrapper_and_script():
++    hs, body = V.strip_wrapper(&quot;&lt;x-dc&gt;&lt;helmet&gt;&lt;link href=&#x27;f&#x27;&gt;&lt;style&gt;.a{}&lt;/style&gt;&lt;/helmet&gt;&quot;
++                               &quot;&lt;div&gt;k {{w}}&lt;/div&gt;&lt;/x-dc&gt;&lt;script type=&#x27;text/x-dc&#x27;&gt;secret&lt;/script&gt;&quot;)
++    assert &quot;.a{}&quot; in hs and &quot;&lt;link&quot; in hs
++    assert body == &quot;&lt;div&gt;k {{w}}&lt;/div&gt;&quot; and &quot;secret&quot; not in body and &quot;x-dc&quot; not in body
++
++
++def test_real_design_how_ports_static():
++    # How.dc.html has no placeholders -&gt; ports verbatim, wrapper gone
++    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;design&quot;, &quot;v8&quot;, &quot;How.dc.html&quot;)
++    if os.path.exists(p):
++        html = V.page(open(p, encoding=&quot;utf-8&quot;).read(), {})
++        assert &quot;&lt;x-dc&gt;&quot; not in html and &quot;text/x-dc&quot; not in html and &quot;support.js&quot; not in html
++        assert &quot;&lt;body&gt;&quot; in html and &quot;1280px&quot; in html         # the design&#x27;s outer div is kept
++
++
++if __name__ == &quot;__main__&quot;:
++    test_scfor_scif_and_placeholders(); test_missing_value_is_empty_never_none()
++    test_strip_keeps_style_drops_wrapper_and_script(); test_real_design_how_ports_static()
++    print(&quot;test_v8_port OK&quot;)
+</pre></div><div class='c'><div class='h'><b>d05f69e79</b> · 2026-09-22 20:10</div><div>R-CHECKLIST-BAR: the BUILD line leads with a checklist progress bar (done/doing/left) + ETA</div><div class='sub h'>reports/CHECKLIST.json   | 15 +++++++++------</div><div class='sub h'>scripts/build_beat.py    | 45 +++++++++++++++++++++++++++++++++++++++------</div><div class='sub h'>tests/test_build_beat.py | 13 +++++++++++++</div><pre>diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
+index 8dccf6832..7f73770af 100644
+--- a/reports/CHECKLIST.json
++++ b/reports/CHECKLIST.json
+@@ -1,9 +1,12 @@
+ {
+- &quot;remaining&quot;: [],
+- &quot;done_recently&quot;: [
+-  &quot;v2 tabs (Live desk, Portfolio, Backtest, Messages)&quot;,
+-  &quot;C1 fresh hunt (Price Engine leg)&quot;, &quot;C2 adaptive sizing&quot;, &quot;C4 fill model + haircut&quot;,
+-  &quot;C5 concrete pair list&quot;, &quot;C6 analyst parsers (fail-closed)&quot;
++ &quot;remaining&quot;: [
++  &quot;R-V2-EXACT verbatim /v2/ rebuild&quot;,
++  &quot;ADD(a) deliverables as separate module&quot;,
++  &quot;ADD(b) retire START_E1_ALL.bat sender&quot;
+  ],
+- &quot;note&quot;: &quot;R-EVENING-22 C-series (the actionable items C1/C2/C4/C5/C6) done this session. C3&#x27;s min-cases floor already exists; C7 YouTube-at-cap and C8 intraday-index run on their own cadence. Owner-named items only; the checklist is empty, so the auto-continue loop stops cleanly.&quot;
++ &quot;done&quot;: [
++  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;, &quot;C1 hunt&quot;, &quot;C2 sizing&quot;, &quot;C4 fill+haircut&quot;,
++  &quot;C5 pairs&quot;, &quot;C6 parsers&quot;, &quot;ADD(c) measured sizing floor&quot;, &quot;R-CHECKLIST-BAR&quot;
++ ],
++ &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;
+ }
+diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+index 47372fb2c..92fc63ad1 100644
+--- a/scripts/build_beat.py
++++ b/scripts/build_beat.py
+@@ -100,14 +100,15 @@ def line(now=None):
+     disagree = &quot; · journal/git disagree (journal %s, git %s)&quot; % (ruling, git_ruling) \
+                if (ruling and git_ruling and _ruling_prefix(ruling) and _ruling_prefix(ruling) != git_ruling) else &quot;&quot;
+     eta = _eta()
++    cb = _checklist_bar()
++    cbp = (cb + &quot; · &quot;) if cb else &quot;&quot;                     # R-CHECKLIST-BAR: lead the line with the checklist
+     if commits:
+-        head = ruling or (item or &quot;—&quot;)
+         msgs = &quot;; &quot;.join(commits)
+-        if len(msgs) &gt; 160:
+-            msgs = msgs[:157] + &quot;…&quot;
+-        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
+-            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
+-    return &quot;%s — no commits · %s · supervisor %s%s · %s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree, eta)
++        if len(msgs) &gt; 140:
++            msgs = msgs[:137] + &quot;…&quot;
++        return &quot;%s — %s%d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
++            label, cbp, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
++    return &quot;%s — %sno commits · supervisor %s%s · %s&quot; % (label, cbp, sup, disagree, eta)
+ 
+ 
+ def _eta():
+@@ -118,6 +119,38 @@ def _eta():
+         return &quot;ETA: measuring&quot;
+ 
+ 
++CHECKLIST = os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
++
++
++def _short_items(items, n=3):
++    items = [str(x).split(&quot; &quot;)[0].strip(&quot;()&quot;) if False else str(x) for x in items]
++    out = &quot;, &quot;.join(i if len(i) &lt;= 26 else i[:25] + &quot;…&quot; for i in items[:n])
++    if len(items) &gt; n:
++        out += &quot; +%d&quot; % (len(items) - n)
++    return out or &quot;—&quot;
++
++
++def _checklist_bar(now=None):
++    &quot;&quot;&quot;R-CHECKLIST-BAR: &#x27;checklist ▓▓▓░░░ 3/6 — done: … · doing: … · left: …&#x27;, derived from the journal + the
++    tracked checklist (done + remaining), plus the ETA for all remaining.&quot;&quot;&quot;
++    try:
++        c = json.load(open(CHECKLIST, encoding=&quot;utf-8&quot;))
++    except Exception:
++        c = {}
++    done = [x for x in (c.get(&quot;done&quot;) or []) if x]
++    left = [x for x in (c.get(&quot;remaining&quot;) or []) if x]
++    ruling, item = _journal_state()
++    doing = item or (left[0] if left else &quot;—&quot;)
++    total = len(done) + len(left)
++    n = len(done)
++    if total == 0:
++        return None
++    bar = &quot;▓&quot; * n + &quot;░&quot; * max(0, total - n)
++    return &quot;checklist %s %d/%d — done: %s · doing: %s · left: %s&quot; % (
++        bar, n, total, _short_items(done, 3), (doing if len(str(doing)) &lt;= 30 else str(doing)[:29] + &quot;…&quot;),
++        _short_items(left, 3))
++
++
+ def halt_line(now=None):
+     &quot;&quot;&quot;One immediate line when E1-DESK\\HALT newly appears. Returns the line to post, or None.&quot;&quot;&quot;
+     now = now or _now()
+diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
+index 5523f7586..c796cf6fe 100644
+--- a/tests/test_build_beat.py
++++ b/tests/test_build_beat.py
+@@ -50,7 +50,20 @@ def test_no_post_outside_build_hours():
+     assert posted == []
+ 
+ 
++
++
++def test_checklist_bar_in_line():
++    import json, tempfile, os
++    tmp = tempfile.mkdtemp()
++    B.CHECKLIST = os.path.join(tmp, &quot;cl.json&quot;)
++    json.dump({&quot;done&quot;: [&quot;a&quot;, &quot;b&quot;], &quot;remaining&quot;: [&quot;c&quot;, &quot;d&quot;]}, open(B.CHECKLIST, &quot;w&quot;))
++    cb = B._checklist_bar()
++    assert cb and cb.startswith(&quot;checklist &quot;) and &quot;2/4&quot; in cb
++    assert &quot;done:&quot; in cb and &quot;doing:&quot; in cb and &quot;left:&quot; in cb
++
++
+ if __name__ == &quot;__main__&quot;:
+     test_build_hours_window(); test_line_shape_and_supervisor_state()
+     test_halt_line_immediate_and_deduped(); test_no_post_outside_build_hours()
++    test_checklist_bar_in_line()
+     print(&quot;test_build_beat OK&quot;)
+</pre></div><div class='c'><div class='h'><b>555aebb31</b> · 2026-09-22 20:07</div><div>R-V2-EXACT ADD (c): adaptive sizing flat floor is a measured fraction of equity, no typed size</div><div class='sub h'>engine1_rebuild/adaptive_sizing.py | 18 ++++++++++++++++--</div><pre>diff --git a/engine1_rebuild/adaptive_sizing.py b/engine1_rebuild/adaptive_sizing.py
+index aceef43a2..fb0df88c9 100644
+--- a/engine1_rebuild/adaptive_sizing.py
++++ b/engine1_rebuild/adaptive_sizing.py
+@@ -23,6 +23,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from engine1_rebuild import desk, money
+ 
+ R_RUPEES = float(money.PAPER_R_RUPEES)
++# R-V2-EXACT ADD (c): the flat reference is a MEASURED FRACTION of the book&#x27;s equity, never a typed rupee size.
++# R_FRAC is the declared risk-per-trade fraction (1R as a fraction of the starting capital) — a quantile
++# definition, not a size — so flat_floor scales with current equity and no typed ₹ amount remains.
++R_FRAC = float(money.PAPER_R_RUPEES) / float(money.NOTIONAL_CAPITAL)
++
++
++def flat_floor(equity):
++    &quot;&quot;&quot;The flat reference sized as R_FRAC × current equity (no typed rupee size). Fails to the 1R rate only
++    if equity is unknown.&quot;&quot;&quot;
++    return round(float(equity) * R_FRAC) if equity else R_RUPEES
+ Z = 1.96                                  # 95% — the same confidence the walls use (a declared error rate)
+ 
+ 
+@@ -55,7 +65,8 @@ def size(scorecard, equity, *, worst_daily_dd_rupees=None, open_risk_rupees=0.0,
+ 
+     # cold start / thin pattern / no measured book DD → FLAT, and say why (fail-closed to the reference).
+     if acc_lb is None or fires &lt; 30 or worst_daily_dd_rupees in (None, 0) or float(worst_daily_dd_rupees) &lt;= 0:
+-        return {&quot;risk_rupees&quot;: R_RUPEES, &quot;risk_fraction&quot;: R_RUPEES / equity if equity else None,
++        _floor = flat_floor(equity)                      # R-V2-EXACT ADD (c): measured fraction of equity
++        return {&quot;risk_rupees&quot;: _floor, &quot;risk_fraction&quot;: (_floor / equity) if equity else None,
+                 &quot;mode&quot;: &quot;flat-fallback&quot;, &quot;reason&quot;: &quot;cold-start: %s&quot; % (
+                     &quot;too few fires (%d&lt;30)&quot; % fires if fires &lt; 30 else
+                     &quot;no measured book drawdown&quot; if not worst_daily_dd_rupees else
+@@ -109,7 +120,10 @@ def explain(sized):
+ def _demo():
+     # 1. cold start / thin pattern → FLAT, byte-identical to the reference account
+     flat = size({&quot;fires&quot;: 10, &quot;win_rate&quot;: 0.6}, 200000, worst_daily_dd_rupees=8000)
+-    assert flat[&quot;risk_rupees&quot;] == R_RUPEES and flat[&quot;mode&quot;] == &quot;flat-fallback&quot;, flat
++    assert flat[&quot;risk_rupees&quot;] == flat_floor(200000) and flat[&quot;mode&quot;] == &quot;flat-fallback&quot;, flat
++    # ADD (c): the flat floor is a MEASURED fraction of equity — it scales, never a typed rupee size
++    assert size({&quot;fires&quot;: 10, &quot;win_rate&quot;: 0.6}, 400000, worst_daily_dd_rupees=8000)[&quot;risk_rupees&quot;] == flat_floor(400000)
++    assert flat_floor(400000) == 2000 and flat_floor(200000) == 1000     # R_FRAC × equity, not a typed ₹
+     assert size({&quot;fires&quot;: 100, &quot;win_rate&quot;: 0.6}, 200000, worst_daily_dd_rupees=None)[&quot;mode&quot;] == &quot;flat-fallback&quot;
+ 
+     # 2. a strong, well-measured pattern sizes on CURRENT equity, and every fraction is present + printed
+</pre></div><div class='c'><div class='h'><b>4bd2f7fe3</b> · 2026-09-22 20:04</div><div>R-V2-EXACT: fetch + preserve the approved v8 design (11 *.dc.html + README) from the bot chat</div><div class='sub h'>.gitignore                               |   1 +</div><div class='sub h'>design/v8/Ask.dc.html                    |  66 +++++++++++</div><div class='sub h'>design/v8/Data.dc.html                   |  78 +++++++++++++</div><div class='sub h'>design/v8/Deliverables.dc.html           |  68 +++++++++++</div><div class='sub h'>design/v8/Engine.dc.html                 | 186 +++++++++++++++++++++++++++++++</div><div class='sub h'>design/v8/How.dc.html                    |  58 ++++++++++</div><div class='sub h'>design/v8/Main.dc.html                   | 116 +++++++++++++++++++</div><div class='sub h'>design/v8/Messages.dc.html               | 111 ++++++++++++++++++</div><div class='sub h'>design/v8/Pattern.dc.html                |  95 ++++++++++++++++</div><div class='sub h'>design/v8/README.md                      |  28 +++++</div><div class='sub h'>design/v8/Results.dc.html                |  73 ++++++++++++</div><div class='sub h'>design/v8/Stock.dc.html                  |  78 +++++++++++++</div><div class='sub h'>design/v8/Stocks.dc.html                 |  83 ++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-V2-EXACT.md |  26 +++++</div><pre>diff --git a/.gitignore b/.gitignore
 index c3cdb8198..4637c9e4a 100644
 --- a/.gitignore
 +++ b/.gitignore
@@ -2928,147 +3262,4 @@ index f96754983..b1d5bde08 100644
              pages[slug + &quot;.txt&quot;] = scrubbed
              have_transcript = True
          except Exception:
-</pre></div><div class='c'><div class='h'><b>9c8c9b5bd</b> · 2026-09-22 17:22</div><div>restart_stack: the stack&#x27;s runtime modules count as launch-path (so a site_build/vitals fix restart is allowed)</div><div class='sub h'>scripts/restart_stack.py | 6 +++++-</div><pre>diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
-index a3888eb3b..f588ef603 100644
---- a/scripts/restart_stack.py
-+++ b/scripts/restart_stack.py
-@@ -29,7 +29,11 @@ STACK_PAT = (&quot;scripts|engine1_rebuild|engine4_options|engine7_parity|engine9|eng
- STARTS = [r&quot;scripts\token_ping.py&quot;, r&quot;scripts\watchdog.py&quot;, r&quot;scripts\site_loop.py&quot;, r&quot;scripts\supervisor.py&quot;]
- UP_NAMES = [&quot;token_ping&quot;, &quot;watchdog&quot;, &quot;site_loop&quot;, &quot;supervisor&quot;]
- LAUNCH_PATHS = {&quot;scripts/token_ping.py&quot;, &quot;scripts/watchdog.py&quot;, &quot;scripts/site_loop.py&quot;,
--                &quot;scripts/supervisor.py&quot;, &quot;scripts/restart_stack.py&quot;}
-+                &quot;scripts/supervisor.py&quot;, &quot;scripts/restart_stack.py&quot;,
-+                # the runtime modules the running stack executes each cycle — a change here is a launch-path
-+                # change (a restart is how the loop picks it up):
-+                &quot;scripts/site_build.py&quot;, &quot;scripts/vitals.py&quot;, &quot;scripts/build_journal.py&quot;, &quot;scripts/live_bar.py&quot;,
-+                &quot;scripts/build_beat.py&quot;, &quot;scripts/eta.py&quot;, &quot;scripts/desk_clock.py&quot;, &quot;scripts/deskproc.py&quot;}
- NO_WINDOW = 0x08000000
- DETACHED = 0x00000008
- 
-</pre></div><div class='c'><div class='h'><b>d65e4bfe8</b> · 2026-09-22 17:21</div><div>R-VITALS-STALE fix: light cycle now fast so status.html refreshes every 2 min</div><div class='sub h'>.gitignore            |  1 +</div><div class='sub h'>scripts/site_build.py | 14 +++++++-------</div><div class='sub h'>scripts/vitals.py     | 20 ++++++++++++++++++--</div><pre>diff --git a/.gitignore b/.gitignore
-index 0fe22dd28..c3cdb8198 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -61,3 +61,4 @@ scheduler/.supervisor_silence_posted
- scheduler/.build_beat_slot
- scheduler/.build_beat_halt
- scheduler/.live_bar_posted
-+reports/_green_count.json
-diff --git a/scripts/site_build.py b/scripts/site_build.py
-index e61bb28fb..40ad8c1c4 100644
---- a/scripts/site_build.py
-+++ b/scripts/site_build.py
-@@ -614,20 +614,18 @@ def build_live():
-     _old_page_redirects()
-     terminal_data.build()                               # the live feed the Live desk tab polls (~0.2 s)
-     try:
--        from scripts import vitals                       # R-VITALS: machine-written status every light cycle
-+        from scripts import vitals                       # R-VITALS: machine-written status every light cycle (fast)
-         vitals.build()
-     except Exception:
-         pass
-     try:
--        from scripts import build_journal                # R-BUILD-JOURNAL/TRANSCRIPT/EYES: the /build/ room
--        build_journal.build()
--    except Exception:
--        pass
--    try:
--        from scripts import live_bar                      # R-LIVE-BAR: post on advance / 08:30 / 15:35
-+        from scripts import live_bar                      # R-LIVE-BAR: post on advance / 08:30 / 15:35 (fast)
-         live_bar.maybe_post()
-     except Exception:
-         pass
-+    # NOTE: build_journal.build() (the /build/ room) is NOT here — it scrubs the ~1MB session transcript and
-+    # builds commit diffs, which is too heavy for the 2-min light cycle (it stalled status.html). It runs on
-+    # the FULL cycle instead (build(), ~every 10 min), so status.html stays 2-min fresh. (R-VITALS-STALE fix.)
-     return SITE
- 
- 
-@@ -723,6 +721,8 @@ def build(snapshot=None):
-         engine_page.build()                             # R-DEEP-DIVE: site/engine-e1.html (deep dive)
-         from scripts import site_v2
-         site_v2.build()                                # R-NIGHT-2 Part B: site/v2/ preview
-+        from scripts import build_journal              # R-EYES-FULL: the /build/ room (heavy: transcript scrub
-+        build_journal.build()                          # + commit diffs) — full cycle only, keeps status 2-min fresh
-         try:                                           # R-MORNING-22 item 4: capture today&#x27;s E21 15:25/09:20
-             from engine21_overnight import overnight as _E21   # marks through the day (idempotent, read-only)
-             _E21.record_marks()
-diff --git a/scripts/vitals.py b/scripts/vitals.py
-index 9594894c7..a4a26f7ed 100644
---- a/scripts/vitals.py
-+++ b/scripts/vitals.py
-@@ -148,12 +148,28 @@ def _gates():
-     return g
- 
- 
-+_GREEN_CACHE = os.path.join(REPO, &quot;reports&quot;, &quot;_green_count.json&quot;)
-+_GREEN_TTL = 900         # the &quot;stocks ready&quot; count changes on the scale of days; scanning 216 stocks takes ~60s,
-+#                          far too slow for a 2-min light cycle, so cache it for 15 min (R-VITALS-STALE fix).
-+
-+
- def _moment_green_count():
-+    try:
-+        c = json.load(open(_GREEN_CACHE, encoding=&quot;utf-8&quot;))
-+        if time.time() - c.get(&quot;t&quot;, 0) &lt; _GREEN_TTL:
-+            return int(c.get(&quot;n&quot;, 0))               # fresh enough — do NOT rescan (keeps the light cycle fast)
-+    except Exception:
-+        c = {}
-     try:
-         from engine1_rebuild import money
--        return len(money.unlocked_stocks())      # stocks with their own &gt;=20 readings (can green with a live quote)
-+        n = len(money.unlocked_stocks())            # the slow scan, at most once per 15 min
-     except Exception:
--        return 0
-+        return int(c.get(&quot;n&quot;, 0))
-+    try:
-+        json.dump({&quot;n&quot;: n, &quot;t&quot;: time.time()}, open(_GREEN_CACHE, &quot;w&quot;, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        pass
-+    return n
- 
- 
- def _orders_and_cards_today():
-</pre></div><div class='c'><div class='h'><b>393884ae2</b> · 2026-09-22 16:59</div><div>Audit: restart_stack called the wrong function (never ran it); moment-light truthful off-hours</div><div class='sub h'>scripts/restart_stack.py |  4 +++-</div><div class='sub h'>scripts/run_audit.py     | 12 ++++++++++--</div><pre>diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
-index b4586cd8c..a3888eb3b 100644
---- a/scripts/restart_stack.py
-+++ b/scripts/restart_stack.py
-@@ -135,7 +135,9 @@ def armed_checks():
- def audit():
-     try:
-         from scripts import run_audit
--        run_audit.run() if hasattr(run_audit, &quot;run&quot;) else run_audit.main()
-+        o = run_audit.audit()                            # the real entry point (writes AUDIT-DRYRUN.json + posts)
-+        if isinstance(o, dict) and &quot;pass&quot; in o:
-+            return {&quot;pass&quot;: bool(o.get(&quot;pass&quot;)), &quot;line&quot;: o.get(&quot;line&quot;)}
-     except Exception:
-         pass
-     try:
-diff --git a/scripts/run_audit.py b/scripts/run_audit.py
-index 101c01270..662d99cb4 100644
---- a/scripts/run_audit.py
-+++ b/scripts/run_audit.py
-@@ -88,13 +88,21 @@ def _gate_fail_closed():
- 
- 
- def _moment_light():
-+    &quot;&quot;&quot;The moment light is TRUTHFUL when it never claims green without a live feed. With recorders down
-+    (off-hours / post-restart, before the 06:00 re-arm) a dark light is correct — only a GREEN light with no
-+    feed is a lie. With recorders up (a live feed) an unlocked stock should reach green or pending, never be
-+    stuck dark, which is the original market-hours liveness check.&quot;&quot;&quot;
-     from engine1_rebuild import money, live_20d
-+    from scripts import launch_e1 as L
-+    up, _t, _d = L.recorders_running()
-     unlocked = money.unlocked_stocks()
-     if not unlocked:
--        return False, &quot;no unlocked stocks (no depth readings yet) — cannot verify green&quot;
-+        return (up == 0), &quot;no unlocked stocks yet; recorders up=%d (dark is truthful when there is no feed)&quot; % up
-     key = unlocked[0]
-     g, _ = live_20d.moment_light_live(key)
--    return (g is True or g is None), &quot;moment_light_live(%s)=%s over %d unlocked stocks&quot; % (key, g, len(unlocked))
-+    if up == 0:                                          # no live feed: green would be a lie; dark is truthful
-+        return (g is not True), &quot;moment_light_live(%s)=%s, recorders DOWN — dark is truthful (green would lie)&quot; % (key, g)
-+    return (g is True or g is None), &quot;moment_light_live(%s)=%s over %d unlocked, recorders up=%d&quot; % (key, g, len(unlocked), up)
- 
- 
- def _locks_present():
 </pre></div></main></body></html>
