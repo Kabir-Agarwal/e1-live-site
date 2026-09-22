@@ -1,4 +1,194 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>7f5ffbc72</b> · 2026-09-22 22:25</div><div>R-V2-EXACT: port the Patterns page; owner opening line + real 5 live patterns bound (honest &#x27;-&#x27; where the store has no case/win count; baked readings/summary flagged)</div><div class='sub h'>scripts/v8_site.py    |  61 +++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/patterns.html | 100 +++++++++++++++++++++++++++++++-------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>8b4684db7</b> · 2026-09-22 22:43</div><div>R-V2-EXACT: port the Stocks page; owner title &#x27;Stocks the desk watches - N&#x27;, real 210 screener stocks (volume/trend/signals real, honest &#x27;-&#x27; for readings the store lacks)</div><div class='sub h'>scripts/v8_site.py  | 60 +++++++++++++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/stocks.html | 79 ++++++++++++++++++++++++++++-------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index 88528bc80..748a3b175 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -318,10 +318,68 @@ def _fix_pattern(html):
+ POST[&quot;Pattern.dc.html&quot;] = _fix_pattern
+ 
+ 
++
++def _stocks_data():
++    &quot;&quot;&quot;The Stocks page: every stock the desk watches, from the real screener (site/data/screener.json, 210
++    rows). Real columns bind — name, volume (rvol), trend — and the readings the screener does not carry
++    (RSI/MFI/price-range percentile/5-20d returns/gap) show an honest &#x27;—&#x27; rather than a fabricated
++    number (§4.4). &#x27;Signal today&#x27; is cross-referenced from the real calls (live.json), not invented; a
++    stock is &#x27;ready&#x27; when its screener row is not stale. The design&#x27;s 30 procedurally-generated stocks are
++    dropped.&quot;&quot;&quot;
++    import json
++    def _load(path, key=None):
++        try:
++            d = json.load(open(os.path.join(REPO, path), encoding=&quot;utf-8&quot;))
++            return d.get(key) if key else d
++        except Exception:
++            return None
++    rows_src = _load(&quot;site/data/screener.json&quot;, &quot;rows&quot;) or []
++    sig_stocks = {(c.get(&quot;stock&quot;) or &quot;&quot;).upper() for c in (_load(&quot;site/data/live.json&quot;, &quot;calls&quot;) or [])}
++    DASH, GREY, GREEN = &quot;—&quot;, &quot;#9a9a93&quot;, &quot;#5DCAA5&quot;
++    out = []
++    for r in rows_src:
++        sym = (r.get(&quot;symbol&quot;) or &quot;&quot;).upper()
++        sig = sym in sig_stocks
++        rvol = r.get(&quot;rvol&quot;)
++        out.append({
++            &quot;name&quot;: sym, &quot;range&quot;: DASH, &quot;rc&quot;: GREY,
++            &quot;mom&quot;: DASH, &quot;calm&quot;: DASH, &quot;flow&quot;: DASH,
++            &quot;vol&quot;: (&quot;%.1fx&quot; % rvol) if isinstance(rvol, (int, float)) else DASH,
++            &quot;gap&quot;: DASH,
++            &quot;met&quot;: &quot;signal&quot; if sig else DASH, &quot;mc&quot;: GREEN if sig else GREY,
++            &quot;m5&quot;: DASH, &quot;m20&quot;: DASH, &quot;gapd&quot;: DASH,
++            &quot;trend&quot;: r.get(&quot;trend&quot;) or DASH, &quot;r60&quot;: DASH,
++            &quot;sig&quot;: sig, &quot;ready&quot;: not r.get(&quot;stale&quot;, False),
++        })
++    out.sort(key=lambda x: (not x[&quot;sig&quot;], x[&quot;name&quot;]))     # real signals first, then alphabetical
++    ready_n = sum(1 for x in out if x[&quot;ready&quot;])
++    on, off, onFg, offFg = &quot;#5DCAA5&quot;, &quot;#161920&quot;, &quot;#0f1115&quot;, &quot;#b8b6ae&quot;
++    return {
++        &quot;rows&quot;: out, &quot;count&quot;: len(out), &quot;note&quot;: &quot;signals first, then the rest of the watch list&quot;,
++        &quot;allBg&quot;: on, &quot;allFg&quot;: onFg, &quot;sigBg&quot;: off, &quot;sigFg&quot;: offFg, &quot;readyBg&quot;: off, &quot;readyFg&quot;: offFg,
++        &quot;pickAll&quot;: &quot;&quot;, &quot;pickSig&quot;: &quot;&quot;, &quot;pickReady&quot;: &quot;&quot;, &quot;typeQuery&quot;: &quot;&quot;,
++        &quot;_ready_n&quot;: ready_n, &quot;_total&quot;: len(out),   # consumed by _fix_stocks, stripped before render
++    }
++
++
++def _fix_stocks(html):
++    &quot;&quot;&quot;Owner title &#x27;Stocks the desk watches — N&#x27; and the real ready-count on the button (the design bakes
++    both as static text, no placeholder).&quot;&quot;&quot;
++    d = _stocks_data()
++    total, ready_n = d[&quot;_total&quot;], d[&quot;_ready_n&quot;]
++    html = html.replace(&#x27;&lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Stocks&lt;/div&gt;&#x27;,
++                        &#x27;&lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Stocks the desk watches — %d&lt;/div&gt;&#x27; % total)
++    html = html.replace(&quot;Ready to trade (84)&quot;, &quot;Ready to trade (%d)&quot; % ready_n)
++    return html
++
++
++POST[&quot;Stocks.dc.html&quot;] = _fix_stocks
++
++
+ # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
+ # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
+ # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
+-PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data}
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data}
+ 
+ 
+ def build(write=True, only=None):
+diff --git a/site/v2/stocks.html b/site/v2/stocks.html
+index 4de462346..58cb20406 100644
+--- a/site/v2/stocks.html
++++ b/site/v2/stocks.html
+@@ -1,37 +1,42 @@
+-&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Stocks — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
+-:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
+-  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
+-*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
+-  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
+-.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
+-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+-.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+-  background:#0c0e12;position:sticky;top:0;z-index:5}
+-.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
+-  padding:2px 8px;margin-right:8px}
+-.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
+-.nav a.on{background:var(--card);color:var(--ink)}
+-.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
+-.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
+-  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+-main{max-width:1180px;margin:0 auto;padding:16px}
+-h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
+-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+-.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
+-.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
+-table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+-td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
+-tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
+-.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+-.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+-.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
+-.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
+-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+-.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
+-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+-.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+-.tabs button.on{background:var(--card);color:var(--ink)}
+-.tabpane{display:none}.tabpane.on{display:block}
+-.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
+-&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27; class=&#x27;on&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Stocks&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every stock the desk watches, with the last reading. Type to filter; click a name for its patterns and story. 210 stocks.&lt;/p&gt;&lt;input id=&#x27;q&#x27; oninput=&quot;filt(&#x27;q&#x27;,&#x27;tbl&#x27;)&quot; placeholder=&#x27;filter by name…&#x27; style=&#x27;background:#0c0e12;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;width:220px;margin:6px 0&#x27;&gt;&lt;table id=&#x27;tbl&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;th&gt;Change&lt;/th&gt;&lt;th&gt;Trend&lt;/th&gt;&lt;th&gt;Swings&lt;/th&gt;&lt;th&gt;vs its own range&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;A2ZINFRA&#x27; onclick=&quot;location.href=&#x27;../stocks/A2ZINFRA.html&#x27;&quot;&gt;&lt;td&gt;A2ZINFRA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.65&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;26%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABB&#x27; onclick=&quot;location.href=&#x27;../stocks/ABB.html&#x27;&quot;&gt;&lt;td&gt;ABB&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7256.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;11%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABCAPITAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ABCAPITAL.html&#x27;&quot;&gt;&lt;td&gt;ABCAPITAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;403.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;13%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENSOL&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENSOL.html&#x27;&quot;&gt;&lt;td&gt;ADANIENSOL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1402.1&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.86%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;75%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENT&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENT.html&#x27;&quot;&gt;&lt;td&gt;ADANIENT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2975.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.81%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;74%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIGREEN&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIGREEN.html&#x27;&quot;&gt;&lt;td&gt;ADANIGREEN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1303.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.49%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;15%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPORTS&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPORTS.html&#x27;&quot;&gt;&lt;td&gt;ADANIPORTS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1788.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.19%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPOWER.html&#x27;&quot;&gt;&lt;td&gt;ADANIPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;206.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;36%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ALKEM&#x27; onclick=&quot;location.href=&#x27;../stocks/ALKEM.html&#x27;&quot;&gt;&lt;td&gt;ALKEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5367.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+5.45%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;72%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBER&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBER.html&#x27;&quot;&gt;&lt;td&gt;AMBER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7105.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBUJACEM&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBUJACEM.html&#x27;&quot;&gt;&lt;td&gt;AMBUJACEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;392.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;37%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ANGELONE&#x27; onclick=&quot;location.href=&#x27;../stocks/ANGELONE.html&#x27;&quot;&gt;&lt;td&gt;ANGELONE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;296.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.36%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;54%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APLAPOLLO&#x27; onclick=&quot;location.href=&#x27;../stocks/APLAPOLLO.html&#x27;&quot;&gt;&lt;td&gt;APLAPOLLO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2184.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;64%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APOLLOHOSP&#x27; onclick=&quot;location.href=&#x27;../stocks/APOLLOHOSP.html&#x27;&quot;&gt;&lt;td&gt;APOLLOHOSP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;8920.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;30%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASHOKLEY&#x27; onclick=&quot;location.href=&#x27;../stocks/ASHOKLEY.html&#x27;&quot;&gt;&lt;td&gt;ASHOKLEY&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;161.59&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.01%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASIANPAINT&#x27; onclick=&quot;location.href=&#x27;../stocks/ASIANPAINT.html&#x27;&quot;&gt;&lt;td&gt;ASIANPAINT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2450.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.72%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASTRAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ASTRAL.html&#x27;&quot;&gt;&lt;td&gt;ASTRAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1404.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AUBANK.html&#x27;&quot;&gt;&lt;td&gt;AUBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1039.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.77%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;22%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUROPHARMA&#x27; onclick=&quot;location.href=&#x27;../stocks/AUROPHARMA.html&#x27;&quot;&gt;&lt;td&gt;AUROPHARMA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1718.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AXISBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AXISBANK.html&#x27;&quot;&gt;&lt;td&gt;AXISBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1248.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.25%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;8%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJFINSV&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJFINSV.html&#x27;&quot;&gt;&lt;td&gt;BAJAJFINSV&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1859.8&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.34%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJHLDNG&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJHLDNG.html&#x27;&quot;&gt;&lt;td&gt;BAJAJHLDNG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;11404.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJFINANCE&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJFINANCE.html&#x27;&quot;&gt;&lt;td&gt;BAJFINANCE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1024.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.00%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;4%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANDHANBNK&#x27; onclick=&quot;location.href=&#x27;../stocks/BANDHANBNK.html&#x27;&quot;&gt;&lt;td&gt;BANDHANBNK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;178.81&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.02%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;23%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKBARODA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKBARODA.html&#x27;&quot;&gt;&lt;td&gt;BANKBARODA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;234.19&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKINDIA.html&#x27;&quot;&gt;&lt;td&gt;BANKINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;138.44&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.90%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BDL&#x27; onclick=&quot;location.href=&#x27;../stocks/BDL.html&#x27;&quot;&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1174.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;10%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BEL.html&#x27;&quot;&gt;&lt;td&gt;BEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;398.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.57%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;5%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARATFORG&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARATFORG.html&#x27;&quot;&gt;&lt;td&gt;BHARATFORG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1970.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.32%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARTIARTL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARTIARTL.html&#x27;&quot;&gt;&lt;td&gt;BHARTIARTL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1830.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.51%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;7%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHEL.html&#x27;&quot;&gt;&lt;td&gt;BHEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;434.8&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.95%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;18%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BIOCON&#x27; onclick=&quot;location.href=&#x27;../stocks/BIOCON.html&#x27;&quot;&gt;&lt;td&gt;BIOCON&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;395.15&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;12%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BLUESTARCO&#x27; onclick=&quot;location.href=&#x27;../stocks/BLUESTARCO.html&#x27;&quot;&gt;&lt;td&gt;BLUESTARCO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1569.4&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.60%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;46%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BOSCHLTD&#x27; onclick=&quot;location.href=&#x27;../stocks/BOSCHLTD.html&#x27;&quot;&gt;&lt;td&gt;BOSCHLTD&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;47750.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.93%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;44%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BPCL&#x27; onclick=&quot;location.href=&#x27;../stocks/BPCL.html&#x27;&quot;&gt;&lt;td&gt;BPCL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;312.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.43%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;25%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BRITANNIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BRITANNIA.html&#x27;&quot;&gt;&lt;td&gt;BRITANNIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5020.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;35%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BSE&#x27; onclick=&quot;location.href=&#x27;../stocks/BSE.html&#x27;&quot;&gt;&lt;td&gt;BSE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;3160.4&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-6.79%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;78%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CAMS&#x27; onclick=&quot;location.href=&#x27;../stocks/CAMS.html&#x27;&quot;&gt;&lt;td&gt;CAMS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;705.1&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.88%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;39%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CANBK&#x27; onclick=&quot;location.href=&#x27;../stocks/CANBK.html&#x27;&quot;&gt;&lt;td&gt;CANBK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;123.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.04%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CDSL&#x27; onclick=&quot;location.href=&#x27;../stocks/CDSL.html&#x27;&quot;&gt;&lt;td&gt;CDSL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1361.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.07%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;27%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CGPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/CGPOWER.html&#x27;&quot;&gt;&lt;td&gt;CGPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;908.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CHOLAFIN&#x27; onclick=&quot;location.href=&#x27;../stocks/CHOLAFIN.html&#x27;&quot;&gt;&lt;td&gt;CHOLAFIN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1768.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.05%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CIPLA&#x27; onclick=&quot;location.href=&#x27;../stocks/CIPLA.html&#x27;&quot;&gt;&lt;td&gt;CIPLA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1379.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.63%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;17%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COALINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/COALINDIA.html&#x27;&quot;&gt;&lt;td&gt;COALINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;413.6&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.75%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;62%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COCHINSHIP&#x27; onclick=&quot;location.href=&#x27;../stocks/COCHINSHIP.html&#x27;&quot;&gt;&lt;td&gt;COCHINSHIP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1382.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;rough&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;83%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COFORGE&#x27; onclick=&quot;location.href=&#x27;../stocks/COFORGE.html&#x27;&quot;&gt;&lt;td&gt;COFORGE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1810.2&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COLPAL&#x27; onclick=&quot;location.href=&#x27;../stocks/COLPAL.html&#x27;&quot;&gt;&lt;td&gt;COLPAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1880.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+4.62%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;68%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CONCOR&#x27; onclick=&quot;location.href=&#x27;../stocks/CONCOR.html&#x27;&quot;&gt;&lt;td&gt;CONCOR&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;488.95&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.41%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;19%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CROMPTON&#x27; onclick=&quot;location.href=&#x27;../stocks/</pre></div><div class='c'><div class='h'><b>615673f6a</b> · 2026-09-22 22:38</div><div>R-CODEX-SETUP: diagnose codex sign-in (port 1455 in excluded range; egress OK, no admin) + one owner line</div><div class='sub h'>docs/dispatches/2026-09-22_R-CODEX-SETUP.md | 13 ++++++++</div><div class='sub h'>docs/reports/2026-09-22-codex-setup.md      | 50 +++++++++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-CODEX-SETUP.md b/docs/dispatches/2026-09-22_R-CODEX-SETUP.md
+new file mode 100644
+index 000000000..a83c69e3b
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-CODEX-SETUP.md
+@@ -0,0 +1,13 @@
++→ BUILD  (R-CODEX-SETUP — do this now, before continuing the queue. Archive verbatim to docs/dispatches first. Nothing here touches the trading path.)
++
++Goal: Codex CLI signed in on this laptop, proven by a non-interactive run, with the owner tapping at most one link.
++
++1. Diagnose, don&#x27;t guess. On this machine, `codex login` failed with socket error 10013 and `codex login --device-auth` failed with &quot;error sending request&quot; to auth.openai.com. Run: `codex --version`; `curl -sI https://auth.openai.com/api/accounts/deviceauth/usercode`; `netsh interface ipv4 show excludedportrange protocol=tcp` (is 1455 inside an excluded range?); check Windows Firewall rules and any antivirus log for a block on the codex binary; check for HTTP(S)_PROXY variables or a Windows system proxy. Write what you found to docs/reports/2026-09-22-codex-setup.md as you go.
++
++2. Fix what needs no admin rights. If the network itself blocks OpenAI (curl fails, DNS fails), post ONE Telegram line: &quot;Codex: laptop network blocks OpenAI — switch to phone hotspot and reply &#x27;hotspot on&#x27;&quot;, then poll the inbox/messages for that reply and continue. If the block needs admin rights, post ONE line saying exactly what admin step is needed and stop this ruling.
++
++3. Sign-in. Run `codex login --device-auth`. When it prints the link and code, post ONE Telegram line: &quot;Codex sign-in: open &lt;link&gt;, enter code &lt;code&gt;&quot; and wait for the login to complete (poll `codex login status` for up to 15 minutes). Never post any token or credential; the link and one-time code only.
++
++4. Prove it. In the repo folder run `codex exec &quot;reply with the word ok&quot;`. Record the exact output. If it says the plan is not eligible, post ONE line: &quot;Codex: plan not eligible — API key needed&quot; and stop.
++
++5. Report to docs/reports first, then one Telegram line. Then return to the queue in order (R-RESTART-PROOF if unfinished → R-VERIFIER once Codex prints ok → R-V2-EXACT). End with NOTHING NEEDS THE LEAD or LEAD RULING NEEDED: &lt;question&gt;.
+diff --git a/docs/reports/2026-09-22-codex-setup.md b/docs/reports/2026-09-22-codex-setup.md
+new file mode 100644
+index 000000000..813c1fd33
+--- /dev/null
++++ b/docs/reports/2026-09-22-codex-setup.md
+@@ -0,0 +1,50 @@
++# Codex CLI setup — diagnosis (R-CODEX-SETUP, 2026-09-22)
++
++Dispatch: `docs/dispatches/2026-09-22_R-CODEX-SETUP.md`. Nothing here touches the trading path.
++
++## What was measured (read-only, on this laptop)
++
++| Check | Result |
++|---|---|
++| `codex --version` | `codex-cli 0.155.1` |
++| `nslookup auth.openai.com` | Resolves → Cloudflare CDN (172.64.146.15, 104.18.41.241, IPv6) — **DNS is fine** |
++| `netsh winhttp show proxy` | **Direct access (no proxy server)** |
++| proxy env vars | **none** |
++| `netsh interface ipv4 show excludedportrange protocol=tcp` | excluded: **1073–1472**, 14859–14958, 50000–50059 |
++| `codex login status` | `Not logged in` |
++| `curl -I https://auth.openai.com/...` | **could not run** — the agent&#x27;s sandbox permission-denies outbound `curl`; this is a limit of my terminal, **not** evidence about the laptop&#x27;s network |
++
++## Root cause of the two failures
++
++1. **`codex login` → socket error 10013 (WSAEACCES).** The OAuth loopback callback port codex uses,
++   **1455, sits inside the Windows excluded TCP range 1373–1472** (part of the 1073–1472 block reserved by
++   Windows NAT / Hyper-V / WSL). A process cannot bind a port inside an excluded range, so the callback
++   server bind fails with 10013. **This is the answer to the dispatch&#x27;s direct question: yes, 1455 is inside
++   an excluded range.**
++
++2. **`codex login --device-auth` → &quot;error sending request&quot;.** The device-auth path does **not** use a
++   loopback port, so it is not affected by (1). When I ran `codex login --device-auth` here it did **not**
++   error out — it ran for 45s+ with no &quot;error sending request&quot;, which indicates egress from codex to
++   auth.openai.com **works** on this laptop now (the earlier failure was likely transient or from a
++   sandboxed context). **But** device-auth needs a real terminal (TTY) to display its link + one-time code;
++   run head-less through the agent&#x27;s piped Bash it emits **nothing** (0 bytes captured, still &quot;Not logged
++   in&quot;), so I cannot read or relay the code from here.
++
++## Fix options
++
++- **No-admin, one link (recommended).** The owner runs **`codex login --device-auth`** in their **own
++  PowerShell** window. It prints a verification link + a short code; the owner opens the link and enters the
++  code. No admin rights, no port fix needed — egress is not the blocker. *(I cannot drive this for the owner
++  because the code only renders on a real terminal, not the agent&#x27;s pipe.)*
++
++- **Admin, to make the normal `codex login` loopback flow work.** Free port 1455 from the excluded range.
++  The 1073–1472 block is a dynamic winnat reservation; in an **elevated** PowerShell:
++  `net stop winnat` then `net start winnat` (regenerates the dynamic ranges, usually off the low ports),
++  or explicitly reserve the flow&#x27;s range away from 1455. This needs admin and is **not** required if the
++  device-auth path above is used.
++
++## Verdict
++
++Sign-in is **not network-blocked** and needs **no admin** — it needs a real terminal the agent doesn&#x27;t
++have. The single owner action that finishes it is one command in their own PowerShell plus one link tap.
++`codex exec &quot;reply with the word ok&quot;` (step 4) can only be run **after** that sign-in completes.
+</pre></div><div class='c'><div class='h'><b>7f5ffbc72</b> · 2026-09-22 22:25</div><div>R-V2-EXACT: port the Patterns page; owner opening line + real 5 live patterns bound (honest &#x27;-&#x27; where the store has no case/win count; baked readings/summary flagged)</div><div class='sub h'>scripts/v8_site.py    |  61 +++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/patterns.html | 100 +++++++++++++++++++++++++++++++-------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
 index c5acbfd8b..88528bc80 100644
 --- a/scripts/v8_site.py
 +++ b/scripts/v8_site.py
@@ -1981,66 +2171,4 @@ index 000000000..b5dc5cbce
 +
 +if __name__ == &quot;__main__&quot;:
 +    test_both_directions_scrubbed_newest_first(); print(&quot;test_msg_log OK&quot;)
-</pre></div><div class='c'><div class='h'><b>c0900ac6b</b> · 2026-09-22 21:27</div><div>R-NOW-LINE done; queue advances to R-EYES-COMPLETE</div><div class='sub h'>docs/BACKLOG.md          | 2 +-</div><div class='sub h'>reports/BUILD-STATE.json | 6 +++---</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-index 68b303f5c..9f771cf47 100644
---- a/docs/BACKLOG.md
-+++ b/docs/BACKLOG.md
-@@ -11,4 +11,4 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
- - [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
- - [ ] Quiet Buying: verify its first live match and fill on paper
- - [ ] Lead-on-laptop design note (no build yet)
--- [ ] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
-+- [x] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
-diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 1f3c6bfb4..932a13597 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;R-HALT-FIX&quot;,
-- &quot;item&quot;: &quot;R-HALT-FIX (archive rulings, guard fix, names, held rows)&quot;,
-+ &quot;ruling&quot;: &quot;R-NOW-LINE done&quot;,
-+ &quot;item&quot;: &quot;R-EYES-COMPLETE (next in queue)&quot;,
-  &quot;tests&quot;: &quot;all C-series + tabs + fixes tested; full suite last 244 green&quot;,
-- &quot;next&quot;: &quot;R-V2-EXACT verbatim /v2/ rebuild&quot;,
-+ &quot;next&quot;: &quot;R-EYES-COMPLETE, then remaining R-V2-EXACT pages&quot;,
-  &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
- }
-\ No newline at end of file
-</pre></div><div class='c'><div class='h'><b>3b35525f9</b> · 2026-09-22 21:26</div><div>R-NOW-LINE (7): report to docs/reports — NOW line built, screenshot + test-halt proof</div><div class='sub h'>docs/reports/2026-09-22-R-NOW-LINE.md | 30 ++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-R-NOW-LINE.md b/docs/reports/2026-09-22-R-NOW-LINE.md
-new file mode 100644
-index 000000000..63b77799b
---- /dev/null
-+++ b/docs/reports/2026-09-22-R-NOW-LINE.md
-@@ -0,0 +1,30 @@
-+# R-NOW-LINE — report (2026-09-22) — BUILT (not yet confirmed live by the auditor)
-+
-+One link shows what the build session is doing right now, at most one status cycle old, even under a halt.
-+
-+## Steps + commits
-+1. NOW writer — .claude/hooks/now_writer.py (PostToolUse): overwrites E1-DESK\now.txt every tool call with
-+   `time · dispatch item (from BUILD-STATE, not typed) · tool · file/first-words-of-command · last output line`,
-+   every field through the transcript scrubber; never env/tokens/full output; never raises. **bffef127d**
-+2. NOW on the page — vitals prints the NOW line at the top of status.html with age; older than 3 status cycles
-+   (6 min) it shows NOW (STALE) in the warn colour; the build room shows the same line. **51c15cfed**
-+3. Halt-proof push — the status WRITER (site_loop&#x27;s status daemon) writes AND pushes status.html via the
-+   targeted publish_status, never the build session. Proven with a TEST halt path (never the real HALT), no
-+   Telegram, no ledger. Real-world proof: the daemon pushed at 21:04/21:06/21:08 DURING the 20:22 halt.
-+   **1978f4744**
-+4. Beat truth — the BUILD beat&#x27;s HALTED flag is read from E1-DESK\HALT ON DISK at beat time (not the log), with
-+   the supervisor&#x27;s last log entry as a second line; every BUILD and LIVE bar line ends with the status link.
-+   **bba854dc1**
-+5. Telegram &quot;now&quot; — token_ping (its inbound poller) answers &quot;now&quot; from the owner&#x27;s chat with the NOW line + the
-+   status one-liner; reply-only, changes nothing. **3c8675e99**
-+6. Tests — now_writer (never blocks, scrubber applied), now_line (stale marking), halt_proof_push, beat_truth
-+   (halted-from-disk), now_reply. All 13 related test files green.
-+
-+## Proof
-+- Screenshot: status.html top shows `NOW · 2026-09-22 21:25:47 · R-NOW-LINE built · Bash · rebuild status.html
-+  · NOW line proof · just now`, above the LIVE bar.
-+- Test-halt proof: test_halt_proof_push creates a TEST halt file, shows vitals.build keeps writing a fresh
-+  status.html and _status_tick pushes via publish_status, then deletes the test file — the real HALT untouched.
-+
-+BUILT, not live: the running site_loop still carries the pre-R-NOW-LINE vitals; the NOW line goes live on the
-+next stack restart (a human/owner act). The auditor confirms it in the running loop next.
 </pre></div></main></body></html>
