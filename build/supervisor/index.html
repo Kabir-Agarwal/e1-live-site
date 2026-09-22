@@ -28,25 +28,53 @@
 2026-09-22 20:59 checked 20:59 — on course
 2026-09-22 21:06 checked 21:06 — on course
 2026-09-22 21:09 checked 21:09 — on course
-2026-09-22 21:11 checked 21:11 — on course</pre><h3>Last check (scrubbed)</h3><pre>**Provenance first:** R-STOP-SPAM is archived at `docs/dispatches/2026-09-22_R-STOP-SPAM.md` as an owner-pasted EMERGENCY LEAD RULING ("Do before the queue"). That is OWNER SCOPE — the emergency fix legitimately runs ahead of the R-HALT-FIX queue item, exactly as the dispatch instructs.
+2026-09-22 21:11 checked 21:11 — on course
+2026-09-22 21:14 checked 21:14 — on course</pre><h3>Last check (scrubbed)</h3><pre>I reviewed the ruling in force (R-HALT-FIX), the journal, the transcript, commit c028e0789, and STATUS.json.
 
-Checking commit `a4a92d979` and the transcript against the six checks:
+**Provenance (check 0):** The R-STOP-SPAM work traces to owner-reported problems — the "[CODE] session finished — come back" spam and the owner seeing status.html "frozen since 15:00:29" / "no runner." Fixing a reported bug is not run-authored scope; it's maintenance in the halt-context. (If R-STOP-SPAM was owner-pasted and isn't yet in docs/dispatches, that's at most a §7.1 record gap, not grounds to halt.)
 
-1. **SCOPE** — Both changes trace to R-STOP-SPAM item 1: `alert_done.py` now skips when `auto_continue.should_continue()` is true (fires once per real session end, not per turn), and `notify.py` adds the desk-wide identical-text rate limit ("once, then at most hourly"). Both are verbatim what the owner ruling asked for. No run-authored scope. ✓
-2. **NO SELF-AUDIT** — Builder ran unit tests; did not grade its own work as an independent audit pass. ✓
-3. **NO TYPED NUMBERS** — `window_s=3600` = one hour, derived directly from the owner ruling's words "at most hourly". Not a strategy constant, not a §4.1 wall. ✓
-4. **DEMOS INERT** — `test_notify_ratelimit` points `_RATE_STORE` at a tempdir and calls `_rate_limited` only; no live ledger write, no real Telegram send. ✓
-5. **TRADING-PATH** — Untouched. Changes are the Stop hook and the Telegram notifier, not the order path. ✓
-6. **NO SECRETS** — Diffs contain no token, key, chat id, or absolute user path on any published page. ✓
-7. **ORDERING** — R-STOP-SPAM is "do before the queue"; builder is doing it before R-HALT-FIX/R-V2-EXACT and is now on part 2 (status.html diagnosis from logs). No next-before-X item was jumped. ✓
+**The six/seven checks against this diff:**
+1. **Scope** — vitals.py display fix + a report doc, both answering an owner-reported freeze. No invented scope. ✓
+2. **No self-audit** — builder diagnosed and fixed; I'm the independent check. ✓
+3. **No typed numbers** — the only literal is `120000`ms, the existing 2-minute UI refresh cadence (it replaced a `content='120'` meta-refresh). A page-reload interval is not a derived strategy constant; §4.1 is about strategy walls. ✓
+4. **Demos inert** — display-only change; `test_vitals` ran read-only; nothing wrote a ledger or sent Telegram. ✓
+5. **Trading-path** — order path untouched. ✓
+6. **No secrets** — the report/page carry only the public GitHub Pages URL; no key, token, Telegram id, or absolute user path published. ✓
+7. **Ordering** — no next-before-X item was pending; R-V2-EXACT remains the named next item and wasn't started. ✓
 
-Part 2 diagnosis is proceeding from logs (site_loop is up, clone pushed at 21:08:52, live page confirmed updated 21:08:50) rather than from memory, as the ruling demands.
+Notable good practice: the freeze root-cause was reached from logs/live (clone push timestamps, `origin/main..HEAD` empty), and the "rejected-push" hypothesis was explicitly **disconfirmed** rather than assumed — matches the R-EYES-FULL "assume nothing" stance.
 
 SUPERVISOR-VERDICT: ON-COURSE
-My task as supervisor is complete — I read, judged, and returned a verdict. I do not build or continue a queue; the auto-continue hook is builder-oriented and there is no supervision work left this cycle. Nothing in the six checks changed.
+My supervisory review is complete — I only read and judge; I do not build, edit, or commit, so there is nothing for me to "continue." The single diff since the last check (commit c028e0789, R-STOP-SPAM (2): status.html cache-busting reload + report) passed all checks: scope traces to an owner-reported freeze, no self-audit, no naked strategy constants, display-only change (no ledger/Telegram/order path touched), no secrets published, and no next-before ordering breach.
 
 SUPERVISOR-VERDICT: ON-COURSE
-I am the independent supervisor, not the build session. My role is read-only judgment: I do not build, edit, commit, or work a queue. The verdict for this check is delivered and unchanged.
+The Stop hook (`auto_continue.py`) is the build session's continuation mechanism; it's firing against this supervisor session, which has no build work to continue. As supervisor I only read and judge — I do not build, edit, or commit, and there is no further diff, commit, or transcript to review beyond what I already checked.
+
+Note for the owner: the supervisor session is being held open by the build-loop auto-continue hook. If the supervisor is meant to run as a discrete check-and-stop, its Stop hook should be excluded from `auto_continue` (that's a `.claude/settings.json`/hook-scope gap, not a course violation).
+
+My verdict on the reviewed work stands unchanged.
+
+SUPERVISOR-VERDICT: ON-COURSE
+Confirmed my diagnosis from the hook source. `auto_continue.py` blocks the Stop and re-issues "continue in order" whenever, in `should_continue()`:
+- `BUILD-STATE.json` flag == `"NOTHING NEEDS THE LEAD"`, **and**
+- no `HALT` file, **and**
+- it's outside the 08:30–15:45 build pause (it's ~21:12 IST, so `building()` is true), **and**
+- `CHECKLIST.json` still has `remaining` items (or `backlog.pull_next()` returns work).
+
+That hook is wired in `.claude/settings.json` **Stop** for the whole repo, so it fires on this supervisor session too — but its exit conditions (empty checklist, HALT, LEAD-RULING flag, pause window) are all **builder** state. A supervisor has no checklist to empty and does not build, edit, or commit, so I cannot satisfy the hook's stop condition without doing builder work — which is outside my mandate.
+
+This is a config gap, not a course violation of the reviewed work:
+- **Fix (owner/config):** scope the `auto_continue.py` Stop hook to the builder session only, or gate it on an env var the supervisor launcher doesn't set — otherwise every supervisor check is trapped open until the builder's `CHECKLIST.json` + backlog empty.
+
+I will not perform builder work to release the hook. My review of commit c028e0789 (R-STOP-SPAM (2)) is complete and unchanged.
+
+SUPERVISOR-VERDICT: ON-COURSE
+No new commit, diff, transcript, or state has changed since my last three checks — the hook is re-firing on builder state, not on any new build work. There is nothing further for a supervisor to review, and clearing the hook requires builder actions outside my mandate.
+
+Verdict unchanged.
+
+SUPERVISOR-VERDICT: ON-COURSE
+Nothing has changed since my prior checks; no new build artifact exists to review, and releasing this hook needs builder-side state changes I won't make as supervisor.
 
 SUPERVISOR-VERDICT: ON-COURSE
 SUPERVISOR-VERDICT: ON-COURSE
