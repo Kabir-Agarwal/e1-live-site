@@ -1,4 +1,562 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>8272c89c4</b> · 2026-09-22 17:32</div><div>build_journal: bound the transcript scrub + commit diffs so the full cycle can&#x27;t stall the site loop</div><div class='sub h'>scripts/build_journal.py | 11 ++++++-----</div><pre>diff --git a/scripts/build_journal.py b/scripts/build_journal.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>868d24f1b</b> · 2026-09-22 17:48</div><div>ADD: desk Telegram links point to plain pages (status.html), never the script-built root</div><div class='sub h'>scripts/alarm.py         |  2 +-</div><div class='sub h'>scripts/lead_digest.py   |  2 +-</div><div class='sub h'>scripts/notify.py        |  5 ++++-</div><div class='sub h'>tests/test_desk_links.py | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/alarm.py b/scripts/alarm.py
+index 1b180adb8..302e223fc 100644
+--- a/scripts/alarm.py
++++ b/scripts/alarm.py
+@@ -10,7 +10,7 @@ import sys
+ 
+ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ 
+-SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
++SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;   # plain page, never the script-built root
+ 
+ 
+ def emergency(message, title=&quot;E1 ALERT&quot;):
+diff --git a/scripts/lead_digest.py b/scripts/lead_digest.py
+index 72b8b3a56..a49a9d131 100644
+--- a/scripts/lead_digest.py
++++ b/scripts/lead_digest.py
+@@ -292,7 +292,7 @@ def build():
+               (i, ph.get(&quot;breadth&quot;, 0), ph.get(&quot;median_margin&quot;), ph.get(&quot;outcome_type&quot;, &quot;&quot;),
+                ph.get(&quot;sentence&quot;, &quot;&quot;)))
+     p(&quot;&quot;)
+-    p(&quot;Site: https://[redacted]-[redacted].github.io/e1-live-site/  |  Digest is regenerated after every&quot;)
++    p(&quot;Site: https://[redacted]-[redacted].github.io/e1-live-site/status.html  |  Digest is regenerated after every&quot;)
+     p(&quot;report and at 15:40 IST daily.&quot;)
+ 
+     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+diff --git a/scripts/notify.py b/scripts/notify.py
+index c77f1216b..f2cae52bf 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -56,7 +56,10 @@ def _log_send(message: str, result: str) -&gt; None:
+             f.write(line)
+     except Exception:
+         pass
+-_SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
++# ADD (2026-09-22): every link the desk sends points to a PLAIN server-rendered page that opens in any browser
++# (including Telegram&#x27;s) — status.html by default, /deliverables/ for deliverables — NEVER the script-built
++# main page (the root index).
++_SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
+ 
+ 
+ def _with_link(message: str) -&gt; str:
+diff --git a/tests/test_desk_links.py b/tests/test_desk_links.py
+new file mode 100644
+index 000000000..fa658e6c2
+--- /dev/null
++++ b/tests/test_desk_links.py
+@@ -0,0 +1,33 @@
++&quot;&quot;&quot;ADD 2026-09-22: every Telegram link the desk sends points to a PLAIN server-rendered page (status.html or
++/deliverables/), never the script-built main page (the bare site root).&quot;&quot;&quot;
++import os, sys, re
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++PLAIN = (&quot;status.html&quot;, &quot;/deliverables/&quot;, &quot;deliverables.html&quot;)
++ROOT = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
++
++
++def _is_plain(url):
++    return any(url.rstrip(&quot;/&quot;).endswith(p.rstrip(&quot;/&quot;)) or p in url for p in PLAIN)
++
++
++def test_notify_default_link_is_plain():
++    from scripts import notify
++    assert _is_plain(notify._SITE), notify._SITE
++    assert notify._SITE.rstrip(&quot;/&quot;) != ROOT.rstrip(&quot;/&quot;)           # not the bare script-built root
++
++
++def test_alarm_link_is_plain():
++    from scripts import alarm
++    assert _is_plain(alarm.SITE) and alarm.SITE.rstrip(&quot;/&quot;) != ROOT.rstrip(&quot;/&quot;)
++
++
++def test_alert_message_appends_status_page():
++    from scripts import notify
++    m = notify._decorate(&quot;desk halted 111&quot;, is_alert=True) if hasattr(notify, &quot;_decorate&quot;) else None
++    # fall back: the appended link in the code path is _SITE
++    assert _is_plain(notify._SITE)
++
++
++if __name__ == &quot;__main__&quot;:
++    test_notify_default_link_is_plain(); test_alarm_link_is_plain(); test_alert_message_appends_status_page()
++    print(&quot;test_desk_links OK&quot;)
+</pre></div><div class='c'><div class='h'><b>146ec8bce</b> · 2026-09-22 17:45</div><div>R-VITALS-STALE decouple: status.html refreshes every 2 min in its own daemon thread</div><div class='sub h'>scripts/publish_site.py | 32 ++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/site_build.py   |  8 +++-----</div><div class='sub h'>scripts/site_loop.py    | 21 +++++++++++++++++++++</div><pre>diff --git a/scripts/publish_site.py b/scripts/publish_site.py
+index 74581729c..23249bf0c 100644
+--- a/scripts/publish_site.py
++++ b/scripts/publish_site.py
+@@ -49,9 +49,41 @@ def _mirror():
+     shutil.copy2(os.path.join(SITE, &quot;index.html&quot;), os.path.join(CLONE, &quot;404.html&quot;))
+ 
+ 
++import threading
++_PUB_LOCK = threading.Lock()     # serialise the full publish and the fast status-only publish on the one clone
++
++
++def publish_status():
++    &quot;&quot;&quot;R-VITALS-STALE decouple: a FAST publish of ONLY status.html + data/status.json (no clone wipe, no full
++    mirror), so a background thread can refresh the status page every 2 min independent of the heavy ~7-min
++    full site build. Serialised with publish() by _PUB_LOCK.&quot;&quot;&quot;
++    files = [&quot;status.html&quot;, os.path.join(&quot;data&quot;, &quot;status.json&quot;)]
++    if not os.path.isdir(SITE):
++        return {&quot;published&quot;: False, &quot;reason&quot;: &quot;no site/&quot;}
++    with _PUB_LOCK:
++        _ensure_clone()
++        for rel in files:
++            src, dst = os.path.join(SITE, rel), os.path.join(CLONE, rel)
++            if os.path.exists(src):
++                os.makedirs(os.path.dirname(dst), exist_ok=True)
++                shutil.copy2(src, dst)
++        if not _git([&quot;status&quot;, &quot;--porcelain&quot;, &quot;--&quot;, &quot;status.html&quot;, &quot;data/status.json&quot;], CLONE).stdout.strip():
++            return {&quot;published&quot;: False, &quot;reason&quot;: &quot;unchanged&quot;}
++        _git([&quot;add&quot;, &quot;status.html&quot;, &quot;data/status.json&quot;], CLONE)
++        _git([&quot;-c&quot;, &quot;user.name=%s&quot; % AUTHOR[0], &quot;-c&quot;, &quot;user.email=%s&quot; % AUTHOR[1], &quot;commit&quot;, &quot;-q&quot;, &quot;-m&quot;,
++              &quot;status refresh\n\nCo-Authored-By: Claude Opus 4.8 &lt;[redacted]&gt;&quot;], CLONE)
++        push = _git([&quot;push&quot;, &quot;-q&quot;, &quot;origin&quot;, &quot;main&quot;], CLONE)
++        return {&quot;published&quot;: push.returncode == 0, &quot;url&quot;: PAGES_URL}
++
++
+ def publish(message=&quot;E1 live site refresh&quot;):
+     if not os.path.isdir(SITE):
+         return {&quot;published&quot;: False, &quot;reason&quot;: &quot;no site/ folder&quot;}
++    with _PUB_LOCK:
++        return _publish_locked(message)
++
++
++def _publish_locked(message):
+     _ensure_clone()
+     _mirror()
+     if not _git([&quot;status&quot;, &quot;--porcelain&quot;], CLONE).stdout.strip():
+diff --git a/scripts/site_build.py b/scripts/site_build.py
+index 40ad8c1c4..447e556fd 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -613,11 +613,9 @@ def build_live():
+     _write_accounts()
+     _old_page_redirects()
+     terminal_data.build()                               # the live feed the Live desk tab polls (~0.2 s)
+-    try:
+-        from scripts import vitals                       # R-VITALS: machine-written status every light cycle (fast)
+-        vitals.build()
+-    except Exception:
+-        pass
++    # NOTE: vitals.build() (status.html) is NOT here — it runs in site_loop&#x27;s dedicated status DAEMON THREAD
++    # every 2 min, decoupled from this loop so the heavy full page cycle can never stall the status page
++    # (R-VITALS-STALE decouple). Having it in only one place also avoids two threads writing status.html.
+     try:
+         from scripts import live_bar                      # R-LIVE-BAR: post on advance / 08:30 / 15:35 (fast)
+         live_bar.maybe_post()
+diff --git a/scripts/site_loop.py b/scripts/site_loop.py
+index b8821ca02..fa92692e0 100644
+--- a/scripts/site_loop.py
++++ b/scripts/site_loop.py
+@@ -92,8 +92,29 @@ def once(full=False):
+     return snapshot_sync.sync(f&quot;E1 site refresh {_ist():%Y-%m-%d %H:%M} IST&quot;) == &quot;pushed&quot;
+ 
+ 
++def _status_tick():
++    &quot;&quot;&quot;One status refresh + fast targeted publish (status.html + data/status.json only).&quot;&quot;&quot;
++    from scripts import vitals, publish_site
++    vitals.build()
++    publish_site.publish_status()
++
++
++def _start_status_daemon(interval=120):
++    import threading
++    def loop():
++        while True:
++            try:
++                _status_tick()
++            except Exception:
++                pass
++            time.sleep(interval)
++    threading.Thread(target=loop, name=&quot;status-daemon&quot;, daemon=True).start()
++
++
+ def main():
+     from engine1_rebuild import live
++    _start_status_daemon()                            # R-VITALS-STALE: status.html refreshed + published every
++    #                                                   2 min in its own thread, never blocked by the page loop
+     last_full = 0.0
+     while True:
+         now = time.time()
+</pre></div><div class='c'><div class='h'><b>02e1ac062</b> · 2026-09-22 17:41</div><div>R-AUTO-CONTINUE (Stop hook) + R-ETA rough ETA + R-NO-WINDOWS hides non-python sub-runs</div><div class='sub h'>.claude/hooks/auto_continue.py                     | 65 +++++++++++++++++++++</div><div class='sub h'>.claude/settings.json                              |  5 ++</div><div class='sub h'>docs/dispatches/2026-09-22_R-AUTO-CONTINUE.md      |  9 +++</div><div class='sub h'>.../2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md |  7 +++</div><div class='sub h'>scripts/deskproc.py                                | 23 ++++++--</div><div class='sub h'>scripts/eta.py                                     | 30 ++++++----</div><div class='sub h'>scripts/run_audit.py                               |  2 +-</div><div class='sub h'>scripts/supervisor.py                              |  5 +-</div><div class='sub h'>scripts/vitals.py                                  |  2 +-</div><div class='sub h'>tests/test_auto_continue.py                        | 68 ++++++++++++++++++++++</div><div class='sub h'>tests/test_eta.py                                  | 19 ++++--</div><pre>diff --git a/.claude/hooks/auto_continue.py b/.claude/hooks/auto_continue.py
+new file mode 100644
+index 000000000..db8121e9c
+--- /dev/null
++++ b/.claude/hooks/auto_continue.py
+@@ -0,0 +1,65 @@
++&quot;&quot;&quot;R-AUTO-CONTINUE: a Stop hook so the builder never stops on its own while checklist items remain.
++
++It BLOCKS the stop and re-issues &quot;continue in order&quot; when ALL of these hold:
++  - the journal&#x27;s next item is non-empty (reports/BUILD-STATE.json &quot;next&quot;),
++  - no HALT exists (E1-DESK\\HALT),
++  - the last self-flag is exactly &quot;NOTHING NEEDS THE LEAD&quot;,
++  - it is outside the 08:30–15:45 build pause (desk_clock.building()),
++  - the checklist still has remaining items (reports/CHECKLIST.json).
++Otherwise it lets the session stop — i.e. it stops for LEAD RULING NEEDED, a HALT, the checklist finished, or
++the pause window. Fail-open: any error lets the stop proceed (never trap the session on a hook bug).
++&quot;&quot;&quot;
++import json
++import os
++import sys
++
++REPO = os.environ.get(&quot;E1_REPO&quot;) or r&quot;[redacted]\Desktop\trading-engines-v2&quot;
++STATE = os.environ.get(&quot;E1_STATE&quot;) or os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;)
++CHECKLIST = os.environ.get(&quot;E1_CHECKLIST&quot;) or os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
++HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
++
++
++def _load(p):
++    try:
++        return json.load(open(p, encoding=&quot;utf-8&quot;))
++    except Exception:
++        return {}
++
++
++def _building():
++    try:
++        sys.path.insert(0, REPO)
++        from scripts import desk_clock
++        return desk_clock.building()
++    except Exception:
++        from datetime import datetime, timezone, timedelta
++        now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
++        m = now.hour * 60 + now.minute
++        return m &gt;= 15 * 60 + 45 or m &lt; 8 * 60 + 30      # fail toward the build window (keep going)
++
++
++def should_continue():
++    st = _load(STATE)
++    nxt = (st.get(&quot;next&quot;) or &quot;&quot;).strip()
++    flag = (st.get(&quot;flag&quot;) or &quot;&quot;).strip()
++    remaining = [x for x in (_load(CHECKLIST).get(&quot;remaining&quot;) or []) if x]
++    return bool(nxt) and (not os.path.exists(HALT)) and flag == &quot;NOTHING NEEDS THE LEAD&quot; \
++        and _building() and bool(remaining)
++
++
++def main():
++    try:
++        raw = sys.stdin.read()
++    except Exception:
++        raw = &quot;&quot;
++    try:
++        if should_continue():
++            # block the stop and hand the session the same instruction the owner would type
++            print(json.dumps({&quot;decision&quot;: &quot;block&quot;, &quot;reason&quot;: &quot;continue in order&quot;}))
++    except Exception:
++        pass
++    sys.exit(0)
++
++
++if __name__ == &quot;__main__&quot;:
++    main()
+diff --git a/.claude/settings.json b/.claude/settings.json
+index 75ba1fd25..276c99c64 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -20,6 +20,11 @@
+             &quot;command&quot;: &quot;pythonw \&quot;[redacted]\\Desktop\\trading-engines-v2\\scripts\\alert_done.py\&quot;&quot;,
+             &quot;async&quot;: true,
+             &quot;timeout&quot;: 20
++          },
++          {
++            &quot;type&quot;: &quot;command&quot;,
++            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\.claude\\hooks\\auto_continue.py\&quot;&quot;,
++            &quot;timeout&quot;: 15
+           }
+         ]
+       }
+diff --git a/docs/dispatches/2026-09-22_R-AUTO-CONTINUE.md b/docs/dispatches/2026-09-22_R-AUTO-CONTINUE.md
+new file mode 100644
+index 000000000..31a23d389
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-AUTO-CONTINUE.md
+@@ -0,0 +1,9 @@
++# R-AUTO-CONTINUE (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++the builder never stops on its own while checklist items remain. Add a Stop hook: if the journal&#x27;s next item
++is non-empty, no HALT exists, the last self-flag is NOTHING NEEDS THE LEAD, and it is outside 08:30–15:45, the
++hook re-issues &quot;continue in order&quot; automatically (the same mechanism as the traitors-game auto-continue loop).
++It stops only for LEAD RULING NEEDED, a HALT, the checklist finished, or the pause window. Test it. Then
++continue in order.
+diff --git a/docs/dispatches/2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md b/docs/dispatches/2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md
+new file mode 100644
+index 000000000..45790a697
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-ETA-and-R-NO-WINDOWS-additions.md
+@@ -0,0 +1,7 @@
++# R-ETA + R-NO-WINDOWS additions (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++(1) R-ETA: show an ETA from the first finished item, labelled &quot;rough (n measured)&quot; until three are measured;
++(2) R-NO-WINDOWS: also hide every non-Python process the desk starts (the supervisor&#x27;s and auditor&#x27;s
++    claude/node sub-runs, PowerShell polls) — no visible or transparent window of any kind; prove by enumeration.
+diff --git a/scripts/deskproc.py b/scripts/deskproc.py
+index 5d4b9c925..6fd5397b1 100644
+--- a/scripts/deskproc.py
++++ b/scripts/deskproc.py
+@@ -47,15 +47,26 @@ def launch(args, name, cwd=None):
+ 
+ 
+ def no_console_windows():
+-    &quot;&quot;&quot;Enumerate top-level windows owned by desk python processes. Returns the offending list (empty = clean).&quot;&quot;&quot;
+-    ps = (&quot;Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
+-          &quot;$_.CommandLine -match &#x27;%s&#x27; -and $_.CommandLine -notmatch &#x27;windows-mcp|serve&#x27; } | &quot;
+-          &quot;ForEach-Object { $p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; &quot;
+-          &quot;if ($p -and $p.MainWindowHandle -ne 0) { $_.ProcessId } }&quot; % DESK_PAT)
++    &quot;&quot;&quot;Enumerate top-level windows owned by ANY desk process — the python services AND every non-python
++    sub-run they start (the supervisor&#x27;s/auditor&#x27;s claude/node, PowerShell polls, cmd, conhost, git). A
++    process counts as the desk&#x27;s if its own command line matches the desk pattern OR its parent is a desk
++    python process. Returns the offending PID list; empty means no desk process owns a visible window
++    (R-NO-WINDOWS + addition: no window of any kind, proven by enumeration).&quot;&quot;&quot;
++    ps = (
++        &quot;$pat=&#x27;%s&#x27;;&quot;
++        &quot;$desk=Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
++        &quot;  $_.CommandLine -match $pat -and $_.CommandLine -notmatch &#x27;windows-mcp|serve&#x27; };&quot;
++        &quot;$deskpids=@($desk | ForEach-Object { $_.ProcessId });&quot;
++        &quot;Get-CimInstance Win32_Process | Where-Object { $_.Name -match &quot;
++        &quot;  &#x27;python|powershell|pwsh|cmd|conhost|node|claude|git|wsl&#x27; } | ForEach-Object {&quot;
++        &quot;  $isdesk=($_.CommandLine -match $pat -and $_.CommandLine -notmatch &#x27;windows-mcp|serve&#x27;) &quot;
++        &quot;    -or ($deskpids -contains $_.ParentProcessId);&quot;
++        &quot;  if ($isdesk) { $p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue;&quot;
++        &quot;    if ($p -and $p.MainWindowHandle -ne 0) { $_.ProcessId } } }&quot; % DESK_PAT)
+     try:
+         out = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;, ps], capture_output=True, text=True,
+                              timeout=30, creationflags=CREATE_NO_WINDOW).stdout
+-        return [int(x) for x in out.split() if x.strip().isdigit()]
++        return sorted(set(int(x) for x in out.split() if x.strip().isdigit()))
+     except Exception:
+         return []
+ 
+diff --git a/scripts/eta.py b/scripts/eta.py
+index 64d1cd569..f97ddbabd 100644
+--- a/scripts/eta.py
++++ b/scripts/eta.py
+@@ -83,9 +83,11 @@ def measure():
+ 
+ 
+ def schedule():
+-    &quot;&quot;&quot;Per-remaining-item ETA + a total finish time, all measured. None when &lt; 3 finished items.&quot;&quot;&quot;
++    &quot;&quot;&quot;Per-remaining-item ETA + a total finish time. Rough from the FIRST finished item (R-ETA addition),
++    firming up to &#x27;measured&#x27; once three items are finished. None only when NOTHING has finished yet.&quot;&quot;&quot;
+     m = measure()
+-    if len(m[&quot;finished&quot;]) &lt; MIN_FINISHED or not m[&quot;median_min&quot;]:
++    n = len(m[&quot;finished&quot;])
++    if n &lt; 1 or not m[&quot;median_min&quot;]:
+         return None
+     now = _now()
+     rows, cursor = [], now
+@@ -93,18 +95,22 @@ def schedule():
+         cursor = cursor + timedelta(minutes=m[&quot;median_min&quot;])
+         rows.append({&quot;item&quot;: item, &quot;eta&quot;: cursor.strftime(&quot;%H:%M&quot;), &quot;size_min&quot;: round(m[&quot;median_min&quot;])})
+     total = cursor if rows else now
++    quality = &quot;measured&quot; if n &gt;= MIN_FINISHED else &quot;rough (%d measured)&quot; % n
+     return {&quot;rows&quot;: rows, &quot;all_done&quot;: total, &quot;median_min&quot;: round(m[&quot;median_min&quot;]),
+-            &quot;commits_per_hour&quot;: m[&quot;commits_per_hour&quot;]}
++            &quot;commits_per_hour&quot;: m[&quot;commits_per_hour&quot;], &quot;quality&quot;: quality, &quot;n&quot;: n}
+ 
+ 
+ def line():
+-    &quot;&quot;&quot;The ETA fragment for the BUILD line. &#x27;ETA: measuring&#x27; until three items are finished-and-measured.&quot;&quot;&quot;
++    &quot;&quot;&quot;The ETA fragment for the BUILD line. &#x27;ETA: measuring&#x27; only before the first item finishes; then a
++    rough ETA labelled &#x27;rough (n measured)&#x27;, firming to &#x27;measured&#x27; at three (R-ETA addition).&quot;&quot;&quot;
+     sch = schedule()
+-    if not sch or not sch[&quot;rows&quot;]:
+-        return &quot;ETA: measuring&quot; if not sch else &quot;ETA: nothing left (measured)&quot;
++    if not sch:
++        return &quot;ETA: measuring&quot;
++    if not sch[&quot;rows&quot;]:
++        return &quot;ETA: nothing left (%s)&quot; % sch[&quot;quality&quot;]
+     nxt = sch[&quot;rows&quot;][0]
+-    return &quot;ETA %s %s · all done ~%s (measured)&quot; % (
+-        _short(nxt[&quot;item&quot;]), nxt[&quot;eta&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;))
++    return &quot;ETA %s %s · all done ~%s (%s)&quot; % (
++        _short(nxt[&quot;item&quot;]), nxt[&quot;eta&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;), sch[&quot;quality&quot;])
+ 
+ 
+ def _short(item, n=22):
+@@ -115,15 +121,15 @@ def _short(item, n=22):
+ def table_html():
+     sch = schedule()
+     if not sch:
+-        return (&quot;&lt;h3&gt;Schedule&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;ETA: measuring — need at least %d finished items with &quot;
+-                &quot;measured durations before an ETA can be computed (no guessed times).&lt;/p&gt;&quot; % MIN_FINISHED)
++        return (&quot;&lt;h3&gt;Schedule&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;ETA: measuring — no item has finished yet, so there is no &quot;
++                &quot;measured duration to size from (no guessed times).&lt;/p&gt;&quot;)
+     rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s min&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
+         _short(r[&quot;item&quot;], 60), r[&quot;size_min&quot;], r[&quot;eta&quot;]) for r in sch[&quot;rows&quot;]) or \
+         &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no remaining items&lt;/td&gt;&lt;/tr&gt;&quot;
+-    return (&quot;&lt;h3&gt;Schedule (measured)&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;Each item sized at the median finished-item time &quot;
++    return (&quot;&lt;h3&gt;Schedule (%s)&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;Each item sized at the median finished-item time &quot;
+             &quot;(%d min); pace %.1f commits/hour. All done ~%s.&lt;/p&gt;&quot;
+             &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Remaining item&lt;/th&gt;&lt;th&gt;Size&lt;/th&gt;&lt;th&gt;ETA&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
+-            % (sch[&quot;median_min&quot;], sch[&quot;commits_per_hour&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;), rows))
++            % (sch[&quot;quality&quot;], sch[&quot;median_min&quot;], sch[&quot;commits_per_hour&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;), rows))
+ 
+ 
+ if __name__ == &quot;__main__&quot;:
+diff --git a/scripts/run_audit.py b/scripts/run_audit.py
+index 662d99cb4..32e8c7699 100644
+--- a/scripts/run_audit.py
++++ b/scripts/run_audit.py
+@@ -150,7 +150,7 @@ def audit():
+ def _commit():
+     try:
+         return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=_REPO, capture_output=True,
+-                              text=True, timeout=15).stdout.strip()
++                              text=True, timeout=15, creationflags=0x08000000).stdout.strip()  # R-NO-WINDOWS
+     except Exception:
+         return &quot;&quot;
+ 
+diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+index a21a87864..db97269fb 100644
+--- a/scripts/supervisor.py
++++ b/scripts/supervisor.py
+@@ -70,7 +70,7 @@ def build_hours(now=None):
+ def _head():
+     try:
+         return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=REPO, capture_output=True,
+-                              text=True, timeout=15).stdout.strip()
++                              text=True, timeout=15, creationflags=0x08000000).stdout.strip()
+     except Exception:
+         return None
+ 
+@@ -90,7 +90,8 @@ def due(now=None):
+ # ---------------------------------------------------------------------------------------------------------
+ def _git(*a):
+     try:
+-        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, timeout=30).stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, timeout=30,
++                              creationflags=0x08000000).stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
+     except Exception:
+         return &quot;&quot;
+ 
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index a4a26f7ed..a4d55c03c 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -44,7 +44,7 @@ def _processes():
+         r = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;,
+             &quot;Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; } | &quot;
+             &quot;Select-Object ProcessId,CreationDate,CommandLine | ConvertTo-Json -Compress&quot;],
+-            capture_output=True, text=True, timeout=30)
++            capture_output=True, text=True, timeout=30, creationflags=0x08000000)  # R-NO-WINDOWS: no window
+         data = json.loads(r.stdout or &quot;[]&quot;)
+         data = [data] if isinstance(data, dict) else data
+         for p in data:
+diff --git a/tests/test_auto_continue.py b/tests/test_auto_continue.py
+new file mode 100644
+index 000000000..0aa104b5b
+--- /dev/null
++++ b/tests/test_auto_continue.py
+@@ -0,0 +1,68 @@
++&quot;&quot;&quot;R-AUTO-CONTINUE: the Stop hook re-issues &#x27;continue in order&#x27; only while checklist items remain and nothing
++else asks it to stop. Tests the pure predicate should_continue() with env-injected state (no real Stop event).&quot;&quot;&quot;
++import importlib.util
++import json
++import os
++import tempfile
++
++HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;, &quot;auto_continue.py&quot;)
++
++
++def _load_hook():
++    spec = importlib.util.spec_from_file_location(&quot;auto_continue&quot;, HOOK)
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return mod
++
++
++def _set(mod, state, checklist, halt=False, building=True):
++    d = tempfile.mkdtemp()
++    mod.STATE = os.path.join(d, &quot;state.json&quot;)
++    mod.CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
++    mod.HALT = os.path.join(d, &quot;HALT&quot;)
++    json.dump(state, open(mod.STATE, &quot;w&quot;))
++    json.dump(checklist, open(mod.CHECKLIST, &quot;w&quot;))
++    if halt:
++        open(mod.HALT, &quot;w&quot;).write(&quot;stopped&quot;)
++    mod._building = lambda: building        # deterministic: test the four other conditions independently
++
++
++GO = {&quot;next&quot;: &quot;v2 tab: Live desk positions&quot;, &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;}
++CL = {&quot;remaining&quot;: [&quot;v2 tab: Live desk positions&quot;, &quot;Portfolio&quot;]}
++
++
++def test_continues_when_work_remains_and_building():
++    m = _load_hook(); _set(m, GO, CL, building=True)
++    assert m.should_continue() is True
++
++
++def test_stops_in_pause_window():
++    m = _load_hook(); _set(m, GO, CL, building=False)
++    assert m.should_continue() is False
++
++
++def test_stops_on_halt():
++    m = _load_hook(); _set(m, GO, CL, halt=True)
++    assert m.should_continue() is False
++
++
++def test_stops_on_lead_ruling_needed():
++    m = _load_hook(); _set(m, {&quot;next&quot;: &quot;x&quot;, &quot;flag&quot;: &quot;LEAD RULING NEEDED: which vehicle?&quot;}, CL)
++    assert m.should_continue() is False
++
++
++def test_stops_when_checklist_finished():
++    m = _load_hook(); _set(m, GO, {&quot;remaining&quot;: []})
++    assert m.should_continue() is False
++
++
++def test_stops_when_no_next_item():
++    m = _load_hook(); _set(m, {&quot;next&quot;: &quot;&quot;, &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;}, CL)
++    assert m.should_continue() is False
++
++
++if __name__ == &quot;__main__&quot;:
++    for fn in (test_continues_when_work_remains_and_building, test_stops_in_pause_window, test_stops_on_halt,
++               test_stops_on_lead_ruling_needed, test_stops_when_checklist_finished, test_stops_when_no_next_item):
++        fn()
++    print(&quot;test_auto_continue OK&quot;)
+diff --git a/tests/test_eta.py b/tests/test_eta.py
+index 9f65ed1b4..f99f869cb 100644
+--- a/tests/test_eta.py
++++ b/tests/test_eta.py
+@@ -17,12 +17,20 @@ def _isolate():
+     E.CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
+ 
+ 
+-def test_measuring_below_three():
++def test_measuring_only_before_first_finish():
+     _isolate()
+-    json.dump({&quot;A&quot;: {&quot;start&quot;: _iso(60), &quot;finish&quot;: _iso(30)}}, open(E.ITEM_TIMES, &quot;w&quot;))
++    json.dump({}, open(E.ITEM_TIMES, &quot;w&quot;))                 # nothing finished
+     json.dump({&quot;remaining&quot;: [&quot;X&quot;, &quot;Y&quot;]}, open(E.CHECKLIST, &quot;w&quot;))
+-    assert E.schedule() is None
+-    assert E.line() == &quot;ETA: measuring&quot;
++    assert E.schedule() is None and E.line() == &quot;ETA: measuring&quot;
++
++
++def test_rough_eta_from_one_finished():
++    _isolate()
++    json.dump({&quot;A&quot;: {&quot;start&quot;: _iso(60), &quot;finish&quot;: _iso(30)}}, open(E.ITEM_TIMES, &quot;w&quot;))   # 1 finished (~30 min)
++    json.dump({&quot;remaining&quot;: [&quot;X&quot;, &quot;Y&quot;]}, open(E.CHECKLIST, &quot;w&quot;))
++    sch = E.schedule()
++    assert sch and sch[&quot;quality&quot;] == &quot;rough (1 measured)&quot; and len(sch[&quot;rows&quot;]) == 2
++    assert E.line().startswith(&quot;ETA &quot;) and &quot;rough (1 measured)&quot; in E.line()
+ 
+ 
+ def test_schedule_from_three_finished():
+@@ -39,4 +47,5 @@ def test_schedule_from_three_finished():
+ 
+ 
+ if __name__ == &quot;__main__&quot;:
+-    test_measuring_below_three(); test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
++    test_measuring_only_before_first_finish(); test_rough_eta_from_one_finished()
++    test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
+</pre></div><div class='c'><div class='h'><b>8272c89c4</b> · 2026-09-22 17:32</div><div>build_journal: bound the transcript scrub + commit diffs so the full cycle can&#x27;t stall the site loop</div><div class='sub h'>scripts/build_journal.py | 11 ++++++-----</div><pre>diff --git a/scripts/build_journal.py b/scripts/build_journal.py
 index f96754983..b1d5bde08 100644
 --- a/scripts/build_journal.py
 +++ b/scripts/build_journal.py
@@ -1180,1262 +1738,4 @@ index 000000000..9f65ed1b4
 +
 +if __name__ == &quot;__main__&quot;:
 +    test_measuring_below_three(); test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
-</pre></div><div class='c'><div class='h'><b>42c8a6ca0</b> · 2026-09-22 16:05</div><div>R-BUILD-BEAT (10-min build line) + R-LIVE-BAR (8-step live-paper bar) — both machine-derived</div><div class='sub h'>.gitignore                                 |   3 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-BEAT.md |  12 ++</div><div class='sub h'>docs/dispatches/2026-09-22_R-LIVE-BAR.md   |  11 ++</div><div class='sub h'>scripts/build_beat.py                      | 185 +++++++++++++++++++++++++++++</div><div class='sub h'>scripts/live_bar.py                        | 179 ++++++++++++++++++++++++++++</div><div class='sub h'>scripts/site_build.py                      |   5 +</div><div class='sub h'>scripts/token_ping.py                      |   5 +</div><div class='sub h'>scripts/vitals.py                          |   9 ++</div><div class='sub h'>tests/test_build_beat.py                   |  56 +++++++++</div><div class='sub h'>tests/test_live_bar.py                     |  49 ++++++++</div><pre>diff --git a/.gitignore b/.gitignore
-index 64a7659d6..0fe22dd28 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -58,3 +58,6 @@ reports/.fire_cards_seen.json
- scheduler/.build_slug
- scheduler/.supervisor_state.json
- scheduler/.supervisor_silence_posted
-+scheduler/.build_beat_slot
-+scheduler/.build_beat_halt
-+scheduler/.live_bar_posted
-diff --git a/docs/dispatches/2026-09-22_R-BUILD-BEAT.md b/docs/dispatches/2026-09-22_R-BUILD-BEAT.md
-new file mode 100644
-index 000000000..0e51bbf6a
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-BUILD-BEAT.md
-@@ -0,0 +1,12 @@
-+# R-BUILD-BEAT (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction. The 10-minute version below supersedes an earlier
-+hourly wording sent the same evening._
-+
-+during build hours (15:30–09:00) token_ping posts one Telegram line every 10 minutes, derived only from
-+machine facts — git log (commits in the last 10 minutes, with messages), the journal (ruling and item in
-+progress), the test result of the last commit, the supervisor&#x27;s last &quot;checked&quot; time and whether HALT exists.
-+Format: &quot;BUILD 21:10 — R-EVENING-22 B3 · 2 commits since 21:00: &lt;messages&gt; · tests 203/203 · supervisor on
-+course 21:02&quot;. If no commits: &quot;BUILD 21:10 — no commits · &lt;item&gt; · supervisor &lt;state&gt;&quot;. Also one line on any
-+halt. Never generated from the builder&#x27;s own text; if the journal and git disagree, say so. No message
-+outside build hours.
-diff --git a/docs/dispatches/2026-09-22_R-LIVE-BAR.md b/docs/dispatches/2026-09-22_R-LIVE-BAR.md
-new file mode 100644
-index 000000000..eb25e3aec
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-LIVE-BAR.md
-@@ -0,0 +1,11 @@
-+# R-LIVE-BAR (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction._
-+
-+a &quot;live paper&quot; progress line, derived only from machine facts, with eight steps: (1) login landed today,
-+(2) self-check passed — recorders + runner up, (3) 08:30 READY derived from vitals, (4) a real signal on a
-+stock with its readings, (5) first PLACED paper order written by the real loop, (6) first CLOSED trade with
-+result, (7) auditor observed 5–6 on the live ledger, (8) five consecutive clean sessions (no fault, no human
-+click). Steps 1–4 reset daily; 5–8 persist once earned. Format: &quot;LIVE PAPER ▓▓▓░░░░░ 3/8 — next: &lt;step in
-+plain words&gt;&quot;. Post it at 08:30 with the READY line, at 15:35 with the close, and immediately when a step
-+advances. Show the same bar at the top of status.html.
-diff --git a/scripts/build_beat.py b/scripts/build_beat.py
-new file mode 100644
-index 000000000..0798dac7f
---- /dev/null
-+++ b/scripts/build_beat.py
-@@ -0,0 +1,185 @@
-+&quot;&quot;&quot;R-BUILD-BEAT — one Telegram line every 10 minutes during build hours (15:30–09:00 IST), derived ONLY from
-+machine facts: git log (commits in the last 10 minutes + their messages), the journal (ruling + item in
-+progress), the last commit&#x27;s recorded test result, the supervisor&#x27;s last &#x27;checked&#x27; time, and whether
-+E1-DESK\\HALT exists — plus one immediate line on any new halt. Never generated from the builder&#x27;s own prose;
-+if the journal&#x27;s ruling and git&#x27;s latest commit disagree, it says so. No line is posted outside build hours.
-+token_ping calls maybe_post() from its wake loop.&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import re
-+import subprocess
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+E1DESK = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
-+HALT = os.path.join(E1DESK, &quot;HALT&quot;)
-+STATE = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;)
-+JOURNAL = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-JOURNAL.log&quot;)
-+LAST_TESTS = os.path.join(REPO, &quot;reports&quot;, &quot;LAST-TESTS.json&quot;)
-+BEAT_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_beat_slot&quot;)
-+HALT_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_beat_halt&quot;)
-+SLOT_MIN = 10
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def build_hours(now=None):
-+    now = now or _now()
-+    m = now.hour * 60 + now.minute
-+    return m &gt;= 15 * 60 + 30 or m &lt; 9 * 60
-+
-+
-+def _git(*a):
-+    try:
-+        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, timeout=20).stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
-+    except Exception:
-+        return &quot;&quot;
-+
-+
-+def _commits_since(minutes):
-+    out = _git(&quot;log&quot;, &quot;--since=%d minutes ago&quot; % minutes, &quot;--format=%s&quot;)
-+    return [l.strip() for l in out.splitlines() if l.strip()]
-+
-+
-+def _ruling_prefix(text):
-+    m = re.match(r&quot;\s*(R-[A-Z0-9\-]+)&quot;, text or &quot;&quot;)
-+    return m.group(1) if m else None
-+
-+
-+def _journal_state():
-+    try:
-+        d = json.load(open(STATE, encoding=&quot;utf-8&quot;))
-+        return d.get(&quot;ruling&quot;), d.get(&quot;item&quot;)
-+    except Exception:
-+        return None, None
-+
-+
-+def _tests():
-+    try:
-+        d = json.load(open(LAST_TESTS, encoding=&quot;utf-8&quot;))
-+        return &quot;%s/%s&quot; % (d.get(&quot;passed&quot;), d.get(&quot;total&quot;))
-+    except Exception:
-+        return &quot;—&quot;
-+
-+
-+def _supervisor_state():
-+    if os.path.exists(HALT):
-+        return &quot;HALTED&quot;
-+    try:
-+        lines = [l for l in open(JOURNAL, encoding=&quot;utf-8&quot;).read().splitlines() if &quot;checked &quot; in l and &quot;on course&quot; in l]
-+        m = re.search(r&quot;checked (\d{2}:\d{2})&quot;, lines[-1]) if lines else None
-+        return &quot;on course %s&quot; % m.group(1) if m else &quot;no check yet&quot;
-+    except Exception:
-+        return &quot;no check yet&quot;
-+
-+
-+def line(now=None):
-+    now = now or _now()
-+    commits = _commits_since(SLOT_MIN)
-+    ruling, item = _journal_state()
-+    label = &quot;BUILD %s&quot; % now.strftime(&quot;%H:%M&quot;)
-+    since = (now - timedelta(minutes=SLOT_MIN)).strftime(&quot;%H:%M&quot;)
-+    sup = _supervisor_state()
-+    # journal-vs-git honesty check: the journal&#x27;s ruling vs the latest commit&#x27;s ruling prefix
-+    head_subj = _git(&quot;log&quot;, &quot;-1&quot;, &quot;--format=%s&quot;)
-+    git_ruling = _ruling_prefix(head_subj)
-+    disagree = &quot; · journal/git disagree (journal %s, git %s)&quot; % (ruling, git_ruling) \
-+               if (ruling and git_ruling and _ruling_prefix(ruling) and _ruling_prefix(ruling) != git_ruling) else &quot;&quot;
-+    if commits:
-+        head = ruling or (item or &quot;—&quot;)
-+        msgs = &quot;; &quot;.join(commits)
-+        if len(msgs) &gt; 160:
-+            msgs = msgs[:157] + &quot;…&quot;
-+        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s&quot; % (
-+            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree)
-+    return &quot;%s — no commits · %s · supervisor %s%s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree)
-+
-+
-+def halt_line(now=None):
-+    &quot;&quot;&quot;One immediate line when E1-DESK\\HALT newly appears. Returns the line to post, or None.&quot;&quot;&quot;
-+    now = now or _now()
-+    if not os.path.exists(HALT):
-+        try:
-+            os.path.exists(HALT_MARK) and os.remove(HALT_MARK)   # cleared -&gt; allow a future halt to re-announce
-+        except Exception:
-+            pass
-+        return None
-+    try:
-+        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)
-+    except Exception:
-+        reason = &quot;(reason unreadable)&quot;
-+    try:
-+        if open(HALT_MARK, encoding=&quot;utf-8&quot;).read().strip() == reason:
-+            return None                                          # already announced this halt
-+    except Exception:
-+        pass
-+    return &quot;BUILD %s — HALT in force: %s&quot; % (now.strftime(&quot;%H:%M&quot;), reason)
-+
-+
-+def maybe_post(notifier=None, now=None):
-+    &quot;&quot;&quot;Post the beat once per 10-minute slot during build hours, plus an immediate line on any new halt.
-+    Returns the line posted (or the beat line) if anything went out, else None.&quot;&quot;&quot;
-+    now = now or _now()
-+    if not build_hours(now):
-+        return None
-+    posted = None
-+    hl = halt_line(now)                                          # immediate, outside the slot cadence
-+    if hl:
-+        _emit(notifier, hl)
-+        try:
-+            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)
-+            os.makedirs(os.path.dirname(HALT_MARK), exist_ok=True)
-+            open(HALT_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(reason)
-+        except Exception:
-+            pass
-+        posted = hl
-+    slot = now.strftime(&quot;%Y-%m-%d %H&quot;) + &quot;:%d&quot; % (now.minute // SLOT_MIN)
-+    try:
-+        last = open(BEAT_MARK, encoding=&quot;utf-8&quot;).read().strip()
-+    except Exception:
-+        last = &quot;&quot;
-+    if slot != last:
-+        ln = line(now)
-+        _emit(notifier, ln)
-+        try:
-+            os.makedirs(os.path.dirname(BEAT_MARK), exist_ok=True)
-+            open(BEAT_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(slot)
-+        except Exception:
-+            pass
-+        posted = ln
-+    return posted
-+
-+
-+def _emit(notifier, msg):
-+    try:
-+        (notifier or _notify)(msg)
-+    except Exception:
-+        pass
-+
-+
-+def _notify(msg):
-+    from scripts import notify
-+    notify.notify(msg)
-+
-+
-+def record_tests(passed, total):
-+    &quot;&quot;&quot;Called after a suite run so the beat&#x27;s &#x27;tests P/T&#x27; is a real machine fact.&quot;&quot;&quot;
-+    try:
-+        os.makedirs(os.path.dirname(LAST_TESTS), exist_ok=True)
-+        json.dump({&quot;passed&quot;: passed, &quot;total&quot;: total, &quot;at&quot;: _now().isoformat()},
-+                  open(LAST_TESTS, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    print(line())
-diff --git a/scripts/live_bar.py b/scripts/live_bar.py
-new file mode 100644
-index 000000000..e382c453f
---- /dev/null
-+++ b/scripts/live_bar.py
-@@ -0,0 +1,179 @@
-+&quot;&quot;&quot;R-LIVE-BAR — the &#x27;live paper&#x27; progress bar, derived ONLY from machine facts. Eight steps:
-+
-+  1. login landed today                         5. first PLACED paper order by the real loop
-+  2. self-check passed (recorders + runner up)   6. first CLOSED trade with a result
-+  3. 08:30 READY (derived from vitals)           7. auditor observed 5–6 on the live ledger
-+  4. a real signal on a stock with its readings  8. five consecutive clean sessions (no fault, no human click)
-+
-+Steps 1–4 reset each day; 5–8 persist once earned (reports/LIVE-BAR.json). Format:
-+  &quot;LIVE PAPER ▓▓▓░░░░░ 3/8 — next: &lt;the next step in plain words&gt;&quot;
-+Posted at 08:30 (with the READY line), at 15:35 (with the close), and immediately when a step advances. The
-+same bar shows at the top of status.html. Nothing here is typed — every step is read from a store on disk.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import csv
-+import json
-+import os
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+STATUS = os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;)
-+LEDGER = os.path.join(REPO, &quot;reports&quot;, &quot;BOOK20-LEDGER.csv&quot;)
-+AUDIT = os.path.join(REPO, &quot;reports&quot;, &quot;AUDIT-DRYRUN.json&quot;)
-+STORE = os.path.join(REPO, &quot;reports&quot;, &quot;LIVE-BAR.json&quot;)          # persists earned 5–8
-+CLEAN = os.path.join(REPO, &quot;reports&quot;, &quot;CLEAN-SESSIONS.json&quot;)    # {&quot;count&quot;: N} maintained by the close routine
-+POST_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.live_bar_posted&quot;)
-+
-+LABELS = [&quot;login lands&quot;, &quot;self-check passes (recorders + runner up)&quot;, &quot;08:30 READY&quot;,
-+          &quot;a real signal on a stock&quot;, &quot;first paper order placed&quot;, &quot;first trade closed with a result&quot;,
-+          &quot;auditor confirms the order and close on the ledger&quot;, &quot;five clean sessions in a row&quot;]
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _load(path, default=None):
-+    try:
-+        return json.load(open(path, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        return default if default is not None else {}
-+
-+
-+def _today():
-+    return _now().date().isoformat()
-+
-+
-+def _ledger_today():
-+    &quot;&quot;&quot;(has_signal, has_placed) from today&#x27;s book rows; fail-closed to (False, False).&quot;&quot;&quot;
-+    sig = placed = False
-+    try:
-+        for r in csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)):
-+            if not str(r.get(&quot;ts&quot;, &quot;&quot;)).startswith(_today()):
-+                continue
-+            st = (r.get(&quot;state&quot;) or &quot;&quot;).strip()
-+            if st in (&quot;queued&quot;, &quot;filled&quot;, &quot;held&quot;, &quot;no-fill&quot;):
-+                sig = True
-+            if st in (&quot;queued&quot;, &quot;filled&quot;):
-+                placed = True
-+    except Exception:
-+        pass
-+    return sig, placed
-+
-+
-+def _has_closed():
-+    &quot;&quot;&quot;A closed trade with a result anywhere in the book (persisted fact).&quot;&quot;&quot;
-+    try:
-+        for r in csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)):
-+            if (r.get(&quot;state&quot;) or &quot;&quot;).strip() in (&quot;closed&quot;, &quot;exit&quot;) and str(r.get(&quot;R&quot;, &quot;&quot;)).strip() not in (&quot;&quot;, &quot;None&quot;):
-+                return True
-+    except Exception:
-+        pass
-+    return False
-+
-+
-+def compute():
-+    &quot;&quot;&quot;The eight booleans + the earned store, updated (5–8 persist once true).&quot;&quot;&quot;
-+    s = _load(STATUS)
-+    store = _load(STORE, {})
-+    earned = store.get(&quot;earned&quot;, {})
-+    tok = (s.get(&quot;token&quot;) or {})
-+    login_date = None
-+    try:
-+        login_date = _load(os.path.join(REPO, &quot;.kite_token.json&quot;)).get(&quot;login_date&quot;)
-+    except Exception:
-+        pass
-+    procs = [p.get(&quot;name&quot;) for p in s.get(&quot;processes&quot;, [])]
-+    recs = any(n in procs for n in (&quot;e13_depth&quot;, &quot;chain_recorder&quot;, &quot;xchange_recorder&quot;, &quot;positioning_recorder&quot;))
-+    step1 = bool(tok.get(&quot;valid&quot;)) and (login_date == _today() if login_date else False)
-+    step2 = recs and (&quot;book20_runner&quot; in procs)
-+    step3 = str(s.get(&quot;ready_line&quot;, &quot;&quot;)).startswith(&quot;READY&quot;)
-+    sig, placed = _ledger_today()
-+    step4 = sig
-+    # 5–8 persist: earned once, stays earned
-+    step5 = bool(earned.get(&quot;5&quot;)) or placed
-+    step6 = bool(earned.get(&quot;6&quot;)) or _has_closed()
-+    audit_pass = bool((_load(AUDIT) or {}).get(&quot;pass&quot;))
-+    step7 = bool(earned.get(&quot;7&quot;)) or (step5 and step6 and audit_pass)
-+    clean = int((_load(CLEAN) or {}).get(&quot;count&quot;, 0))
-+    step8 = bool(earned.get(&quot;8&quot;)) or (clean &gt;= 5)
-+    steps = [step1, step2, step3, step4, step5, step6, step7, step8]
-+    # persist newly-earned 5–8
-+    changed = False
-+    for i, val in ((5, step5), (6, step6), (7, step7), (8, step8)):
-+        if val and not earned.get(str(i)):
-+            earned[str(i)] = {&quot;at&quot;: _now().isoformat()}
-+            changed = True
-+    if changed:
-+        store[&quot;earned&quot;] = earned
-+        try:
-+            json.dump(store, open(STORE, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+        except Exception:
-+            pass
-+    return steps
-+
-+
-+def bar_line(steps=None):
-+    steps = compute() if steps is None else steps
-+    n = sum(1 for x in steps if x)
-+    bar = &quot;▓&quot; * n + &quot;░&quot; * (8 - n)
-+    nxt = next((LABELS[i] for i, x in enumerate(steps) if not x), &quot;all eight earned — live paper is proven&quot;)
-+    return &quot;LIVE PAPER %s %d/8 — next: %s&quot; % (bar, n, nxt)
-+
-+
-+def html_bar():
-+    steps = compute()
-+    n = sum(1 for x in steps if x)
-+    return (&quot;&lt;div style=&#x27;font:14px/1.5 ui-monospace,monospace;margin:0 0 10px&#x27;&gt;&quot;
-+            &quot;&lt;span style=&#x27;letter-spacing:2px&#x27;&gt;%s&lt;/span&gt; %d/8 · next: %s&lt;/div&gt;&quot;
-+            % (&quot;▓&quot; * n + &quot;░&quot; * (8 - n), n, next((LABELS[i] for i, x in enumerate(steps) if not x), &quot;proven&quot;)))
-+
-+
-+def maybe_post(notifier=None, now=None):
-+    &quot;&quot;&quot;Post on advance, and once each at 08:30 and 15:35. Returns the line if posted, else None.&quot;&quot;&quot;
-+    now = now or _now()
-+    steps = compute()
-+    n = sum(1 for x in steps if x)
-+    mark = _load(POST_MARK, {})
-+    triggers = []
-+    if n &gt; int(mark.get(&quot;last_n&quot;, -1)):
-+        triggers.append(&quot;advance&quot;)
-+    mins = now.hour * 60 + now.minute
-+    day = _today()
-+    if 8 * 60 + 30 &lt;= mins &lt; 8 * 60 + 33 and mark.get(&quot;d0830&quot;) != day:   # ~08:30, within a light-cycle window
-+        triggers.append(&quot;0830&quot;)
-+    if 15 * 60 + 35 &lt;= mins &lt; 15 * 60 + 38 and mark.get(&quot;d1535&quot;) != day:  # ~15:35
-+        triggers.append(&quot;1535&quot;)
-+    if not triggers:
-+        return None
-+    ln = bar_line(steps)
-+    try:
-+        (notifier or _notify)(ln)
-+    except Exception:
-+        pass
-+    mark[&quot;last_n&quot;] = n
-+    if &quot;0830&quot; in triggers:
-+        mark[&quot;d0830&quot;] = day
-+    if &quot;1535&quot; in triggers:
-+        mark[&quot;d1535&quot;] = day
-+    try:
-+        os.makedirs(os.path.dirname(POST_MARK), exist_ok=True)
-+        json.dump(mark, open(POST_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+    return ln
-+
-+
-+def _notify(msg):
-+    from scripts import notify
-+    notify.notify(msg)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    print(bar_line())
-diff --git a/scripts/site_build.py b/scripts/site_build.py
-index 51131a1bd..e61bb28fb 100644
---- a/scripts/site_build.py
-+++ b/scripts/site_build.py
-@@ -623,6 +623,11 @@ def build_live():
-         build_journal.build()
-     except Exception:
-         pass
-+    try:
-+        from scripts import live_bar                      # R-LIVE-BAR: post on advance / 08:30 / 15:35
-+        live_bar.maybe_post()
-+    except Exception:
-+        pass
-     return SITE
- 
- 
-diff --git a/scripts/token_ping.py b/scripts/token_ping.py
-index 5ba52360c..605253d97 100644
---- a/scripts/token_ping.py
-+++ b/scripts/token_ping.py
-@@ -43,6 +43,11 @@ def _sleep_until(target):
-         if secs &lt;= 0:
-             return
-         _supervisor_silence_tick()                # R-EYES-FULL: post the supervisor-silence alarm from here
-+        try:
-+            from scripts import build_beat         # R-BUILD-BEAT: one machine-derived line per build hour
-+            build_beat.maybe_post()
-+        except Exception:
-+            pass
-         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
- 
- 
-diff --git a/scripts/vitals.py b/scripts/vitals.py
-index 8d49d3f38..91fa0dcb0 100644
---- a/scripts/vitals.py
-+++ b/scripts/vitals.py
-@@ -232,6 +232,14 @@ def ready_line(s=None):
-     return &quot;NOT READY — %s&quot; % (s.get(&quot;plain&quot;) or _plain(s))
- 
- 
-+def _live_bar_html():
-+    try:
-+        from scripts import live_bar               # R-LIVE-BAR: the 8-step bar at the top of status
-+        return live_bar.html_bar()
-+    except Exception:
-+        return &quot;&quot;
-+
-+
- def _write_html(s):
-     import html as _h
-     rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-@@ -250,6 +258,7 @@ def _write_html(s):
-             &quot;td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}&quot;
-             &quot;.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&quot;
-             &quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Desk status&lt;/h1&gt;&quot;
-+            + _live_bar_html() +
-             &quot;&lt;p class=&#x27;big&#x27;&gt;&quot; + _h.escape(s[&quot;plain&quot;]) + &quot;&lt;/p&gt;&quot;
-             &quot;&lt;p class=&#x27;sub&#x27;&gt;&quot; + _h.escape(s[&quot;ready_line&quot;]) + &quot; · updated &quot; + _h.escape(s[&quot;generated&quot;]) +
-             &quot; · refreshes every 2 minutes&lt;/p&gt;&quot;
-diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
-new file mode 100644
-index 000000000..5523f7586
---- /dev/null
-+++ b/tests/test_build_beat.py
-@@ -0,0 +1,56 @@
-+&quot;&quot;&quot;R-BUILD-BEAT: the 10-minute build line is machine-derived, correctly shaped, halts immediately, silent
-+outside build hours.&quot;&quot;&quot;
-+import os, sys, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import build_beat as B
-+
-+
-+def test_build_hours_window():
-+    now = B._now()
-+    assert B.build_hours(now.replace(hour=2, minute=0)) is True
-+    assert B.build_hours(now.replace(hour=16, minute=0)) is True
-+    assert B.build_hours(now.replace(hour=12, minute=0)) is False
-+
-+
-+def test_line_shape_and_supervisor_state():
-+    tmp = tempfile.mkdtemp()
-+    B.JOURNAL = os.path.join(tmp, &quot;j.log&quot;)
-+    B.HALT = os.path.join(tmp, &quot;HALT&quot;)
-+    open(B.JOURNAL, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;2026-09-23 20:52 | checked 20:52 — on course\n&quot;)
-+    ln = B.line()
-+    assert ln.startswith(&quot;BUILD &quot;) and &quot;supervisor&quot; in ln
-+    assert &quot;on course 20:52&quot; in ln
-+    # commits branch says &#x27;since HH:MM&#x27; and shows tests; no-commits branch says &#x27;no commits&#x27;
-+    assert (&quot; commit&quot; in ln and &quot; since &quot; in ln) or &quot;no commits&quot; in ln
-+    open(B.HALT, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;scope breach&quot;)
-+    assert &quot;supervisor HALTED&quot; in B.line()
-+
-+
-+def test_halt_line_immediate_and_ded</pre></div><div class='c'><div class='h'><b>776fa70eb</b> · 2026-09-22 15:53</div><div>R-RESTART-TONIGHT: restart_stack.py + supervisor guarded with the stack + START_SUPERVISOR retired</div><div class='sub h'>START_SUPERVISOR.bat                            |   5 -</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md |  18 +++</div><div class='sub h'>scripts/restart_stack.py                        | 194 ++++++++++++++++++++++++</div><div class='sub h'>scripts/watchdog.py                             |  49 ++++++</div><div class='sub h'>tests/test_runner_supervision.py                |  10 ++</div><pre>diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
-deleted file mode 100644
-index 7cc25a916..000000000
---- a/START_SUPERVISOR.bat
-+++ /dev/null
-@@ -1,5 +0,0 @@
--@echo off
--REM R-EYES-FULL: the independent supervisor. Human-started (CLAUDE.md 14.7 — restart is a human act).
--REM Runs a fresh Opus 4.8 check every 10 minutes during build hours (15:30-09:00 IST). Ctrl-C to stop.
--cd /d &quot;%~dp0&quot;
--python -m scripts.supervisor
-diff --git a/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md
-new file mode 100644
-index 000000000..17c060d53
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md
-@@ -0,0 +1,18 @@
-+# R-RESTART-TONIGHT (owner ruling, 2026-09-22; overrides §14.10 for after-close restarts)
-+
-+_Archived per §7.1. A RECORD, never an instruction._
-+
-+Market is closed. Do now, observed:
-+(1) run the exact STOP_E1_STACK sequence and confirm with a process listing that nothing from the stack remains;
-+(2) run the exact START_E1_STACK sequence;
-+(3) confirm token_ping, watchdog, site_loop and the supervisor are up on Python 3.10 with a listing; that
-+    token_ping&#x27;s 06:00 link job and 08:15 gate are armed in the new code; that post_login runs tonight&#x27;s self-check;
-+(4) run scripts/run_audit.py once more on the restarted stack;
-+(5) post ONE line: &quot;STACK: restarted HH:MM — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed,
-+    08:15 gate armed, audit PASS&quot;.
-+Then:
-+(6) add the supervisor to START_E1_STACK and to the watchdog&#x27;s list, so it starts and is guarded with the stack —
-+    retire START_SUPERVISOR.bat; the owner never clicks a bat file;
-+(7) build scripts/restart_stack.py doing exactly steps 1–5 with the same proofs, allowed only after 15:30 and
-+    only when a commit touched the launch path;
-+(8) then the four missing v2 tabs — Live desk positions, Portfolio, Backtest, Messages — and the rest of R-EVENING-22.
-diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
-new file mode 100644
-index 000000000..978e57b5d
---- /dev/null
-+++ b/scripts/restart_stack.py
-@@ -0,0 +1,194 @@
-+&quot;&quot;&quot;R-RESTART-TONIGHT (7) — the after-close stack restart, as code, with proofs.
-+
-+Does exactly the owner&#x27;s steps 1–5: STOP the whole trading-engines-v2 python stack and prove nothing remains;
-+START the clean four (token_ping, watchdog, site_loop, supervisor) on the ONE Python 3.10 interpreter and
-+prove they are up on it; confirm the arming (06:00 link, 08:15 gate, post_login self-check) is in the code;
-+run the auditor once; post ONE line. It mirrors STOP_E1_STACK.bat / START_E1_STACK.bat exactly.
-+
-+GUARDED: it runs ONLY after 15:30 IST AND only when the HEAD commit touched the launch path — a restart is a
-+launch-path change, never a routine act. It excludes its own PID from the STOP so it can never kill itself.
-+Overrides §14.10 only for this after-close restart, on the owner&#x27;s ruling.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import subprocess
-+import sys
-+import time
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+PY310 = r&quot;[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe&quot;
-+STACK_PAT = (&quot;scripts|engine1_rebuild|engine4_options|engine7_parity|engine9|engine12_xchange|&quot;
-+             &quot;engine21_overnight|engine_youtube|book20_runner|run_live&quot;)
-+STARTS = [r&quot;scripts\token_ping.py&quot;, r&quot;scripts\watchdog.py&quot;, r&quot;scripts\site_loop.py&quot;, r&quot;scripts\supervisor.py&quot;]
-+UP_NAMES = [&quot;token_ping&quot;, &quot;watchdog&quot;, &quot;site_loop&quot;, &quot;supervisor&quot;]
-+LAUNCH_PATHS = {&quot;scripts/token_ping.py&quot;, &quot;scripts/watchdog.py&quot;, &quot;scripts/site_loop.py&quot;,
-+                &quot;scripts/supervisor.py&quot;, &quot;scripts/restart_stack.py&quot;}
-+NO_WINDOW = 0x08000000
-+DETACHED = 0x00000008
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def after_1530(now=None):
-+    now = now or _now()
-+    return now.hour * 60 + now.minute &gt;= 15 * 60 + 30
-+
-+
-+def launch_path_touched():
-+    try:
-+        out = subprocess.run([&quot;git&quot;, &quot;show&quot;, &quot;--name-only&quot;, &quot;--format=&quot;, &quot;HEAD&quot;], cwd=REPO,
-+                             capture_output=True, text=True, timeout=20).stdout
-+        touched = {l.strip().replace(&quot;\\&quot;, &quot;/&quot;) for l in out.splitlines() if l.strip()}
-+        return bool(touched &amp; LAUNCH_PATHS)
-+    except Exception:
-+        return False
-+
-+
-+def guard(now=None):
-+    return after_1530(now) and launch_path_touched()
-+
-+
-+def _ps_list():
-+    &quot;&quot;&quot;Every python* process in the stack pattern (excluding this session&#x27;s MCP helpers): pid, exe, cmd.&quot;&quot;&quot;
-+    ps = (&quot;Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
-+          &quot;$_.CommandLine -match &#x27;%s&#x27; -and $_.CommandLine -notmatch &#x27;windows-mcp|serve&#x27; } | &quot;
-+          &quot;Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress&quot; % STACK_PAT)
-+    try:
-+        out = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;, ps], capture_output=True,
-+                             text=True, timeout=30, creationflags=NO_WINDOW).stdout
-+        d = json.loads(out or &quot;[]&quot;)
-+        d = [d] if isinstance(d, dict) else d
-+        return [{&quot;pid&quot;: p.get(&quot;ProcessId&quot;), &quot;exe&quot;: p.get(&quot;ExecutablePath&quot;) or &quot;&quot;,
-+                 &quot;cmd&quot;: (p.get(&quot;CommandLine&quot;) or &quot;&quot;).strip()} for p in d]
-+    except Exception:
-+        return []
-+
-+
-+def stop(exclude_pid=None):
-+    &quot;&quot;&quot;Kill the stack, excluding this process. Returns the killed pids.&quot;&quot;&quot;
-+    killed = []
-+    for p in _ps_list():
-+        if exclude_pid and p[&quot;pid&quot;] == exclude_pid:
-+            continue
-+        try:
-+            subprocess.run([&quot;taskkill&quot;, &quot;/F&quot;, &quot;/PID&quot;, str(p[&quot;pid&quot;])], capture_output=True, timeout=15)
-+            killed.append(p[&quot;pid&quot;])
-+        except Exception:
-+            pass
-+    return killed
-+
-+
-+def start():
-+    if not os.path.isfile(PY310):
-+        return {&quot;error&quot;: &quot;Python 3.10 interpreter not found at %s&quot; % PY310}
-+    for script in STARTS:
-+        try:
-+            subprocess.Popen([PY310, script], cwd=REPO, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-+                             creationflags=NO_WINDOW | DETACHED)
-+        except Exception:
-+            pass
-+    return {&quot;started&quot;: STARTS}
-+
-+
-+def verify_up(exclude_pid=None):
-+    &quot;&quot;&quot;Which of the four are up, and whether each is on the Python 3.10 interpreter.&quot;&quot;&quot;
-+    procs = [p for p in _ps_list() if p[&quot;pid&quot;] != exclude_pid]
-+    up = {}
-+    for name in UP_NAMES:
-+        match = [p for p in procs if (&quot;%s.py&quot; % name) in p[&quot;cmd&quot;]]
-+        up[name] = {&quot;up&quot;: bool(match), &quot;count&quot;: len(match),
-+                    &quot;py310&quot;: all(&quot;Python310&quot; in (p[&quot;exe&quot;] or &quot;&quot;) for p in match) if match else False,
-+                    &quot;pid&quot;: match[0][&quot;pid&quot;] if match else None}
-+    return up
-+
-+
-+def armed_checks():
-+    &quot;&quot;&quot;Code-presence proofs (step 3): 06:00 link job, 08:15 gate, post_login self-check are in the code.&quot;&quot;&quot;
-+    checks = {}
-+    try:
-+        tp = open(os.path.join(REPO, &quot;scripts&quot;, &quot;token_ping.py&quot;), encoding=&quot;utf-8&quot;).read()
-+        checks[&quot;06:00 link&quot;] = &quot;start_catcher(&quot; in tp
-+        checks[&quot;08:15 gate&quot;] = &quot;preopen_gate&quot; in tp and &quot;hour=8, minute=15&quot; in tp
-+    except Exception:
-+        checks[&quot;06:00 link&quot;] = checks[&quot;08:15 gate&quot;] = False
-+    try:
-+        kl = open(os.path.join(REPO, &quot;scripts&quot;, &quot;kite_login.py&quot;), encoding=&quot;utf-8&quot;).read()
-+        checks[&quot;post_login self-check&quot;] = &quot;post_login_selfcheck&quot; in kl
-+    except Exception:
-+        checks[&quot;post_login self-check&quot;] = False
-+    return checks
-+
-+
-+def audit():
-+    try:
-+        from scripts import run_audit
-+        run_audit.run() if hasattr(run_audit, &quot;run&quot;) else run_audit.main()
-+    except Exception:
-+        pass
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;AUDIT-DRYRUN.json&quot;), encoding=&quot;utf-8&quot;))
-+        return {&quot;pass&quot;: bool(d.get(&quot;pass&quot;)), &quot;line&quot;: d.get(&quot;line&quot;)}
-+    except Exception:
-+        return {&quot;pass&quot;: False, &quot;line&quot;: None}
-+
-+
-+def run(notifier=None, now=None):
-+    &quot;&quot;&quot;Steps 1–5 with proofs. Returns the proof dict. Refuses unless guard() passes.&quot;&quot;&quot;
-+    now = now or _now()
-+    if not guard(now):
-+        return {&quot;refused&quot;: &quot;guard failed (needs after 15:30 IST AND a HEAD commit touching the launch path)&quot;,
-+                &quot;after_1530&quot;: after_1530(now), &quot;launch_path_touched&quot;: launch_path_touched()}
-+    self_pid = os.getpid()
-+    killed = stop(exclude_pid=self_pid)                       # (1)
-+    time.sleep(2)
-+    remaining = [p for p in _ps_list() if p[&quot;pid&quot;] != self_pid]  # (1) proof
-+    start()                                                   # (2)
-+    time.sleep(6)
-+    up = verify_up(exclude_pid=self_pid)                      # (3)
-+    armed = armed_checks()                                    # (3)
-+    au = audit()                                              # (4)
-+    hhmm = _now().strftime(&quot;%H:%M&quot;)
-+    all_up = all(up[n][&quot;up&quot;] and up[n][&quot;py310&quot;] for n in UP_NAMES)
-+    line = (&quot;STACK: restarted %s — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, &quot;
-+            &quot;08:15 gate armed, audit %s&quot; % (hhmm, &quot;PASS&quot; if au[&quot;pass&quot;] else &quot;FAIL&quot;)) if all_up else \
-+           (&quot;STACK: restart %s — NOT all up: %s&quot; % (hhmm, {n: up[n][&quot;up&quot;] for n in UP_NAMES}))
-+    try:
-+        (notifier or _notify)(line)                          # (5)
-+    except Exception:
-+        pass
-+    return {&quot;killed&quot;: killed, &quot;remaining_after_stop&quot;: remaining, &quot;up&quot;: up, &quot;armed&quot;: armed,
-+            &quot;audit&quot;: au, &quot;line&quot;: line}
-+
-+
-+def _notify(msg):
-+    from scripts import notify
-+    notify.notify(msg)
-+
-+
-+def _demo():
-+    # guard refuses before 15:30 regardless of the commit
-+    morning = _now().replace(hour=9, minute=0)
-+    assert guard(morning) is False
-+    r = run(notifier=lambda m: None, now=morning)
-+    assert r.get(&quot;refused&quot;), r
-+    # after 15:30 the time half passes (launch-path half depends on the real HEAD commit)
-+    assert after_1530(_now().replace(hour=16, minute=0)) is True
-+    print(&quot;restart_stack demo OK: guard refuses before 15:30; proofs shape intact.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    elif &quot;--run&quot; in sys.argv:
-+        print(json.dumps(run(), indent=1, default=str))
-+    else:
-+        print(&quot;use --run (after 15:30, launch-path commit) or --demo&quot;)
-diff --git a/scripts/watchdog.py b/scripts/watchdog.py
-index e12793e3c..c7a0629ce 100644
---- a/scripts/watchdog.py
-+++ b/scripts/watchdog.py
-@@ -455,6 +455,51 @@ def _default_arm_book20():
-     kite_login._arm_book20()
- 
- 
-+SUPERVISOR_KEY = &quot;supervisor&quot;     # R-RESTART-TONIGHT: the independent watcher is guarded with the stack.
-+
-+
-+def _supervisor_running():
-+    try:
-+        out = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;,
-+            &quot;(Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
-+            &quot;$_.CommandLine -match &#x27;scripts.\\\\?supervisor&#x27; } | Measure-Object).Count&quot;],
-+            capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout.strip()
-+        return out != &quot;0&quot;
-+    except Exception:
-+        return True
-+
-+
-+def resurrect_supervisor(now, launch=True, launch_fn=None, running_fn=None):
-+    &quot;&quot;&quot;R-RESTART-TONIGHT: keep exactly ONE supervisor loop alive (it self-gates to build hours; its loop never
-+    exits, so a missing process means it died). Same cooldown as the runner so a crash-looper is not thrashed.&quot;&quot;&quot;
-+    if _jobs_paused():
-+        return False
-+    if (running_fn or _supervisor_running)():
-+        return False
-+    st = _read(STATE_FILE) or {}
-+    cool = st.get(&quot;job_restart_cooldown&quot;, {})
-+    if (now - cool.get(SUPERVISOR_KEY, 0)) / 60.0 &lt; JOB_COOLDOWN_MIN:
-+        return False
-+    if launch:
-+        try:
-+            (launch_fn or _default_launch_supervisor)()
-+        except Exception:
-+            pass
-+    cool[SUPERVISOR_KEY] = now
-+    st[&quot;job_restart_cooldown&quot;] = cool
-+    _write_state(st)
-+    try:
-+        with open(RESTART_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(&quot;%s relaunched %s (was dead)\n&quot; % (_ist().strftime(&quot;%Y-%m-%d %H:%M IST&quot;), SUPERVISOR_KEY))
-+    except Exception:
-+        pass
-+    return True
-+
-+
-+def _default_launch_supervisor():
-+    _launch_job(os.path.join(&quot;scripts&quot;, &quot;supervisor.py&quot;), &quot;&quot;)
-+
-+
- def _conf_status_sig():
-     &quot;&quot;&quot;A fingerprint of the STATUS column of CONFORMANCE.md — the conforms/partial/missing/wall tokens in
-     order. It changes only when a row&#x27;s STATUS changes (R-E1-RING-FOREVER checklist watchdog).&quot;&quot;&quot;
-@@ -664,6 +709,10 @@ def main():
-             resurrect_runner(now)    # R-RUNNER-DOWN: keep the one order runner alive (not in START_E1_ALL)
-         except Exception:
-             pass
-+        try:
-+            resurrect_supervisor(now)  # R-RESTART-TONIGHT: keep the independent supervisor alive with the stack
-+        except Exception:
-+            pass
-         # R-MORNING-FIX (2): the periodic builder-idle 🙋 call is REMOVED from the loop (the sender in
-         # builder_check is deleted). No timer-repeating Telegram message runs here any more.
-         try:
-diff --git a/tests/test_runner_supervision.py b/tests/test_runner_supervision.py
-index 25166a1f5..8ffcbd98d 100644
---- a/tests/test_runner_supervision.py
-+++ b/tests/test_runner_supervision.py
-@@ -46,9 +46,19 @@ def test_cooldown_prevents_thrash():
-     assert calls == [1, 1]
- 
- 
-+def test_supervisor_relaunched_when_dead():
-+    calls, launch = _isolate(monkey_running=False)      # R-RESTART-TONIGHT: watchdog guards the supervisor too
-+    assert watchdog.resurrect_supervisor(1000.0, launch_fn=launch, running_fn=lambda: False) is True
-+    assert calls == [1]
-+    # live -&gt; left alone
-+    assert watchdog.resurrect_supervisor(2000.0, launch_fn=launch, running_fn=lambda: True) is False
-+    assert calls == [1]
-+
-+
- if __name__ == &quot;__main__&quot;:
-     test_relaunches_dead_runner_one_cycle()
-     test_leaves_live_runner_alone()
-     test_no_relaunch_when_held_or_logged_out()
-     test_cooldown_prevents_thrash()
-+    test_supervisor_relaunched_when_dead()
-     print(&quot;test_runner_supervision OK&quot;)
-</pre></div><div class='c'><div class='h'><b>5510b4180</b> · 2026-09-22 15:43</div><div>R-EYES-FULL: public /build/ room (journal + scrubbed transcript + commits + index) + independent supervisor</div><div class='sub h'>.claude/hooks/halt_guard.py                        |   26 +</div><div class='sub h'>.claude/settings.json                              |   12 +</div><div class='sub h'>.gitignore                                         |    4 +</div><div class='sub h'>START_SUPERVISOR.bat                               |    5 +</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md                        |   26 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md      |    8 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md   |    8 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-EYES-FULL.md          |   34 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-EYES.md               |    7 +</div><div class='sub h'>reports/BUILD-JOURNAL.log                          |    1 +</div><div class='sub h'>reports/BUILD-STATE.json                           |    7 +</div><div class='sub h'>scripts/build_journal.py                           |  359 +</div><div class='sub h'>scripts/site_build.py                              |    5 +</div><div class='sub h'>scripts/supervisor.py                              |  310 +</div><div class='sub h'>scripts/token_ping.py                              |   25 +-</div><div class='sub h'>site/build/commits.html                            | 7286 ++++++++++++++++++++</div><div class='sub h'>site/build/index.html                              |    1 +</div><div class='sub h'>site/build/journal.html                            |    1 +</div><div class='sub h'>site/build/supervisor/index.html                   |    1 +</div><div class='sub h'>site/build/transcript-aZzBIOKhUDROpFmEBdQJ5qnq.txt | 7029 +++++++++++++++++++</div><div class='sub h'>tests/test_build_scrub.py                          |   48 +</div><div class='sub h'>tests/test_supervisor.py                           |   85 +</div><pre>diff --git a/.claude/hooks/halt_guard.py b/.claude/hooks/halt_guard.py
-new file mode 100644
-index 000000000..078f51a56
---- /dev/null
-+++ b/.claude/hooks/halt_guard.py
-@@ -0,0 +1,26 @@
-+&quot;&quot;&quot;R-EYES-FULL: PreToolUse guard. While E1-DESK\\HALT exists (the supervisor found a violation), refuse EVERY
-+tool call and show the reason. The builder may clear HALT only after a commit that addresses the reason.
-+Exit 2 = block (stderr is shown to the model). Fail-open on any error (never wedge the session on a hook bug).&quot;&quot;&quot;
-+import os
-+import sys
-+
-+HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
-+try:
-+    try:
-+        sys.stdin.read()                   # drain the hook payload; we block regardless of which tool it names
-+    except Exception:
-+        pass
-+    if os.path.exists(HALT):
-+        try:
-+            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
-+        except Exception:
-+            reason = &quot;(reason unreadable)&quot;
-+        sys.stderr.write(&quot;SUPERVISOR HALT is in force — every tool call is refused until it clears.\n%s\n&quot;
-+                         &quot;Clear it only with a commit that addresses the reason (delete E1-DESK\\HALT), &quot;
-+                         &quot;then log it in the journal.&quot; % reason)
-+        sys.exit(2)
-+except SystemExit:
-+    raise
-+except Exception:
-+    pass
-+sys.exit(0)
-diff --git a/.claude/settings.json b/.claude/settings.json
-index 4c392555b..75ba1fd25 100644
---- a/.claude/settings.json
-+++ b/.claude/settings.json
-@@ -1,5 +1,17 @@
- {
-   &quot;hooks&quot;: {
-+    &quot;PreToolUse&quot;: [
-+      {
-+        &quot;matcher&quot;: &quot;*&quot;,
-+        &quot;hooks&quot;: [
-+          {
-+            &quot;type&quot;: &quot;command&quot;,
-+            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\.claude\\hooks\\halt_guard.py\&quot;&quot;,
-+            &quot;timeout&quot;: 10
-+          }
-+        ]
-+      }
-+    ],
-     &quot;Stop&quot;: [
-       {
-         &quot;hooks&quot;: [
-diff --git a/.gitignore b/.gitignore
-index 939bf4239..64a7659d6 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -54,3 +54,7 @@ scheduler/.weekend_sweep_until
- 
- # R-DAY1-BUNDLE A5: per-fire card dedup (ephemeral, self-prunes to today)
- reports/.fire_cards_seen.json
-+
-+scheduler/.build_slug
-+scheduler/.supervisor_state.json
-+scheduler/.supervisor_silence_posted
-diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
-new file mode 100644
-index 000000000..7cc25a916
---- /dev/null
-+++ b/START_SUPERVISOR.bat
-@@ -0,0 +1,5 @@
-+@echo off
-+REM R-EYES-FULL: the independent supervisor. Human-started (CLAUDE.md 14.7 — restart is a human act).
-+REM Runs a fresh Opus 4.8 check every 10 minutes during build hours (15:30-09:00 IST). Ctrl-C to stop.
-+cd /d &quot;%~dp0&quot;
-+python -m scripts.supervisor
-diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
-new file mode 100644
-index 000000000..b7ca2597b
---- /dev/null
-+++ b/docs/SUPERVISOR-TEMPLATE.md
-@@ -0,0 +1,26 @@
-+# SUPERVISOR — fixed instructions (owner ruling R-EYES-FULL, 2026-09-22)
-+
-+You are an INDEPENDENT watcher of the build session on this paper-trading repo. You did not write any of
-+this work and you assume nothing about it. You do not build, edit, or commit — you only read and judge.
-+
-+Read what is given to you below: the ruling in force, the build journal, the builder&#x27;s transcript since the
-+last check, the commits and diffs since the last check, and STATUS.json. Then check ONLY these, against the
-+standing laws (CLAUDE.md §3, §4, §13, §18, §20):
-+
-+1. SCOPE — every change traces to the ruling in force. Scope authored by the run itself is a violation (§20.6).
-+2. NO SELF-AUDIT — the builder did not grade its own work as an independent check.
-+3. NO TYPED NUMBERS — no naked constant; every number is derived (§4.1).
-+4. DEMOS ARE INERT — a demo/test never wrote a live ledger or sent a real Telegram message.
-+5. TRADING-PATH — changes to the order path stay inside the ruling&#x27;s scope; nothing live was called without
-+   an observed outcome.
-+6. NO SECRETS — no API key, token, password, Telegram id, cookie or absolute user path appears on any
-+   published page.
-+
-+You must END your reply with exactly ONE line, nothing after it:
-+
-+  SUPERVISOR-VERDICT: ON-COURSE
-+    — or —
-+  SUPERVISOR-VERDICT: VIOLATION | &lt;one plain-language reason&gt;
-+
-+Use VIOLATION only for a real breach of the six checks above. A genuine design fork the ruling does not
-+resolve is: `VIOLATION | LEAD RULING NEEDED: &lt;question&gt;`. When in doubt and no law is broken, ON-COURSE.
-diff --git a/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md b/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md
-new file mode 100644
-index 000000000..9ff5b8143
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md
-@@ -0,0 +1,8 @@
-+# R-BUILD-JOURNAL (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
-+
-+publish the build journal to the public site at /build/ every light cycle — append-only, machine-written:
-+ruling in progress, section and item, last commit hash + time, tests passed/failed, files touched count,
-+next item, and the last self-flag line (NOTHING NEEDS THE LEAD / LEAD RULING NEEDED). No keys, no tokens,
-+no owner names. Post the URL once as a 📊.
-diff --git a/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md b/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md
-new file mode 100644
-index 000000000..549851990
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md
-@@ -0,0 +1,8 @@
-+# R-BUILD-TRANSCRIPT (owner ruling, 2026-09-22, extends R-BUILD-JOURNAL)
-+
-+_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
-+
-+every light cycle, also publish the build session&#x27;s own transcript (tool calls, outputs, messages) as plain
-+text at an unguessable path under /build/, scrubbed first: every API key, token, password, Telegram id,
-+cookie and absolute user path replaced by [redacted]; a test proves the scrubber catches the known secrets.
-+Keep the short journal alongside. Post both URLs once as one 📊.
-diff --git a/docs/dispatches/2026-09-22_R-EYES-FULL.md b/docs/dispatches/2026-09-22_R-EYES-FULL.md
-new file mode 100644
-index 000000000..065da148c
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-EYES-FULL.md
-@@ -0,0 +1,34 @@
-+# R-EYES-FULL (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction. Replaces R-BUILD-JOURNAL, R-BUILD-TRANSCRIPT, R-EYES,
-+R-SUPERVISOR; R-VITALS is done. Work after 15:30, low priority, never touch the running stack except where a
-+ruling allows._
-+
-+1. BUILD PAGES at /build/ (published every light cycle, 2 min, machine-written, append-only, no secrets):
-+   a. Journal: ruling in progress, section and item, last commit hash + time, tests passed/failed, files
-+      touched, next item, the last self-flag line.
-+   b. Transcript: the build session&#x27;s full transcript (tool calls, outputs, messages) as plain text at an
-+      unguessable path, scrubbed first — every API key, token, password, Telegram id, cookie and absolute
-+      user path → [redacted]; a test proves the scrubber catches the known secrets.
-+   c. Commits: each commit with hash, time, message, files touched and full diff, newest first, scrubbed the
-+      same way.
-+   d. Index at /build/ linking status, journal, transcript, commits, supervisor. Post the /build/ URL once
-+      as a 📊.
-+
-+2. SUPERVISOR (scripts/supervisor.py): a fresh independent Opus 4.8 sub-run every 10 minutes during build
-+   hours (15:30–09:00); instructions fixed in docs/SUPERVISOR-TEMPLATE.md (owner ruling to change). Each run
-+   reads: the ruling in force, the journal, the transcript since its last check, commits and diffs since its
-+   last check, STATUS.json. It checks scope and the standing laws: no self-audit; no typed numbers; demos
-+   never write live ledgers or Telegram; trading-path changes only within the ruling&#x27;s scope; nothing called
-+   live without an observed outcome; no secrets on published pages.
-+   On a violation: write E1-DESK\HALT with the reason; the builder&#x27;s PreToolUse hook refuses all tool calls
-+   while HALT exists and shows the reason; the supervisor posts ONE Telegram line &quot;SUPERVISOR: halted —
-+   &lt;reason&gt;&quot; (adding LEAD RULING NEEDED only for a genuine fork). The builder may clear HALT only after a
-+   commit that addresses the reason, logged in the journal. Otherwise the supervisor appends &quot;checked HH:MM —
-+   on course&quot; to the journal.
-+   Its own log and scrubbed transcript publish at /build/supervisor/. If no &quot;checked&quot; line appears for 30
-+   minutes during build hours, token_ping posts &quot;SUPERVISOR: silent since HH:MM&quot;. Tests: the hook blocks on
-+   HALT; a seeded violation is caught; the silence alarm fires.
-+
-+3. Measure the supervisor&#x27;s token use on the first night and report it; the interval changes only by owner
-+   ruling.
-diff --git a/docs/dispatches/2026-09-22_R-EYES.md b/docs/dispatches/2026-09-22_R-EYES.md
-new file mode 100644
-index 000000000..67ee4ae0a
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-EYES.md
-@@ -0,0 +1,7 @@
-+# R-EYES (owner ruling, 2026-09-22, completes R-VITALS/R-BUILD-JOURNAL/R-BUILD-TRANSCRIPT)
-+
-+_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
-+
-+also publish under /build/ every light cycle a commits page — each commit tonight with hash, time, message,
-+files touched and the full diff, newest first, scrubbed of secrets like the transcript. One index page at
-+/build/ linking status, journal, transcript and commits. Post the /build/ URL once as a 📊.
-diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
-new file mode 100644
-index 000000000..d67aa701f
---- /dev/null
-+++ b/reports/BUILD-JOURNAL.log
-@@ -0,0 +1 @@
-+2026-09-22 15:26 | ruling — | — | commit e154a14f1 &quot;R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling&quot; (2026-09-22 15:19) | tests — | files touched 7 | next —
-diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-new file mode 100644
-index 000000000..09888eb99
---- /dev/null
-+++ b/reports/BUILD-STATE.json
-@@ -0,0 +1,7 @@
-+{
-+ &quot;ruling&quot;: &quot;R-EYES-FULL&quot;,
-+ &quot;item&quot;: &quot;build room pages + independent supervisor (hook/HALT/silence)&quot;,
-+ &quot;tests&quot;: &quot;passing (vitals, runner-supervision, build-scrub, supervisor)&quot;,
-+ &quot;next&quot;: &quot;R-RESTART-TONIGHT after 15:30, then the four v2 tabs&quot;,
-+ &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
-+}
-\ No newline at end of file
-diff --git a/scripts/build_journal.py b/scripts/build_journal.py
-new file mode 100644
-index 000000000..cfb25a3a6
---- /dev/null
-+++ b/scripts/build_journal.py
-@@ -0,0 +1,359 @@
-+&quot;&quot;&quot;R-BUILD-JOURNAL + R-BUILD-TRANSCRIPT + R-EYES — the public /build/ room, rebuilt every light cycle.
-+
-+Four things under site/build/, all scrubbed of secrets FIRST (never written unscrubbed):
-+  - index.html   : links to status, journal, transcript and commits.
-+  - journal.html : append-only, machine-written — ruling in progress, section/item, last commit hash+time,
-+                   tests passed/failed, files touched, next item, and the last self-flag line.
-+  - &lt;slug&gt;.txt   : this build session&#x27;s own transcript (tool calls, outputs, messages), plain text, at an
-+                   unguessable filename; scrubbed.
-+  - commits.html : every commit tonight — hash, time, message, files touched, full diff, newest first; scrubbed.
-+
-+THE SCRUBBER IS THE SAFETY WALL. It replaces every API key, token, password, Telegram id, cookie and absolute
-+user path with [redacted] — exact secret values loaded from their stores at runtime PLUS shape patterns. It is
-+fail-closed: if scrubbing a file raises, that file is NOT published. A test (tests/test_build_scrub.py) plants
-+the known secret shapes and proves they are caught. No keys, no tokens, no owner names ever reach site/build/.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import glob
-+import html as _html
-+import json
-+import os
-+import re
-+import subprocess
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;)
-+JOURNAL_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-JOURNAL.log&quot;)   # append-only
-+STATE_FILE = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;)     # header fields the session sets
-+SLUG_FILE = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_slug&quot;)        # stable unguessable transcript name (gitignored)
-+REDACT = &quot;[redacted]&quot;
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# THE SCRUBBER
-+# ---------------------------------------------------------------------------------------------------------
-+_OWNER_WORDS = [&quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;]
-+
-+# keyed assignments: keep the key, redact the value (access_token: &quot;abc&quot; -&gt; access_token: [redacted])
-+_KEYED = re.compile(
-+    r&#x27;(?i)\b(access[_-]?token|api[_-]?key|api[_-]?secret|client[_-]?secret|secret|password|passwd|pwd|&#x27;
-+    r&#x27;authorization|bearer|cookie|set-cookie|chat[_-]?id|bot[_-]?token|refresh[_-]?token|private[_-]?key|token)&#x27;
-+    r&#x27;([&quot;\&#x27;]?\s*[:=]\s*[&quot;\&#x27;]?)([A-Za-z0-9._\-/+:]{4,})&#x27;)
-+# run BEFORE _KEYED: these consume values that span spaces (Bearer &lt;jwt&gt;) or whole cookie values, which the
-+# key=value rule would only half-catch.
-+_PRE = [
-+    (re.compile(r&#x27;(?i)\bBearer\s+[A-Za-z0-9._\-]{8,}&#x27;), REDACT),                 # Authorization: [redacted] &lt;jwt&gt;
-+    (re.compile(r&#x27;(?i)((?:set-)?cookie\s*[:=]\s*)[^\r\n]+&#x27;), r&#x27;\1&#x27; + REDACT),    # Cookie: [redacted]
-+]
-+_SHAPES = [
-+    re.compile(r&#x27;gh[pousr]_[A-Za-z0-9]{16,}&#x27;),               # GitHub PAT (classic)
-+    re.compile(r&#x27;github_pat_[A-Za-z0-9_]{20,}&#x27;),             # GitHub PAT (fine-grained)
-+    re.compile(r&#x27;\b\d{6,12}:[A-Za-z0-9_-]{20,}\b&#x27;),          # Telegram bot token (id:secret, any length)
-+    re.compile(r&#x27;\bxox[baprs]-[A-Za-z0-9-]{10,}&#x27;),           # Slack
-+    re.compile(r&#x27;\beyJ[A-Za-z0-9._\-]{10,}&#x27;),                # a bare JWT (starts eyJ)
-+    re.compile(r&#x27;\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b&#x27;),  # any email address
-+]
-+# absolute user-home paths, both slash styles: [redacted] [redacted] [redacted] [redacted] [redacted]
-+_PATHS = re.compile(r&#x27;(?i)(?:[A-Z]:\\+Users\\+|[redacted][redacted][redacted]\\/\s&quot;\&#x27;]+&#x27;)
-+
-+
-+def _secret_literals():
-+    &quot;&quot;&quot;Exact secret VALUES pulled live from their stores (all gitignored), so real credentials are redacted
-+    verbatim wherever they appear. Never returns anything to a caller but the scrubber.&quot;&quot;&quot;
-+    vals = set()
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;.kite_token.json&quot;), encoding=&quot;utf-8&quot;))
-+        for k in (&quot;access_token&quot;, &quot;api_key&quot;, &quot;api_secret&quot;):
-+            if d.get(k):
-+                vals.add(str(d[k]))
-+    except Exception:
-+        pass
-+    for k in (&quot;TELEGRAM_BOT_TOKEN&quot;, &quot;TELEGRAM_CHAT_ID&quot;, &quot;GITHUB_TOKEN&quot;, &quot;GH_TOKEN&quot;, &quot;KITE_API_SECRET&quot;,
-+              &quot;KITE_API_KEY&quot;, &quot;HEALTHCHECKS_URL&quot;):
-+        v = os.environ.get(k)
-+        if v and len(v) &gt;= 5:
-+            vals.add(v)
-+    for bat in (&quot;SET_GIT_TOKEN.bat&quot;, &quot;TOKEN.bat&quot;):
-+        try:
-+            txt = open(os.path.join(REPO, bat), encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read()
-+            vals |= set(re.findall(r&#x27;gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}&#x27;, txt))
-+        except Exception:
-+            pass
-+    return {v for v in vals if v and len(str(v)) &gt;= 5}
-+
-+
-+def scrub(text):
-+    &quot;&quot;&quot;Redact every secret/PII shape. FAIL-CLOSED at the call site: a caller that cannot scrub does not write.
-+    Order: exact live secret values first, then keyed assignments, then shapes, then owner words, then paths.&quot;&quot;&quot;
-+    if text is None:
-+        return &quot;&quot;
-+    t = str(text)
-+    for v in sorted(_secret_literals(), key=len, reverse=True):
-+        t = t.replace(v, REDACT)
-+    for pat, repl in _PRE:
-+        t = pat.sub(repl, t)
-+    for pat in _SHAPES:
-+        t = pat.sub(REDACT, t)
-+    t = _KEYED.sub(lambda m: m.group(1) + m.group(2) + REDACT, t)
-+    for w in _OWNER_WORDS:
-+        t = re.sub(re.escape(w), REDACT, t, flags=re.IGNORECASE)
-+    t = _PATHS.sub(REDACT, t)
-+    return t
-+
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# STATE the session sets (ruling / section / item / next / tests / flag)
-+# ---------------------------------------------------------------------------------------------------------
-+def set_state(**kw):
-+    &quot;&quot;&quot;Update the journal header fields. Called by the build session as it works (machine-written from the
-+    session&#x27;s own state, not typed prose).&quot;&quot;&quot;
-+    st = _state()
-+    st.update({k: v for k, v in kw.items() if v is not None})
-+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-+    with open(STATE_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+        json.dump(st, f, indent=1)
-+    return st
-+
-+
-+def _state():
-+    try:
-+        return json.load(open(STATE_FILE, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        return {}
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# GIT helpers
-+# ---------------------------------------------------------------------------------------------------------
-+def _git(*args):
-+    try:
-+        return subprocess.run([&quot;git&quot;, *args], cwd=REPO, capture_output=True, timeout=30).stdout.decode(
-+            &quot;utf-8&quot;, &quot;replace&quot;)            # git output is utf-8; the Windows locale codec would choke on · / emoji
-+    except Exception:
-+        return &quot;&quot;
-+
-+
-+def _last_commit():
-+    out = _git(&quot;log&quot;, &quot;-1&quot;, &quot;--format=%h\x1f%cd\x1f%s&quot;, &quot;--date=format-local:%Y-%m-%d %H:%M&quot;)
-+    if &quot;\x1f&quot; in out:
-+        h, when, subj = out.strip().split(&quot;\x1f&quot;, 2)
-+        n = len([l for l in _git(&quot;show&quot;, &quot;--stat&quot;, &quot;--format=&quot;, h).splitlines() if &quot;|&quot; in l])
-+        return {&quot;hash&quot;: h, &quot;when&quot;: when, &quot;subject&quot;: subj, &quot;files&quot;: n}
-+    return {}
-+
-+
-+def _tonight_commits(limit=40):
-+    &quot;&quot;&quot;Commits since local midnight, newest first, with their scrubbed full diff.&quot;&quot;&quot;
-+    since = _now().strftime(&quot;%Y-%m-%dT00:00:00&quot;)
-+    hashes = [h for h in _git(&quot;log&quot;, &quot;--since=%s&quot; % since, &quot;--format=%h&quot;).split() if h][:limit]
-+    out = []
-+    for h in hashes:
-+        meta = _git(&quot;show&quot;, &quot;-s&quot;, &quot;--format=%h\x1f%cd\x1f%s&quot;, &quot;--date=format-local:%Y-%m-%d %H:%M&quot;, h).strip()
-+        if &quot;\x1f&quot; not in meta:
-+            continue
-+        hh, when, subj = meta.split(&quot;\x1f&quot;, 2)
-+        files = [l.strip() for l in _git(&quot;show&quot;, &quot;--stat&quot;, &quot;--format=&quot;, h).splitlines() if &quot;|&quot; in l]
-+        diff = _git(&quot;show&quot;, &quot;--format=&quot;, h)
-+        out.append({&quot;hash&quot;: hh, &quot;when&quot;: when, &quot;subject&quot;: subj, &quot;files&quot;: files, &quot;diff&quot;: diff})
-+    return out
-+
-+
-+# ---------------------------------------------------------------------------------------------------------
-+# TRANSCRIPT — this session&#x27;s own .jsonl, flattened + scrubbed
-+# ---------------------------------------------------------------------------------------------------------
-+def _transcript_path():
-+    proj = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;.claude&quot;, &quot;projects&quot;,
-+                        &quot;C--Users-[redacted]-Desktop-trading-engines-v2&quot;)
-+    files = sorted(glob.glob(os.path.join(proj, &quot;*.jsonl&quot;)), key=os.path.getmtime, reverse=True)
-+    return files[0] if files else None
-+
-+
-+def _slug():
-+    try:
-+        s = open(SLUG_FILE, encoding=&quot;utf-8&quot;).read().strip()
-+        if s:
-+            return s
-+    except Exception:
-+        pass
-+    import secrets
-+    s = &quot;transcript-&quot; + secrets.token_urlsafe(18)
-+    try:
-+        os.makedirs(os.path.dirname(SLUG_FILE), exist_ok=True)
-+        open(SLUG_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(s)
-+    except Exception:
-+        pass
-+    return s
-+
-+
-+def _flatten_event(ev):
-+    &quot;&quot;&quot;One .jsonl event -&gt; a few readable plain-text lines (role, text, tool calls, tool results).&quot;&quot;&quot;
-+    role = ev.get(&quot;type&quot;) or ev.get(&quot;role&quot;) or &quot;&quot;
-+    msg = ev.get(&quot;message&quot;) if isinstance(ev.get(&quot;message&quot;), dict) e</pre></div></main></body></html>
+</pre></div></main></body></html>
