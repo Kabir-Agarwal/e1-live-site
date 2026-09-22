@@ -1,4 +1,501 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c028e0789</b> · 2026-09-22 21:12</div><div>R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen</div><div class='sub h'>docs/reports/2026-09-22-R-STOP-SPAM.md | 34 ++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py                      |  4 +++-</div><pre>diff --git a/docs/reports/2026-09-22-R-STOP-SPAM.md b/docs/reports/2026-09-22-R-STOP-SPAM.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3c8675e99</b> · 2026-09-22 21:22</div><div>R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only)</div><div class='sub h'>scripts/kill_switch.py  | 27 +++++++++++++++++++++++++++</div><div class='sub h'>tests/test_now_reply.py | 27 +++++++++++++++++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+index c11a2ef5f..1f7107b54 100644
+--- a/scripts/kill_switch.py
++++ b/scripts/kill_switch.py
+@@ -103,9 +103,36 @@ def poll_telegram(get=None):
+                 action = &quot;CLEAR-HALT&quot; if ok else action
+             except Exception:
+                 pass
++        elif text == &quot;NOW&quot;:                            # R-NOW-LINE §5: reply-only — the NOW line + status one-liner
++            try:
++                _reply_now()
++                action = &quot;NOW&quot;
++            except Exception:
++                pass
+     return action
+ 
+ 
++def _reply_now():
++    &quot;&quot;&quot;Answer &#x27;now&#x27; with the current NOW scene plus the status one-liner. Reply-only; changes nothing.&quot;&quot;&quot;
++    import json
++    from scripts import notify as N
++    scene = &quot;(no scene yet)&quot;
++    try:
++        from scripts import vitals
++        line, _age, _stale = vitals.now_line()
++        scene = line or scene
++    except Exception:
++        pass
++    plain = &quot;&quot;
++    try:
++        d = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
++                                        &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;))
++        plain = d.get(&quot;plain&quot;) or &quot;&quot;
++    except Exception:
++        pass
++    N.notify(&quot;NOW: %s\n%s&quot; % (scene, plain))
++
++
+ def _tg_creds():
+     from scripts import notify as N
+     return N._creds()
+diff --git a/tests/test_now_reply.py b/tests/test_now_reply.py
+new file mode 100644
+index 000000000..9f2a9c880
+--- /dev/null
++++ b/tests/test_now_reply.py
+@@ -0,0 +1,27 @@
++&quot;&quot;&quot;R-NOW-LINE (5): &#x27;now&#x27; from the owner&#x27;s chat gets a reply (NOW line + status one-liner); reply-only.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++
++def test_now_replies_and_changes_nothing(monkeypatch):
++    from scripts import kill_switch, notify, vitals
++    sent = []
++    monkeypatch.setattr(notify, &quot;notify&quot;, lambda m, *a, **k: sent.append(m) or True)
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;); open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;porting the Live desk&quot;)
++    vitals.NOW_FILE = nf
++    monkeypatch.setattr(kill_switch, &quot;_tg_creds&quot;, lambda: (&quot;tok&quot;, &quot;999&quot;))
++    monkeypatch.setattr(kill_switch, &quot;_read_offset&quot;, lambda: 0)
++    monkeypatch.setattr(kill_switch, &quot;_write_offset&quot;, lambda v: None)
++    # a KILL flag would flip state; &#x27;now&#x27; must not
++    killed = {&quot;flag&quot;: False}
++    monkeypatch.setattr(kill_switch, &quot;kill&quot;, lambda *a, **k: killed.__setitem__(&quot;flag&quot;, True))
++    data = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 5, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 999}, &quot;text&quot;: &quot;now&quot;}}]})
++    act = kill_switch.poll_telegram(get=lambda u: data)
++    assert act == &quot;NOW&quot;
++    assert sent and &quot;NOW:&quot; in sent[0] and &quot;porting the Live desk&quot; in sent[0]
++    assert killed[&quot;flag&quot;] is False                            # reply-only, no state change
++
++
++if __name__ == &quot;__main__&quot;:
++    import pytest
++    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
+</pre></div><div class='c'><div class='h'><b>bba854dc1</b> · 2026-09-22 21:20</div><div>R-NOW-LINE (4): beat HALTED flag from E1-DESK\HALT on disk + supervisor 2nd line; status link on every line</div><div class='sub h'>scripts/build_beat.py    | 28 +++++++++++++++++++++++++---</div><div class='sub h'>scripts/live_bar.py      |  3 ++-</div><div class='sub h'>tests/test_beat_truth.py | 31 +++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+index 79523d862..13c66425f 100644
+--- a/scripts/build_beat.py
++++ b/scripts/build_beat.py
+@@ -76,7 +76,12 @@ def _tests():
+         return &quot;—&quot;
+ 
+ 
++STATUS_LINK = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
++SUP_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;SUPERVISOR.log&quot;)
++
++
+ def _supervisor_state():
++    # R-NOW-LINE §4: the HALTED flag comes from whether E1-DESK\HALT exists ON DISK at beat time — never the log.
+     if os.path.exists(HALT):
+         return &quot;HALTED&quot;
+     try:
+@@ -87,6 +92,23 @@ def _supervisor_state():
+         return &quot;no check yet&quot;
+ 
+ 
++def _supervisor_last_entry():
++    &quot;&quot;&quot;The supervisor&#x27;s most recent log line — shown as the beat&#x27;s second line when halted (R-NOW-LINE §4).&quot;&quot;&quot;
++    try:
++        lines = [l for l in open(SUP_LOG, encoding=&quot;utf-8&quot;).read().splitlines() if l.strip()]
++        return lines[-1][:200] if lines else &quot;(no supervisor entry yet)&quot;
++    except Exception:
++        return &quot;(no supervisor entry yet)&quot;
++
++
++def _tail(line):
++    &quot;&quot;&quot;R-NOW-LINE §4: every BUILD line ends with the status link; when halted, a second line = supervisor&#x27;s last.&quot;&quot;&quot;
++    out = line + &quot; · &quot; + STATUS_LINK
++    if os.path.exists(HALT):
++        out += &quot;\nSUPERVISOR: &quot; + _supervisor_last_entry()
++    return out
++
++
+ def line(now=None):
+     now = now or _now()
+     commits = _commits_since(SLOT_MIN)
+@@ -106,9 +128,9 @@ def line(now=None):
+         msgs = &quot;; &quot;.join(commits)
+         if len(msgs) &gt; 140:
+             msgs = msgs[:137] + &quot;…&quot;
+-        return &quot;%s — %s%d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
+-            label, cbp, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
+-    return &quot;%s — %sno commits · supervisor %s%s · %s&quot; % (label, cbp, sup, disagree, eta)
++        return _tail(&quot;%s — %s%d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
++            label, cbp, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta))
++    return _tail(&quot;%s — %sno commits · supervisor %s%s · %s&quot; % (label, cbp, sup, disagree, eta))
+ 
+ 
+ def _eta():
+diff --git a/scripts/live_bar.py b/scripts/live_bar.py
+index e382c453f..041e45fe6 100644
+--- a/scripts/live_bar.py
++++ b/scripts/live_bar.py
+@@ -124,7 +124,8 @@ def bar_line(steps=None):
+     n = sum(1 for x in steps if x)
+     bar = &quot;▓&quot; * n + &quot;░&quot; * (8 - n)
+     nxt = next((LABELS[i] for i, x in enumerate(steps) if not x), &quot;all eight earned — live paper is proven&quot;)
+-    return &quot;LIVE PAPER %s %d/8 — next: %s&quot; % (bar, n, nxt)
++    # R-NOW-LINE §4: every LIVE bar line ends with the status link so any pasted line carries it.
++    return &quot;LIVE PAPER %s %d/8 — next: %s · https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot; % (bar, n, nxt)
+ 
+ 
+ def html_bar():
+diff --git a/tests/test_beat_truth.py b/tests/test_beat_truth.py
+new file mode 100644
+index 000000000..cf5f9c641
+--- /dev/null
++++ b/tests/test_beat_truth.py
+@@ -0,0 +1,31 @@
++&quot;&quot;&quot;R-NOW-LINE (4): the beat&#x27;s HALTED flag is from E1-DESK\HALT on disk (not the log), with the supervisor&#x27;s
++last entry as a second line; every BUILD and LIVE bar line ends with the status link.&quot;&quot;&quot;
++import os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import build_beat, live_bar
++
++
++def test_halted_flag_from_disk_with_supervisor_second_line():
++    d = tempfile.mkdtemp()
++    build_beat.HALT = os.path.join(d, &quot;HALT&quot;)
++    build_beat.SUP_LOG = os.path.join(d, &quot;sup.log&quot;)
++    open(build_beat.SUP_LOG, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;21:20 checked 21:20 — on course\n21:22 halted — scope\n&quot;)
++    # no HALT on disk -&gt; not HALTED
++    assert build_beat._supervisor_state() != &quot;HALTED&quot;
++    # HALT on disk -&gt; HALTED, and _tail adds the supervisor&#x27;s last entry as a second line
++    open(build_beat.HALT, &quot;w&quot;).write(&quot;reason&quot;)
++    assert build_beat._supervisor_state() == &quot;HALTED&quot;
++    tail = build_beat._tail(&quot;BUILD 21:22 — x&quot;)
++    assert build_beat.STATUS_LINK in tail
++    assert &quot;\nSUPERVISOR: &quot; in tail and &quot;halted — scope&quot; in tail
++
++
++def test_every_line_ends_with_status_link():
++    d = tempfile.mkdtemp(); build_beat.HALT = os.path.join(d, &quot;noHALT&quot;)
++    assert build_beat.STATUS_LINK in build_beat._tail(&quot;BUILD x&quot;)
++    assert &quot;status.html&quot; in live_bar.bar_line()
++
++
++if __name__ == &quot;__main__&quot;:
++    test_halted_flag_from_disk_with_supervisor_second_line(); test_every_line_ends_with_status_link()
++    print(&quot;test_beat_truth OK&quot;)
+</pre></div><div class='c'><div class='h'><b>1978f4744</b> · 2026-09-22 21:19</div><div>R-NOW-LINE (3): prove status write+push is the status writer&#x27;s, halt-proof (test halt path)</div><div class='sub h'>tests/test_halt_proof_push.py | 36 ++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/tests/test_halt_proof_push.py b/tests/test_halt_proof_push.py
+new file mode 100644
+index 000000000..0e42c93a6
+--- /dev/null
++++ b/tests/test_halt_proof_push.py
+@@ -0,0 +1,36 @@
++&quot;&quot;&quot;R-NOW-LINE (3): status.html is written AND pushed by the STATUS WRITER (site_loop&#x27;s status daemon), never
++the build session, and it keeps working while a HALT exists. Proven against a TEST halt path — never the real
++HALT — and it touches no Telegram and no ledger.&quot;&quot;&quot;
++import os, sys, tempfile, time
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++
++def test_status_writer_writes_and_pushes_under_a_test_halt(monkeypatch):
++    from scripts import vitals, site_loop, publish_site
++    d = tempfile.mkdtemp()
++    test_halt = os.path.join(d, &quot;TEST_HALT&quot;); open(test_halt, &quot;w&quot;).write(&quot;test halt reason&quot;)
++    monkeypatch.setenv(&quot;E1_HALT_FILE&quot;, test_halt)             # point the guard at the TEST halt, not the real one
++    nf = os.path.join(d, &quot;now.txt&quot;); open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;scene during test halt&quot;)
++    vitals.NOW_FILE = nf
++
++    # the status WRITE happens despite the halt (vitals.build writes status.html with a fresh generated time)
++    before = vitals.build()[&quot;generated&quot;]
++    time.sleep(0.01)
++    after = vitals.build()[&quot;generated&quot;]
++    assert after != before                                    # it keeps writing while halted
++    assert os.path.exists(vitals.SITE_HTML) and &quot;NOW&quot; in open(vitals.SITE_HTML, encoding=&quot;utf-8&quot;).read()
++
++    # the PUSH is the status writer&#x27;s targeted publish_status (the daemon&#x27;s), NOT a full build-session publish
++    pushed = {&quot;status_only&quot;: 0}
++    monkeypatch.setattr(publish_site, &quot;publish_status&quot;, lambda: pushed.__setitem__(&quot;status_only&quot;, pushed[&quot;status_only&quot;] + 1) or {&quot;published&quot;: True})
++    monkeypatch.setattr(vitals, &quot;build&quot;, lambda write=True: {&quot;generated&quot;: &quot;x&quot;})
++    site_loop._status_tick()                                   # one status cycle
++    assert pushed[&quot;status_only&quot;] == 1                          # pushed via the status-only path, halt-proof
++
++    os.remove(test_halt)                                       # clean up the TEST halt; the real HALT untouched
++    assert not os.path.exists(test_halt)
++
++
++if __name__ == &quot;__main__&quot;:
++    import pytest
++    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
+</pre></div><div class='c'><div class='h'><b>51c15cfed</b> · 2026-09-22 21:18</div><div>R-NOW-LINE (2): NOW line at the top of status.html + the build room, with age / STALE</div><div class='sub h'>scripts/build_journal.py |  7 ++++++-</div><div class='sub h'>scripts/vitals.py        | 29 ++++++++++++++++++++++++++++-</div><div class='sub h'>tests/test_now_line.py   | 40 ++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/build_journal.py b/scripts/build_journal.py
+index b1d5bde08..7167599cb 100644
+--- a/scripts/build_journal.py
++++ b/scripts/build_journal.py
+@@ -341,8 +341,13 @@ def _index_body(slug, have_transcript):
+     st = _state()
+     tlink = (&quot;&lt;li&gt;&lt;a href=&#x27;%s.txt&#x27;&gt;Transcript&lt;/a&gt; — this session&#x27;s tool calls and messages, scrubbed&lt;/li&gt;&quot; % slug
+              if have_transcript else &quot;&lt;li class=&#x27;sub&#x27;&gt;Transcript — unavailable this cycle&lt;/li&gt;&quot;)
++    try:
++        from scripts import vitals                  # R-NOW-LINE §2: the build room shows the same NOW line
++        now_html = vitals._now_line_html()
++    except Exception:
++        now_html = &quot;&quot;
+     return _page(&quot;Build room&quot;,
+-        &quot;&lt;h1&gt;Build room&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;What the desk is building tonight, refreshed every 2 minutes. &quot;
++        &quot;&lt;h1&gt;Build room&lt;/h1&gt;&quot; + now_html + &quot;&lt;p class=&#x27;sub&#x27;&gt;What the desk is building tonight, refreshed every 2 minutes. &quot;
+         &quot;Everything here is scrubbed of keys, tokens and names.&lt;/p&gt;&quot;
+         &quot;&lt;p&gt;Ruling in progress: &lt;b&gt;%s&lt;/b&gt; · %s&lt;/p&gt;&lt;ul&gt;&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;../status.html&#x27;&gt;Status&lt;/a&gt; — is the desk up right now&lt;/li&gt;&quot;
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index df79bc540..0d43bb490 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -248,6 +248,33 @@ def ready_line(s=None):
+     return &quot;NOT READY — %s&quot; % (s.get(&quot;plain&quot;) or _plain(s))
+ 
+ 
++NOW_FILE = os.environ.get(&quot;E1_NOW_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;now.txt&quot;)
++STATUS_CYCLE_S = 120                              # the status writer&#x27;s cadence; 3 cycles stale (R-NOW-LINE §2)
++
++
++def now_line():
++    &quot;&quot;&quot;R-NOW-LINE §2: (text, age_seconds, stale) for the current NOW scene, from E1-DESK\\now.txt.&quot;&quot;&quot;
++    try:
++        line = open(NOW_FILE, encoding=&quot;utf-8&quot;).read().strip()
++        age = time.time() - os.path.getmtime(NOW_FILE)
++        return line, age, age &gt; 3 * STATUS_CYCLE_S
++    except Exception:
++        return None, None, True
++
++
++def _now_line_html():
++    import html as _h
++    line, age, stale = now_line()
++    if not line:
++        return &quot;&lt;div style=&#x27;color:#9a9a93;margin:0 0 10px&#x27;&gt;NOW: (no now.txt yet)&lt;/div&gt;&quot;
++    mins = int((age or 0) // 60)
++    ago = (&quot;%d min ago&quot; % mins) if mins else &quot;just now&quot;
++    colour = &quot;#FAC775&quot; if stale else &quot;#b8b6ae&quot;       # warn colour when stale — stale must never look live
++    label = &quot;NOW (STALE)&quot; if stale else &quot;NOW&quot;
++    return (&quot;&lt;div style=&#x27;color:%s;margin:0 0 10px;font-size:13px&#x27;&gt;&lt;b&gt;%s&lt;/b&gt; · %s &lt;span style=&#x27;color:#9a9a93&#x27;&gt;· %s&lt;/span&gt;&lt;/div&gt;&quot;
++            % (colour, label, _h.escape(line), ago))
++
++
+ def _live_bar_html():
+     try:
+         from scripts import live_bar               # R-LIVE-BAR: the 8-step bar at the top of status
+@@ -279,7 +306,7 @@ def _write_html(s):
+             &quot;td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}&quot;
+             &quot;.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&quot;
+             &quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Desk status&lt;/h1&gt;&quot;
+-            + _live_bar_html() +
++            + _now_line_html() + _live_bar_html() +
+             &quot;&lt;p class=&#x27;big&#x27;&gt;&quot; + _h.escape(s[&quot;plain&quot;]) + &quot;&lt;/p&gt;&quot;
+             &quot;&lt;p class=&#x27;sub&#x27;&gt;&quot; + _h.escape(s[&quot;ready_line&quot;]) + &quot; · updated &quot; + _h.escape(s[&quot;generated&quot;]) +
+             &quot; · refreshes every 2 minutes&lt;/p&gt;&quot;
+diff --git a/tests/test_now_line.py b/tests/test_now_line.py
+new file mode 100644
+index 000000000..cf88f038e
+--- /dev/null
++++ b/tests/test_now_line.py
+@@ -0,0 +1,40 @@
++&quot;&quot;&quot;R-NOW-LINE (2): status writer prints the NOW line with age; older than 3 cycles is STALE in warn colour.&quot;&quot;&quot;
++import os, sys, time, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import vitals
++
++
++def test_fresh_now_line_not_stale():
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;)
++    open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;2026-09-22 21:30:00 · R-NOW-LINE · Write · x.py · done&quot;)
++    vitals.NOW_FILE = nf
++    line, age, stale = vitals.now_line()
++    assert line and stale is False and age &lt; 5
++    assert &quot;NOW&quot; in vitals._now_line_html() and &quot;STALE&quot; not in vitals._now_line_html()
++
++
++def test_stale_now_line_marked():
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;)
++    open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;old scene&quot;)
++    old = time.time() - 3 * vitals.STATUS_CYCLE_S - 30
++    os.utime(nf, (old, old))
++    vitals.NOW_FILE = nf
++    line, age, stale = vitals.now_line()
++    assert stale is True
++    html = vitals._now_line_html()
++    assert &quot;STALE&quot; in html and &quot;#FAC775&quot; in html          # warn colour, never looks live
++
++
++def test_status_html_has_now_line():
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;)
++    open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;scene here&quot;)
++    vitals.NOW_FILE = nf
++    s = vitals.build(write=False)
++    # the writer embeds the NOW line at the top of the page (via _write_html on build)
++    vitals.build()  # writes status.html
++    assert &quot;NOW&quot; in open(vitals.SITE_HTML, encoding=&quot;utf-8&quot;).read()
++
++
++if __name__ == &quot;__main__&quot;:
++    test_fresh_now_line_not_stale(); test_stale_now_line_marked(); test_status_html_has_now_line()
++    print(&quot;test_now_line OK&quot;)
+</pre></div><div class='c'><div class='h'><b>bffef127d</b> · 2026-09-22 21:16</div><div>R-NOW-LINE (1): PostToolUse now-writer — one scrubbed line to E1-DESK\now.txt per tool call</div><div class='sub h'>.claude/hooks/now_writer.py | 82 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>.claude/settings.json       |  6 ++++</div><div class='sub h'>tests/test_now_writer.py    | 33 ++++++++++++++++++</div><pre>diff --git a/.claude/hooks/now_writer.py b/.claude/hooks/now_writer.py
+new file mode 100644
+index 000000000..c4976801a
+--- /dev/null
++++ b/.claude/hooks/now_writer.py
+@@ -0,0 +1,82 @@
++&quot;&quot;&quot;R-NOW-LINE (1): PostToolUse hook — overwrite E1-DESK\\now.txt on every tool call with ONE line describing
++what the build session is doing right now:
++
++    &lt;machine-clock time&gt; · &lt;current dispatch item, from the journal, not typed&gt; · &lt;tool name&gt; ·
++    &lt;file path or first few words of the command&gt; · &lt;last line of that tool&#x27;s output&gt;
++
++Every field is passed through the SAME scrubber the public transcript uses, so no env value, token, secret or
++absolute user path is ever written; only the LAST line of output is taken, never the full output. The hook
++NEVER raises — a failed write must never block a tool (PostToolUse anyway cannot block, but we still swallow
++everything).&quot;&quot;&quot;
++import json
++import os
++import sys
++from datetime import datetime, timezone, timedelta
++
++REPO = r&quot;[redacted]\Desktop\trading-engines-v2&quot;
++NOW_FILE = os.environ.get(&quot;E1_NOW_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;now.txt&quot;)
++IST = timezone(timedelta(hours=5, minutes=30))
++
++
++def _scrub(s):
++    try:
++        sys.path.insert(0, REPO)
++        from scripts import build_journal
++        return build_journal.scrub(s)
++    except Exception:
++        # scrubber unavailable -&gt; be conservative: drop anything that looks like a path/secret
++        import re
++        s = re.sub(r&quot;(?i)[A-Z]:\\\\?Users\\\\?[^\s]*|[redacted]\s]*|[A-Za-z0-9_\-]{24,}&quot;, &quot;[redacted]&quot;, str(s or &quot;&quot;))
++        return s
++
++
++def _item():
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;), encoding=&quot;utf-8&quot;))
++        return d.get(&quot;item&quot;) or d.get(&quot;ruling&quot;) or &quot;—&quot;
++    except Exception:
++        return &quot;—&quot;
++
++
++def _last_line(resp):
++    if resp is None:
++        return &quot;&quot;
++    if isinstance(resp, dict):
++        resp = resp.get(&quot;stdout&quot;) or resp.get(&quot;output&quot;) or resp.get(&quot;content&quot;) or json.dumps(resp)[:500]
++    lines = [l for l in str(resp).splitlines() if l.strip()]
++    return lines[-1][:160] if lines else &quot;&quot;
++
++
++def _detail(tool, ti):
++    ti = ti or {}
++    if &quot;file_path&quot; in ti:
++        return str(ti.get(&quot;file_path&quot;))
++    cmd = ti.get(&quot;command&quot;)
++    if cmd:
++        return &quot; &quot;.join(str(cmd).split()[:6])          # first few words only
++    return &quot;&quot;
++
++
++def main():
++    try:
++        raw = sys.stdin.read()
++        payload = json.loads(raw) if raw.strip() else {}
++    except Exception:
++        payload = {}
++    try:
++        t = datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M:%S&quot;)
++        tool = payload.get(&quot;tool_name&quot;) or &quot;?&quot;
++        detail = _scrub(_detail(tool, payload.get(&quot;tool_input&quot;)))
++        out = _scrub(_last_line(payload.get(&quot;tool_response&quot;)))
++        item = _scrub(_item())
++        line = &quot; · &quot;.join([t, item, tool, detail, out])
++        os.makedirs(os.path.dirname(NOW_FILE), exist_ok=True)
++        with open(NOW_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(line + &quot;\n&quot;)
++    except Exception:
++        pass                                            # never raise
++    sys.exit(0)
++
++
++if __name__ == &quot;__main__&quot;:
++    main()
+diff --git a/.claude/settings.json b/.claude/settings.json
+index 276c99c64..784cd66a6 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -38,6 +38,12 @@
+             &quot;command&quot;: &quot;pythonw \&quot;[redacted]\\Desktop\\trading-engines-v2\\scripts\\builder_pulse.py\&quot; --hook&quot;,
+             &quot;async&quot;: true,
+             &quot;timeout&quot;: 10
++          },
++          {
++            &quot;type&quot;: &quot;command&quot;,
++            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\.claude\\hooks\\now_writer.py\&quot;&quot;,
++            &quot;async&quot;: true,
++            &quot;timeout&quot;: 10
+           }
+         ]
+       }
+diff --git a/tests/test_now_writer.py b/tests/test_now_writer.py
+new file mode 100644
+index 000000000..01e7abf1f
+--- /dev/null
++++ b/tests/test_now_writer.py
+@@ -0,0 +1,33 @@
++&quot;&quot;&quot;R-NOW-LINE (1): the PostToolUse now-writer writes one scrubbed line to now.txt and never raises.&quot;&quot;&quot;
++import json, os, subprocess, sys, tempfile
++HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;, &quot;now_writer.py&quot;)
++
++
++def _run(payload, nowfile):
++    env = dict(os.environ, E1_NOW_FILE=nowfile)
++    r = subprocess.run([sys.executable, HOOK], input=json.dumps(payload).encode(&quot;utf-8&quot;),
++                       capture_output=True, env=env)
++    return r.returncode
++
++
++def test_writes_one_scrubbed_line():
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;)
++    payload = {&quot;tool_name&quot;: &quot;Bash&quot;,
++               &quot;tool_input&quot;: {&quot;command&quot;: &quot;git commit -m x &amp;&amp; echo done extra words here ignored&quot;},
++               &quot;tool_response&quot;: {&quot;stdout&quot;: &quot;line one\n[redacted]\nlast line here&quot;}}
++    assert _run(payload, nf) == 0
++    txt = open(nf, encoding=&quot;utf-8&quot;).read()
++    assert txt.count(&quot;\n&quot;) == 1                              # exactly one line
++    assert &quot;Bash&quot; in txt and &quot;git commit&quot; in txt            # tool + first words of command
++    assert &quot;ghp_&quot; not in txt                                # secret scrubbed
++    assert &quot;[redacted]&quot; in txt or &quot;last line here&quot; in txt   # last output line, scrubbed
++
++
++def test_never_raises_on_garbage():
++    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;)
++    assert subprocess.run([sys.executable, HOOK], input=b&quot;not json&quot;,
++                          capture_output=True, env=dict(os.environ, E1_NOW_FILE=nf)).returncode == 0
++
++
++if __name__ == &quot;__main__&quot;:
++    test_writes_one_scrubbed_line(); test_never_raises_on_garbage(); print(&quot;test_now_writer OK&quot;)
+</pre></div><div class='c'><div class='h'><b>43822e23c</b> · 2026-09-22 21:14</div><div>R-HALT-FIX (6) test: ask_the_desk client is anonymised (&#x27;A desk client&#x27;, no person&#x27;s name)</div><div class='sub h'>tests/test_ask_the_desk.py | 4 ++--</div><pre>diff --git a/tests/test_ask_the_desk.py b/tests/test_ask_the_desk.py
+index 27af15244..5324ebafd 100644
+--- a/tests/test_ask_the_desk.py
++++ b/tests/test_ask_the_desk.py
+@@ -1,5 +1,5 @@
+ &quot;&quot;&quot;R-ASK-THE-DESK (as amended by R-EVENING-22 D1): the two index-test requests moved to the separate
+-/deliverables/ page and were removed here, leaving Nikhil&#x27;s stock-hold request. Plain language, stable
++/deliverables/ page and were removed here, leaving an anonymised client stock-hold request. Plain language, stable
+ numbering, numbers that match for-nikhil.html, and no scope a run invented.&quot;&quot;&quot;
+ from scripts import ask_the_desk as A
+ 
+@@ -11,7 +11,7 @@ def test_module_demo():
+ def test_remaining_entry_is_nikhils_stock_hold_and_dated():
+     ns = [e[&quot;n&quot;] for e in A.ENTRIES]
+     assert ns == [1]                                        # D1: only the stock-hold request remains here
+-    assert all(e[&quot;who&quot;] == &quot;Nikhil&quot; and e[&quot;ruling&quot;] == &quot;R-INDEX-TESTS&quot; for e in A.ENTRIES)
++    assert all(e[&quot;who&quot;] == &quot;A desk client&quot; and e[&quot;ruling&quot;] == &quot;R-INDEX-TESTS&quot; for e in A.ENTRIES)
+     assert all(e[&quot;date&quot;] == &quot;2026-09-18&quot; for e in A.ENTRIES)
+     # the entry carries all six required fields
+     for e in A.ENTRIES:
+</pre></div><div class='c'><div class='h'><b>c028e0789</b> · 2026-09-22 21:12</div><div>R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen</div><div class='sub h'>docs/reports/2026-09-22-R-STOP-SPAM.md | 34 ++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py                      |  4 +++-</div><pre>diff --git a/docs/reports/2026-09-22-R-STOP-SPAM.md b/docs/reports/2026-09-22-R-STOP-SPAM.md
 new file mode 100644
 index 000000000..65430a9ca
 --- /dev/null
@@ -947,747 +1444,4 @@ index 7f73770af..e51884394 100644
 + &quot;provenance&quot;: &quot;owner rulings R-BACKLOG / R-CHECKLIST-BAR / R-AUTO-CONTINUE (docs/dispatches/2026-09-22_*), archived per \u00a77.1; the checklist + backlog + BUILD bar trace to these, not run-authored (\u00a720.6).&quot;
 +}
 \ No newline at end of file
-</pre></div><div class='c'><div class='h'><b>c2accee7a</b> · 2026-09-22 20:49</div><div>Reconcile journal + beat state with git (R-HALT-FIX step 3): current work is R-HALT-FIX then R-V2-EXACT</div><div class='sub h'>reports/BUILD-JOURNAL.log |  1 +</div><div class='sub h'>reports/BUILD-STATE.json  |  8 ++++----</div><div class='sub h'>reports/ITEM-TIMES.json   | 18 ++++++++++++++++++</div><pre>diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
-index 2d8b6b14d..cddb1f39e 100644
---- a/reports/BUILD-JOURNAL.log
-+++ b/reports/BUILD-JOURNAL.log
-@@ -43,3 +43,4 @@ checked 20:14 — on course
- 2026-09-22 20:16 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit 2f4b40d40 &quot;R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)&quot; (2026-09-22 20:13) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next 
- 2026-09-22 20:28 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit cf31b722b &quot;R-BACKLOG: standing queue — auto-continue pulls the next item when the checklist empties; IDLE hourly&quot; (2026-09-22 20:18) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 7 | next 
- 2026-09-22 15:18 | clear halt: R-BACKLOG was owner-pasted; ruling not archived - cleared by owner
-+2026-09-22 15:19 | reconcile: journal item lagged at &quot;R-NO-WINDOWS/four v2 tabs&quot; while git advanced through C1-C6, the v2 tabs, R-CHECKLIST-BAR, R-BACKLOG and the halt clearance; current work is R-HALT-FIX then R-V2-EXACT (matches HEAD 34d4d26f0)
-diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 09888eb99..1f3c6bfb4 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;R-EYES-FULL&quot;,
-- &quot;item&quot;: &quot;build room pages + independent supervisor (hook/HALT/silence)&quot;,
-- &quot;tests&quot;: &quot;passing (vitals, runner-supervision, build-scrub, supervisor)&quot;,
-- &quot;next&quot;: &quot;R-RESTART-TONIGHT after 15:30, then the four v2 tabs&quot;,
-+ &quot;ruling&quot;: &quot;R-HALT-FIX&quot;,
-+ &quot;item&quot;: &quot;R-HALT-FIX (archive rulings, guard fix, names, held rows)&quot;,
-+ &quot;tests&quot;: &quot;all C-series + tabs + fixes tested; full suite last 244 green&quot;,
-+ &quot;next&quot;: &quot;R-V2-EXACT verbatim /v2/ rebuild&quot;,
-  &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
- }
-\ No newline at end of file
-diff --git a/reports/ITEM-TIMES.json b/reports/ITEM-TIMES.json
-new file mode 100644
-index 000000000..45d9ba1eb
---- /dev/null
-+++ b/reports/ITEM-TIMES.json
-@@ -0,0 +1,18 @@
-+{
-+ &quot;v2 tab: Live desk positions&quot;: {
-+  &quot;start&quot;: &quot;2026-09-22T16:16:20.948262+05:30&quot;,
-+  &quot;finish&quot;: &quot;2026-09-22T17:56:34.340488+05:30&quot;
-+ },
-+ &quot;R-EVENING-22 C1 (fresh hunt across 6 sources)&quot;: {
-+  &quot;start&quot;: &quot;2026-09-22T17:56:34.340488+05:30&quot;,
-+  &quot;finish&quot;: &quot;2026-09-22T18:16:07.280380+05:30&quot;
-+ },
-+ &quot;R-EVENING-22 C-series complete&quot;: {
-+  &quot;start&quot;: &quot;2026-09-22T18:16:07.280380+05:30&quot;,
-+  &quot;finish&quot;: &quot;2026-09-22T20:49:30.608268+05:30&quot;
-+ },
-+ &quot;R-HALT-FIX (archive rulings, guard fix, names, held rows)&quot;: {
-+  &quot;start&quot;: &quot;2026-09-22T20:49:30.608268+05:30&quot;,
-+  &quot;finish&quot;: null
-+ }
-+}
-\ No newline at end of file
-</pre></div><div class='c'><div class='h'><b>34d4d26f0</b> · 2026-09-22 20:49</div><div>clear halt: R-BACKLOG was owner-pasted; ruling not archived - cleared by owner</div><div class='sub h'>reports/BUILD-JOURNAL.log | 44 ++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
-index d67aa701f..2d8b6b14d 100644
---- a/reports/BUILD-JOURNAL.log
-+++ b/reports/BUILD-JOURNAL.log
-@@ -1 +1,45 @@
- 2026-09-22 15:26 | ruling — | — | commit e154a14f1 &quot;R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling&quot; (2026-09-22 15:19) | tests — | files touched 7 | next —
-+checked 15:55 — on course
-+2026-09-22 15:56 | ruling R-EYES-FULL | build room pages + independent supervisor (hook/HALT/silence) | commit 776fa70eb &quot;R-RESTART-TONIGHT: restart_stack.py + supervisor guarded with the stack + START_SUPERVISOR retired&quot; (2026-09-22 15:53) | tests passing (vitals, runner-supervision, build-scrub, supervisor) | files touched 5 | next R-RESTART-TONIGHT after 15:30, then the four v2 tabs
-+checked 16:06 — on course
-+2026-09-22 16:06 | ruling R-EYES-FULL | build room pages + independent supervisor (hook/HALT/silence) | commit 42c8a6ca0 &quot;R-BUILD-BEAT (10-min build line) + R-LIVE-BAR (8-step live-paper bar) — both machine-derived&quot; (2026-09-22 16:05) | tests passing (vitals, runner-supervision, build-scrub, supervisor) | files touched 10 | next R-RESTART-TONIGHT after 15:30, then the four v2 tabs
-+2026-09-22 16:17 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 3ce5bf858 &quot;R-NO-WINDOWS: one windowless launcher, output to E1-DESK\logs, proven no console windows&quot; (2026-09-22 16:16) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 8 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 16:17 — on course
-+2026-09-22 16:21 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit b085eb488 &quot;supervisor: count cache-read tokens in the per-run usage log (R-EYES-FULL measurement)&quot; (2026-09-22 16:18) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 1 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 16:28 — on course
-+checked 16:34 — on course
-+2026-09-22 16:34 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 88565b04f &quot;R-VITALS-STALE + cadence: supervisor runs after every commit + 30-min idle; status cache-busting&quot; (2026-09-22 16:32) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 6 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 16:49 — on course
-+2026-09-22 16:50 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 8628ba4fb &quot;GUARD AMENDMENT: build pause 08:30-15:45 on market days (one clock) + 2-min site cadence in build hours&quot; (2026-09-22 16:47) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 8 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 17:00 — on course
-+2026-09-22 17:01 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 393884ae2 &quot;Audit: restart_stack called the wrong function (never ran it); moment-light truthful off-hours&quot; (2026-09-22 16:59) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 2 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+2026-09-22 17:22 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit d65e4bfe8 &quot;R-VITALS-STALE fix: light cycle now fast so status.html refreshes every 2 min&quot; (2026-09-22 17:21) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 3 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 17:23 — on course
-+2026-09-22 17:27 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 9c8c9b5bd &quot;restart_stack: the stack&#x27;s runtime modules count as launch-path (so a site_build/vitals fix restart is allowed)&quot; (2026-09-22 17:22) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 1 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 17:33 — on course
-+2026-09-22 17:37 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 8272c89c4 &quot;build_journal: bound the transcript scrub + commit diffs so the full cycle can&#x27;t stall the site loop&quot; (2026-09-22 17:32) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 1 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 17:43 — on course
-+checked 17:47 — on course
-+checked 17:50 — on course
-+2026-09-22 17:50 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | v2 tab: Live desk positions | commit 868d24f1b &quot;ADD: desk Telegram links point to plain pages (status.html), never the script-built root&quot; (2026-09-22 17:48) | tests touched-module green; full suite has 1 slow/hanging test to triage | files touched 4 | next v2 tabs: Live desk positions, Portfolio, Backtest, Messages (then R-EVENING-22 C-series)
-+checked 17:58 — on course
-+2026-09-22 18:02 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C1 (fresh hunt across 6 sources) | commit 20ef607ba &quot;B4: build the four missing v2 tabs — Live desk, Portfolio, Backtest, Messages&quot; (2026-09-22 17:54) | tests 244/244 full suite green; all new tabs + fixes tested | files touched 2 | next R-EVENING-22 C-series (C1, C2, C4, C5, C6) — strategy research
-+checked 18:06 — on course
-+2026-09-22 18:14 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C1 (fresh hunt across 6 sources) | commit 5635ca3e9 &quot;R-EVENING-22 C5: the concrete NSE&lt;-&gt;BSE pair list from recorded cross-exchange data&quot; (2026-09-22 18:11) | tests 244/244 full suite green; all new tabs + fixes tested | files touched 4 | next R-EVENING-22 C-series (C1, C2, C4, C5, C6) — strategy research
-+checked 18:15 — on course
-+checked 18:18 — on course
-+2026-09-22 18:25 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b &quot;R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)&quot; (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
-+checked 18:48 — on course
-+2026-09-22 18:56 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b &quot;R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)&quot; (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
-+checked 19:19 — on course
-+2026-09-22 19:20 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b &quot;R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)&quot; (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
-+checked 19:49 — on course
-+2026-09-22 19:53 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit b4c30553b &quot;R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)&quot; (2026-09-22 18:15) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 5 | next 
-+2026-09-22 20:05 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit 4bd2f7fe3 &quot;R-V2-EXACT: fetch + preserve the approved v8 design (11 *.dc.html + README) from the bot chat&quot; (2026-09-22 20:04) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 14 | next 
-+checked 20:05 — on course
-+checked 20:08 — on course
-+checked 20:11 — on course
-+checked 20:14 — on course
-+2026-09-22 20:16 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit 2f4b40d40 &quot;R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)&quot; (2026-09-22 20:13) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next 
-+2026-09-22 20:28 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit cf31b722b &quot;R-BACKLOG: standing queue — auto-continue pulls the next item when the checklist empties; IDLE hourly&quot; (2026-09-22 20:18) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 7 | next 
-+2026-09-22 15:18 | clear halt: R-BACKLOG was owner-pasted; ruling not archived - cleared by owner
-</pre></div><div class='c'><div class='h'><b>cf31b722b</b> · 2026-09-22 20:18</div><div>R-BACKLOG: standing queue — auto-continue pulls the next item when the checklist empties; IDLE hourly</div><div class='sub h'>.claude/hooks/auto_continue.py |  16 ++++--</div><div class='sub h'>.gitignore                     |   1 +</div><div class='sub h'>docs/BACKLOG.md                |  12 +++++</div><div class='sub h'>scripts/backlog.py             | 112 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/build_beat.py          |  27 ++++++++++</div><div class='sub h'>tests/test_auto_continue.py    |  23 +++++++--</div><div class='sub h'>tests/test_backlog.py          |  41 +++++++++++++++</div><pre>diff --git a/.claude/hooks/auto_continue.py b/.claude/hooks/auto_continue.py
-index db8121e9c..fe074973a 100644
---- a/.claude/hooks/auto_continue.py
-+++ b/.claude/hooks/auto_continue.py
-@@ -39,12 +39,22 @@ def _building():
- 
- 
- def should_continue():
-+    &quot;&quot;&quot;Continue while the checklist has work — and, per R-BACKLOG, when it empties, pull the next backlog item
-+    into the checklist and keep going. Stop only for a HALT, a LEAD RULING NEEDED flag, the pause window, or an
-+    empty checklist AND empty backlog.&quot;&quot;&quot;
-     st = _load(STATE)
--    nxt = (st.get(&quot;next&quot;) or &quot;&quot;).strip()
-     flag = (st.get(&quot;flag&quot;) or &quot;&quot;).strip()
-+    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not _building():
-+        return False
-     remaining = [x for x in (_load(CHECKLIST).get(&quot;remaining&quot;) or []) if x]
--    return bool(nxt) and (not os.path.exists(HALT)) and flag == &quot;NOTHING NEEDS THE LEAD&quot; \
--        and _building() and bool(remaining)
-+    if remaining:
-+        return True
-+    try:                                              # checklist empty -&gt; pull the next backlog item (R-BACKLOG)
-+        sys.path.insert(0, REPO)
-+        from scripts import backlog
-+        return bool(backlog.pull_next())
-+    except Exception:
-+        return False
- 
- 
- def main():
-diff --git a/.gitignore b/.gitignore
-index 4637c9e4a..7e85ce406 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -63,3 +63,4 @@ scheduler/.build_beat_halt
- scheduler/.live_bar_posted
- reports/_green_count.json
- design/v8.zip
-+scheduler/.build_idle_hour
-diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-new file mode 100644
-index 000000000..c6bd4db02
---- /dev/null
-+++ b/docs/BACKLOG.md
-@@ -0,0 +1,12 @@
-+# BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
-+
-+When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
-+logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
-+
-+- [~] R-V2-EXACT and its addendum — verbatim /v2/ rebuild from design/v8/
-+- [x] R-CHECKLIST-BAR — checklist bar in the BUILD line
-+- [ ] Analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed, with a one-line Telegram note when one lands
-+- [ ] O1 point-in-time universe from NSE&#x27;s public F&amp;O history archives, robots-checked, nothing guessed
-+- [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
-+- [ ] Quiet Buying: verify its first live match and fill on paper
-+- [ ] Lead-on-laptop design note (no build yet)
-diff --git a/scripts/backlog.py b/scripts/backlog.py
-new file mode 100644
-index 000000000..54af03ab9
---- /dev/null
-+++ b/scripts/backlog.py
-@@ -0,0 +1,112 @@
-+&quot;&quot;&quot;R-BACKLOG — the standing queue (docs/BACKLOG.md). When the active checklist empties, the auto-continue
-+pulls the TOP unchecked backlog item into the checklist and logs it, so autonomous progress never stalls while
-+owner-curated work remains. A run never invents a backlog item (§12/§20.6).&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import re
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+LOG = os.path.join(REPO, &quot;reports&quot;, &quot;BACKLOG.log&quot;)
-+
-+
-+def _bl_path():      # read env at CALL time so overrides (and tests) always take effect
-+    return os.environ.get(&quot;E1_BACKLOG&quot;) or os.path.join(REPO, &quot;docs&quot;, &quot;BACKLOG.md&quot;)
-+
-+
-+def _cl_path():
-+    return os.environ.get(&quot;E1_CHECKLIST&quot;) or os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
-+
-+_LINE = re.compile(r&quot;^- \[( |~|x)\] (.+?)\s*$&quot;)
-+
-+
-+def items():
-+    &quot;&quot;&quot;[(state, text)] in file order; state is &#x27; &#x27; (queued), &#x27;~&#x27; (active) or &#x27;x&#x27; (done).&quot;&quot;&quot;
-+    out = []
-+    try:
-+        for ln in open(_bl_path(), encoding=&quot;utf-8&quot;):
-+            m = _LINE.match(ln.rstrip(&quot;\n&quot;))
-+            if m:
-+                out.append((m.group(1), m.group(2)))
-+    except Exception:
-+        pass
-+    return out
-+
-+
-+def next_item():
-+    for state, text in items():
-+        if state == &quot; &quot;:
-+            return text
-+    return None
-+
-+
-+def is_empty():
-+    return next_item() is None
-+
-+
-+def _checklist():
-+    try:
-+        return json.load(open(_cl_path(), encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        return {&quot;remaining&quot;: [], &quot;done&quot;: []}
-+
-+
-+def pull_next(logger=None):
-+    &quot;&quot;&quot;If the checklist is empty of remaining items, move the top queued backlog item into it and mark that
-+    backlog line active. Returns the pulled item, or None. Logs the pull.&quot;&quot;&quot;
-+    c = _checklist()
-+    if [x for x in (c.get(&quot;remaining&quot;) or []) if x]:
-+        return None                                   # checklist still has work — nothing to pull
-+    nxt = next_item()
-+    if not nxt:
-+        return None
-+    # mark the backlog line active
-+    try:
-+        lines = open(_bl_path(), encoding=&quot;utf-8&quot;).read().splitlines()
-+        for i, ln in enumerate(lines):
-+            m = _LINE.match(ln)
-+            if m and m.group(1) == &quot; &quot; and m.group(2) == nxt:
-+                lines[i] = ln.replace(&quot;- [ ]&quot;, &quot;- [~]&quot;, 1)
-+                break
-+        open(_bl_path(), &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;\n&quot;.join(lines) + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+    c.setdefault(&quot;remaining&quot;, []).append(nxt)
-+    try:
-+        json.dump(c, open(_cl_path(), &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+    line = &quot;%s pulled backlog -&gt; checklist: %s&quot; % (datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;), nxt)
-+    try:
-+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
-+        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+    if logger:
-+        try:
-+            logger(line)
-+        except Exception:
-+            pass
-+    return nxt
-+
-+
-+def all_empty():
-+    &quot;&quot;&quot;True when neither the checklist nor the backlog has any remaining work — the IDLE state.&quot;&quot;&quot;
-+    c = _checklist()
-+    return not [x for x in (c.get(&quot;remaining&quot;) or []) if x] and is_empty()
-+
-+
-+def _demo():
-+    assert isinstance(items(), list) and all(len(t) == 2 for t in items())
-+    print(&quot;backlog demo OK: %d items, next=%s&quot; % (len(items()), (next_item() or &quot;—&quot;)[:40]))
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo() if &quot;--demo&quot; in sys.argv else print(&quot;next backlog item:&quot;, next_item())
-diff --git a/scripts/build_beat.py b/scripts/build_beat.py
-index 92fc63ad1..79523d862 100644
---- a/scripts/build_beat.py
-+++ b/scripts/build_beat.py
-@@ -178,6 +178,12 @@ def maybe_post(notifier=None, now=None):
-     now = now or _now()
-     if not build_hours(now):
-         return None
-+    try:                                                        # R-BACKLOG: when nothing is queued, IDLE hourly
-+        from scripts import backlog
-+        if backlog.all_empty():
-+            return _idle_tick(notifier, now)
-+    except Exception:
-+        pass
-     posted = None
-     hl = halt_line(now)                                          # immediate, outside the slot cadence
-     if hl:
-@@ -213,6 +219,27 @@ def _emit(notifier, msg):
-         pass
- 
- 
-+IDLE_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_idle_hour&quot;)
-+
-+
-+def _idle_tick(notifier, now):
-+    &quot;&quot;&quot;R-BACKLOG: &#x27;IDLE — list empty&#x27; once, then hourly, while nothing is queued.&quot;&quot;&quot;
-+    hour_key = now.strftime(&quot;%Y-%m-%d %H&quot;)
-+    try:
-+        last = open(IDLE_MARK, encoding=&quot;utf-8&quot;).read().strip()
-+    except Exception:
-+        last = &quot;&quot;
-+    if hour_key == last:
-+        return None
-+    _emit(notifier, &quot;IDLE — list empty&quot;)
-+    try:
-+        os.makedirs(os.path.dirname(IDLE_MARK), exist_ok=True)
-+        open(IDLE_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(hour_key)
-+    except Exception:
-+        pass
-+    return &quot;IDLE — list empty&quot;
-+
-+
- def _notify(msg):
-     from scripts import notify
-     notify.notify(msg)
-diff --git a/tests/test_auto_continue.py b/tests/test_auto_continue.py
-index 0aa104b5b..b0c9285c4 100644
---- a/tests/test_auto_continue.py
-+++ b/tests/test_auto_continue.py
-@@ -51,18 +51,31 @@ def test_stops_on_lead_ruling_needed():
-     assert m.should_continue() is False
- 
- 
--def test_stops_when_checklist_finished():
-+def _empty_backlog():
-+    import tempfile
-+    d = tempfile.mkdtemp()
-+    bl = os.path.join(d, &quot;BACKLOG.md&quot;); open(bl, &quot;w&quot;).write(&quot;- [x] done\n&quot;)
-+    os.environ[&quot;E1_BACKLOG&quot;] = bl
-+
-+
-+def test_stops_when_checklist_and_backlog_empty():
-     m = _load_hook(); _set(m, GO, {&quot;remaining&quot;: []})
-+    os.environ[&quot;E1_CHECKLIST&quot;] = m.CHECKLIST; _empty_backlog()   # both empty -&gt; stop (R-BACKLOG)
-     assert m.should_continue() is False
- 
- 
--def test_stops_when_no_next_item():
--    m = _load_hook(); _set(m, {&quot;next&quot;: &quot;&quot;, &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;}, CL)
--    assert m.should_continue() is False
-+def test_pulls_from_backlog_when_checklist_empty():
-+    import tempfile, json as _j
-+    m = _load_hook(); _set(m, GO, {&quot;remaining&quot;: []})
-+    os.environ[&quot;E1_CHECKLIST&quot;] = m.CHECKLIST
-+    bl = os.path.join(tempfile.mkdtemp(), &quot;BACKLOG.md&quot;); open(bl, &quot;w&quot;).write(&quot;- [ ] next backlog item\n&quot;)
-+    os.environ[&quot;E1_BACKLOG&quot;] = bl
-+    assert m.should_continue() is True                          # empty checklist + a backlog item -&gt; pull + go
- 
- 
- if __name__ == &quot;__main__&quot;:
-     for fn in (test_continues_when_work_remains_and_building, test_stops_in_pause_window, test_stops_on_halt,
--               test_stops_on_lead_ruling_needed, test_stops_when_checklist_finished, test_stops_when_no_next_item):
-+               test_stops_on_lead_ruling_needed, test_stops_when_checklist_and_backlog_empty,
-+               test_pulls_from_backlog_when_checklist_empty):
-         fn()
-     print(&quot;test_auto_continue OK&quot;)
-diff --git a/tests/test_backlog.py b/tests/test_backlog.py
-new file mode 100644
-index 000000000..88963af6a
---- /dev/null
-+++ b/tests/test_backlog.py
-@@ -0,0 +1,41 @@
-+&quot;&quot;&quot;R-BACKLOG: the standing queue — pull the top queued item into an empty checklist, mark it active, and IDLE
-+only when both are empty. Isolated via env overrides.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+
-+
-+def _setup(backlog_lines, remaining):
-+    d = tempfile.mkdtemp()
-+    bl = os.path.join(d, &quot;BACKLOG.md&quot;); cl = os.path.join(d, &quot;cl.json&quot;)
-+    open(bl, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;\n&quot;.join(backlog_lines) + &quot;\n&quot;)
-+    json.dump({&quot;remaining&quot;: remaining, &quot;done&quot;: []}, open(cl, &quot;w&quot;))
-+    os.environ[&quot;E1_BACKLOG&quot;] = bl; os.environ[&quot;E1_CHECKLIST&quot;] = cl
-+    import importlib
-+    from scripts import backlog as B
-+    importlib.reload(B)
-+    return B, bl, cl
-+
-+
-+def test_pull_next_when_checklist_empty():
-+    B, bl, cl = _setup([&quot;- [x] done one&quot;, &quot;- [ ] item two&quot;, &quot;- [ ] item three&quot;], [])
-+    pulled = B.pull_next()
-+    assert pulled == &quot;item two&quot;
-+    assert &quot;item two&quot; in json.load(open(cl))[&quot;remaining&quot;]     # moved into the checklist
-+    assert &quot;- [~] item two&quot; in open(bl, encoding=&quot;utf-8&quot;).read()   # marked active in the backlog
-+
-+
-+def test_no_pull_while_checklist_has_work():
-+    B, bl, cl = _setup([&quot;- [ ] item two&quot;], [&quot;still doing this&quot;])
-+    assert B.pull_next() is None                                # checklist busy -&gt; don&#x27;t pull
-+
-+
-+def test_all_empty_only_when_both_empty():
-+    B, bl, cl = _setup([&quot;- [x] done&quot;], [])
-+    assert B.all_empty() is True
-+    B, bl, cl = _setup([&quot;- [ ] queued&quot;], [])
-+    assert B.all_empty() is False
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_pull_next_when_checklist_empty(); test_no_pull_while_checklist_has_work(); test_all_empty_only_when_both_empty()
-+    print(&quot;test_backlog OK&quot;)
-</pre></div><div class='c'><div class='h'><b>2f4b40d40</b> · 2026-09-22 20:13</div><div>R-V2-EXACT: the v8 porter engine (strip wrapper + bind sc-for/sc-if/placeholders)</div><div class='sub h'>scripts/v8_port.py    | 130 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_v8_port.py |  36 ++++++++++++++</div><pre>diff --git a/scripts/v8_port.py b/scripts/v8_port.py
-new file mode 100644
-index 000000000..d8623bdd2
---- /dev/null
-+++ b/scripts/v8_port.py
-@@ -0,0 +1,130 @@
-+&quot;&quot;&quot;R-V2-EXACT — the porter engine for the approved v8 design (design/v8/*.dc.html).
-+
-+It ports a .dc.html design file to a server-rendered page VERBATIM: it keeps the head fonts + the helmet
-+&lt;style&gt; + the outer content &lt;div&gt; exactly as given, strips the &lt;x-dc&gt;/&lt;helmet&gt; wrapper and the
-+&lt;script type=&quot;text/x-dc&quot;&gt; block, and binds the data:
-+  {{name}} / {{alias.field}}          → a value from the page&#x27;s data dict (or the loop item)
-+  &lt;sc-for list=&quot;{{x}}&quot; as=&quot;v&quot;&gt;…&lt;/sc-for&gt; → repeat the inner template once per record in data[&#x27;x&#x27;], with {{v.f}}
-+  &lt;sc-if value=&quot;{{y}}&quot;&gt;…&lt;/sc-if&gt;       → render the inner only when the value is truthy
-+
-+Markup and CSS are never rewritten — only placeholders and repeated rows change. Per-page data binding lives in
-+scripts/site_v2.py; this module is just the engine (and it is what the no-sample-values gate is tested against).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import re
-+
-+
-+def strip_wrapper(dc_html):
-+    &quot;&quot;&quot;Return (head_style, body) — the helmet fonts+style, and the outer content &lt;div&gt;…&lt;/div&gt;. Drops the
-+    &lt;!doctype&gt;/&lt;head&gt;/support.js, the &lt;x-dc&gt;/&lt;helmet&gt; tags themselves, and the trailing x-dc &lt;script&gt; block.&quot;&quot;&quot;
-+    # the helmet holds the &lt;link rel=stylesheet …fonts…&gt; and the &lt;style&gt;…&lt;/style&gt; to keep
-+    helmet = re.search(r&quot;&lt;helmet&gt;(.*?)&lt;/helmet&gt;&quot;, dc_html, re.S)
-+    head_style = helmet.group(1).strip() if helmet else &quot;&quot;
-+    # the body is everything between &lt;/helmet&gt; and &lt;/x-dc&gt;
-+    m = re.search(r&quot;&lt;/helmet&gt;(.*?)&lt;/x-dc&gt;&quot;, dc_html, re.S)
-+    body = (m.group(1) if m else dc_html).strip()
-+    return head_style, body
-+
-+
-+def _find_block(s, tag, start=0):
-+    &quot;&quot;&quot;Find the next &lt;tag …&gt;…&lt;/tag&gt; from `start`, honouring nesting of the same tag. Returns
-+    (open_start, inner_start, inner_end, close_end, attrs) or None.&quot;&quot;&quot;
-+    om = re.compile(r&quot;&lt;%s\b([^&gt;]*)&gt;&quot; % tag)
-+    o = om.search(s, start)
-+    if not o:
-+        return None
-+    depth = 1
-+    i = o.end()
-+    tok = re.compile(r&quot;&lt;%s\b[^&gt;]*&gt;|&lt;/%s&gt;&quot; % (tag, tag))
-+    while depth:
-+        t = tok.search(s, i)
-+        if not t:
-+            return None
-+        if t.group().startswith(&quot;&lt;/&quot;):
-+            depth -= 1
-+            if depth == 0:
-+                return (o.start(), o.end(), t.start(), t.end(), o.group(1))
-+            i = t.end()
-+        else:
-+            depth += 1
-+            i = t.end()
-+
-+
-+def _lookup(ctx, key):
-+    key = key.strip()
-+    if key in ctx:
-+        return ctx[key]
-+    if &quot;.&quot; in key:
-+        head, rest = key.split(&quot;.&quot;, 1)
-+        obj = ctx.get(head)
-+        if isinstance(obj, dict):
-+            return _lookup(obj, rest) if &quot;.&quot; in rest else obj.get(rest)
-+    return None
-+
-+
-+def render(tpl, ctx):
-+    &quot;&quot;&quot;Expand sc-for, then sc-if, then {{…}} placeholders, against ctx (a dict; loop items are merged under
-+    their alias).&quot;&quot;&quot;
-+    # 1) sc-for (outermost; inner is rendered per item, so nested sc-for/sc-if resolve in the recursion)
-+    while True:
-+        blk = _find_block(tpl, &quot;sc-for&quot;)
-+        if not blk:
-+            break
-+        os_, is_, ie_, ce_, attrs = blk
-+        lst = re.search(r&#x27;list=&quot;\{\{\s*([^}]+?)\s*\}\}&quot;&#x27;, attrs)
-+        alias = re.search(r&#x27;as=&quot;([^&quot;]+)&quot;&#x27;, attrs)
-+        inner = tpl[is_:ie_]
-+        items = _lookup(ctx, lst.group(1)) if lst else None
-+        a = alias.group(1) if alias else &quot;item&quot;
-+        out = []
-+        for it in (items or []):
-+            child = dict(ctx)
-+            child[a] = it
-+            out.append(render(inner, child))
-+        tpl = tpl[:os_] + &quot;&quot;.join(out) + tpl[ce_:]
-+    # 2) sc-if
-+    while True:
-+        blk = _find_block(tpl, &quot;sc-if&quot;)
-+        if not blk:
-+            break
-+        os_, is_, ie_, ce_, attrs = blk
-+        val = re.search(r&#x27;value=&quot;\{\{\s*([^}]+?)\s*\}\}&quot;&#x27;, attrs)
-+        inner = tpl[is_:ie_]
-+        keep = bool(_lookup(ctx, val.group(1))) if val else False
-+        tpl = tpl[:os_] + (render(inner, ctx) if keep else &quot;&quot;) + tpl[ce_:]
-+    # 3) placeholders {{name}} / {{alias.field}}
-+    def sub(m):
-+        v = _lookup(ctx, m.group(1))
-+        return &quot;&quot; if v is None else str(v)
-+    return re.sub(r&quot;\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}&quot;, sub, tpl)
-+
-+
-+def page(dc_html, ctx, title=None):
-+    &quot;&quot;&quot;A full server-rendered HTML page from a design file + its data.&quot;&quot;&quot;
-+    head_style, body = strip_wrapper(dc_html)
-+    body = render(body, ctx)
-+    t = re.search(r&quot;&lt;title&gt;(.*?)&lt;/title&gt;&quot;, dc_html)
-+    ttl = title or (t.group(1) if t else &quot;E1 Terminal&quot;)
-+    return (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
-+            &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
-+            &quot;&lt;title&gt;%s&lt;/title&gt;%s&lt;/head&gt;&lt;body&gt;%s&lt;/body&gt;&lt;/html&gt;&quot; % (ttl, head_style, body))
-+
-+
-+def _demo():
-+    tpl = (&#x27;&lt;ul&gt;&lt;sc-for list=&quot;{{rows}}&quot; as=&quot;r&quot;&gt;&lt;li&gt;{{r.name}}: {{r.n}}&#x27;
-+           &#x27;&lt;sc-if value=&quot;{{r.live}}&quot;&gt; LIVE&lt;/sc-if&gt;&lt;/li&gt;&lt;/sc-for&gt;&lt;/ul&gt; total {{total}}&#x27;)
-+    out = render(tpl, {&quot;rows&quot;: [{&quot;name&quot;: &quot;A&quot;, &quot;n&quot;: 1, &quot;live&quot;: True}, {&quot;name&quot;: &quot;B&quot;, &quot;n&quot;: 2, &quot;live&quot;: False}],
-+                       &quot;total&quot;: 3})
-+    assert out == &quot;&lt;ul&gt;&lt;li&gt;A: 1 LIVE&lt;/li&gt;&lt;li&gt;B: 2&lt;/li&gt;&lt;/ul&gt; total 3&quot;, out
-+    # a missing value renders empty, never &#x27;None&#x27;/&#x27;undefined&#x27;
-+    assert render(&quot;x{{nope}}y&quot;, {}) == &quot;xy&quot;
-+    # strip keeps the style + body, drops the wrapper and the x-dc script
-+    hs, body = strip_wrapper(&quot;&lt;x-dc&gt;&lt;helmet&gt;&lt;style&gt;.a{}&lt;/style&gt;&lt;/helmet&gt;&lt;div&gt;hi {{w}}&lt;/div&gt;&lt;/x-dc&gt;&quot;
-+                             &quot;&lt;script type=&#x27;text/x-dc&#x27;&gt;junk&lt;/script&gt;&quot;)
-+    assert &quot;.a{}&quot; in hs and body == &quot;&lt;div&gt;hi {{w}}&lt;/div&gt;&quot; and &quot;junk&quot; not in body
-+    print(&quot;v8_port demo OK: sc-for + sc-if + placeholders bind; wrapper/script stripped; no None leaks.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo()
-diff --git a/tests/test_v8_port.py b/tests/test_v8_port.py
-new file mode 100644
-index 000000000..e7d6a78eb
---- /dev/null
-+++ b/tests/test_v8_port.py
-@@ -0,0 +1,36 @@
-+&quot;&quot;&quot;R-V2-EXACT: the porter engine binds the design&#x27;s placeholders/loops/conditionals and strips the wrapper.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import v8_port as V
-+
-+
-+def test_scfor_scif_and_placeholders():
-+    tpl = &#x27;&lt;sc-for list=&quot;{{rows}}&quot; as=&quot;r&quot;&gt;&lt;li&gt;{{r.name}}&lt;sc-if value=&quot;{{r.live}}&quot;&gt; LIVE&lt;/sc-if&gt;&lt;/li&gt;&lt;/sc-for&gt;&#x27;
-+    out = V.render(tpl, {&quot;rows&quot;: [{&quot;name&quot;: &quot;A&quot;, &quot;live&quot;: True}, {&quot;name&quot;: &quot;B&quot;, &quot;live&quot;: False}]})
-+    assert out == &quot;&lt;li&gt;A LIVE&lt;/li&gt;&lt;li&gt;B&lt;/li&gt;&quot;, out
-+
-+
-+def test_missing_value_is_empty_never_none():
-+    assert V.render(&quot;x{{missing}}y{{a.b}}z&quot;, {}) == &quot;xyz&quot;
-+
-+
-+def test_strip_keeps_style_drops_wrapper_and_script():
-+    hs, body = V.strip_wrapper(&quot;&lt;x-dc&gt;&lt;helmet&gt;&lt;link href=&#x27;f&#x27;&gt;&lt;style&gt;.a{}&lt;/style&gt;&lt;/helmet&gt;&quot;
-+                               &quot;&lt;div&gt;k {{w}}&lt;/div&gt;&lt;/x-dc&gt;&lt;script type=&#x27;text/x-dc&#x27;&gt;secret&lt;/script&gt;&quot;)
-+    assert &quot;.a{}&quot; in hs and &quot;&lt;link&quot; in hs
-+    assert body == &quot;&lt;div&gt;k {{w}}&lt;/div&gt;&quot; and &quot;secret&quot; not in body and &quot;x-dc&quot; not in body
-+
-+
-+def test_real_design_how_ports_static():
-+    # How.dc.html has no placeholders -&gt; ports verbatim, wrapper gone
-+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;design&quot;, &quot;v8&quot;, &quot;How.dc.html&quot;)
-+    if os.path.exists(p):
-+        html = V.page(open(p, encoding=&quot;utf-8&quot;).read(), {})
-+        assert &quot;&lt;x-dc&gt;&quot; not in html and &quot;text/x-dc&quot; not in html and &quot;support.js&quot; not in html
-+        assert &quot;&lt;body&gt;&quot; in html and &quot;1280px&quot; in html         # the design&#x27;s outer div is kept
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_scfor_scif_and_placeholders(); test_missing_value_is_empty_never_none()
-+    test_strip_keeps_style_drops_wrapper_and_script(); test_real_design_how_ports_static()
-+    print(&quot;test_v8_port OK&quot;)
-</pre></div><div class='c'><div class='h'><b>d05f69e79</b> · 2026-09-22 20:10</div><div>R-CHECKLIST-BAR: the BUILD line leads with a checklist progress bar (done/doing/left) + ETA</div><div class='sub h'>reports/CHECKLIST.json   | 15 +++++++++------</div><div class='sub h'>scripts/build_beat.py    | 45 +++++++++++++++++++++++++++++++++++++++------</div><div class='sub h'>tests/test_build_beat.py | 13 +++++++++++++</div><pre>diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
-index 8dccf6832..7f73770af 100644
---- a/reports/CHECKLIST.json
-+++ b/reports/CHECKLIST.json
-@@ -1,9 +1,12 @@
- {
-- &quot;remaining&quot;: [],
-- &quot;done_recently&quot;: [
--  &quot;v2 tabs (Live desk, Portfolio, Backtest, Messages)&quot;,
--  &quot;C1 fresh hunt (Price Engine leg)&quot;, &quot;C2 adaptive sizing&quot;, &quot;C4 fill model + haircut&quot;,
--  &quot;C5 concrete pair list&quot;, &quot;C6 analyst parsers (fail-closed)&quot;
-+ &quot;remaining&quot;: [
-+  &quot;R-V2-EXACT verbatim /v2/ rebuild&quot;,
-+  &quot;ADD(a) deliverables as separate module&quot;,
-+  &quot;ADD(b) retire START_E1_ALL.bat sender&quot;
-  ],
-- &quot;note&quot;: &quot;R-EVENING-22 C-series (the actionable items C1/C2/C4/C5/C6) done this session. C3&#x27;s min-cases floor already exists; C7 YouTube-at-cap and C8 intraday-index run on their own cadence. Owner-named items only; the checklist is empty, so the auto-continue loop stops cleanly.&quot;
-+ &quot;done&quot;: [
-+  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;, &quot;C1 hunt&quot;, &quot;C2 sizing&quot;, &quot;C4 fill+haircut&quot;,
-+  &quot;C5 pairs&quot;, &quot;C6 parsers&quot;, &quot;ADD(c) measured sizing floor&quot;, &quot;R-CHECKLIST-BAR&quot;
-+ ],
-+ &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;
- }
-diff --git a/scripts/build_beat.py b/scripts/build_beat.py
-index 47372fb2c..92fc63ad1 100644
---- a/scripts/build_beat.py
-+++ b/scripts/build_beat.py
-@@ -100,14 +100,15 @@ def line(now=None):
-     disagree = &quot; · journal/git disagree (journal %s, git %s)&quot; % (ruling, git_ruling) \
-                if (ruling and git_ruling and _ruling_prefix(ruling) and _ruling_prefix(ruling) != git_ruling) else &quot;&quot;
-     eta = _eta()
-+    cb = _checklist_bar()
-+    cbp = (cb + &quot; · &quot;) if cb else &quot;&quot;                     # R-CHECKLIST-BAR: lead the line with the checklist
-     if commits:
--        head = ruling or (item or &quot;—&quot;)
-         msgs = &quot;; &quot;.join(commits)
--        if len(msgs) &gt; 160:
--            msgs = msgs[:157] + &quot;…&quot;
--        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
--            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
--    return &quot;%s — no commits · %s · supervisor %s%s · %s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree, eta)
-+        if len(msgs) &gt; 140:
-+            msgs = msgs[:137] + &quot;…&quot;
-+        return &quot;%s — %s%d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
-+            label, cbp, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
-+    return &quot;%s — %sno commits · supervisor %s%s · %s&quot; % (label, cbp, sup, disagree, eta)
- 
- 
- def _eta():
-@@ -118,6 +119,38 @@ def _eta():
-         return &quot;ETA: measuring&quot;
- 
- 
-+CHECKLIST = os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
-+
-+
-+def _short_items(items, n=3):
-+    items = [str(x).split(&quot; &quot;)[0].strip(&quot;()&quot;) if False else str(x) for x in items]
-+    out = &quot;, &quot;.join(i if len(i) &lt;= 26 else i[:25] + &quot;…&quot; for i in items[:n])
-+    if len(items) &gt; n:
-+        out += &quot; +%d&quot; % (len(items) - n)
-+    return out or &quot;—&quot;
-+
-+
-+def _checklist_bar(now=None):
-+    &quot;&quot;&quot;R-CHECKLIST-BAR: &#x27;checklist ▓▓▓░░░ 3/6 — done: … · doing: … · left: …&#x27;, derived from the journal + the
-+    tracked checklist (done + remaining), plus the ETA for all remaining.&quot;&quot;&quot;
-+    try:
-+        c = json.load(open(CHECKLIST, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        c = {}
-+    done = [x for x in (c.get(&quot;done&quot;) or []) if x]
-+    left = [x for x in (c.get(&quot;remaining&quot;) or []) if x]
-+    ruling, item = _journal_state()
-+    doing = item or (left[0] if left else &quot;—&quot;)
-+    total = len(done) + len(left)
-+    n = len(done)
-+    if total == 0:
-+        return None
-+    bar = &quot;▓&quot; * n + &quot;░&quot; * max(0, total - n)
-+    return &quot;checklist %s %d/%d — done: %s · doing: %s · left: %s&quot; % (
-+        bar, n, total, _short_items(done, 3), (doing if len(str(doing)) &lt;= 30 else str(doing)[:29] + &quot;…&quot;),
-+        _short_items(left, 3))
-+
-+
- def halt_line(now=None):
-     &quot;&quot;&quot;One immediate line when E1-DESK\\HALT newly appears. Returns the line to post, or None.&quot;&quot;&quot;
-     now = now or _now()
-diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
-index 5523f7586..c796cf6fe 100644
---- a/tests/test_build_beat.py
-+++ b/tests/test_build_beat.py
-@@ -50,7 +50,20 @@ def test_no_post_outside_build_hours():
-     assert posted == []
- 
- 
-+
-+
-+def test_checklist_bar_in_line():
-+    import json, tempfile, os
-+    tmp = tempfile.mkdtemp()
-+    B.CHECKLIST = os.path.join(tmp, &quot;cl.json&quot;)
-+    json.dump({&quot;done&quot;: [&quot;a&quot;, &quot;b&quot;], &quot;remaining&quot;: [&quot;c&quot;, &quot;d&quot;]}, open(B.CHECKLIST, &quot;w&quot;))
-+    cb = B._checklist_bar()
-+    assert cb and cb.startswith(&quot;checklist &quot;) and &quot;2/4&quot; in cb
-+    assert &quot;done:&quot; in cb and &quot;doing:&quot; in cb and &quot;left:&quot; in cb
-+
-+
- if __name__ == &quot;__main__&quot;:
-     test_build_hours_window(); test_line_shape_and_supervisor_state()
-     test_halt_line_immediate_and_deduped(); test_no_post_outside_build_hours()
-+    test_checklist_bar_in_line()
-     print(&quot;test_build_beat OK&quot;)
-</pre></div><div class='c'><div class='h'><b>555aebb31</b> · 2026-09-22 20:07</div><div>R-V2-EXACT ADD (c): adaptive sizing flat floor is a measured fraction of equity, no typed size</div><div class='sub h'>engine1_rebuild/adaptive_sizing.py | 18 ++++++++++++++++--</div><pre>diff --git a/engine1_rebuild/adaptive_sizing.py b/engine1_rebuild/adaptive_sizing.py
-index aceef43a2..fb0df88c9 100644
---- a/engine1_rebuild/adaptive_sizing.py
-+++ b/engine1_rebuild/adaptive_sizing.py
-@@ -23,6 +23,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
- from engine1_rebuild import desk, money
- 
- R_RUPEES = float(money.PAPER_R_RUPEES)
-+# R-V2-EXACT ADD (c): the flat reference is a MEASURED FRACTION of the book&#x27;s equity, never a typed rupee size.
-+# R_FRAC is the declared risk-per-trade fraction (1R as a fraction of the starting capital) — a quantile
-+# definition, not a size — so flat_floor scales with current equity and no typed ₹ amount remains.
-+R_FRAC = float(money.PAPER_R_RUPEES) / float(money.NOTIONAL_CAPITAL)
-+
-+
-+def flat_floor(equity):
-+    &quot;&quot;&quot;The flat reference sized as R_FRAC × current equity (no typed rupee size). Fails to the 1R rate only
-+    if equity is unknown.&quot;&quot;&quot;
-+    return round(float(equity) * R_FRAC) if equity else R_RUPEES
- Z = 1.96                                  # 95% — the same confidence the walls use (a declared error rate)
- 
- 
-@@ -55,7 +65,8 @@ def size(scorecard, equity, *, worst_daily_dd_rupees=None, open_risk_rupees=0.0,
- 
-     # cold start / thin pattern / no measured book DD → FLAT, and say why (fail-closed to the reference).
-     if acc_lb is None or fires &lt; 30 or worst_daily_dd_rupees in (None, 0) or float(worst_daily_dd_rupees) &lt;= 0:
--        return {&quot;risk_rupees&quot;: R_RUPEES, &quot;risk_fraction&quot;: R_RUPEES / equity if equity else None,
-+        _floor = flat_floor(equity)                      # R-V2-EXACT ADD (c): measured fraction of equity
-+        return {&quot;risk_rupees&quot;: _floor, &quot;risk_fraction&quot;: (_floor / equity) if equity else None,
-                 &quot;mode&quot;: &quot;flat-fallback&quot;, &quot;reason&quot;: &quot;cold-start: %s&quot; % (
-                     &quot;too few fires (%d&lt;30)&quot; % fires if fires &lt; 30 else
-                     &quot;no measured book drawdown&quot; if not worst_daily_dd_rupees else
-@@ -109,7 +120,10 @@ def explain(sized):
- def _demo():
-     # 1. cold start / thin pattern → FLAT, byte-identical to the reference account
-     flat = size({&quot;fires&quot;: 10, &quot;win_rate&quot;: 0.6}, 200000, worst_daily_dd_rupees=8000)
--    assert flat[&quot;risk_rupees&quot;] == R_RUPEES and flat[&quot;mode&quot;] == &quot;flat-fallback&quot;, flat
-+    assert flat[&quot;risk_rupees&quot;] == flat_floor(200000) and flat[&quot;mode&quot;] == &quot;flat-fallback&quot;, flat
-+    # ADD (c): the flat floor is a MEASURED fraction of equity — it scales, never a typed rupee size
-+    assert size({&quot;fires&quot;: 10, &quot;win_rate&quot;: 0.6}, 400000, worst_daily_dd_rupees=8000)[&quot;risk_rupees&quot;] == flat_floor(400000)
-+    assert flat_floor(400000) == 2000 and flat_floor(200000) == 1000     # R_FRAC × equity, not a typed ₹
-     assert size({&quot;fires&quot;: 100, &quot;win_rate&quot;: 0.6}, 200000, worst_daily_dd_rupees=None)[&quot;mode&quot;] == &quot;flat-fallback&quot;
- 
-     # 2. a strong, well-measured pattern sizes on CURRENT equity, and every fraction is present + printed
 </pre></div></main></body></html>
