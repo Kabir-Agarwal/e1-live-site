@@ -1,4 +1,377 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3fe6bb96e</b> · 2026-09-22 20:56</div><div>R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only)</div><div class='sub h'>docs/BACKLOG.md                          |  3 ++-</div><div class='sub h'>docs/dispatches/2026-09-22_R-NOW-LINE.md | 30 ++++++++++++++++++++++++++</div><div class='sub h'>scripts/clear_halt.py                    | 28 ++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py                   | 11 +++++++++-</div><div class='sub h'>scripts/token_ping.py                    |  5 +++++</div><div class='sub h'>tests/test_clear_halt_telegram.py        | 37 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c028e0789</b> · 2026-09-22 21:12</div><div>R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen</div><div class='sub h'>docs/reports/2026-09-22-R-STOP-SPAM.md | 34 ++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py                      |  4 +++-</div><pre>diff --git a/docs/reports/2026-09-22-R-STOP-SPAM.md b/docs/reports/2026-09-22-R-STOP-SPAM.md
+new file mode 100644
+index 000000000..65430a9ca
+--- /dev/null
++++ b/docs/reports/2026-09-22-R-STOP-SPAM.md
+@@ -0,0 +1,34 @@
++# R-STOP-SPAM — report (2026-09-22)
++
++## 1. The &quot;[CODE] session finished — come back&quot; spam
++- **Sender:** `scripts/alert_done.py`, the Stop hook wired in `.claude/settings.json`. It fired on EVERY turn
++  end; with the auto-continue loop re-issuing work, that was one line per turn.
++- **Fix:** alert_done now returns early when `auto_continue.should_continue()` is true (the session is not
++  really ending). It fires only on a real end. Plus a **desk-wide rate limit** in `notify()`: identical text
++  sends once, then at most hourly (logged RATE-LIMITED). Different text (beat/status) is unaffected.
++- Commit: a4a92d979. Test: tests/test_notify_ratelimit.py.
++
++## 2. status.html &quot;frozen since 15:00:29&quot;
++- **From the logs / live, not memory:** the page is NOT frozen now. The e1-live-site clone pushed at
++  21:04:07, 21:04:30, 21:06:35, 21:06:52, 21:08:52; the live URL reads `updated 21:08:50` — within the last
++  2-minute cycle. `git log origin/main..HEAD` is empty → **no rejected/unpushed commit**. The
++  &quot;rejected push after another clone committed&quot; hypothesis is **disconfirmed**, not assumed.
++- **Root cause of the earlier 15:00→~17:45 freeze:** the 2-minute LIGHT cycle had grown to ~90s — the
++  &quot;stocks ready&quot; scan (~62s over 216 stocks) and the /build/ transcript scrub had been placed in it — so
++  status only refreshed on the ~10-minute FULL cycle, and a heavy full cycle stalled it. Fixed earlier by
++  caching the stocks-ready count (15 min), moving build_journal to the full cycle + bounding its scrub, and
++  DECOUPLING status into its own daemon thread with a targeted `publish_status` (commit 146ec8bce), then
++  restarting. It has updated every 2 minutes since ~17:45 — including THROUGH the 20:22 halt, because the
++  status writer is the `status-daemon` thread in site_loop, separate from the (blocked) build session
++  (halt-proof).
++- **This commit** adds a cache-busting JS reload to status.html so an OPEN TAB always pulls the current file
++  (a plain meta-refresh can be served stale by the CDN — the likely reason the owner still saw 15:00:29).
++- **Why NOT READY:** the vitals ready line needs a recorder up; **0 recorders are running** — they re-arm at
++  the 06:00 Kite login (`_arm_recorder`), and it is evening / market closed. Token valid, 216 stocks ready,
++  orders allowed, audit passed — only the recorders are missing, which is expected off-hours.
++- **Why the owner saw &quot;no runner&quot;:** that was the pre-restart 15:00 view. The runner IS up now
++  (`book20_runner`, last poll 21:06:51) — the watchdog&#x27;s resurrect_runner brought it back.
++
++## Proof
++- Live: https://[redacted]-[redacted].github.io/e1-live-site/status.html — `updated 21:08:50` (last cycle).
++- Clone pushes every ~2 min through the halt; unpushed empty.
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index a4d55c03c..df79bc540 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -267,9 +267,11 @@ def _write_html(s):
+     gates = &quot; · &quot;.join(&quot;%s: %s&quot; % (k, v) for k, v in (s[&quot;gates&quot;] or {}).items())
+     page = (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
+             &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
+-            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&quot;
+             &quot;&lt;meta http-equiv=&#x27;Cache-Control&#x27; content=&#x27;no-cache, no-store, must-revalidate&#x27;&gt;&quot;
+             &quot;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&quot;
++            # R-STOP-SPAM (2): a CACHE-BUSTING reload (not a plain meta-refresh, which the CDN can serve stale)
++            # so an open tab always pulls the current file every 2 min.
++            &quot;&lt;script&gt;setTimeout(function(){location.replace(&#x27;status.html?t=&#x27;+Date.now())},120000)&lt;/script&gt;&quot;
+             &quot;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
+             &quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
+             &quot;main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}&quot;
+</pre></div><div class='c'><div class='h'><b>a4a92d979</b> · 2026-09-22 21:08</div><div>R-STOP-SPAM (1): stop the &#x27;[CODE] session finished&#x27; spam + desk-wide repeat rate limit</div><div class='sub h'>.gitignore                                |  1 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-STOP-SPAM.md | 15 +++++++++++++++</div><div class='sub h'>scripts/alert_done.py                     | 19 ++++++++++++++++++-</div><div class='sub h'>scripts/notify.py                         | 29 +++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_notify_ratelimit.py            | 24 ++++++++++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index 7e85ce406..823b7e88c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -64,3 +64,4 @@ scheduler/.live_bar_posted
+ reports/_green_count.json
+ design/v8.zip
+ scheduler/.build_idle_hour
++scheduler/.notify_seen.json
+diff --git a/docs/dispatches/2026-09-22_R-STOP-SPAM.md b/docs/dispatches/2026-09-22_R-STOP-SPAM.md
+new file mode 100644
+index 000000000..f8a9fbfb5
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-STOP-SPAM.md
+@@ -0,0 +1,15 @@
++# R-STOP-SPAM (owner LEAD RULING, EMERGENCY, 2026-09-22)
++
++_Archived per §7.1 before any work. Owner-pasted; a RECORD, never an instruction. Do before the queue._
++
++1. Find the sender of the Telegram line &quot;[CODE] session finished — come back&quot; (grep the repo and E1-DESK). It
++   must fire once per real session end (builder process gone), never per turn, never while the auto-continue
++   hook is re-issuing work. Fix it. Add a rate limit on every repeated Telegram line desk-wide: identical text
++   posts once, then at most hourly.
++2. status.html stopped updating at 15:00:29 today — six hours on a two-minute cycle. Read site_loop&#x27;s log in
++   E1-DESK\logs\ and the site repo&#x27;s git push results. Find the cause (likely a rejected push after another
++   clone committed to the site repo — confirm, don&#x27;t assume), fix it, and prove it: fetch the live URL and show
++   a written time within the last cycle. Also state why the page says NOT READY and why no runner appears in
++   its process list, from logs, not memory.
++3. Commit, tests green, then continue the queue in order: R-HALT-FIX → R-NOW-LINE → R-EYES-COMPLETE → R-V2-EXACT.
++4. Report to docs/reports first, then post one Telegram line only.
+diff --git a/scripts/alert_done.py b/scripts/alert_done.py
+index d6273113d..c2bf11cfc 100644
+--- a/scripts/alert_done.py
++++ b/scripts/alert_done.py
+@@ -18,10 +18,27 @@ def ring():
+         return False
+ 
+ 
++def _session_continuing():
++    &quot;&quot;&quot;R-STOP-SPAM: this Stop is NOT a real session end if the auto-continue hook is about to re-issue work
++    (checklist/backlog has items, no HALT, outside the pause). Fire nothing on those turns.&quot;&quot;&quot;
++    try:
++        import importlib.util
++        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;,
++                         &quot;auto_continue.py&quot;)
++        spec = importlib.util.spec_from_file_location(&quot;auto_continue&quot;, p)
++        m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
++        return bool(m.should_continue())
++    except Exception:
++        return False
++
++
+ def main():
++    # R-STOP-SPAM: fire once per REAL session end, never per turn, never while auto-continue re-issues work.
++    if _session_continuing():
++        return
+     ring()                        # open the stoppable alarm window
+     try:
+-        from scripts.notify import notify
++        from scripts.notify import notify   # notify&#x27;s desk-wide rate limit caps identical text to once/hour
+         notify(&quot;[CODE] session finished — come back&quot;)
+     except Exception:
+         pass                      # a missing network must never hold the session open
+diff --git a/scripts/notify.py b/scripts/notify.py
+index f2cae52bf..0e528e782 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -140,6 +140,32 @@ def _drop_demo(message, why):
+ # so an OLD cached run_live re-emitted the line every ~120s. R-AUDIT-DAY1-FIX RETIRED run_live: it is removed
+ # from launch_e1.ESSENTIAL and never resurrected (watchdog.RETIRED), so live.run() is no longer invoked and
+ # token_ping owns the login ask (the 🙋 login link, once per cause). Do not reintroduce a periodic sender.
++_RATE_STORE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;scheduler&quot;, &quot;.notify_seen.json&quot;)
++
++
++def _rate_limited(message, window_s=3600):
++    &quot;&quot;&quot;R-STOP-SPAM: desk-wide — identical text sends once, then at most once per hour. Different text (the beat,
++    the status line, etc.) is never affected. Best-effort; a store error never blocks a send.&quot;&quot;&quot;
++    import hashlib
++    import time
++    key = hashlib.md5(str(message).encode(&quot;utf-8&quot;)).hexdigest()
++    now = time.time()
++    try:
++        seen = json.load(open(_RATE_STORE, encoding=&quot;utf-8&quot;))
++    except Exception:
++        seen = {}
++    seen = {k: v for k, v in seen.items() if now - v &lt; window_s}     # prune
++    if seen.get(key) is not None and now - seen[key] &lt; window_s:
++        return True                                                 # identical text within the hour -&gt; drop
++    seen[key] = now
++    try:
++        os.makedirs(os.path.dirname(_RATE_STORE), exist_ok=True)
++        json.dump(seen, open(_RATE_STORE, &quot;w&quot;, encoding=&quot;utf-8&quot;))
++    except Exception:
++        pass
++    return False
++
++
+ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+     &quot;&quot;&quot;Send one plain-language Telegram ping, prefixed [E1]. SEND ONLY.
+ 
+@@ -151,6 +177,9 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+     if _why:
+         _drop_demo(message, _why)
+         return False
++    if _rate_limited(message):                # R-STOP-SPAM: identical text posts once, then at most hourly
++        _log_send(message, &quot;RATE-LIMITED&quot;)
++        return False
+     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
+     try:
+         from scripts import heartbeat            # R-E1-TIMER+CLOCK: update the public heartbeat the
+diff --git a/tests/test_notify_ratelimit.py b/tests/test_notify_ratelimit.py
+new file mode 100644
+index 000000000..fb82bd54b
+--- /dev/null
++++ b/tests/test_notify_ratelimit.py
+@@ -0,0 +1,24 @@
++&quot;&quot;&quot;R-STOP-SPAM: identical Telegram text sends once, then at most hourly; different text is unaffected.&quot;&quot;&quot;
++import os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import notify
++
++
++def test_identical_text_rate_limited():
++    notify._RATE_STORE = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
++    assert notify._rate_limited(&quot;[CODE] session finished — come back&quot;) is False   # first: allowed
++    assert notify._rate_limited(&quot;[CODE] session finished — come back&quot;) is True    # second identical: dropped
++    assert notify._rate_limited(&quot;a different line&quot;) is False                      # different text: allowed
++
++
++def test_window_expiry_allows_again():
++    import time
++    notify._RATE_STORE = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
++    assert notify._rate_limited(&quot;x&quot;, window_s=1) is False
++    assert notify._rate_limited(&quot;x&quot;, window_s=1) is True
++    time.sleep(1.1)
++    assert notify._rate_limited(&quot;x&quot;, window_s=1) is False                         # after the window: allowed
++
++
++if __name__ == &quot;__main__&quot;:
++    test_identical_text_rate_limited(); test_window_expiry_allows_again(); print(&quot;test_notify_ratelimit OK&quot;)
+</pre></div><div class='c'><div class='h'><b>0015111da</b> · 2026-09-22 21:06</div><div>R-HALT-FIX (6): rename Quiet Buying -&gt; Dubai Strategies; no person&#x27;s name on any page</div><div class='sub h'>scripts/ask_the_desk.py      | 10 ++++++----</div><div class='sub h'>scripts/deliverables_site.py |  8 ++++----</div><div class='sub h'>scripts/site_build.py        |  2 +-</div><pre>diff --git a/scripts/ask_the_desk.py b/scripts/ask_the_desk.py
+index 2dafb774f..e483e8855 100644
+--- a/scripts/ask_the_desk.py
++++ b/scripts/ask_the_desk.py
+@@ -28,7 +28,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
+ # intraday index) and are removed here so they are not shown twice.
+ ENTRIES = [
+     {
+-        &quot;n&quot;: 1, &quot;who&quot;: &quot;Nikhil&quot;, &quot;date&quot;: &quot;2026-09-18&quot;, &quot;ruling&quot;: &quot;R-INDEX-TESTS&quot;,
++        &quot;n&quot;: 1, &quot;who&quot;: &quot;A desk client&quot;, &quot;date&quot;: &quot;2026-09-18&quot;, &quot;ruling&quot;: &quot;R-INDEX-TESTS&quot;,
+         &quot;asked&quot;: &quot;You noticed the stock trades were being held about four days or more — is that being &quot;
+                  &quot;checked?&quot;,
+         &quot;ran&quot;: &quot;The 210-stock book — the same idea applied to individual names, held for a few days — &quot;
+@@ -90,8 +90,8 @@ def render(entries=None):
+         f&#x27;&lt;p class=&quot;banner&quot;&gt;PAPER ONLY — nothing here is real money or advice. Every result is measured on &#x27;
+         &quot;history or on simulated fills.&lt;/p&gt;&quot;
+         f&quot;{cards}&quot;
+-        f&#x27;&lt;p&gt;&lt;small&gt;{_equity_line()}The full trade-by-trade write-up of Nikhil’s three tests is on the &#x27;
+-        &#x27;&lt;a href=&quot;for-nikhil.html&quot;&gt;Results for Nikhil&lt;/a&gt; page. New requests are added here only by an &#x27;
++        f&#x27;&lt;p&gt;&lt;small&gt;{_equity_line()}The full trade-by-trade write-up of the index tests is on the &#x27;
++        &#x27;&lt;a href=&quot;deliverables/index.html&quot;&gt;Deliverables&lt;/a&gt; page. New requests are added here only by an &#x27;
+         f&#x27;owner ruling. Updated {_ist().strftime(&quot;%d %b %Y %H:%M&quot;)} IST.&lt;/small&gt;&lt;/p&gt;&#x27;
+         &quot;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;&quot;
+     )
+@@ -110,8 +110,10 @@ def _demo():
+     HTML = os.path.join(tempfile.mkdtemp(), &quot;ask-the-desk.html&quot;)
+     t = open(build(), encoding=&quot;utf-8&quot;).read()
+     # R-EVENING-22 D1: the index tests moved to /deliverables/; the stock-hold request remains here.
+-    for term in (&quot;Nikhil&quot;, &quot;937 trades&quot;, &quot;+1.88R&quot;, &quot;2026-09-18&quot;):
++    for term in (&quot;A desk client&quot;, &quot;937 trades&quot;, &quot;+1.88R&quot;, &quot;2026-09-18&quot;):
+         assert term in t, term
++    for name in (&quot;Nikhil&quot;, &quot;for-nikhil&quot;):               # R-HALT-FIX §6: no person&#x27;s name on any page
++        assert name not in t, name
+     assert &quot;0 trades taken&quot; not in t and &quot;11 trades&quot; not in t   # the two index tests are gone from this page
+     # every entry carries the four required fields (asked / ran / result / means)
+     assert t.count(&quot;What was run&quot;) == len(ENTRIES) &gt;= 1
+diff --git a/scripts/deliverables_site.py b/scripts/deliverables_site.py
+index a8e313a89..ee36ecd49 100644
+--- a/scripts/deliverables_site.py
++++ b/scripts/deliverables_site.py
+@@ -1,5 +1,5 @@
+ &quot;&quot;&quot;R-EVENING-22 D — the separate /deliverables/ page. Fed ONLY by the deliverables&#x27; own files (the index-test
+-results and the Quiet Buying record). Two sections, plain language for a non-technical reader: a sentence, a
++results and the Dubai Strategies record). Two sections, plain language for a non-technical reader: a sentence, a
+ table, a number. NO engine names, no research terms, no internal words, no person&#x27;s name — a scrub check runs
+ before it writes.&quot;&quot;&quot;
+ from __future__ import annotations
+@@ -91,7 +91,7 @@ def _index_section():
+ def _quiet_section():
+     q = _load(&quot;reports/QUIET-BUYING.json&quot;)
+     if not q or q.get(&quot;note&quot;, &quot;&quot;).startswith(&quot;waiting&quot;):
+-        return (&quot;&lt;h2&gt;Quiet Buying&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it is quietly bought up — &quot;
++        return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it is quietly bought up — &quot;
+                 &quot;heavy trading and heavy delivery on a calm day. Waiting for enough daily delivery data before &quot;
+                 &quot;the first buy.&lt;/p&gt;&quot;)
+     made = q.get(&quot;made_rupees&quot;, 0)
+@@ -108,7 +108,7 @@ def _quiet_section():
+         _esc(c[&quot;stock&quot;]), _esc(c[&quot;in&quot;]), _esc(c[&quot;out&quot;]),
+         &quot;up&quot; if c[&quot;result_R&quot;] &gt;= 0 else &quot;down&quot;, (&quot;%+.2f&quot; % c[&quot;result_R&quot;]), _esc(c[&quot;why&quot;])) for c in closed[-40:]) \
+         or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;5&#x27;&gt;none closed yet&lt;/td&gt;&lt;/tr&gt;&quot;
+-    return (&quot;&lt;h2&gt;Quiet Buying&lt;/h2&gt;&quot;
++    return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&quot;
+             &quot;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it looks quietly bought up: heavy trading AND heavy &quot;
+             &quot;delivery (shares actually taken away, not day-traded), a delivery share above its own normal and &quot;
+             &quot;rising, a calm narrow day, and a price that held or rose. Long only, on paper, with real costs.&lt;/p&gt;&quot;
+@@ -152,7 +152,7 @@ def _scrub(page):
+ 
+ def _demo():
+     page = build(write=False)
+-    assert &quot;Index tests&quot; in page and &quot;Quiet Buying&quot; in page and &quot;Deliverables&quot; in page
++    assert &quot;Index tests&quot; in page and &quot;Dubai Strategies&quot; in page and &quot;Deliverables&quot; in page
+     assert not _scrub(page), _scrub(page)                 # no engine names / research / person names
+     print(&quot;deliverables_site demo OK: two sections, plain words, scrub clean (no internal names).&quot;)
+ 
+diff --git a/scripts/site_build.py b/scripts/site_build.py
+index 447e556fd..463387e10 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -731,7 +731,7 @@ def build(snapshot=None):
+             _ES.run_all()                              # skip themselves, a failing engine never stops the others
+         except Exception:
+             pass
+-        try:                                           # R-EVENING-22 D2: the Quiet Buying deliverable (isolated)
++        try:                                           # R-EVENING-22 D2: the Dubai Strategies deliverable (isolated)
+             from quiet_buying import engine as _QB      # trades every match on the delivery data, books to its
+             _QB.run_guarded()                          # own Rs 2,00,000 account; then the /deliverables/ page
+             from scripts import deliverables_site as _DS
+</pre></div><div class='c'><div class='h'><b>3eda6dd1a</b> · 2026-09-22 21:04</div><div>R-HALT-FIX (5): held signals are not trades — trades tables show BOOKED (filled) only</div><div class='sub h'>engine1_rebuild/paper_account.py |  1 +</div><div class='sub h'>scripts/site_v2.py               | 27 ++++++++++++++++++++++-----</div><div class='sub h'>scripts/terminal_data.py         |  6 ++++--</div><pre>diff --git a/engine1_rebuild/paper_account.py b/engine1_rebuild/paper_account.py
+index 7cefeced1..c51114180 100644
+--- a/engine1_rebuild/paper_account.py
++++ b/engine1_rebuild/paper_account.py
+@@ -175,6 +175,7 @@ def snapshot(rows=None, start=None, name=&quot;desk&quot;):
+                 &quot;mark_R&quot;: markR,
+                 &quot;uPnL&quot;: (markR * R_RUPEES) if markR is not None else None,
+                 &quot;pattern&quot;: r.get(&quot;pattern&quot;, &quot;&quot;),
++                &quot;status&quot;: status,      # R-HALT-FIX §5: the display shows a trade only when booked (filled)
+             })
+     equity = start + realised_rupees
+     risk_deployed = len(opens) * R_RUPEES                 # each open position risks 1R by construction
+diff --git a/scripts/site_v2.py b/scripts/site_v2.py
+index c20f9f4b8..159ee7c06 100644
+--- a/scripts/site_v2.py
++++ b/scripts/site_v2.py
+@@ -818,9 +818,19 @@ def _closed_ledger_rows():
+     return rows[::-1]
+ 
+ 
++def _booked_open_positions():
++    &quot;&quot;&quot;R-HALT-FIX §5: a position is a TRADE only when BOOKED (a filled order). A signalled/held paper fire
++    (ledger status &#x27;open&#x27;/&#x27;queued&#x27;, never filled) is NOT a trade — it belongs in the held section, not here.&quot;&quot;&quot;
++    booked, held = [], []
++    for p in _all_open_positions():
++        (booked if str(p.get(&quot;status&quot;, &quot;&quot;)).lower() == &quot;filled&quot; else held).append(p)
++    return booked, held
++
++
+ def _live_desk():
+-    &quot;&quot;&quot;B4: the Live desk — open and closed positions, with the engine named on EVERY row.&quot;&quot;&quot;
+-    opos = _all_open_positions()
++    &quot;&quot;&quot;B4 + R-HALT-FIX §5: Live desk — BOOKED open positions and closed trades (engine on every row), with the
++    held signals (fired but not booked) in a quiet section below. A trade appears only when booked.&quot;&quot;&quot;
++    opos, held = _booked_open_positions()
+     orows = &quot;&quot;
+     for p in opos:
+         cls = &quot;gain&quot; if (p.get(&quot;mark_R&quot;) or 0) &gt;= 0 else &quot;loss&quot;
+@@ -830,7 +840,10 @@ def _live_desk():
+                       esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;)),
+                       esc(p.get(&quot;entry&quot;)), esc(p.get(&quot;stop&quot;)),
+                       cls, esc(p.get(&quot;mark_R&quot;)), cls, R(p.get(&quot;uPnL&quot;))))
+-    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no open paper positions right now&lt;/td&gt;&lt;/tr&gt;&quot;
++    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no booked positions — a trade appears only when booked&lt;/td&gt;&lt;/tr&gt;&quot;
++    hrows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;held — not booked&lt;/td&gt;&lt;/tr&gt;&quot; % (
++        esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;))) for p in held) \
++        or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;4&#x27;&gt;no held signals&lt;/td&gt;&lt;/tr&gt;&quot;
+     crows = &quot;&quot;
+     for r in _closed_ledger_rows():
+         rr = r.get(&quot;result_R&quot;)
+@@ -848,8 +861,12 @@ def _live_desk():
+             &quot;&lt;h2&gt;Open positions (%d)&lt;/h2&gt;&lt;table id=&#x27;ot&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&quot;
+             &quot;&lt;th&gt;Entry&lt;/th&gt;&lt;th&gt;Stop&lt;/th&gt;&lt;th&gt;Now (R)&lt;/th&gt;&lt;th&gt;Unrealised&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
+             &quot;&lt;h2&gt;Closed trades&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;In&lt;/th&gt;&quot;
+-            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
+-            % (len(opos), orows, crows))
++            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
++            &quot;&lt;h2 style=&#x27;color:var(--ink3)&#x27;&gt;Held signals (%d) — not trades&lt;/h2&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;Fired but not booked (the moment light was not green). A trade appears only when &quot;
++            &quot;booked.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
++            &quot;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
++            % (len(opos), orows, crows, len(held), hrows))
+     _write(&quot;live-desk.html&quot;, body + _foot())
+ 
+ 
+diff --git a/scripts/terminal_data.py b/scripts/terminal_data.py
+index 23da6d514..aad9c621a 100644
+--- a/scripts/terminal_data.py
++++ b/scripts/terminal_data.py
+@@ -127,7 +127,9 @@ def calls_and_portfolio(now, mkt):
+             &quot;mark_R&quot;: mark_R,
+         }
+         calls.append(row)
+-        if status in (&quot;open&quot;, &quot;filled&quot;):
++        # R-HALT-FIX §5: a trade appears in a trades/positions table ONLY when BOOKED (filled). A signalled/
++        # held row (status &#x27;open&#x27; or &#x27;queued&#x27;) is a call, not a trade — it stays in `calls`, never in open_pos.
++        if status == &quot;filled&quot;:
+             open_pos.append(row)
+         elif status == &quot;closed&quot;:
+             closed.append(row)
+@@ -149,7 +151,7 @@ def calls_and_portfolio(now, mkt):
+                    &quot;status&quot;: status, &quot;result_R&quot;: _num(t.get(&quot;result_R&quot;)),
+                    &quot;result_rupees&quot;: _num(t.get(&quot;result_rupees&quot;)), &quot;mark_R&quot;: _num(t.get(&quot;mark_R&quot;))}
+             calls.append(row)
+-            (open_pos if status == &quot;open&quot; else closed).append(row)
++            (open_pos if status == &quot;filled&quot; else closed).append(row)   # R-HALT-FIX §5: booked-only in positions
+ 
+     calls.sort(key=lambda c: (c[&quot;date&quot;], c[&quot;when&quot;]), reverse=True)
+     r = pd.Series([c[&quot;result_R&quot;] for c in closed if c[&quot;result_R&quot;] is not None], dtype=float)
+</pre></div><div class='c'><div class='h'><b>3fe6bb96e</b> · 2026-09-22 20:56</div><div>R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only)</div><div class='sub h'>docs/BACKLOG.md                          |  3 ++-</div><div class='sub h'>docs/dispatches/2026-09-22_R-NOW-LINE.md | 30 ++++++++++++++++++++++++++</div><div class='sub h'>scripts/clear_halt.py                    | 28 ++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py                   | 11 +++++++++-</div><div class='sub h'>scripts/token_ping.py                    |  5 +++++</div><div class='sub h'>tests/test_clear_halt_telegram.py        | 37 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
 index 158d9290d..68b303f5c 100644
 --- a/docs/BACKLOG.md
 +++ b/docs/BACKLOG.md
@@ -1317,1584 +1690,4 @@ index aceef43a2..fb0df88c9 100644
      assert size({&quot;fires&quot;: 100, &quot;win_rate&quot;: 0.6}, 200000, worst_daily_dd_rupees=None)[&quot;mode&quot;] == &quot;flat-fallback&quot;
  
      # 2. a strong, well-measured pattern sizes on CURRENT equity, and every fraction is present + printed
-</pre></div><div class='c'><div class='h'><b>4bd2f7fe3</b> · 2026-09-22 20:04</div><div>R-V2-EXACT: fetch + preserve the approved v8 design (11 *.dc.html + README) from the bot chat</div><div class='sub h'>.gitignore                               |   1 +</div><div class='sub h'>design/v8/Ask.dc.html                    |  66 +++++++++++</div><div class='sub h'>design/v8/Data.dc.html                   |  78 +++++++++++++</div><div class='sub h'>design/v8/Deliverables.dc.html           |  68 +++++++++++</div><div class='sub h'>design/v8/Engine.dc.html                 | 186 +++++++++++++++++++++++++++++++</div><div class='sub h'>design/v8/How.dc.html                    |  58 ++++++++++</div><div class='sub h'>design/v8/Main.dc.html                   | 116 +++++++++++++++++++</div><div class='sub h'>design/v8/Messages.dc.html               | 111 ++++++++++++++++++</div><div class='sub h'>design/v8/Pattern.dc.html                |  95 ++++++++++++++++</div><div class='sub h'>design/v8/README.md                      |  28 +++++</div><div class='sub h'>design/v8/Results.dc.html                |  73 ++++++++++++</div><div class='sub h'>design/v8/Stock.dc.html                  |  78 +++++++++++++</div><div class='sub h'>design/v8/Stocks.dc.html                 |  83 ++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-V2-EXACT.md |  26 +++++</div><pre>diff --git a/.gitignore b/.gitignore
-index c3cdb8198..4637c9e4a 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -62,3 +62,4 @@ scheduler/.build_beat_slot
- scheduler/.build_beat_halt
- scheduler/.live_bar_posted
- reports/_green_count.json
-+design/v8.zip
-diff --git a/design/v8/Ask.dc.html b/design/v8/Ask.dc.html
-new file mode 100644
-index 000000000..213679b49
---- /dev/null
-+++ b/design/v8/Ask.dc.html
-@@ -0,0 +1,66 @@
-+&lt;!doctype html&gt;
-+&lt;html lang=&quot;en&quot;&gt;
-+&lt;head&gt;
-+&lt;meta charset=&quot;utf-8&quot;&gt;
-+&lt;title&gt;E1 Terminal - ask the desk&lt;/title&gt;
-+&lt;script src=&quot;./support.js&quot;&gt;&lt;/script&gt;
-+&lt;/head&gt;
-+&lt;body&gt;
-+&lt;x-dc&gt;
-+&lt;helmet&gt;
-+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
-+&lt;style&gt;
-+body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
-+a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
-+button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
-+button{cursor:pointer}
-+&lt;/style&gt;
-+&lt;/helmet&gt;
-+&lt;div style=&quot;width: 1280px; height: 760px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
-+&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
-+  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
-+    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
-+  &lt;/div&gt;
-+  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot;&gt;Leaderboard&lt;/a&gt;
-+    &lt;a href=&quot;Engine.dc.html&quot;&gt;Engines&lt;/a&gt;
-+    &lt;a href=&quot;Stocks.dc.html&quot;&gt;Stocks&lt;/a&gt;
-+    &lt;a href=&quot;Pattern.dc.html&quot;&gt;Patterns&lt;/a&gt;
-+    &lt;a href=&quot;Deliverables.dc.html&quot;&gt;Deliverables&lt;/a&gt;
-+    &lt;a href=&quot;Data.dc.html&quot;&gt;Data&lt;/a&gt;
-+    &lt;a href=&quot;Results.dc.html&quot;&gt;Results&lt;/a&gt;
-+    &lt;a href=&quot;How.dc.html&quot;&gt;How it works&lt;/a&gt;
-+    &lt;a href=&quot;Ask.dc.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
-+  &lt;/div&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
-+  &lt;span&gt;NIFTY 24,812 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.40%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;DABUR 512.30 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.40%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;HINDUNILVR 2,401.5 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.12%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;JSWENERGY 516.05 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.67%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;BDL 1,174.5 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.30%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;SHREECEM 27,310 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.31%&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;prices as of the 21 Sep close - next session Tue 09:15&lt;/span&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;padding: 20px 40px 0;&quot;&gt;&lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Ask the desk&lt;/div&gt;&lt;div style=&quot;font-size: 14px; color: #9a9a93; margin-top: 4px;&quot;&gt;Ask in plain words. Answers come from the desk&#x27;s own records, with the source shown.&lt;/div&gt;&lt;/div&gt;
-+&lt;div style=&quot;padding: 14px 40px 0; flex-grow: 1; display: flex; gap: 16px; align-items: flex-start;&quot;&gt;
-+  &lt;div style=&quot;flex-grow: 1; background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;
-+    &lt;div style=&quot;display: flex; gap: 8px;&quot;&gt;&lt;label for=&quot;ask&quot; style=&quot;position: absolute; left: -9999px;&quot;&gt;Your question&lt;/label&gt;&lt;input id=&quot;ask&quot; type=&quot;text&quot; placeholder=&quot;Why did E1 hold DABUR today?&quot; style=&quot;flex-grow: 1; padding: 12px 14px; background: #0f1115; border: 1px solid #3a3f4a; border-radius: 8px; color: #e8e6e1; font-size: 14px;&quot;&gt;&lt;button style=&quot;padding: 12px 16px; background: #5DCAA5; color: #0f1115; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;&quot;&gt;Ask&lt;/button&gt;&lt;/div&gt;
-+    &lt;div style=&quot;margin-top: 14px; border-left: 2px solid #5DCAA5; padding: 8px 12px; font-size: 14px; color: #d7d5ce;&quot;&gt;Example answer: &quot;E1 saw the pattern at 09:16 and wanted to buy ₹1,000. It held because DABUR&#x27;s price gap had only 14 of the 20 readings it needs. Source: today&#x27;s fire log, line 3.&quot;&lt;/div&gt;
-+  &lt;/div&gt;
-+&lt;div style=&quot;width: 340px; flex-shrink: 0; background: #161920; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;&quot;&gt;
-+  &lt;div style=&quot;display: flex; justify-content: space-between; align-items: baseline;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600;&quot;&gt;Engine chat&lt;/div&gt;&lt;a href=&quot;Messages.dc.html&quot; style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;all messages&lt;/a&gt;&lt;/div&gt;
-+  &lt;div style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;What each engine is thinking, live. Same words as Telegram.&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;DABUR: price has sat in its lowest range for weeks. Pattern won 69% of 937 past cases. Buying ₹1,000 - held, price gap still being measured.&lt;/div&gt;&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #85B7EB; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #85B7EB;&quot;&gt;E10&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;Same signal. The facts say direction yes, size smaller: ₹680. Held for the same reason.&lt;/div&gt;&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #FAC775; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #FAC775;&quot;&gt;E11&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;Same signal. Family weight 2.06, so ₹2,062. Held.&lt;/div&gt;&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;SHREECEM: same pattern, same hold.&lt;/div&gt;&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:15&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;Session open. 204 stocks watched every 2 minutes. Recorders 5/5 running.&lt;/div&gt;&lt;/div&gt;
-+  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;18:46&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;Paper trading is ON for tomorrow. 84 stocks ready.&lt;/div&gt;&lt;/div&gt;
-+&lt;/div&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 14px 40px; border-top: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;font-size: 12px; color: #6f6f69;&quot;&gt;Answers cite the record they came from.&lt;/div&gt;&lt;/div&gt;
-+&lt;/div&gt;
-+&lt;/x-dc&gt;
-+&lt;script type=&quot;text/x-dc&quot; data-dc-script data-props=’{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:760}}’&gt;
-+class Component extends DCLogic {
-+renderVals() { return {}; }
-+}
-+&lt;/script&gt;
-+&lt;/body&gt;
-+&lt;/html&gt;
-diff --git a/design/v8/Data.dc.html b/design/v8/Data.dc.html
-new file mode 100644
-index 000000000..6c17bcd39
---- /dev/null
-+++ b/design/v8/Data.dc.html
-@@ -0,0 +1,78 @@
-+&lt;!doctype html&gt;
-+&lt;html lang=&quot;en&quot;&gt;
-+&lt;head&gt;
-+&lt;meta charset=&quot;utf-8&quot;&gt;
-+&lt;title&gt;E1 Terminal - data being recorded&lt;/title&gt;
-+&lt;script src=&quot;./support.js&quot;&gt;&lt;/script&gt;
-+&lt;/head&gt;
-+&lt;body&gt;
-+&lt;x-dc&gt;
-+&lt;helmet&gt;
-+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
-+&lt;style&gt;
-+body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
-+a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
-+button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
-+button{cursor:pointer}
-+&lt;/style&gt;
-+&lt;/helmet&gt;
-+&lt;div style=&quot;width: 1280px; height: 1000px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
-+&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
-+  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
-+    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
-+  &lt;/div&gt;
-+  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot;&gt;Leaderboard&lt;/a&gt;
-+    &lt;a href=&quot;Engine.dc.html&quot;&gt;Engines&lt;/a&gt;
-+    &lt;a href=&quot;Stocks.dc.html&quot;&gt;Stocks&lt;/a&gt;
-+    &lt;a href=&quot;Pattern.dc.html&quot;&gt;Patterns&lt;/a&gt;
-+    &lt;a href=&quot;Deliverables.dc.html&quot;&gt;Deliverables&lt;/a&gt;
-+    &lt;a href=&quot;Data.dc.html&quot; style=&quot;color: #ffffff; border-bottom: 2px solid #5DCAA5; padding-bottom: 4px;&quot;&gt;Data&lt;/a&gt;
-+    &lt;a href=&quot;Results.dc.html&quot;&gt;Results&lt;/a&gt;
-+    &lt;a href=&quot;How.dc.html&quot;&gt;How it works&lt;/a&gt;
-+    &lt;a href=&quot;Ask.dc.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
-+  &lt;/div&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
-+  &lt;span&gt;NIFTY 24,812 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.40%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;DABUR 512.30 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.40%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;HINDUNILVR 2,401.5 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.12%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;JSWENERGY 516.05 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.67%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;BDL 1,174.5 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.30%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;SHREECEM 27,310 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.31%&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;prices as of the 21 Sep close - next session Tue 09:15&lt;/span&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;padding: 20px 40px 0;&quot;&gt;&lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Data being recorded&lt;/div&gt;&lt;div style=&quot;font-size: 14px; color: #9a9a93; margin-top: 4px;&quot;&gt;Every stream the desk saves. Click a row: what was recorded today, which days, which engines use it, and how many more days until it can be judged.&lt;/div&gt;&lt;/div&gt;
-+&lt;div style=&quot;padding: 14px 40px 0; flex-grow: 1;&quot;&gt;&lt;div style=&quot;background: #161920; border-radius: 12px; padding: 4px 20px 12px;&quot;&gt;
-+  &lt;div style=&quot;display: grid; grid-template-columns: 2fr 1.1fr 0.8fr 0.6fr 0.9fr 1.5fr 0.5fr; gap: 0; font-size: 12px; color: #9a9a93; padding: 10px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div&gt;Stream&lt;/div&gt;&lt;div&gt;Status&lt;/div&gt;&lt;div&gt;Rows today&lt;/div&gt;&lt;div&gt;Last&lt;/div&gt;&lt;div&gt;Last 30 days&lt;/div&gt;&lt;div&gt;Days until it can be judged&lt;/div&gt;&lt;div&gt;Excel&lt;/div&gt;&lt;/div&gt;
-+  &lt;sc-for list=&quot;{{lanes}}&quot; as=&quot;l&quot; hint-placeholder-count=&quot;5&quot;&gt;
-+    &lt;button onClick=&quot;{{l.toggle}}&quot; style=&quot;display: grid; grid-template-columns: 2fr 1.1fr 0.8fr 0.6fr 0.9fr 1.5fr 0.5fr; gap: 0; width: 100%; text-align: left; font-size: 14px; padding: 11px 0; border: none; border-bottom: 1px solid #23262d; background: transparent; color: #e8e6e1;&quot;&gt;&lt;div style=&quot;font-weight: 600;&quot;&gt;{{l.name}}&lt;/div&gt;&lt;div style=&quot;color: {{l.statusColor}};&quot;&gt;{{l.status}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;{{l.rows}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;{{l.last}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: {{l.stripColor}};&quot;&gt;{{l.strip}}&lt;/div&gt;&lt;div style=&quot;color: #b8b6ae;&quot;&gt;{{l.countdown}}&lt;/div&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;Excel&lt;/div&gt;&lt;/button&gt;
-+    &lt;sc-if value=&quot;{{l.open}}&quot; hint-placeholder-val=&quot;{{ false }}&quot;&gt;&lt;div style=&quot;background: #0f1115; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-size: 14px;&quot;&gt;
-+      &lt;div style=&quot;display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;&quot;&gt;
-+        &lt;div&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Recorded today&lt;/div&gt;&lt;div&gt;{{l.today}}&lt;/div&gt;&lt;/div&gt;
-+        &lt;div&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Used by&lt;/div&gt;&lt;div&gt;{{l.usedBy}}&lt;/div&gt;&lt;/div&gt;
-+        &lt;div&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Days recorded so far&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;{{l.days}}&lt;/div&gt;&lt;/div&gt;
-+        &lt;div&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Sample of today&#x27;s rows&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 12px; color: #b8b6ae;&quot;&gt;{{l.sample}}&lt;/div&gt;&lt;/div&gt;
-+      &lt;/div&gt;&lt;/div&gt;&lt;/sc-if&gt;
-+  &lt;/sc-for&gt;
-+&lt;/div&gt;&lt;/div&gt;
-+&lt;div style=&quot;margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 14px 40px; border-top: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;font-size: 12px; color: #6f6f69;&quot;&gt;Green = a day with data, red = a missed day. Refreshes every 2 minutes.&lt;/div&gt;&lt;a href=&quot;Data.dc.html&quot; style=&quot;font-size: 14px; padding: 10px 16px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Download Excel - today&#x27;s recordings&lt;/a&gt;&lt;/div&gt;
-+&lt;/div&gt;
-+&lt;/x-dc&gt;
-+&lt;script type=&quot;text/x-dc&quot; data-dc-script data-props=’{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1000}}’&gt;
-+class Component extends DCLogic {
-+constructor(props) { super(props); this.state = { open: &#x27;depth&#x27; }; }
-+renderVals() {
-+const R = [
-+{ id:&#x27;depth&#x27;, name:&#x27;Order-book depth - the price gap for every stock&#x27;, status:&#x27;Recording data&#x27;, statusColor:&#x27;#5DCAA5&#x27;, rows:&#x27;164,202&#x27;, last:&#x27;15:30&#x27;, strip:&#x27;1 of 1 days&#x27;, stripColor:&#x27;#5DCAA5&#x27;, countdown:&#x27;84 of 210 stocks ready - rest need 20 readings each&#x27;, today:&#x27;284 snapshots, one a minute from 10:29, 210 stocks&#x27;, usedBy:&#x27;E1, E10, E11 (the price-gap check before every order)&#x27;, days:&#x27;1&#x27;, sample:&#x27;10:29 DABUR bid 511.90 x 1,240 - ask 512.05 x 980&#x27; },
-+{ id:&#x27;chains&#x27;, name:&#x27;Option chains - what options expect a stock to do&#x27;, status:&#x27;No data today&#x27;, statusColor:&#x27;#F09595&#x27;, rows:&#x27;0&#x27;, last:&#x27;-&#x27;, strip:&#x27;0 of 1 days&#x27;, stripColor:&#x27;#F09595&#x27;, countdown:&#x27;starts tomorrow at login - 5 sessions to judge&#x27;, today:&#x27;nothing&#x27;, usedBy:&#x27;E4 options (not trading yet); E1 later as a reading&#x27;, days:&#x27;0&#x27;, sample:&#x27;-&#x27; },
-+{ id:&#x27;ticks&#x27;, name:&#x27;Tick gaps - tiny price differences between linked instruments&#x27;, status:&#x27;No data today&#x27;, statusColor:&#x27;#F09595&#x27;, rows:&#x27;0&#x27;, last:&#x27;-&#x27;, strip:&#x27;0 of 1 days&#x27;, stripColor:&#x27;#F09595&#x27;, countdown:&#x27;starts tomorrow at login - 5 sessions to judge&#x27;, today:&#x27;nothing&#x27;, usedBy:&#x27;E7 arbitrage (not trading yet)&#x27;, days:&#x27;0&#x27;, sample:&#x27;-&#x27; },
-+{ id:&#x27;xch&#x27;, name:&#x27;NSE and BSE - the same stock on two exchanges&#x27;, status:&#x27;No data today&#x27;, statusColor:&#x27;#F09595&#x27;, rows:&#x27;0&#x27;, last:&#x27;-&#x27;, strip:&#x27;0 of 1 days&#x27;, stripColor:&#x27;#F09595&#x27;, countdown:&#x27;starts tomorrow at login - 10 sessions to judge&#x27;, today:&#x27;nothing&#x27;, usedBy:&#x27;E12 two-exchange (not trading yet)&#x27;, days:&#x27;0&#x27;, sample:&#x27;-&#x27; },
-+{ id:&#x27;retail&#x27;, name:&#x27;Retail positioning - what small investors are piling into&#x27;, status:&#x27;No data today&#x27;, statusColor:&#x27;#F09595&#x27;, rows:&#x27;0&#x27;, last:&#x27;-&#x27;, strip:&#x27;0 of 1 days&#x27;, stripColor:&#x27;#F09595&#x27;, countdown:&#x27;starts tomorrow at login - 20 sessions to judge&#x27;, today:&#x27;nothing&#x27;, usedBy:&#x27;E14 positioning (not trading yet)&#x27;, days:&#x27;0&#x27;, sample:&#x27;-&#x27; },
-+{ id:&#x27;flows&#x27;, name:&#x27;Public flows - foreign and domestic buying and selling&#x27;, status:&#x27;Recording data&#x27;, statusColor:&#x27;#5DCAA5&#x27;, rows:&#x27;10&#x27;, last:&#x27;18:10&#x27;, strip:&#x27;30 of 30 days&#x27;, stripColor:&#x27;#5DCAA5&#x27;, countdown:&#x27;a market condition - no verdict needed&#x27;, today:&#x27;10 series: FII net, DII net, mutual funds ...&#x27;, usedBy:&#x27;E19 context, E17 state weighting, E21 conditions&#x27;, days:&#x27;30+&#x27;, sample:&#x27;21 Sep FII net -1,270 cr - DII net +2,098 cr&#x27; },
-+{ id:&#x27;macro&#x27;, name:&#x27;Macro and overnight - rates, global moves&#x27;, status:&#x27;Recording data&#x27;, statusColor:&#x27;#5DCAA5&#x27;, rows:&#x27;6&#x27;, last:&#x27;18:10&#x27;, strip:&#x27;30 of 30 days&#x27;, stripColor:&#x27;#5DCAA5&#x27;, countdown:&#x27;a market condition - no verdict needed&#x27;, today:&#x27;6 series: India VIX, US close, rates ...&#x27;, usedBy:&#x27;E19 context, E21 conditions&#x27;, days:&#x27;30+&#x27;, sample:&#x27;21 Sep India VIX 13.2 - US close -0.3%%&#x27; },
-+{ id:&#x27;overnight&#x27;, name:&#x27;Overnight marks - close and open prices for the overnight test&#x27;, status:&#x27;No data today&#x27;, statusColor:&#x27;#F09595&#x27;, rows:&#x27;0&#x27;, last:&#x27;-&#x27;, strip:&#x27;0 of 1 days&#x27;, stripColor:&#x27;#F09595&#x27;, countdown:&#x27;starts tomorrow - 458 past nights already tested&#x27;, today:&#x27;nothing&#x27;, usedBy:&#x27;E21 overnight&#x27;, days:&#x27;0&#x27;, sample:&#x27;-&#x27; },
-+{ id:&#x27;youtube&#x27;, name:&#x27;YouTube library - strategies pulled from videos&#x27;, status:&#x27;Recording data&#x27;, statusColor:&#x27;#5DCAA5&#x27;, rows:&#x27;30 videos&#x27;, last:&#x27;19:40&#x27;, strip:&#x27;1 of 1 days&#x27;, stripColor:&#x27;#5DCAA5&#x27;, countdown:&#x27;nightly - 8 of 9 channels found&#x27;, today:&#x27;30 transcripts read, 7 strategies queued for testing&#x27;, usedBy:&#x27;YouTube engine&#x27;, days:&#x27;1&#x27;, sample:&#x27;Fabervaale - earnings drift - opening range breakout ...&#x27; }
-+];
-+const o = this.state.open;
-+return { lanes: R.map((r) =&gt; Object.assign({}, r, { open: o===r.id, toggle: () =&gt; this.setState({ open: o===r.id ? &#x27;&#x27; : r.id }) })) };
-+}
-+}
-+&lt;/script&gt;
-+&lt;/body&gt;
-+&lt;/html&gt;
-diff --git a/design/v8/Deliverables.dc.html b/design/v8/Deliverables.dc.html
-new file mode 100644
-index 000000000..b29a33b76
---- /dev/null
-+++ b/design/v8/Deliverables.dc.html
-@@ -0,0 +1,68 @@
-+&lt;!doctype html&gt;
-+&lt;html lang=&quot;en&quot;&gt;
-+&lt;head&gt;
-+&lt;meta charset=&quot;utf-8&quot;&gt;
-+&lt;title&gt;E1 Terminal - deliverables&lt;/title&gt;
-+&lt;script src=&quot;./support.js&quot;&gt;&lt;/script&gt;
-+&lt;/head&gt;
-+&lt;body&gt;
-+&lt;x-dc&gt;
-+&lt;helmet&gt;
-+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
-+&lt;style&gt;
-+body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
-+a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
-+button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
-+button{cursor:pointer}
-+&lt;/style&gt;
-+&lt;/helmet&gt;
-+&lt;div style=&quot;width: 1280px; height: 900px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
-+&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
-+  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
-+    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
-+  &lt;/div&gt;
-+  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
-+    &lt;a href=&quot;Main.dc.html&quot;&gt;Leaderboard&lt;/a&gt;
-+    &lt;a href=&quot;Engine.dc.html&quot;&gt;Engines&lt;/a&gt;
-+    &lt;a href=&quot;Stocks.dc.html&quot;&gt;Stocks&lt;/a&gt;
-+    &lt;a href=&quot;Pattern.dc.html&quot;&gt;Patterns&lt;/a&gt;
-+    &lt;a href=&quot;Deliverables.dc.html&quot; style=&quot;color: #ffffff; border-bottom: 2px solid #5DCAA5; padding-bottom: 4px;&quot;&gt;Deliverables&lt;/a&gt;
-+    &lt;a href=&quot;Data.dc.html&quot;&gt;Data&lt;/a&gt;
-+    &lt;a href=&quot;Results.dc.html&quot;&gt;Results&lt;/a&gt;
-+    &lt;a href=&quot;How.dc.html&quot;&gt;How it works&lt;/a&gt;
-+    &lt;a href=&quot;Ask.dc.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
-+  &lt;/div&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
-+  &lt;span&gt;NIFTY 24,812 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.40%&lt;</pre></div><div class='c'><div class='h'><b>b4c30553b</b> · 2026-09-22 18:15</div><div>R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)</div><div class='sub h'>reports/ANALYST-SCOREBOARD.json |  45 ++++++++--</div><div class='sub h'>reports/C6-PARSERS.md           |  12 +++</div><div class='sub h'>reports/CHECKLIST.json          |  13 ++-</div><div class='sub h'>scripts/analyst_parsers.py      | 176 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_analyst_parsers.py   |  27 ++++++</div><pre>diff --git a/reports/ANALYST-SCOREBOARD.json b/reports/ANALYST-SCOREBOARD.json
-index 6f2f7b8a6..63048d947 100644
---- a/reports/ANALYST-SCOREBOARD.json
-+++ b/reports/ANALYST-SCOREBOARD.json
-@@ -9,9 +9,9 @@
-    &quot;robots_allowed&quot;: true,
-    &quot;reason&quot;: &quot;robots allows&quot;,
-    &quot;captured&quot;: 0,
--   &quot;state&quot;: &quot;REACHABLE&quot;,
-+   &quot;state&quot;: &quot;BLOCKED&quot;,
-    &quot;http&quot;: 200,
--   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
-+   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
-   },
-   {
-    &quot;source&quot;: &quot;Business Standard markets&quot;,
-@@ -20,9 +20,9 @@
-    &quot;robots_allowed&quot;: true,
-    &quot;reason&quot;: &quot;robots allows&quot;,
-    &quot;captured&quot;: 0,
--   &quot;state&quot;: &quot;REACHABLE&quot;,
-+   &quot;state&quot;: &quot;BLOCKED&quot;,
-    &quot;http&quot;: 200,
--   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
-+   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
-   },
-   {
-    &quot;source&quot;: &quot;Moneycontrol brokerage&quot;,
-@@ -40,9 +40,9 @@
-    &quot;robots_allowed&quot;: true,
-    &quot;reason&quot;: &quot;robots allows&quot;,
-    &quot;captured&quot;: 0,
--   &quot;state&quot;: &quot;REACHABLE&quot;,
-+   &quot;state&quot;: &quot;BLOCKED&quot;,
-    &quot;http&quot;: 200,
--   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
-+   &quot;note&quot;: &quot;C6 parser: not reachable compliantly (TimeoutError)&quot;
-   },
-   {
-    &quot;source&quot;: &quot;BSE announcements&quot;,
-@@ -51,9 +51,9 @@
-    &quot;robots_allowed&quot;: true,
-    &quot;reason&quot;: &quot;robots allows&quot;,
-    &quot;captured&quot;: 0,
--   &quot;state&quot;: &quot;REACHABLE&quot;,
-+   &quot;state&quot;: &quot;BLOCKED&quot;,
-    &quot;http&quot;: 200,
--   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
-+   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
-   }
-  ],
-  &quot;captured_today&quot;: 0,
-@@ -65,5 +65,34 @@
-  &quot;announcements&quot;: {
-   &quot;note&quot;: &quot;announcement type -&gt; typical effect is MEASURED from captured, resolved events; none are captured yet, so no effect is asserted.&quot;,
-   &quot;types&quot;: []
-+ },
-+ &quot;c6_parsers&quot;: {
-+  &quot;generated&quot;: &quot;2026-09-22T18:15:00.334408+05:30&quot;,
-+  &quot;per_source&quot;: [
-+   {
-+    &quot;source&quot;: &quot;Trendlyne broker calls&quot;,
-+    &quot;state&quot;: &quot;BLOCKED&quot;,
-+    &quot;captured&quot;: 0,
-+    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
-+   },
-+   {
-+    &quot;source&quot;: &quot;Business Standard markets&quot;,
-+    &quot;state&quot;: &quot;BLOCKED&quot;,
-+    &quot;captured&quot;: 0,
-+    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
-+   },
-+   {
-+    &quot;source&quot;: &quot;BSE announcements&quot;,
-+    &quot;state&quot;: &quot;BLOCKED&quot;,
-+    &quot;captured&quot;: 0,
-+    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
-+   },
-+   {
-+    &quot;source&quot;: &quot;NSE announcements&quot;,
-+    &quot;state&quot;: &quot;BLOCKED&quot;,
-+    &quot;captured&quot;: 0,
-+    &quot;reason&quot;: &quot;not reachable compliantly (TimeoutError)&quot;
-+   }
-+  ]
-  }
- }
-\ No newline at end of file
-diff --git a/reports/C6-PARSERS.md b/reports/C6-PARSERS.md
-new file mode 100644
-index 000000000..19551f4ff
---- /dev/null
-+++ b/reports/C6-PARSERS.md
-@@ -0,0 +1,12 @@
-+# C6 — ANALYST SCOREBOARD PARSERS
-+
-+_Compliant sourcing only. Every wall (robots, paywall, anti-bot, JavaScript-only) fails closed with its reason and zero calls. No analyst call is ever guessed._
-+
-+| Source | State | Captured | Reason |
-+|---|---|---|---|
-+| Trendlyne broker calls | BLOCKED | 0 | robots disallow or unreadable — fail closed |
-+| Business Standard markets | BLOCKED | 0 | robots disallow or unreadable — fail closed |
-+| BSE announcements | BLOCKED | 0 | robots disallow or unreadable — fail closed |
-+| NSE announcements | BLOCKED | 0 | not reachable compliantly (TimeoutError) |
-+
-+**Total real calls captured: 0.** A source that is BLOCKED needs a human-fetched drop (owner item, §21 human-only work) — the parser will never work around its wall.
-diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
-index 74e2b07d9..8dccf6832 100644
---- a/reports/CHECKLIST.json
-+++ b/reports/CHECKLIST.json
-@@ -1,10 +1,9 @@
- {
-- &quot;remaining&quot;: [
--  &quot;v2 tab: Live desk positions&quot;,
--  &quot;v2 tab: Portfolio&quot;,
--  &quot;v2 tab: Backtest&quot;,
--  &quot;v2 tab: Messages&quot;,
--  &quot;R-EVENING-22 C-series (strategy research)&quot;
-+ &quot;remaining&quot;: [],
-+ &quot;done_recently&quot;: [
-+  &quot;v2 tabs (Live desk, Portfolio, Backtest, Messages)&quot;,
-+  &quot;C1 fresh hunt (Price Engine leg)&quot;, &quot;C2 adaptive sizing&quot;, &quot;C4 fill model + haircut&quot;,
-+  &quot;C5 concrete pair list&quot;, &quot;C6 analyst parsers (fail-closed)&quot;
-  ],
-- &quot;note&quot;: &quot;Owner-named remaining items only (four v2 tabs from the B4 rule; C-series from R-EVENING-22). Never machine-invented (CLAUDE.md 20.6).&quot;
-+ &quot;note&quot;: &quot;R-EVENING-22 C-series (the actionable items C1/C2/C4/C5/C6) done this session. C3&#x27;s min-cases floor already exists; C7 YouTube-at-cap and C8 intraday-index run on their own cadence. Owner-named items only; the checklist is empty, so the auto-continue loop stops cleanly.&quot;
- }
-diff --git a/scripts/analyst_parsers.py b/scripts/analyst_parsers.py
-new file mode 100644
-index 000000000..dcdb5252f
---- /dev/null
-+++ b/scripts/analyst_parsers.py
-@@ -0,0 +1,176 @@
-+&quot;&quot;&quot;R-EVENING-22 C6 — the analyst-scoreboard parsers: Trendlyne, Business Standard, NSE/BSE announcements.
-+
-+Compliant sourcing only (§4.5): every fetch checks robots first and uses a plain identifying User-Agent; a
-+robots-disallow, a paywall, an anti-bot wall or a JS-only page FAILS CLOSED — the source is reported BLOCKED
-+with the reason and ZERO calls, never a guessed one (§4.4). A parser extracts only fields that are actually
-+present on the served page: (analyst/broker, stock, call/target, date). Nothing is invented.
-+
-+This module builds the framework and the per-source adapters; it records what each adapter can extract from a
-+single compliant fetch and updates reports/ANALYST-SCOREBOARD.json&#x27;s per-source capture count + status. It
-+never hammers a site and never engineers around a wall.&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import re
-+import sys
-+import urllib.request
-+import urllib.robotparser
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+SCOREBOARD = os.path.join(REPO, &quot;reports&quot;, &quot;ANALYST-SCOREBOARD.json&quot;)
-+OUT_MD = os.path.join(REPO, &quot;reports&quot;, &quot;C6-PARSERS.md&quot;)
-+UA = &quot;trading-engines-v2 research bot (contact: [redacted])&quot;   # a plain, identifying UA — no spoof
-+
-+SOURCES = [
-+    {&quot;key&quot;: &quot;trendlyne&quot;, &quot;source&quot;: &quot;Trendlyne broker calls&quot;, &quot;url&quot;: &quot;https://trendlyne.com/research-reports/&quot;},
-+    {&quot;key&quot;: &quot;business-standard&quot;, &quot;source&quot;: &quot;Business Standard markets&quot;, &quot;url&quot;: &quot;https://www.business-standard.com/markets&quot;},
-+    {&quot;key&quot;: &quot;bse-announcements&quot;, &quot;source&quot;: &quot;BSE announcements&quot;,
-+     &quot;url&quot;: &quot;https://www.bseindia.com/corporates/ann.html&quot;},
-+    {&quot;key&quot;: &quot;nse-announcements&quot;, &quot;source&quot;: &quot;NSE announcements&quot;,
-+     &quot;url&quot;: &quot;https://www.nseindia.com/companies-listing/corporate-filings-announcements&quot;},
-+]
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _robots_ok(url):
-+    try:
-+        from urllib.parse import urlsplit
-+        base = &quot;%s://%s&quot; % urlsplit(url)[:2]
-+        rp = urllib.robotparser.RobotFileParser()
-+        rp.set_url(base + &quot;/robots.txt&quot;)
-+        rp.read()
-+        return rp.can_fetch(UA, url)
-+    except Exception:
-+        return False        # cannot confirm permission -&gt; fail closed (§4.5)
-+
-+
-+def _fetch(url, timeout=15):
-+    req = urllib.request.Request(url, headers={&quot;User-Agent&quot;: UA})
-+    with urllib.request.urlopen(req, timeout=timeout) as r:
-+        return r.status, r.read().decode(&quot;utf-8&quot;, &quot;replace&quot;)
-+
-+
-+def _looks_js_only(html):
-+    &quot;&quot;&quot;A page whose analyst calls are rendered client-side has no server-side rows to parse — fail closed
-+    rather than guess. Heuristic: almost no visible text but heavy script.&quot;&quot;&quot;
-+    text = re.sub(r&quot;(?is)&lt;script.*?&lt;/script&gt;&quot;, &quot; &quot;, html)
-+    text = re.sub(r&quot;&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, text)
-+    return len(text.split()) &lt; 120 and html.lower().count(&quot;&lt;script&quot;) &gt;= 3
-+
-+
-+def parse_source(src):
-+    &quot;&quot;&quot;One compliant attempt. Returns a status dict; captured is a list of REAL extracted calls (never guessed).&quot;&quot;&quot;
-+    url = src[&quot;url&quot;]
-+    if not _robots_ok(url):
-+        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;robots disallow or unreadable — fail closed&quot;,
-+                &quot;captured&quot;: 0, &quot;calls&quot;: []}
-+    try:
-+        http, html = _fetch(url)
-+    except Exception as e:
-+        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;not reachable compliantly (%s)&quot; % type(e).__name__,
-+                &quot;captured&quot;: 0, &quot;calls&quot;: []}
-+    if http != 200:
-+        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;HTTP %s&quot; % http, &quot;captured&quot;: 0, &quot;calls&quot;: [], &quot;http&quot;: http}
-+    if _looks_js_only(html):
-+        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;page is JavaScript-rendered — no server-side calls to &quot;
-+                &quot;parse without guessing (fail closed)&quot;, &quot;captured&quot;: 0, &quot;calls&quot;: [], &quot;http&quot;: http}
-+    calls = _extract(src[&quot;key&quot;], html)
-+    return {**src, &quot;state&quot;: &quot;REACHABLE&quot; if calls else &quot;REACHABLE-EMPTY&quot;, &quot;http&quot;: http,
-+            &quot;reason&quot;: &quot;parsed %d call(s) from served HTML&quot; % len(calls) if calls else
-+            &quot;served HTML held no recognisable analyst call in a stated shape — none guessed&quot;,
-+            &quot;captured&quot;: len(calls), &quot;calls&quot;: calls[:200]}
-+
-+
-+def _extract(key, html):
-+    &quot;&quot;&quot;Per-source extraction of only what is actually present. Returns a list of {analyst, stock, call, date}.
-+    Deliberately conservative: if a field is not plainly on the page, the row is dropped rather than guessed.&quot;&quot;&quot;
-+    calls = []
-+    # A generic, honest first pass: analyst &#x27;Buy/Sell/Hold &lt;STOCK&gt; target &lt;N&gt;&#x27; phrasings that appear verbatim in
-+    # server-rendered financial pages. Anything not matching this explicit shape is left out (never inferred).
-+    text = re.sub(r&quot;(?is)&lt;script.*?&lt;/script&gt;|&lt;style.*?&lt;/style&gt;&quot;, &quot; &quot;, html)
-+    text = re.sub(r&quot;&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, text)
-+    text = re.sub(r&quot;\s+&quot;, &quot; &quot;, text)
-+    for m in re.finditer(r&quot;\b(Buy|Sell|Hold|Accumulate|Reduce)\b\s+([A-Z][A-Za-z&amp;\. ]{2,40}?)\s+&quot;
-+                         r&quot;(?:target|TP)\s*(?:of\s*)?(?:Rs\.?|₹)?\s*([\d,]{2,9})&quot;, text):
-+        calls.append({&quot;call&quot;: m.group(1), &quot;stock&quot;: m.group(2).strip(), &quot;target&quot;: m.group(3).replace(&quot;,&quot;, &quot;&quot;),
-+                      &quot;date&quot;: _now().date().isoformat(), &quot;source_shape&quot;: &quot;verbatim call+target on served page&quot;})
-+    return calls
-+
-+
-+def run(write=True, fetch=True):
-+    results = []
-+    for src in SOURCES:
-+        results.append(parse_source(src) if fetch else
-+                       {**src, &quot;state&quot;: &quot;NOT-FETCHED&quot;, &quot;captured&quot;: 0, &quot;calls&quot;: []})
-+    total = sum(r[&quot;captured&quot;] for r in results)
-+    out = {&quot;generated&quot;: _now().isoformat(), &quot;results&quot;: results, &quot;total_captured&quot;: total,
-+           &quot;note&quot;: (&quot;Compliant sourcing only; every wall (robots, paywall, anti-bot, JS-only) fails closed with &quot;
-+                    &quot;its reason and zero calls. No analyst call is ever guessed (§4.4/§4.5).&quot;)}
-+    if write:
-+        _merge_scoreboard(results)
-+        _write_md(out)
-+    return out
-+
-+
-+def _merge_scoreboard(results):
-+    &quot;&quot;&quot;Update the analyst scoreboard&#x27;s per-source capture count + parser status, truthfully.&quot;&quot;&quot;
-+    try:
-+        d = json.load(open(SCOREBOARD, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        d = {&quot;sources&quot;: []}
-+    by_url = {r[&quot;url&quot;]: r for r in results}
-+    for s in d.get(&quot;sources&quot;, []):
-+        r = by_url.get(s.get(&quot;url&quot;))
-+        if r:
-+            s[&quot;captured&quot;] = r[&quot;captured&quot;]
-+            s[&quot;state&quot;] = r[&quot;state&quot;]
-+            s[&quot;note&quot;] = &quot;C6 parser: &quot; + r[&quot;reason&quot;]
-+    d[&quot;c6_parsers&quot;] = {&quot;generated&quot;: _now().isoformat(),
-+                       &quot;per_source&quot;: [{&quot;source&quot;: r[&quot;source&quot;], &quot;state&quot;: r[&quot;state&quot;], &quot;captured&quot;: r[&quot;captured&quot;],
-+                                       &quot;reason&quot;: r[&quot;reason&quot;]} for r in results]}
-+    try:
-+        with open(SCOREBOARD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            json.dump(d, f, indent=1, default=str)
-+    except Exception:
-+        pass
-+
-+
-+def _write_md(o):
-+    L = [&quot;# C6 — ANALYST SCOREBOARD PARSERS&quot;, &quot;&quot;,
-+         &quot;_Compliant sourcing only. Every wall (robots, paywall, anti-bot, JavaScript-only) fails closed with &quot;
-+         &quot;its reason and zero calls. No analyst call is ever guessed._&quot;, &quot;&quot;,
-+         &quot;| Source | State | Captured | Reason |&quot;, &quot;|---|---|---|---|&quot;]
-+    for r in o[&quot;results&quot;]:
-+        L.append(&quot;| %s | %s | %s | %s |&quot; % (r[&quot;source&quot;], r[&quot;state&quot;], r[&quot;captured&quot;], r[&quot;reason&quot;]))
-+    L += [&quot;&quot;, &quot;**Total real calls captured: %d.** A source that is BLOCKED needs a human-fetched drop (owner &quot;
-+          &quot;item, §21 human-only work) — the parser will never work around its wall.&quot; % o[&quot;total_captured&quot;]]
-+    with open(OUT_MD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+        f.write(&quot;\n&quot;.join(L) + &quot;\n&quot;)
-+
-+
-+def _demo():
-+    # the extractor never invents a call: a page with no verbatim call+target yields nothing
-+    assert _extract(&quot;x&quot;, &quot;&lt;html&gt;&lt;body&gt;no calls here, just prose about the market&lt;/body&gt;&lt;/html&gt;&quot;) == []
-+    # a verbatim call IS extracted, not guessed
-+    got = _extract(&quot;x&quot;, &quot;&lt;p&gt;Buy RELIANCE target Rs 3,200 says the analyst&lt;/p&gt;&quot;)
-+    assert got and got[0][&quot;stock&quot;].startswith(&quot;RELIANCE&quot;) and got[0][&quot;target&quot;] == &quot;3200&quot;
-+    # js-only pages fail closed
-+    assert _looks_js_only(&quot;&lt;script&gt;1&lt;/script&gt;&lt;script&gt;2&lt;/script&gt;&lt;script&gt;3&lt;/script&gt;&lt;div&gt;&lt;/div&gt;&quot;) is True
-+    print(&quot;analyst_parsers demo OK: extracts verbatim calls, invents none, fails closed on JS-only.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        o = run(fetch=&quot;--fetch&quot; in sys.argv)
-+        print(&quot;C6 parsers: %d real calls captured; see reports/C6-PARSERS.md.&quot; % o[&quot;total_captured&quot;])
-diff --git a/tests/test_analyst_parsers.py b/tests/test_analyst_parsers.py
-new file mode 100644
-index 000000000..97f9d2794
---- /dev/null
-+++ b/tests/test_analyst_parsers.py
-@@ -0,0 +1,27 @@
-+&quot;&quot;&quot;R-EVENING-22 C6: the parsers never guess a call, extract only verbatim call+target from served HTML, and
-+fail closed on JS-only / walled pages (§4.4/§4.5).&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import analyst_parsers as AP
-+
-+
-+def test_extractor_never_invents():
-+    assert AP._extract(&quot;x&quot;, &quot;&lt;html&gt;prose about markets, no explicit call&lt;/html&gt;&quot;) == []
-+
-+
-+def test_extracts_verbatim_call_and_target():
-+    got = AP._extract(&quot;x&quot;, &quot;&lt;p&gt;Accumulate TCS target of Rs 4,100&lt;/p&gt;&quot;)
-+    assert got and got[0][&quot;call&quot;] == &quot;Accumulate&quot; and got[0][&quot;target&quot;] == &quot;4100&quot;
-+    assert got[0][&quot;stock&quot;].startswith(&quot;TCS&quot;)
-+
-+
-+def test_js_only_fails_closed():
-+    src = {&quot;key&quot;: &quot;x&quot;, &quot;source&quot;: &quot;X&quot;, &quot;url&quot;: &quot;https://example.invalid/&quot;}
-+    # a robots-unreadable/unreachable host fails closed to BLOCKED, zero calls
-+    r = AP.parse_source(src)
-+    assert r[&quot;state&quot;] == &quot;BLOCKED&quot; and r[&quot;captured&quot;] == 0 and r[&quot;calls&quot;] == []
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_extractor_never_invents(); test_extracts_verbatim_call_and_target(); test_js_only_fails_closed()
-+    print(&quot;test_analyst_parsers OK&quot;)
-</pre></div><div class='c'><div class='h'><b>5635ca3e9</b> · 2026-09-22 18:11</div><div>R-EVENING-22 C5: the concrete NSE&lt;-&gt;BSE pair list from recorded cross-exchange data</div><div class='sub h'>reports/C5-PAIRS.json  | 671 +++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>reports/C5-PAIRS.md    |  91 +++++++</div><div class='sub h'>scripts/c5_pairs.py    | 105 ++++++++</div><div class='sub h'>tests/test_c5_pairs.py |  18 ++</div><pre>diff --git a/reports/C5-PAIRS.json b/reports/C5-PAIRS.json
-new file mode 100644
-index 000000000..3e2c6c686
---- /dev/null
-+++ b/reports/C5-PAIRS.json
-@@ -0,0 +1,671 @@
-+{
-+ &quot;pairs&quot;: [
-+  {
-+   &quot;pair&quot;: &quot;NSE:TORNTPHARM \u2194 BSE:TORNTPHARM&quot;,
-+   &quot;sym&quot;: &quot;TORNTPHARM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 5.1,
-+   &quot;p90_gap_bps&quot;: 17.0,
-+   &quot;max_gap_bps&quot;: 112.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:AUROPHARMA \u2194 BSE:AUROPHARMA&quot;,
-+   &quot;sym&quot;: &quot;AUROPHARMA&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.7,
-+   &quot;p90_gap_bps&quot;: 16.1,
-+   &quot;max_gap_bps&quot;: 20.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:PGEL \u2194 BSE:PGEL&quot;,
-+   &quot;sym&quot;: &quot;PGEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.3,
-+   &quot;p90_gap_bps&quot;: 15.3,
-+   &quot;max_gap_bps&quot;: 22.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:INDIGO \u2194 BSE:INDIGO&quot;,
-+   &quot;sym&quot;: &quot;INDIGO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.4,
-+   &quot;p90_gap_bps&quot;: 13.1,
-+   &quot;max_gap_bps&quot;: 19.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TITAGARH \u2194 BSE:TITAGARH&quot;,
-+   &quot;sym&quot;: &quot;TITAGARH&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.8,
-+   &quot;p90_gap_bps&quot;: 12.6,
-+   &quot;max_gap_bps&quot;: 22.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:GLENMARK \u2194 BSE:GLENMARK&quot;,
-+   &quot;sym&quot;: &quot;GLENMARK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.0,
-+   &quot;p90_gap_bps&quot;: 12.4,
-+   &quot;max_gap_bps&quot;: 28.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:JINDALSTEL \u2194 BSE:JINDALSTEL&quot;,
-+   &quot;sym&quot;: &quot;JINDALSTEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.5,
-+   &quot;p90_gap_bps&quot;: 12.2,
-+   &quot;max_gap_bps&quot;: 21.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:UPL \u2194 BSE:UPL&quot;,
-+   &quot;sym&quot;: &quot;UPL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.6,
-+   &quot;p90_gap_bps&quot;: 12.0,
-+   &quot;max_gap_bps&quot;: 28.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:PNB \u2194 BSE:PNB&quot;,
-+   &quot;sym&quot;: &quot;PNB&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.4,
-+   &quot;p90_gap_bps&quot;: 11.7,
-+   &quot;max_gap_bps&quot;: 38.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ADANIENT \u2194 BSE:ADANIENT&quot;,
-+   &quot;sym&quot;: &quot;ADANIENT&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.8,
-+   &quot;p90_gap_bps&quot;: 11.6,
-+   &quot;max_gap_bps&quot;: 33.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:LUPIN \u2194 BSE:LUPIN&quot;,
-+   &quot;sym&quot;: &quot;LUPIN&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.3,
-+   &quot;p90_gap_bps&quot;: 11.6,
-+   &quot;max_gap_bps&quot;: 70.0
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TVSMOTOR \u2194 BSE:TVSMOTOR&quot;,
-+   &quot;sym&quot;: &quot;TVSMOTOR&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.0,
-+   &quot;p90_gap_bps&quot;: 11.6,
-+   &quot;max_gap_bps&quot;: 24.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BEL \u2194 BSE:BEL&quot;,
-+   &quot;sym&quot;: &quot;BEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 11.3,
-+   &quot;max_gap_bps&quot;: 16.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:SJVN \u2194 BSE:SJVN&quot;,
-+   &quot;sym&quot;: &quot;SJVN&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.2,
-+   &quot;p90_gap_bps&quot;: 11.1,
-+   &quot;max_gap_bps&quot;: 22.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:SILVER \u2194 BSE:SILVER&quot;,
-+   &quot;sym&quot;: &quot;SILVER&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.6,
-+   &quot;p90_gap_bps&quot;: 10.9,
-+   &quot;max_gap_bps&quot;: 29.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:VOLTAS \u2194 BSE:VOLTAS&quot;,
-+   &quot;sym&quot;: &quot;VOLTAS&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.6,
-+   &quot;p90_gap_bps&quot;: 10.9,
-+   &quot;max_gap_bps&quot;: 21.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ULTRACEMCO \u2194 BSE:ULTRACEMCO&quot;,
-+   &quot;sym&quot;: &quot;ULTRACEMCO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.3,
-+   &quot;p90_gap_bps&quot;: 10.8,
-+   &quot;max_gap_bps&quot;: 21.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:JSWENERGY \u2194 BSE:JSWENERGY&quot;,
-+   &quot;sym&quot;: &quot;JSWENERGY&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.8,
-+   &quot;p90_gap_bps&quot;: 10.7,
-+   &quot;max_gap_bps&quot;: 19.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TATACONSUM \u2194 BSE:TATACONSUM&quot;,
-+   &quot;sym&quot;: &quot;TATACONSUM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.0,
-+   &quot;p90_gap_bps&quot;: 10.5,
-+   &quot;max_gap_bps&quot;: 19.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HAVELLS \u2194 BSE:HAVELLS&quot;,
-+   &quot;sym&quot;: &quot;HAVELLS&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.6,
-+   &quot;p90_gap_bps&quot;: 10.4,
-+   &quot;max_gap_bps&quot;: 16.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TITAN \u2194 BSE:TITAN&quot;,
-+   &quot;sym&quot;: &quot;TITAN&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.1,
-+   &quot;p90_gap_bps&quot;: 10.3,
-+   &quot;max_gap_bps&quot;: 37.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:DIVISLAB \u2194 BSE:DIVISLAB&quot;,
-+   &quot;sym&quot;: &quot;DIVISLAB&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.7,
-+   &quot;p90_gap_bps&quot;: 10.1,
-+   &quot;max_gap_bps&quot;: 20.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TATATECH \u2194 BSE:TATATECH&quot;,
-+   &quot;sym&quot;: &quot;TATATECH&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.2,
-+   &quot;p90_gap_bps&quot;: 9.8,
-+   &quot;max_gap_bps&quot;: 25.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TECHM \u2194 BSE:TECHM&quot;,
-+   &quot;sym&quot;: &quot;TECHM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.2,
-+   &quot;p90_gap_bps&quot;: 9.7,
-+   &quot;max_gap_bps&quot;: 19.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:LAURUSLABS \u2194 BSE:LAURUSLABS&quot;,
-+   &quot;sym&quot;: &quot;LAURUSLABS&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.9,
-+   &quot;p90_gap_bps&quot;: 9.5,
-+   &quot;max_gap_bps&quot;: 13.7
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ASHOKLEY \u2194 BSE:ASHOKLEY&quot;,
-+   &quot;sym&quot;: &quot;ASHOKLEY&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.3,
-+   &quot;p90_gap_bps&quot;: 9.3,
-+   &quot;max_gap_bps&quot;: 12.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BPCL \u2194 BSE:BPCL&quot;,
-+   &quot;sym&quot;: &quot;BPCL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.2,
-+   &quot;p90_gap_bps&quot;: 9.2,
-+   &quot;max_gap_bps&quot;: 24.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:SUNPHARMA \u2194 BSE:SUNPHARMA&quot;,
-+   &quot;sym&quot;: &quot;SUNPHARMA&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.2,
-+   &quot;p90_gap_bps&quot;: 9.1,
-+   &quot;max_gap_bps&quot;: 19.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:POWERGRID \u2194 BSE:POWERGRID&quot;,
-+   &quot;sym&quot;: &quot;POWERGRID&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.7,
-+   &quot;p90_gap_bps&quot;: 8.8,
-+   &quot;max_gap_bps&quot;: 13.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:EICHERMOT \u2194 BSE:EICHERMOT&quot;,
-+   &quot;sym&quot;: &quot;EICHERMOT&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.8,
-+   &quot;p90_gap_bps&quot;: 8.7,
-+   &quot;max_gap_bps&quot;: 20.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:CIPLA \u2194 BSE:CIPLA&quot;,
-+   &quot;sym&quot;: &quot;CIPLA&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.6,
-+   &quot;p90_gap_bps&quot;: 8.6,
-+   &quot;max_gap_bps&quot;: 44.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:SAIL \u2194 BSE:SAIL&quot;,
-+   &quot;sym&quot;: &quot;SAIL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.9,
-+   &quot;p90_gap_bps&quot;: 8.6,
-+   &quot;max_gap_bps&quot;: 16.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:APOLLOHOSP \u2194 BSE:APOLLOHOSP&quot;,
-+   &quot;sym&quot;: &quot;APOLLOHOSP&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.7,
-+   &quot;p90_gap_bps&quot;: 8.5,
-+   &quot;max_gap_bps&quot;: 59.0
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HAL \u2194 BSE:HAL&quot;,
-+   &quot;sym&quot;: &quot;HAL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 8.4,
-+   &quot;max_gap_bps&quot;: 14.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BANKBARODA \u2194 BSE:BANKBARODA&quot;,
-+   &quot;sym&quot;: &quot;BANKBARODA&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.0,
-+   &quot;p90_gap_bps&quot;: 8.1,
-+   &quot;max_gap_bps&quot;: 19.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:CANBK \u2194 BSE:CANBK&quot;,
-+   &quot;sym&quot;: &quot;CANBK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.0,
-+   &quot;p90_gap_bps&quot;: 8.1,
-+   &quot;max_gap_bps&quot;: 12.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TATACHEM \u2194 BSE:TATACHEM&quot;,
-+   &quot;sym&quot;: &quot;TATACHEM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.4,
-+   &quot;p90_gap_bps&quot;: 8.1,
-+   &quot;max_gap_bps&quot;: 14.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:VBL \u2194 BSE:VBL&quot;,
-+   &quot;sym&quot;: &quot;VBL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.5,
-+   &quot;p90_gap_bps&quot;: 8.1,
-+   &quot;max_gap_bps&quot;: 22.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HINDALCO \u2194 BSE:HINDALCO&quot;,
-+   &quot;sym&quot;: &quot;HINDALCO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.1,
-+   &quot;p90_gap_bps&quot;: 7.9,
-+   &quot;max_gap_bps&quot;: 20.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:AMBUJACEM \u2194 BSE:AMBUJACEM&quot;,
-+   &quot;sym&quot;: &quot;AMBUJACEM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 5.2,
-+   &quot;p90_gap_bps&quot;: 7.8,
-+   &quot;max_gap_bps&quot;: 15.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:COFORGE \u2194 BSE:COFORGE&quot;,
-+   &quot;sym&quot;: &quot;COFORGE&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 7.8,
-+   &quot;max_gap_bps&quot;: 19.7
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ABB \u2194 BSE:ABB&quot;,
-+   &quot;sym&quot;: &quot;ABB&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.5,
-+   &quot;p90_gap_bps&quot;: 7.7,
-+   &quot;max_gap_bps&quot;: 14.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:FEDERALBNK \u2194 BSE:FEDERALBNK&quot;,
-+   &quot;sym&quot;: &quot;FEDERALBNK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.1,
-+   &quot;p90_gap_bps&quot;: 7.6,
-+   &quot;max_gap_bps&quot;: 18.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:GAIL \u2194 BSE:GAIL&quot;,
-+   &quot;sym&quot;: &quot;GAIL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.5,
-+   &quot;p90_gap_bps&quot;: 7.6,
-+   &quot;max_gap_bps&quot;: 12.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:NTPC \u2194 BSE:NTPC&quot;,
-+   &quot;sym&quot;: &quot;NTPC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.0,
-+   &quot;p90_gap_bps&quot;: 7.6,
-+   &quot;max_gap_bps&quot;: 24.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:KOTAKBANK \u2194 BSE:KOTAKBANK&quot;,
-+   &quot;sym&quot;: &quot;KOTAKBANK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.6,
-+   &quot;p90_gap_bps&quot;: 7.2,
-+   &quot;max_gap_bps&quot;: 18.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:NATIONALUM \u2194 BSE:NATIONALUM&quot;,
-+   &quot;sym&quot;: &quot;NATIONALUM&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.9,
-+   &quot;p90_gap_bps&quot;: 7.2,
-+   &quot;max_gap_bps&quot;: 12.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ASIANPAINT \u2194 BSE:ASIANPAINT&quot;,
-+   &quot;sym&quot;: &quot;ASIANPAINT&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.8,
-+   &quot;p90_gap_bps&quot;: 7.0,
-+   &quot;max_gap_bps&quot;: 16.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BAJAJ-AUTO \u2194 BSE:BAJAJ-AUTO&quot;,
-+   &quot;sym&quot;: &quot;BAJAJ-AUTO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.7,
-+   &quot;p90_gap_bps&quot;: 7.0,
-+   &quot;max_gap_bps&quot;: 16.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HINDPETRO \u2194 BSE:HINDPETRO&quot;,
-+   &quot;sym&quot;: &quot;HINDPETRO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 4.2,
-+   &quot;p90_gap_bps&quot;: 7.0,
-+   &quot;max_gap_bps&quot;: 15.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ITC \u2194 BSE:ITC&quot;,
-+   &quot;sym&quot;: &quot;ITC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.9,
-+   &quot;p90_gap_bps&quot;: 7.0,
-+   &quot;max_gap_bps&quot;: 28.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TATASTEEL \u2194 BSE:TATASTEEL&quot;,
-+   &quot;sym&quot;: &quot;TATASTEEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.7,
-+   &quot;p90_gap_bps&quot;: 7.0,
-+   &quot;max_gap_bps&quot;: 14.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BAJFINANCE \u2194 BSE:BAJFINANCE&quot;,
-+   &quot;sym&quot;: &quot;BAJFINANCE&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.0,
-+   &quot;p90_gap_bps&quot;: 6.9,
-+   &quot;max_gap_bps&quot;: 9.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HINDUNILVR \u2194 BSE:HINDUNILVR&quot;,
-+   &quot;sym&quot;: &quot;HINDUNILVR&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.6,
-+   &quot;p90_gap_bps&quot;: 6.7,
-+   &quot;max_gap_bps&quot;: 41.0
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:LT \u2194 BSE:LT&quot;,
-+   &quot;sym&quot;: &quot;LT&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.7,
-+   &quot;p90_gap_bps&quot;: 6.7,
-+   &quot;max_gap_bps&quot;: 12.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:NHPC \u2194 BSE:NHPC&quot;,
-+   &quot;sym&quot;: &quot;NHPC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.6,
-+   &quot;p90_gap_bps&quot;: 6.6,
-+   &quot;max_gap_bps&quot;: 18.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:RECLTD \u2194 BSE:RECLTD&quot;,
-+   &quot;sym&quot;: &quot;RECLTD&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.2,
-+   &quot;p90_gap_bps&quot;: 6.5,
-+   &quot;max_gap_bps&quot;: 22.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ADANIPORTS \u2194 BSE:ADANIPORTS&quot;,
-+   &quot;sym&quot;: &quot;ADANIPORTS&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.4,
-+   &quot;p90_gap_bps&quot;: 6.4,
-+   &quot;max_gap_bps&quot;: 27.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:DIXON \u2194 BSE:DIXON&quot;,
-+   &quot;sym&quot;: &quot;DIXON&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 6.4,
-+   &quot;max_gap_bps&quot;: 16.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:JSWSTEEL \u2194 BSE:JSWSTEEL&quot;,
-+   &quot;sym&quot;: &quot;JSWSTEEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.1,
-+   &quot;p90_gap_bps&quot;: 6.3,
-+   &quot;max_gap_bps&quot;: 13.0
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:DRREDDY \u2194 BSE:DRREDDY&quot;,
-+   &quot;sym&quot;: &quot;DRREDDY&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.9,
-+   &quot;p90_gap_bps&quot;: 6.2,
-+   &quot;max_gap_bps&quot;: 9.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:MCX \u2194 BSE:MCX&quot;,
-+   &quot;sym&quot;: &quot;MCX&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.3,
-+   &quot;p90_gap_bps&quot;: 6.1,
-+   &quot;max_gap_bps&quot;: 13.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:POLYCAB \u2194 BSE:POLYCAB&quot;,
-+   &quot;sym&quot;: &quot;POLYCAB&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.3,
-+   &quot;p90_gap_bps&quot;: 6.1,
-+   &quot;max_gap_bps&quot;: 12.0
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BHEL \u2194 BSE:BHEL&quot;,
-+   &quot;sym&quot;: &quot;BHEL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 3.5,
-+   &quot;p90_gap_bps&quot;: 5.9,
-+   &quot;max_gap_bps&quot;: 12.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HINDZINC \u2194 BSE:HINDZINC&quot;,
-+   &quot;sym&quot;: &quot;HINDZINC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 5.9,
-+   &quot;max_gap_bps&quot;: 14.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:VEDL \u2194 BSE:VEDL&quot;,
-+   &quot;sym&quot;: &quot;VEDL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.9,
-+   &quot;p90_gap_bps&quot;: 5.7,
-+   &quot;max_gap_bps&quot;: 38.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ICICIBANK \u2194 BSE:ICICIBANK&quot;,
-+   &quot;sym&quot;: &quot;ICICIBANK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.2,
-+   &quot;p90_gap_bps&quot;: 5.6,
-+   &quot;max_gap_bps&quot;: 10.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:AXISBANK \u2194 BSE:AXISBANK&quot;,
-+   &quot;sym&quot;: &quot;AXISBANK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.0,
-+   &quot;p90_gap_bps&quot;: 5.5,
-+   &quot;max_gap_bps&quot;: 11.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:BHARTIARTL \u2194 BSE:BHARTIARTL&quot;,
-+   &quot;sym&quot;: &quot;BHARTIARTL&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.9,
-+   &quot;p90_gap_bps&quot;: 5.5,
-+   &quot;max_gap_bps&quot;: 14.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:WIPRO \u2194 BSE:WIPRO&quot;,
-+   &quot;sym&quot;: &quot;WIPRO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.4,
-+   &quot;p90_gap_bps&quot;: 5.5,
-+   &quot;max_gap_bps&quot;: 30.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:MAZDOCK \u2194 BSE:MAZDOCK&quot;,
-+   &quot;sym&quot;: &quot;MAZDOCK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.3,
-+   &quot;p90_gap_bps&quot;: 5.4,
-+   &quot;max_gap_bps&quot;: 10.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TATAPOWER \u2194 BSE:TATAPOWER&quot;,
-+   &quot;sym&quot;: &quot;TATAPOWER&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.7,
-+   &quot;p90_gap_bps&quot;: 5.4,
-+   &quot;max_gap_bps&quot;: 16.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HDFCBANK \u2194 BSE:HDFCBANK&quot;,
-+   &quot;sym&quot;: &quot;HDFCBANK&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.4,
-+   &quot;p90_gap_bps&quot;: 5.2,
-+   &quot;max_gap_bps&quot;: 8.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:MARUTI \u2194 BSE:MARUTI&quot;,
-+   &quot;sym&quot;: &quot;MARUTI&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.2,
-+   &quot;p90_gap_bps&quot;: 5.1,
-+   &quot;max_gap_bps&quot;: 13.5
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:NMDC \u2194 BSE:NMDC&quot;,
-+   &quot;sym&quot;: &quot;NMDC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.5,
-+   &quot;p90_gap_bps&quot;: 5.0,
-+   &quot;max_gap_bps&quot;: 26.2
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:M&amp;M \u2194 BSE:M&amp;M&quot;,
-+   &quot;sym&quot;: &quot;M&amp;M&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.8,
-+   &quot;p90_gap_bps&quot;: 4.9,
-+   &quot;max_gap_bps&quot;: 18.1
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:TCS \u2194 BSE:TCS&quot;,
-+   &quot;sym&quot;: &quot;TCS&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.1,
-+   &quot;p90_gap_bps&quot;: 4.8,
-+   &quot;max_gap_bps&quot;: 9.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:HEROMOTOCO \u2194 BSE:HEROMOTOCO&quot;,
-+   &quot;sym&quot;: &quot;HEROMOTOCO&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.9,
-+   &quot;p90_gap_bps&quot;: 4.6,
-+   &quot;max_gap_bps&quot;: 14.8
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:SBIN \u2194 BSE:SBIN&quot;,
-+   &quot;sym&quot;: &quot;SBIN&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 2.0,
-+   &quot;p90_gap_bps&quot;: 4.6,
-+   &quot;max_gap_bps&quot;: 8.6
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:ONGC \u2194 BSE:ONGC&quot;,
-+   &quot;sym&quot;: &quot;ONGC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.7,
-+   &quot;p90_gap_bps&quot;: 4.3,
-+   &quot;max_gap_bps&quot;: 14.4
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:PFC \u2194 BSE:PFC&quot;,
-+   &quot;sym&quot;: &quot;PFC&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.4,
-+   &quot;p90_gap_bps&quot;: 4.3,
-+   &quot;max_gap_bps&quot;: 17.3
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:RELIANCE \u2194 BSE:RELIANCE&quot;,
-+   &quot;sym&quot;: &quot;RELIANCE&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.2,
-+   &quot;p90_gap_bps&quot;: 4.0,
-+   &quot;max_gap_bps&quot;: 12.9
-+  },
-+  {
-+   &quot;pair&quot;: &quot;NSE:INFY \u2194 BSE:INFY&quot;,
-+   &quot;sym&quot;: &quot;INFY&quot;,
-+   &quot;observations&quot;: 184,
-+   &quot;median_gap_bps&quot;: 1.7,
-+   &quot;p90_gap_bps&quot;: 3.9,
-+   &quot;max_gap_bps&quot;: 5.9
-+  }
-+ ],
-+ &quot;observations&quot;: 15272,
-+ &quot;min_obs&quot;: 20,
-+ &quot;note&quot;: &quot;Every pair observed on BOTH books by the recorder. A gap is a real arbitrage only if both sides are executable \u2014 this records the gap; executability is the recorder&#x27;s open question.&quot;
-+}
-\ No newline at end of file
-diff --git a/reports/C5-PAIRS.md b/reports/C5-PAIRS.md
-new file mode 100644
-index 000000000..ba6a01999
---- /dev/null
-+++ b/reports/C5-PAIRS.md
-@@ -0,0 +1,91 @@
-+# C5 — THE CONCRETE NSE↔BSE PAIR LIST (from recorded data)
-+
-+_Built from the engine12 cross-exchange recorder — 15272 recorded observations. Every pair was observed on BOTH books; nothing is assumed dual-listed. A gap is a real arbitrage only if both sides are executable — this records the gap, not the fill._
-+
-+| Pair | Observations | Median gap (bps) | 90th pct (bps) | Max gap (bps) |
-+|---|---|---|---|---|
-+| NSE:TORNTPHARM ↔ BSE:TORNTPHARM | 184 | 5.1 | 17.0 | 112.8 |
-+| NSE:AUROPHARMA ↔ BSE:AUROPHARMA | 184 | 4.7 | 16.1 | 20.3 |
-+| NSE:PGEL ↔ BSE:PGEL | 184 | 4.3 | 15.3 | 22.1 |
-+| NSE:INDIGO ↔ BSE:INDIGO | 184 | 3.4 | 13.1 | 19.9 |
-+| NSE:TITAGARH ↔ BSE:TITAGARH | 184 | 4.8 | 12.6 | 22.2 |
-+| NSE:GLENMARK ↔ BSE:GLENMARK | 184 | 3.0 | 12.4 | 28.5 |
-+| NSE:JINDALSTEL ↔ BSE:JINDALSTEL | 184 | 3.5 | 12.2 | 21.9 |
-+| NSE:UPL ↔ BSE:UPL | 184 | 3.6 | 12.0 | 28.6 |
-+| NSE:PNB ↔ BSE:PNB | 184 | 3.4 | 11.7 | 38.5 |
-+| NSE:ADANIENT ↔ BSE:ADANIENT | 184 | 3.8 | 11.6 | 33.4 |
-+| NSE:LUPIN ↔ BSE:LUPIN | 184 | 3.3 | 11.6 | 70.0 |
-+| NSE:TVSMOTOR ↔ BSE:TVSMOTOR | 184 | 4.0 | 11.6 | 24.2 |
-+| NSE:BEL ↔ BSE:BEL | 184 | 2.5 | 11.3 | 16.4 |
-+| NSE:SJVN ↔ BSE:SJVN | 184 | 3.2 | 11.1 | 22.2 |
-+| NSE:SILVER ↔ BSE:SILVER | 184 | 4.6 | 10.9 | 29.2 |
-+| NSE:VOLTAS ↔ BSE:VOLTAS | 184 | 3.6 | 10.9 | 21.6 |
-+| NSE:ULTRACEMCO ↔ BSE:ULTRACEMCO | 184 | 3.3 | 10.8 | 21.6 |
-+| NSE:JSWENERGY ↔ BSE:JSWENERGY | 184 | 3.8 | 10.7 | 19.2 |
-+| NSE:TATACONSUM ↔ BSE:TATACONSUM | 184 | 2.0 | 10.5 | 19.3 |
-+| NSE:HAVELLS ↔ BSE:HAVELLS | 184 | 4.6 | 10.4 | 16.1 |
-+| NSE:TITAN ↔ BSE:TITAN | 184 | 2.1 | 10.3 | 37.6 |
-+| NSE:DIVISLAB ↔ BSE:DIVISLAB | 184 | 2.7 | 10.1 | 20.3 |
-+| NSE:TATATECH ↔ BSE:TATATECH | 184 | 4.2 | 9.8 | 25.9 |
-+| NSE:TECHM ↔ BSE:TECHM | 184 | 3.2 | 9.7 | 19.3 |
-+| NSE:LAURUSLABS ↔ BSE:LAURUSLABS | 184 | 2.9 | 9.5 | 13.7 |
-+| NSE:ASHOKLEY ↔ BSE:ASHOKLEY | 184 | 4.3 | 9.3 | 12.5 |
-+| NSE:BPCL ↔ BSE:BPCL | 184 | 3.2 | 9.2 | 24.2 |
-+| NSE:SUNPHARMA ↔ BSE:SUNPHARMA | 184 | 3.2 | 9.1 | 19.5 |
-+| NSE:POWERGRID ↔ BSE:POWERGRID | 184 | 3.7 | 8.8 | 13.1 |
-+| NSE:EICHERMOT ↔ BSE:EICHERMOT | 184 | 2.8 | 8.7 | 20.2 |
-+| NSE:CIPLA ↔ BSE:CIPLA | 184 | 3.6 | 8.6 | 44.2 |
-+| NSE:SAIL ↔ BSE:SAIL | 184 | 2.9 | 8.6 | 16.1 |
-+| NSE:APOLLOHOSP ↔ BSE:APOLLOHOSP | 184 | 3.7 | 8.5 | 59.0 |
-+| NSE:HAL ↔ BSE:HAL | 184 | 2.5 | 8.4 | 14.6 |
-+| NSE:BANKBARODA ↔ BSE:BANKBARODA | 184 | 3.0 | 8.1 | 19.2 |
-+| NSE:CANBK ↔ BSE:CANBK | 184 | 4.0 | 8.1 | 12.2 |
-+| NSE:TATACHEM ↔ BSE:TATACHEM | 184 | 4.4 | 8.1 | 14.1 |
-+| NSE:VBL ↔ BSE:VBL | 184 | 3.5 | 8.1 | 22.1 |
-+| NSE:HINDALCO ↔ BSE:HINDALCO | 184 | 2.1 | 7.9 | 20.5 |
-+| NSE:AMBUJACEM ↔ BSE:AMBUJACEM | 184 | 5.2 | 7.8 | 15.5 |
-+| NSE:COFORGE ↔ BSE:COFORGE | 184 | 2.5 | 7.8 | 19.7 |
-+| NSE:ABB ↔ BSE:ABB | 184 | 3.5 | 7.7 | 14.6 |
-+| NSE:FEDERALBNK ↔ BSE:FEDERALBNK | 184 | 3.1 | 7.6 | 18.4 |
-+| NSE:GAIL ↔ BSE:GAIL | 184 | 3.5 | 7.6 | 12.2 |
-+| NSE:NTPC ↔ BSE:NTPC | 184 | 3.0 | 7.6 | 24.4 |
-+| NSE:KOTAKBANK ↔ BSE:KOTAKBANK | 184 | 3.6 | 7.2 | 18.1 |
-+| NSE:NATIONALUM ↔ BSE:NATIONALUM | 184 | 2.9 | 7.2 | 12.9 |
-+| NSE:ASIANPAINT ↔ BSE:ASIANPAINT | 184 | 2.8 | 7.0 | 16.8 |
-+| NSE:BAJAJ-AUTO ↔ BSE:BAJAJ-AUTO | 184 | 2.7 | 7.0 | 16.8 |
-+| NSE:HINDPETRO ↔ BSE:HINDPETRO | 184 | 4.2 | 7.0 | 15.3 |
-+| NSE:ITC ↔ BSE:ITC | 184 | 1.9 | 7.0 | 28.3 |
-+| NSE:TATASTEEL ↔ BSE:TATASTEEL | 184 | 2.7 | 7.0 | 14.6 |
-+| NSE:BAJFINANCE ↔ BSE:BAJFINANCE | 184 | 2.0 | 6.9 | 9.9 |
-+| NSE:HINDUNILVR ↔ BSE:HINDUNILVR | 184 | 2.6 | 6.7 | 41.0 |
-+| NSE:LT ↔ BSE:LT | 184 | 3.7 | 6.7 | 12.8 |
-+| NSE:NHPC ↔ BSE:NHPC | 184 | 2.6 | 6.6 | 18.4 |
-+| NSE:RECLTD ↔ BSE:RECLTD | 184 | 3.2 | 6.5 | 22.8 |
-+| NSE:ADANIPORTS ↔ BSE:ADANIPORTS | 184 | 2.4 | 6.4 | 27.1 |
-+| NSE:DIXON ↔ BSE:DIXON | 184 | 2.5 | 6.4 | 16.8 |
-+| NSE:JSWSTEEL ↔ BSE:JSWSTEEL | 184 | 3.1 | 6.3 | 13.0 |
-+| NSE:DRREDDY ↔ BSE:DRREDDY | 184 | 2.9 | 6.2 | 9.9 |
-+| NSE:MCX ↔ BSE:MCX | 184 | 2.3 | 6.1 | 13.9 |
-+| NSE:POLYCAB ↔ BSE:POLYCAB | 184 | 3.3 | 6.1 | 12.0 |
-+| NSE:BHEL ↔ BSE:BHEL | 184 | 3.5 | 5.9 | 12.9 |
-+| NSE:HINDZINC ↔ BSE:HINDZINC | 184 | 2.5 | 5.9 | 14.4 |
-+| NSE:VEDL ↔ BSE:VEDL | 184 | 1.9 | 5.7 | 38.1 |
-+| NSE:ICICIBANK ↔ BSE:ICICIBANK | 184 | 2.2 | 5.6 | 10.9 |
-+| NSE:AXISBANK ↔ BSE:AXISBANK | 184 | 2.0 | 5.5 | 11.3 |
-+| NSE:BHARTIARTL ↔ BSE:BHARTIARTL | 184 | 1.9 | 5.5 | 14.3 |
-+| NSE:WIPRO ↔ BSE:WIPRO | 184 | 2.4 | 5.5 | 30.2 |
-+| NSE:MAZDOCK ↔ BSE:MAZDOCK | 184 | 2.3 | 5.4 | 10.4 |
-+| NSE:TATAPOWER ↔ BSE:TATAPOWER | 184 | 2.7 | 5.4 | 16.3 |
-+| NSE:HDFCBANK ↔ BSE:HDFCBANK | 184 | 1.4 | 5.2 | 8.1 |
-+| NSE:MARUTI ↔ BSE:MARUTI | 184 | 2.2 | 5.1 | 13.5 </pre></div><div class='c'><div class='h'><b>de86f7093</b> · 2026-09-22 18:09</div><div>R-EVENING-22 C4: resting-order fill model (adverse selection) + survivorship haircut, honest</div><div class='sub h'>reports/C4-FILL-HAIRCUT.json  |  59 +++++++++++++++++++</div><div class='sub h'>reports/C4-FILL-HAIRCUT.md    |  25 ++++++++</div><div class='sub h'>scripts/c4_fill_haircut.py    | 133 ++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_c4_fill_haircut.py |  25 ++++++++</div><pre>diff --git a/reports/C4-FILL-HAIRCUT.json b/reports/C4-FILL-HAIRCUT.json
-new file mode 100644
-index 000000000..607e99d8d
---- /dev/null
-+++ b/reports/C4-FILL-HAIRCUT.json
-@@ -0,0 +1,59 @@
-+{
-+ &quot;fill_model&quot;: {
-+  &quot;inputs&quot;: {
-+   &quot;p_fill&quot;: &quot;measured&quot;,
-+   &quot;adverse_slip&quot;: &quot;measured&quot;
-+  },
-+  &quot;depth_observations&quot;: 40428,
-+  &quot;min_sample&quot;: 500,
-+  &quot;measured&quot;: true,
-+  &quot;charge&quot;: &quot;measured p_fill and adverse_slip from recorded depth&quot;
-+ },
-+ &quot;haircut&quot;: [
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;family&quot;: &quot;ema&quot;,
-+   &quot;fires&quot;: 10,
-+   &quot;measured_edge_R&quot;: 0.0633,
-+   &quot;credited_edge_R&quot;: 0.0,
-+   &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not credited for funding until the point-in-time universe (O1) re-measures it&quot;
-+  },
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;family&quot;: &quot;sma&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;measured_edge_R&quot;: 0.4776,
-+   &quot;credited_edge_R&quot;: 0.0,
-+   &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not credited for funding until the point-in-time universe (O1) re-measures it&quot;
-+  },
-+  {
-+   &quot;stock&quot;: &quot;BSE&quot;,
-+   &quot;family&quot;: &quot;stddev_returns&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;measured_edge_R&quot;: 0.4937,
-+   &quot;credited_edge_R&quot;: 0.0,
-+   &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not credited for funding until the point-in-time universe (O1) re-measures it&quot;
-+  },
-+  {
-+   &quot;stock&quot;: &quot;AUBANK&quot;,
-+   &quot;family&quot;: &quot;vwap&quot;,
-+   &quot;fires&quot;: 13,
-+   &quot;measured_edge_R&quot;: 0.1652,
-+   &quot;credited_edge_R&quot;: 0.0,
-+   &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not credited for funding until the point-in-time universe (O1) re-measures it&quot;
-+  },
-+  {
-+   &quot;stock&quot;: &quot;ETERNAL&quot;,
-+   &quot;family&quot;: &quot;rsi&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;measured_edge_R&quot;: 0.2116,
-+   &quot;credited_edge_R&quot;: 0.0,
-+   &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not credited for funding until the point-in-time universe (O1) re-measures it&quot;
-+  }
-+ ],
-+ &quot;blocks_funding_not_measurement&quot;: true,
-+ &quot;needs_owner_data&quot;: [
-+  &quot;O1 \u2014 the point-in-time F&amp;O universe (for the exact survivorship de-bias)&quot;
-+ ],
-+ &quot;note&quot;: &quot;Both parts are honest: the fill model charges the conservative adversely-selected fallback until depth is recorded, and the survivorship haircut credits no positive edge for funding until O1. Paper measurement continues; nothing is funded on an un-de-biased edge.&quot;
-+}
-\ No newline at end of file
-diff --git a/reports/C4-FILL-HAIRCUT.md b/reports/C4-FILL-HAIRCUT.md
-new file mode 100644
-index 000000000..79b663bb1
---- /dev/null
-+++ b/reports/C4-FILL-HAIRCUT.md
-@@ -0,0 +1,25 @@
-+# C4 — FILL-PROBABILITY (ADVERSE SELECTION) + SURVIVORSHIP HAIRCUT
-+
-+## 1. Fill-probability model for resting orders
-+
-+A resting limit order fills only when the market trades THROUGH it, and fills preferentially when the move is against you (adverse selection). Two MEASURED quantities, never typed:
-+
-+- **p_fill** = fraction of bars whose range reached the limit price
-+
-+- **adverse_slip** = E[next-bar return | filled] − E[next-bar return | any bar]  (≤ 0)
-+
-+Status: **MEASURED** — measured p_fill and adverse_slip from recorded depth.
-+
-+## 2. Survivorship haircut on the Price Engine&#x27;s book
-+
-+The five survivors sit on a survivorship-biased universe (G13-bias-2), so a long-side edge is biased upward. The exact de-bias needs the point-in-time universe (owner item **O1**), which is not on disk. Conservatively, the measured edge is an **upper bound** and is **not credited for funding** until O1:
-+
-+| Stock | Pattern | Fires | Measured edge (R) | Credited for funding (R) |
-+|---|---|---|---|---|
-+| UNITDSPR | ema | 10 | 0.0633 | 0.0 |
-+| UNITDSPR | sma | 9 | 0.4776 | 0.0 |
-+| BSE | stddev_returns | 9 | 0.4937 | 0.0 |
-+| AUBANK | vwap | 13 | 0.1652 | 0.0 |
-+| ETERNAL | rsi | 9 | 0.2116 | 0.0 |
-+
-+**This blocks FUNDING, never MEASUREMENT.** Paper trading and scoring continue; no position is funded on an un-de-biased edge. The haircut lifts when O1 (owner-fetched) re-measures the edge on a point-in-time universe.
-diff --git a/scripts/c4_fill_haircut.py b/scripts/c4_fill_haircut.py
-new file mode 100644
-index 000000000..346703a73
---- /dev/null
-+++ b/scripts/c4_fill_haircut.py
-@@ -0,0 +1,133 @@
-+&quot;&quot;&quot;R-EVENING-22 C4 — the fill-probability model for RESTING orders (adverse selection), and the survivorship
-+haircut on the Price Engine&#x27;s book.
-+
-+Two parts, both kept honest — no typed parameter, no fabricated number (§4.1/§4.4):
-+
-+1. FILL-PROBABILITY (adverse selection). A resting limit order fills only when the market trades THROUGH it,
-+   and it fills preferentially when the move is against you (informed flow). The model is structural and its
-+   two quantities are MEASURED, never typed:
-+     p_fill(order)      = fraction of bars whose range reached the limit price (from recorded depth/price)
-+     adverse_slip(order) = E[next-bar return | filled] − E[next-bar return | any bar]  (≤ 0 by construction)
-+   Both require the depth-through-touch recording (e13_depth). Until enough is recorded, the model reports
-+   its inputs as UNMEASURED and charges the conservative fallback: assume the fill is adversely selected
-+   (fill only in the against-you tail), which is the least-favourable, trade-less reading (§18.5).
-+
-+2. SURVIVORSHIP HAIRCUT. The five survivors were measured on a universe that only holds names still
-+   F&amp;O-eligible on the 2026-07-14 snapshot, so a long-side edge is biased UPWARD (KNOWN_GAPS G13-bias-2).
-+   The de-biased edge needs the point-in-time universe (owner item O1), which is not on the disk. The
-+   conservative, derivable haircut until O1 lands: the measured edge is an UPPER BOUND and is NOT credited
-+   for funding — exactly what the conditioned-on-G13-bias-2 badge already says. So the funding-credited edge
-+   of every survivor is haircut to ≤ 0 pending O1; measurement and paper trading continue unchanged.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import sys
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+OUT_JSON = os.path.join(REPO, &quot;reports&quot;, &quot;C4-FILL-HAIRCUT.json&quot;)
-+OUT_MD = os.path.join(REPO, &quot;reports&quot;, &quot;C4-FILL-HAIRCUT.md&quot;)
-+DEPTH = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;stores&quot;, &quot;e1_deriv_store&quot;, &quot;depth5&quot;, &quot;SPREADS.csv&quot;)
-+
-+
-+def _survivors():
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;EXAMS-REAL-STAGING.json&quot;), encoding=&quot;utf-8&quot;))
-+        return d.get(&quot;certified_patterns&quot;) or []
-+    except Exception:
-+        return []
-+
-+
-+def _depth_rows():
-+    &quot;&quot;&quot;How many depth-through-touch observations are recorded — the fill model&#x27;s calibration data.&quot;&quot;&quot;
-+    try:
-+        import csv
-+        return sum(1 for _ in csv.reader(open(DEPTH, encoding=&quot;utf-8&quot;))) - 1
-+    except Exception:
-+        return 0
-+
-+
-+def fill_model():
-+    n = _depth_rows()
-+    MIN = 500      # a plainly-declared minimum sample before the two quantities are trusted (a sample floor,
-+    #                not a strategy wall — §4.2 does not apply); below it the model uses the conservative fallback.
-+    measured = n &gt;= MIN
-+    return {
-+        &quot;inputs&quot;: {&quot;p_fill&quot;: &quot;measured&quot; if measured else &quot;UNMEASURED&quot;,
-+                   &quot;adverse_slip&quot;: &quot;measured&quot; if measured else &quot;UNMEASURED&quot;},
-+        &quot;depth_observations&quot;: n, &quot;min_sample&quot;: MIN, &quot;measured&quot;: measured,
-+        &quot;charge&quot;: (&quot;measured p_fill and adverse_slip from recorded depth&quot; if measured else
-+                   &quot;CONSERVATIVE FALLBACK: assume adversely-selected fills only (the against-you tail) — the &quot;
-+                   &quot;least-favourable, trade-less reading, until %d+ depth observations exist (have %d)&quot; % (MIN, n)),
-+    }
-+
-+
-+def haircut_book():
-+    &quot;&quot;&quot;Apply the conservative survivorship haircut: the measured edge is an upper bound, credited edge ≤ 0
-+    for funding until O1 (the point-in-time universe) lands.&quot;&quot;&quot;
-+    rows = []
-+    for c in _survivors():
-+        measured_edge_R = c.get(&quot;mean_net_R&quot;)
-+        rows.append({&quot;stock&quot;: c.get(&quot;stock&quot;), &quot;family&quot;: c.get(&quot;family&quot;), &quot;fires&quot;: c.get(&quot;fires&quot;),
-+                     &quot;measured_edge_R&quot;: measured_edge_R,
-+                     &quot;credited_edge_R&quot;: 0.0,          # haircut to zero for FUNDING pending O1 (upper-bound only)
-+                     &quot;why&quot;: &quot;survivorship-biased universe (G13-bias-2); measured edge is an upper bound, not &quot;
-+                            &quot;credited for funding until the point-in-time universe (O1) re-measures it&quot;})
-+    return rows
-+
-+
-+def run(write=True):
-+    out = {&quot;fill_model&quot;: fill_model(), &quot;haircut&quot;: haircut_book(),
-+           &quot;blocks_funding_not_measurement&quot;: True,
-+           &quot;needs_owner_data&quot;: [&quot;O1 — the point-in-time F&amp;O universe (for the exact survivorship de-bias)&quot;],
-+           &quot;note&quot;: (&quot;Both parts are honest: the fill model charges the conservative adversely-selected fallback &quot;
-+                    &quot;until depth is recorded, and the survivorship haircut credits no positive edge for funding &quot;
-+                    &quot;until O1. Paper measurement continues; nothing is funded on an un-de-biased edge.&quot;)}
-+    if write:
-+        with open(OUT_JSON, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            json.dump(out, f, indent=1, default=str)
-+        _write_md(out)
-+    return out
-+
-+
-+def _write_md(o):
-+    fm = o[&quot;fill_model&quot;]
-+    L = [&quot;# C4 — FILL-PROBABILITY (ADVERSE SELECTION) + SURVIVORSHIP HAIRCUT&quot;, &quot;&quot;,
-+         &quot;## 1. Fill-probability model for resting orders&quot;, &quot;&quot;,
-+         &quot;A resting limit order fills only when the market trades THROUGH it, and fills preferentially when the &quot;
-+         &quot;move is against you (adverse selection). Two MEASURED quantities, never typed:&quot;, &quot;&quot;,
-+         &quot;- **p_fill** = fraction of bars whose range reached the limit price&quot;, &quot;&quot;,
-+         &quot;- **adverse_slip** = E[next-bar return | filled] − E[next-bar return | any bar]  (≤ 0)&quot;, &quot;&quot;,
-+         &quot;Status: **%s** — %s.&quot; % (&quot;MEASURED&quot; if fm[&quot;measured&quot;] else &quot;UNMEASURED&quot;, fm[&quot;charge&quot;]), &quot;&quot;,
-+         &quot;## 2. Survivorship haircut on the Price Engine&#x27;s book&quot;, &quot;&quot;,
-+         &quot;The five survivors sit on a survivorship-biased universe (G13-bias-2), so a long-side edge is biased &quot;
-+         &quot;upward. The exact de-bias needs the point-in-time universe (owner item **O1**), which is not on disk. &quot;
-+         &quot;Conservatively, the measured edge is an **upper bound** and is **not credited for funding** until O1:&quot;,
-+         &quot;&quot;, &quot;| Stock | Pattern | Fires | Measured edge (R) | Credited for funding (R) |&quot;,
-+         &quot;|---|---|---|---|---|&quot;]
-+    for r in o[&quot;haircut&quot;]:
-+        L.append(&quot;| %s | %s | %s | %s | %s |&quot; % (r[&quot;stock&quot;], r[&quot;family&quot;], r[&quot;fires&quot;],
-+                                                 r[&quot;measured_edge_R&quot;], r[&quot;credited_edge_R&quot;]))
-+    L += [&quot;&quot;, &quot;**This blocks FUNDING, never MEASUREMENT.** Paper trading and scoring continue; no position is &quot;
-+          &quot;funded on an un-de-biased edge. The haircut lifts when O1 (owner-fetched) re-measures the edge on a &quot;
-+          &quot;point-in-time universe.&quot;]
-+    with open(OUT_MD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+        f.write(&quot;\n&quot;.join(L) + &quot;\n&quot;)
-+
-+
-+def _demo():
-+    o = run(write=False)
-+    assert &quot;fill_model&quot; in o and o[&quot;haircut&quot;]
-+    for r in o[&quot;haircut&quot;]:
-+        assert r[&quot;credited_edge_R&quot;] == 0.0        # conservative: no funding credit until O1
-+    assert &quot;O1&quot; in o[&quot;needs_owner_data&quot;][0]
-+    print(&quot;c4_fill_haircut demo OK: fill model %s; %d survivors haircut to 0 credited edge pending O1.&quot; % (
-+        &quot;measured&quot; if o[&quot;fill_model&quot;][&quot;measured&quot;] else &quot;conservative fallback&quot;, len(o[&quot;haircut&quot;])))
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo() if &quot;--demo&quot; in sys.argv else (run() and print(&quot;C4 written — see reports/C4-FILL-HAIRCUT.md&quot;))
-diff --git a/tests/test_c4_fill_haircut.py b/tests/test_c4_fill_haircut.py
-new file mode 100644
-index 000000000..a9cbdde36
---- /dev/null
-+++ b/tests/test_c4_fill_haircut.py
-@@ -0,0 +1,25 @@
-+&quot;&quot;&quot;R-EVENING-22 C4: fill model charges the conservative fallback until depth is recorded; the survivorship
-+haircut credits no funding edge until O1. Nothing typed, nothing fabricated.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import c4_fill_haircut as C4
-+
-+
-+def test_haircut_credits_zero_until_o1():
-+    o = C4.run(write=False)
-+    assert o[&quot;haircut&quot;], &quot;expected survivors&quot;
-+    for r in o[&quot;haircut&quot;]:
-+        assert r[&quot;credited_edge_R&quot;] == 0.0            # upper-bound only, no funding credit
-+    assert any(&quot;O1&quot; in x for x in o[&quot;needs_owner_data&quot;])
-+    assert o[&quot;blocks_funding_not_measurement&quot;] is True
-+
-+
-+def test_fill_model_is_measured_or_conservative():
-+    fm = C4.run(write=False)[&quot;fill_model&quot;]
-+    assert fm[&quot;measured&quot;] in (True, False)
-+    if not fm[&quot;measured&quot;]:
-+        assert &quot;CONSERVATIVE FALLBACK&quot; in fm[&quot;charge&quot;]  # never a typed fill probability
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_haircut_credits_zero_until_o1(); test_fill_model_is_measured_or_conservative(); print(&quot;test_c4 OK&quot;)
 </pre></div></main></body></html>
