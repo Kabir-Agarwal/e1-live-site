@@ -1,4 +1,602 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>776fa70eb</b> · 2026-09-22 15:53</div><div>R-RESTART-TONIGHT: restart_stack.py + supervisor guarded with the stack + START_SUPERVISOR retired</div><div class='sub h'>START_SUPERVISOR.bat                            |   5 -</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md |  18 +++</div><div class='sub h'>scripts/restart_stack.py                        | 194 ++++++++++++++++++++++++</div><div class='sub h'>scripts/watchdog.py                             |  49 ++++++</div><div class='sub h'>tests/test_runner_supervision.py                |  10 ++</div><pre>diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>42c8a6ca0</b> · 2026-09-22 16:05</div><div>R-BUILD-BEAT (10-min build line) + R-LIVE-BAR (8-step live-paper bar) — both machine-derived</div><div class='sub h'>.gitignore                                 |   3 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-BEAT.md |  12 ++</div><div class='sub h'>docs/dispatches/2026-09-22_R-LIVE-BAR.md   |  11 ++</div><div class='sub h'>scripts/build_beat.py                      | 185 +++++++++++++++++++++++++++++</div><div class='sub h'>scripts/live_bar.py                        | 179 ++++++++++++++++++++++++++++</div><div class='sub h'>scripts/site_build.py                      |   5 +</div><div class='sub h'>scripts/token_ping.py                      |   5 +</div><div class='sub h'>scripts/vitals.py                          |   9 ++</div><div class='sub h'>tests/test_build_beat.py                   |  56 +++++++++</div><div class='sub h'>tests/test_live_bar.py                     |  49 ++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index 64a7659d6..0fe22dd28 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -58,3 +58,6 @@ reports/.fire_cards_seen.json
+ scheduler/.build_slug
+ scheduler/.supervisor_state.json
+ scheduler/.supervisor_silence_posted
++scheduler/.build_beat_slot
++scheduler/.build_beat_halt
++scheduler/.live_bar_posted
+diff --git a/docs/dispatches/2026-09-22_R-BUILD-BEAT.md b/docs/dispatches/2026-09-22_R-BUILD-BEAT.md
+new file mode 100644
+index 000000000..0e51bbf6a
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-BUILD-BEAT.md
+@@ -0,0 +1,12 @@
++# R-BUILD-BEAT (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction. The 10-minute version below supersedes an earlier
++hourly wording sent the same evening._
++
++during build hours (15:30–09:00) token_ping posts one Telegram line every 10 minutes, derived only from
++machine facts — git log (commits in the last 10 minutes, with messages), the journal (ruling and item in
++progress), the test result of the last commit, the supervisor&#x27;s last &quot;checked&quot; time and whether HALT exists.
++Format: &quot;BUILD 21:10 — R-EVENING-22 B3 · 2 commits since 21:00: &lt;messages&gt; · tests 203/203 · supervisor on
++course 21:02&quot;. If no commits: &quot;BUILD 21:10 — no commits · &lt;item&gt; · supervisor &lt;state&gt;&quot;. Also one line on any
++halt. Never generated from the builder&#x27;s own text; if the journal and git disagree, say so. No message
++outside build hours.
+diff --git a/docs/dispatches/2026-09-22_R-LIVE-BAR.md b/docs/dispatches/2026-09-22_R-LIVE-BAR.md
+new file mode 100644
+index 000000000..eb25e3aec
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-LIVE-BAR.md
+@@ -0,0 +1,11 @@
++# R-LIVE-BAR (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++a &quot;live paper&quot; progress line, derived only from machine facts, with eight steps: (1) login landed today,
++(2) self-check passed — recorders + runner up, (3) 08:30 READY derived from vitals, (4) a real signal on a
++stock with its readings, (5) first PLACED paper order written by the real loop, (6) first CLOSED trade with
++result, (7) auditor observed 5–6 on the live ledger, (8) five consecutive clean sessions (no fault, no human
++click). Steps 1–4 reset daily; 5–8 persist once earned. Format: &quot;LIVE PAPER ▓▓▓░░░░░ 3/8 — next: &lt;step in
++plain words&gt;&quot;. Post it at 08:30 with the READY line, at 15:35 with the close, and immediately when a step
++advances. Show the same bar at the top of status.html.
+diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+new file mode 100644
+index 000000000..0798dac7f
+--- /dev/null
++++ b/scripts/build_beat.py
+@@ -0,0 +1,185 @@
++&quot;&quot;&quot;R-BUILD-BEAT — one Telegram line every 10 minutes during build hours (15:30–09:00 IST), derived ONLY from
++machine facts: git log (commits in the last 10 minutes + their messages), the journal (ruling + item in
++progress), the last commit&#x27;s recorded test result, the supervisor&#x27;s last &#x27;checked&#x27; time, and whether
++E1-DESK\\HALT exists — plus one immediate line on any new halt. Never generated from the builder&#x27;s own prose;
++if the journal&#x27;s ruling and git&#x27;s latest commit disagree, it says so. No line is posted outside build hours.
++token_ping calls maybe_post() from its wake loop.&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++E1DESK = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
++HALT = os.path.join(E1DESK, &quot;HALT&quot;)
++STATE = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;)
++JOURNAL = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-JOURNAL.log&quot;)
++LAST_TESTS = os.path.join(REPO, &quot;reports&quot;, &quot;LAST-TESTS.json&quot;)
++BEAT_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_beat_slot&quot;)
++HALT_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_beat_halt&quot;)
++SLOT_MIN = 10
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def build_hours(now=None):
++    now = now or _now()
++    m = now.hour * 60 + now.minute
++    return m &gt;= 15 * 60 + 30 or m &lt; 9 * 60
++
++
++def _git(*a):
++    try:
++        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, timeout=20).stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++    except Exception:
++        return &quot;&quot;
++
++
++def _commits_since(minutes):
++    out = _git(&quot;log&quot;, &quot;--since=%d minutes ago&quot; % minutes, &quot;--format=%s&quot;)
++    return [l.strip() for l in out.splitlines() if l.strip()]
++
++
++def _ruling_prefix(text):
++    m = re.match(r&quot;\s*(R-[A-Z0-9\-]+)&quot;, text or &quot;&quot;)
++    return m.group(1) if m else None
++
++
++def _journal_state():
++    try:
++        d = json.load(open(STATE, encoding=&quot;utf-8&quot;))
++        return d.get(&quot;ruling&quot;), d.get(&quot;item&quot;)
++    except Exception:
++        return None, None
++
++
++def _tests():
++    try:
++        d = json.load(open(LAST_TESTS, encoding=&quot;utf-8&quot;))
++        return &quot;%s/%s&quot; % (d.get(&quot;passed&quot;), d.get(&quot;total&quot;))
++    except Exception:
++        return &quot;—&quot;
++
++
++def _supervisor_state():
++    if os.path.exists(HALT):
++        return &quot;HALTED&quot;
++    try:
++        lines = [l for l in open(JOURNAL, encoding=&quot;utf-8&quot;).read().splitlines() if &quot;checked &quot; in l and &quot;on course&quot; in l]
++        m = re.search(r&quot;checked (\d{2}:\d{2})&quot;, lines[-1]) if lines else None
++        return &quot;on course %s&quot; % m.group(1) if m else &quot;no check yet&quot;
++    except Exception:
++        return &quot;no check yet&quot;
++
++
++def line(now=None):
++    now = now or _now()
++    commits = _commits_since(SLOT_MIN)
++    ruling, item = _journal_state()
++    label = &quot;BUILD %s&quot; % now.strftime(&quot;%H:%M&quot;)
++    since = (now - timedelta(minutes=SLOT_MIN)).strftime(&quot;%H:%M&quot;)
++    sup = _supervisor_state()
++    # journal-vs-git honesty check: the journal&#x27;s ruling vs the latest commit&#x27;s ruling prefix
++    head_subj = _git(&quot;log&quot;, &quot;-1&quot;, &quot;--format=%s&quot;)
++    git_ruling = _ruling_prefix(head_subj)
++    disagree = &quot; · journal/git disagree (journal %s, git %s)&quot; % (ruling, git_ruling) \
++               if (ruling and git_ruling and _ruling_prefix(ruling) and _ruling_prefix(ruling) != git_ruling) else &quot;&quot;
++    if commits:
++        head = ruling or (item or &quot;—&quot;)
++        msgs = &quot;; &quot;.join(commits)
++        if len(msgs) &gt; 160:
++            msgs = msgs[:157] + &quot;…&quot;
++        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s&quot; % (
++            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree)
++    return &quot;%s — no commits · %s · supervisor %s%s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree)
++
++
++def halt_line(now=None):
++    &quot;&quot;&quot;One immediate line when E1-DESK\\HALT newly appears. Returns the line to post, or None.&quot;&quot;&quot;
++    now = now or _now()
++    if not os.path.exists(HALT):
++        try:
++            os.path.exists(HALT_MARK) and os.remove(HALT_MARK)   # cleared -&gt; allow a future halt to re-announce
++        except Exception:
++            pass
++        return None
++    try:
++        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)
++    except Exception:
++        reason = &quot;(reason unreadable)&quot;
++    try:
++        if open(HALT_MARK, encoding=&quot;utf-8&quot;).read().strip() == reason:
++            return None                                          # already announced this halt
++    except Exception:
++        pass
++    return &quot;BUILD %s — HALT in force: %s&quot; % (now.strftime(&quot;%H:%M&quot;), reason)
++
++
++def maybe_post(notifier=None, now=None):
++    &quot;&quot;&quot;Post the beat once per 10-minute slot during build hours, plus an immediate line on any new halt.
++    Returns the line posted (or the beat line) if anything went out, else None.&quot;&quot;&quot;
++    now = now or _now()
++    if not build_hours(now):
++        return None
++    posted = None
++    hl = halt_line(now)                                          # immediate, outside the slot cadence
++    if hl:
++        _emit(notifier, hl)
++        try:
++            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)
++            os.makedirs(os.path.dirname(HALT_MARK), exist_ok=True)
++            open(HALT_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(reason)
++        except Exception:
++            pass
++        posted = hl
++    slot = now.strftime(&quot;%Y-%m-%d %H&quot;) + &quot;:%d&quot; % (now.minute // SLOT_MIN)
++    try:
++        last = open(BEAT_MARK, encoding=&quot;utf-8&quot;).read().strip()
++    except Exception:
++        last = &quot;&quot;
++    if slot != last:
++        ln = line(now)
++        _emit(notifier, ln)
++        try:
++            os.makedirs(os.path.dirname(BEAT_MARK), exist_ok=True)
++            open(BEAT_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(slot)
++        except Exception:
++            pass
++        posted = ln
++    return posted
++
++
++def _emit(notifier, msg):
++    try:
++        (notifier or _notify)(msg)
++    except Exception:
++        pass
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++def record_tests(passed, total):
++    &quot;&quot;&quot;Called after a suite run so the beat&#x27;s &#x27;tests P/T&#x27; is a real machine fact.&quot;&quot;&quot;
++    try:
++        os.makedirs(os.path.dirname(LAST_TESTS), exist_ok=True)
++        json.dump({&quot;passed&quot;: passed, &quot;total&quot;: total, &quot;at&quot;: _now().isoformat()},
++                  open(LAST_TESTS, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++    except Exception:
++        pass
++
++
++if __name__ == &quot;__main__&quot;:
++    print(line())
+diff --git a/scripts/live_bar.py b/scripts/live_bar.py
+new file mode 100644
+index 000000000..e382c453f
+--- /dev/null
++++ b/scripts/live_bar.py
+@@ -0,0 +1,179 @@
++&quot;&quot;&quot;R-LIVE-BAR — the &#x27;live paper&#x27; progress bar, derived ONLY from machine facts. Eight steps:
++
++  1. login landed today                         5. first PLACED paper order by the real loop
++  2. self-check passed (recorders + runner up)   6. first CLOSED trade with a result
++  3. 08:30 READY (derived from vitals)           7. auditor observed 5–6 on the live ledger
++  4. a real signal on a stock with its readings  8. five consecutive clean sessions (no fault, no human click)
++
++Steps 1–4 reset each day; 5–8 persist once earned (reports/LIVE-BAR.json). Format:
++  &quot;LIVE PAPER ▓▓▓░░░░░ 3/8 — next: &lt;the next step in plain words&gt;&quot;
++Posted at 08:30 (with the READY line), at 15:35 (with the close), and immediately when a step advances. The
++same bar shows at the top of status.html. Nothing here is typed — every step is read from a store on disk.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import csv
++import json
++import os
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++STATUS = os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;)
++LEDGER = os.path.join(REPO, &quot;reports&quot;, &quot;BOOK20-LEDGER.csv&quot;)
++AUDIT = os.path.join(REPO, &quot;reports&quot;, &quot;AUDIT-DRYRUN.json&quot;)
++STORE = os.path.join(REPO, &quot;reports&quot;, &quot;LIVE-BAR.json&quot;)          # persists earned 5–8
++CLEAN = os.path.join(REPO, &quot;reports&quot;, &quot;CLEAN-SESSIONS.json&quot;)    # {&quot;count&quot;: N} maintained by the close routine
++POST_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.live_bar_posted&quot;)
++
++LABELS = [&quot;login lands&quot;, &quot;self-check passes (recorders + runner up)&quot;, &quot;08:30 READY&quot;,
++          &quot;a real signal on a stock&quot;, &quot;first paper order placed&quot;, &quot;first trade closed with a result&quot;,
++          &quot;auditor confirms the order and close on the ledger&quot;, &quot;five clean sessions in a row&quot;]
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _load(path, default=None):
++    try:
++        return json.load(open(path, encoding=&quot;utf-8&quot;))
++    except Exception:
++        return default if default is not None else {}
++
++
++def _today():
++    return _now().date().isoformat()
++
++
++def _ledger_today():
++    &quot;&quot;&quot;(has_signal, has_placed) from today&#x27;s book rows; fail-closed to (False, False).&quot;&quot;&quot;
++    sig = placed = False
++    try:
++        for r in csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)):
++            if not str(r.get(&quot;ts&quot;, &quot;&quot;)).startswith(_today()):
++                continue
++            st = (r.get(&quot;state&quot;) or &quot;&quot;).strip()
++            if st in (&quot;queued&quot;, &quot;filled&quot;, &quot;held&quot;, &quot;no-fill&quot;):
++                sig = True
++            if st in (&quot;queued&quot;, &quot;filled&quot;):
++                placed = True
++    except Exception:
++        pass
++    return sig, placed
++
++
++def _has_closed():
++    &quot;&quot;&quot;A closed trade with a result anywhere in the book (persisted fact).&quot;&quot;&quot;
++    try:
++        for r in csv.DictReader(open(LEDGER, encoding=&quot;utf-8&quot;)):
++            if (r.get(&quot;state&quot;) or &quot;&quot;).strip() in (&quot;closed&quot;, &quot;exit&quot;) and str(r.get(&quot;R&quot;, &quot;&quot;)).strip() not in (&quot;&quot;, &quot;None&quot;):
++                return True
++    except Exception:
++        pass
++    return False
++
++
++def compute():
++    &quot;&quot;&quot;The eight booleans + the earned store, updated (5–8 persist once true).&quot;&quot;&quot;
++    s = _load(STATUS)
++    store = _load(STORE, {})
++    earned = store.get(&quot;earned&quot;, {})
++    tok = (s.get(&quot;token&quot;) or {})
++    login_date = None
++    try:
++        login_date = _load(os.path.join(REPO, &quot;.kite_token.json&quot;)).get(&quot;login_date&quot;)
++    except Exception:
++        pass
++    procs = [p.get(&quot;name&quot;) for p in s.get(&quot;processes&quot;, [])]
++    recs = any(n in procs for n in (&quot;e13_depth&quot;, &quot;chain_recorder&quot;, &quot;xchange_recorder&quot;, &quot;positioning_recorder&quot;))
++    step1 = bool(tok.get(&quot;valid&quot;)) and (login_date == _today() if login_date else False)
++    step2 = recs and (&quot;book20_runner&quot; in procs)
++    step3 = str(s.get(&quot;ready_line&quot;, &quot;&quot;)).startswith(&quot;READY&quot;)
++    sig, placed = _ledger_today()
++    step4 = sig
++    # 5–8 persist: earned once, stays earned
++    step5 = bool(earned.get(&quot;5&quot;)) or placed
++    step6 = bool(earned.get(&quot;6&quot;)) or _has_closed()
++    audit_pass = bool((_load(AUDIT) or {}).get(&quot;pass&quot;))
++    step7 = bool(earned.get(&quot;7&quot;)) or (step5 and step6 and audit_pass)
++    clean = int((_load(CLEAN) or {}).get(&quot;count&quot;, 0))
++    step8 = bool(earned.get(&quot;8&quot;)) or (clean &gt;= 5)
++    steps = [step1, step2, step3, step4, step5, step6, step7, step8]
++    # persist newly-earned 5–8
++    changed = False
++    for i, val in ((5, step5), (6, step6), (7, step7), (8, step8)):
++        if val and not earned.get(str(i)):
++            earned[str(i)] = {&quot;at&quot;: _now().isoformat()}
++            changed = True
++    if changed:
++        store[&quot;earned&quot;] = earned
++        try:
++            json.dump(store, open(STORE, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++        except Exception:
++            pass
++    return steps
++
++
++def bar_line(steps=None):
++    steps = compute() if steps is None else steps
++    n = sum(1 for x in steps if x)
++    bar = &quot;▓&quot; * n + &quot;░&quot; * (8 - n)
++    nxt = next((LABELS[i] for i, x in enumerate(steps) if not x), &quot;all eight earned — live paper is proven&quot;)
++    return &quot;LIVE PAPER %s %d/8 — next: %s&quot; % (bar, n, nxt)
++
++
++def html_bar():
++    steps = compute()
++    n = sum(1 for x in steps if x)
++    return (&quot;&lt;div style=&#x27;font:14px/1.5 ui-monospace,monospace;margin:0 0 10px&#x27;&gt;&quot;
++            &quot;&lt;span style=&#x27;letter-spacing:2px&#x27;&gt;%s&lt;/span&gt; %d/8 · next: %s&lt;/div&gt;&quot;
++            % (&quot;▓&quot; * n + &quot;░&quot; * (8 - n), n, next((LABELS[i] for i, x in enumerate(steps) if not x), &quot;proven&quot;)))
++
++
++def maybe_post(notifier=None, now=None):
++    &quot;&quot;&quot;Post on advance, and once each at 08:30 and 15:35. Returns the line if posted, else None.&quot;&quot;&quot;
++    now = now or _now()
++    steps = compute()
++    n = sum(1 for x in steps if x)
++    mark = _load(POST_MARK, {})
++    triggers = []
++    if n &gt; int(mark.get(&quot;last_n&quot;, -1)):
++        triggers.append(&quot;advance&quot;)
++    mins = now.hour * 60 + now.minute
++    day = _today()
++    if 8 * 60 + 30 &lt;= mins &lt; 8 * 60 + 33 and mark.get(&quot;d0830&quot;) != day:   # ~08:30, within a light-cycle window
++        triggers.append(&quot;0830&quot;)
++    if 15 * 60 + 35 &lt;= mins &lt; 15 * 60 + 38 and mark.get(&quot;d1535&quot;) != day:  # ~15:35
++        triggers.append(&quot;1535&quot;)
++    if not triggers:
++        return None
++    ln = bar_line(steps)
++    try:
++        (notifier or _notify)(ln)
++    except Exception:
++        pass
++    mark[&quot;last_n&quot;] = n
++    if &quot;0830&quot; in triggers:
++        mark[&quot;d0830&quot;] = day
++    if &quot;1535&quot; in triggers:
++        mark[&quot;d1535&quot;] = day
++    try:
++        os.makedirs(os.path.dirname(POST_MARK), exist_ok=True)
++        json.dump(mark, open(POST_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++    except Exception:
++        pass
++    return ln
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++if __name__ == &quot;__main__&quot;:
++    print(bar_line())
+diff --git a/scripts/site_build.py b/scripts/site_build.py
+index 51131a1bd..e61bb28fb 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -623,6 +623,11 @@ def build_live():
+         build_journal.build()
+     except Exception:
+         pass
++    try:
++        from scripts import live_bar                      # R-LIVE-BAR: post on advance / 08:30 / 15:35
++        live_bar.maybe_post()
++    except Exception:
++        pass
+     return SITE
+ 
+ 
+diff --git a/scripts/token_ping.py b/scripts/token_ping.py
+index 5ba52360c..605253d97 100644
+--- a/scripts/token_ping.py
++++ b/scripts/token_ping.py
+@@ -43,6 +43,11 @@ def _sleep_until(target):
+         if secs &lt;= 0:
+             return
+         _supervisor_silence_tick()                # R-EYES-FULL: post the supervisor-silence alarm from here
++        try:
++            from scripts import build_beat         # R-BUILD-BEAT: one machine-derived line per build hour
++            build_beat.maybe_post()
++        except Exception:
++            pass
+         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
+ 
+ 
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index 8d49d3f38..91fa0dcb0 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -232,6 +232,14 @@ def ready_line(s=None):
+     return &quot;NOT READY — %s&quot; % (s.get(&quot;plain&quot;) or _plain(s))
+ 
+ 
++def _live_bar_html():
++    try:
++        from scripts import live_bar               # R-LIVE-BAR: the 8-step bar at the top of status
++        return live_bar.html_bar()
++    except Exception:
++        return &quot;&quot;
++
++
+ def _write_html(s):
+     import html as _h
+     rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
+@@ -250,6 +258,7 @@ def _write_html(s):
+             &quot;td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}&quot;
+             &quot;.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&quot;
+             &quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Desk status&lt;/h1&gt;&quot;
++            + _live_bar_html() +
+             &quot;&lt;p class=&#x27;big&#x27;&gt;&quot; + _h.escape(s[&quot;plain&quot;]) + &quot;&lt;/p&gt;&quot;
+             &quot;&lt;p class=&#x27;sub&#x27;&gt;&quot; + _h.escape(s[&quot;ready_line&quot;]) + &quot; · updated &quot; + _h.escape(s[&quot;generated&quot;]) +
+             &quot; · refreshes every 2 minutes&lt;/p&gt;&quot;
+diff --git a/tests/test_build_beat.py b/tests/test_build_beat.py
+new file mode 100644
+index 000000000..5523f7586
+--- /dev/null
++++ b/tests/test_build_beat.py
+@@ -0,0 +1,56 @@
++&quot;&quot;&quot;R-BUILD-BEAT: the 10-minute build line is machine-derived, correctly shaped, halts immediately, silent
++outside build hours.&quot;&quot;&quot;
++import os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import build_beat as B
++
++
++def test_build_hours_window():
++    now = B._now()
++    assert B.build_hours(now.replace(hour=2, minute=0)) is True
++    assert B.build_hours(now.replace(hour=16, minute=0)) is True
++    assert B.build_hours(now.replace(hour=12, minute=0)) is False
++
++
++def test_line_shape_and_supervisor_state():
++    tmp = tempfile.mkdtemp()
++    B.JOURNAL = os.path.join(tmp, &quot;j.log&quot;)
++    B.HALT = os.path.join(tmp, &quot;HALT&quot;)
++    open(B.JOURNAL, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;2026-09-23 20:52 | checked 20:52 — on course\n&quot;)
++    ln = B.line()
++    assert ln.startswith(&quot;BUILD &quot;) and &quot;supervisor&quot; in ln
++    assert &quot;on course 20:52&quot; in ln
++    # commits branch says &#x27;since HH:MM&#x27; and shows tests; no-commits branch says &#x27;no commits&#x27;
++    assert (&quot; commit&quot; in ln and &quot; since &quot; in ln) or &quot;no commits&quot; in ln
++    open(B.HALT, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;scope breach&quot;)
++    assert &quot;supervisor HALTED&quot; in B.line()
++
++
++def test_halt_line_immediate_and_deduped():
++    tmp = tempfile.mkdtemp()
++    B.HALT = os.path.join(tmp, &quot;HALT&quot;)
++    B.HALT_MARK = os.path.join(tmp, &quot;mark&quot;)
++    assert B.halt_line() is None                       # no HALT -&gt; no line
++    open(B.HALT, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;a demo wrote a live ledger&quot;)
++    hl = B.halt_line()
++    assert hl and &quot;HALT in force&quot; in hl and &quot;live ledger&quot; in hl
++    posted = []
++    B.maybe_post(notifier=posted.append, now=B._now().replace(hour=2, minute=3))
++    assert any(&quot;HALT in force&quot; in m for m in posted)
++    # a second pass does not re-announce the same halt
++    posted2 = []
++    B.maybe_post(notifier=posted2.append, now=B._now().replace(hour=2, minute=4))
++    assert not any(&quot;HALT in force&quot; in m for m in posted2)
++
++
++def test_no_post_outside_build_hours():
++    posted = []
++    noon = B._now().replace(hour=12, minute=0)
++    assert B.maybe_post(notifier=posted.append, now=noon) is None
++    assert posted == []
++
++
++if __name__ == &quot;__main__&quot;:
++    test_build_hours_window(); test_line_shape_and_supervisor_state()
++    test_halt_line_immediate_and_deduped(); test_no_post_outside_build_hours()
++    print(&quot;test_build_beat OK&quot;)
+diff --git a/tests/test_live_bar.py b/tests/test_live_bar.py
+new file mode 100644
+index 000000000..95f7e967a
+--- /dev/null
++++ b/tests/test_live_bar.py
+@@ -0,0 +1,49 @@
++&quot;&quot;&quot;R-LIVE-BAR: the bar is machine-derived, 1–4 reset daily, 5–8 persist, format correct, posts on advance.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import live_bar as L
++
++
++def _isolate():
++    d = tempfile.mkdtemp()
++    L.STATUS = os.path.join(d, &quot;status.json&quot;)
++    L.LEDGER = os.path.join(d, &quot;ledger.csv&quot;)
++    L.AUDIT = os.path.join(d, &quot;audit.json&quot;)
++    L.STORE = os.path.join(d, &quot;store.json&quot;)
++    L.CLEAN = os.path.join(d, &quot;clean.json&quot;)
++    L.POST_MARK = os.path.join(d, &quot;mark.json&quot;)
++    return d
++
++
++def test_bar_shape_and_next():
++    _isolate()
++    json.dump({&quot;token&quot;: {&quot;valid&quot;: False}, &quot;processes&quot;: [], &quot;ready_line&quot;: &quot;NOT READY&quot;}, open(L.STATUS, &quot;w&quot;))
++    ln = L.bar_line()
++    assert ln.startswith(&quot;LIVE PAPER &quot;) and &quot;/8 — next:&quot; in ln
++    assert &quot;▓&quot; in ln or &quot;░&quot; in ln
++    # nothing earned -&gt; next is step 1
++    assert &quot;login lands&quot; in ln
++
++
++def test_5to8_persist_once_earned():
++    _isolate()
++    json.dump({&quot;token&quot;: {&quot;valid&quot;: False}, &quot;processes&quot;: [], &quot;ready_line&quot;: &quot;NOT READY&quot;}, open(L.STATUS, &quot;w&quot;))
++    json.dump({&quot;earned&quot;: {&quot;5&quot;: {&quot;at&quot;: &quot;x&quot;}, &quot;6&quot;: {&quot;at&quot;: &quot;x&quot;}}}, open(L.STORE, &quot;w&quot;))
++    steps = L.compute()
++    assert steps[4] is True and steps[5] is True           # 5 and 6 stay earned with an empty ledger
++
++
++def test_posts_on_advance_only():
++    _isolate()
++    json.dump({&quot;token&quot;: {&quot;valid&quot;: False}, &quot;processes&quot;: [], &quot;ready_line&quot;: &quot;READY&quot;}, open(L.STATUS, &quot;w&quot;))
++    posted = []
++    midday = L._now().replace(hour=11, minute=0)            # avoid the 08:30/15:35 windows
++    r1 = L.maybe_post(notifier=posted.append, now=midday)   # first time: n&gt;-1 -&gt; advance -&gt; post
++    assert r1 is not None and len(posted) == 1
++    r2 = L.maybe_post(notifier=posted.append, now=midday)   # same n -&gt; no advance -&gt; no post
++    assert r2 is None and len(posted) == 1
++
++
++if __name__ == &quot;__main__&quot;:
++    test_bar_shape_and_next(); test_5to8_persist_once_earned(); test_posts_on_advance_only()
++    print(&quot;test_live_bar OK&quot;)
+</pre></div><div class='c'><div class='h'><b>776fa70eb</b> · 2026-09-22 15:53</div><div>R-RESTART-TONIGHT: restart_stack.py + supervisor guarded with the stack + START_SUPERVISOR retired</div><div class='sub h'>START_SUPERVISOR.bat                            |   5 -</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md |  18 +++</div><div class='sub h'>scripts/restart_stack.py                        | 194 ++++++++++++++++++++++++</div><div class='sub h'>scripts/watchdog.py                             |  49 ++++++</div><div class='sub h'>tests/test_runner_supervision.py                |  10 ++</div><pre>diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
 deleted file mode 100644
 index 7cc25a916..000000000
 --- a/START_SUPERVISOR.bat
@@ -8162,270 +8760,4 @@ index 24490d80b..7f4168ecb 100644
  .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
 -&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1067&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1065&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1064&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1059&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1058&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.1%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1053&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1049&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1043&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1023&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;998&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;992&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.6%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;990&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;975&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;972&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;955&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Signal&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;DABUR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;HINDUNILVR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;JSWENERGY&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;SHREECEM&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;The certified book re-run as if it had to cross a real order book — measured spread, market impact and fees on every trade.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Fill assumption&lt;/th&gt;&lt;th&gt;Made&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;At the mid (before cost)&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;+15.4 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;At the real spread&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-87.5 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;With the calibrated cost&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-89.9 R&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Even at the real measured spread the edge does not survive: most of the cost is the fixed exchange-and-tax charge on every trade.&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;ol class=&#x27;sub&#x27;&gt;&lt;li&gt;Search each stock&#x27;s own history for a behaviour that repeats.&lt;/li&gt;&lt;li&gt;Prove it on test years, then on sealed months never seen while building.&lt;/li&gt;&lt;li&gt;Keep it only if its move clears the real cost of trading.&lt;/li&gt;&lt;li&gt;Trade it on paper, scored daily after real costs.&lt;/li&gt;&lt;/ol&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T02:06:16.573252+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 \ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1067&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1065&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1064&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1059&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1058&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.1%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1053&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1049&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1043&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1023&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;998&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;992&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.6%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;990&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next m</pre></div><div class='c'><div class='h'><b>41703ee47</b> · 2026-09-22 02:10</div><div>R-ALL-ENGINES-TOMORROW (2-4): pre-open gate, 08:30 line, site two-book rows + export section</div><div class='sub h'>scripts/preopen_gate.py       | 130 ++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/site_v2.py            |  55 ++++++++++++++++++</div><div class='sub h'>site/v2/ask.html              |   2 +-</div><div class='sub h'>site/v2/data.html             |   2 +-</div><div class='sub h'>site/v2/deliverables.html     |   2 +-</div><div class='sub h'>site/v2/engine-E1.html        |   2 +-</div><div class='sub h'>site/v2/engine-E2.html        |   2 +-</div><div class='sub h'>site/v2/engine-E3.html        |   2 +-</div><div class='sub h'>site/v2/engine-E4.html        |   2 +-</div><div class='sub h'>site/v2/engine-E6.html        |   2 +-</div><div class='sub h'>site/v2/engine-E8.html        |   2 +-</div><div class='sub h'>site/v2/engines.html          |   2 +-</div><div class='sub h'>site/v2/how.html              |   2 +-</div><div class='sub h'>site/v2/index.html            |   2 +-</div><div class='sub h'>site/v2/patterns.html         |   2 +-</div><div class='sub h'>site/v2/results.html          |   2 +-</div><div class='sub h'>site/v2/stocks.html           |   2 +-</div><div class='sub h'>tests/test_engine_accounts.py |   8 +++</div><pre>diff --git a/scripts/preopen_gate.py b/scripts/preopen_gate.py
-new file mode 100644
-index 000000000..44e414161
---- /dev/null
-+++ b/scripts/preopen_gate.py
-@@ -0,0 +1,130 @@
-+&quot;&quot;&quot;R-ALL-ENGINES-TOMORROW items 2 &amp; 3 — the 08:15 pre-open gate and the 08:30 line.
-+
-+At 08:15 this runs the full test suite and the day-one rehearsals (E1/E10/E11 core + one per new engine). Any
-+engine whose rehearsal fails is set DIARY-ONLY for the day (record, no orders, no cards) and listed for the
-+evening fix. If the CORE path (E1/E10/E11) fails, the gate says NOT READY and prints the revert instruction
-+(the owner reverts the core files to the 17:26 STOP→START commit before 08:45 — a human act, never automatic).
-+
-+At 08:30 `line()` prints the single status line:
-+  READY — trading today: &lt;engines&gt; ; diary only: &lt;engines&gt; ; reason per diary
-+or
-+  NOT READY — &lt;reason&gt;
-+
-+This module DECIDES and REPORTS; it never restarts the stack and never places an order.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import subprocess
-+import sys
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+STATUS = os.path.join(_REPO, &quot;reports&quot;, &quot;PREOPEN-GATE.json&quot;)
-+CORE = (&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;)
-+
-+
-+def run_tests(timeout=1800):
-+    &quot;&quot;&quot;Full test suite. Returns (passed_bool, summary_line).&quot;&quot;&quot;
-+    try:
-+        r = subprocess.run([sys.executable, &quot;-m&quot;, &quot;pytest&quot;, &quot;-q&quot;, &quot;--no-header&quot;],
-+                           cwd=_REPO, capture_output=True, text=True, timeout=timeout,
-+                           env={**os.environ, &quot;PYTHONUTF8&quot;: &quot;1&quot;, &quot;TELEGRAM_BOT_TOKEN&quot;: &quot;&quot;, &quot;TELEGRAM_CHAT_ID&quot;: &quot;&quot;})
-+        tail = [l for l in (r.stdout or &quot;&quot;).splitlines() if l.strip()][-1:] or [&quot;&quot;]
-+        return (r.returncode == 0, tail[0][:200])
-+    except Exception as e:
-+        return (False, &quot;tests did not run: %s&quot; % type(e).__name__)
-+
-+
-+def gate(run_tests_fn=None, rehearse_core_fn=None, rehearse_engines_fn=None, write=True):
-+    &quot;&quot;&quot;Run the gate. Returns the status dict. Injectable for tests.&quot;&quot;&quot;
-+    from scripts import engine_accounts as EA
-+    run_tests_fn = run_tests_fn or run_tests
-+    tests_ok, tests_line = run_tests_fn()
-+
-+    # core rehearsal (E1/E10/E11)
-+    if rehearse_core_fn is not None:
-+        core_ok = rehearse_core_fn()
-+    else:
-+        try:
-+            from scripts import rehearsal_day1 as RD
-+            core_ok = bool(RD.run())
-+        except Exception:
-+            core_ok = False
-+
-+    # per-engine rehearsals -&gt; diary-only on failure
-+    if rehearse_engines_fn is not None:
-+        reh = rehearse_engines_fn()
-+    else:
-+        from scripts import rehearsal_day1 as RD
-+        reh = RD.rehearse_new_engines()
-+
-+    trading = [e for e, r in reh.items() if r.get(&quot;ok&quot;)]
-+    diary = {e: r.get(&quot;reason&quot;, &quot;&quot;) for e, r in reh.items() if not r.get(&quot;ok&quot;)}
-+
-+    core_failed = not (tests_ok and core_ok)
-+    status = {
-+        &quot;tests_ok&quot;: tests_ok, &quot;tests_line&quot;: tests_line, &quot;core_ok&quot;: core_ok,
-+        &quot;core_failed&quot;: core_failed, &quot;trading_today&quot;: trading, &quot;diary_only&quot;: diary,
-+        &quot;revert_instruction&quot;: (None if not core_failed else
-+                               &quot;Core path (E1/E10/E11) failed — revert the core files to the 17:26 STOP→START &quot;
-+                               &quot;commit before 08:45 (a human act).&quot;),
-+        &quot;line&quot;: None,
-+    }
-+    status[&quot;line&quot;] = line_from(status)
-+    if write:
-+        try:
-+            with open(STATUS, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+                json.dump(status, f, indent=1, default=str)
-+        except Exception:
-+            pass
-+    return status
-+
-+
-+def line_from(status):
-+    &quot;&quot;&quot;The 08:30 line from a status dict.&quot;&quot;&quot;
-+    if status.get(&quot;core_failed&quot;):
-+        reason = &quot;core path or tests failed&quot; if not status.get(&quot;tests_ok&quot;) else &quot;core rehearsal failed&quot;
-+        return &quot;NOT READY — %s. %s&quot; % (reason, status.get(&quot;revert_instruction&quot;) or &quot;&quot;)
-+    trading = &quot;, &quot;.join([&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;] + list(status.get(&quot;trading_today&quot;, []))) or &quot;none&quot;
-+    diary = status.get(&quot;diary_only&quot;) or {}
-+    if diary:
-+        d = &quot;; &quot;.join(&quot;%s (%s)&quot; % (e, r) for e, r in diary.items())
-+        return &quot;READY — trading today: %s ; diary only: %s&quot; % (trading, d)
-+    return &quot;READY — trading today: %s ; diary only: none&quot; % trading
-+
-+
-+def line():
-+    &quot;&quot;&quot;Print the 08:30 line from the last gate run (or run the gate if none).&quot;&quot;&quot;
-+    try:
-+        return json.load(open(STATUS, encoding=&quot;utf-8&quot;)).get(&quot;line&quot;) or gate()[&quot;line&quot;]
-+    except Exception:
-+        return gate()[&quot;line&quot;]
-+
-+
-+def _demo():
-+    # injected: tests pass, core passes, one engine&#x27;s rehearsal fails -&gt; READY with that engine diary-only
-+    st = gate(run_tests_fn=lambda: (True, &quot;42 passed&quot;),
-+              rehearse_core_fn=lambda: True,
-+              rehearse_engines_fn=lambda: {&quot;E21&quot;: {&quot;ok&quot;: True}, &quot;E9&quot;: {&quot;ok&quot;: False, &quot;reason&quot;: &quot;no stream&quot;}},
-+              write=False)
-+    assert st[&quot;line&quot;].startswith(&quot;READY&quot;), st[&quot;line&quot;]
-+    assert &quot;E9 (no stream)&quot; in st[&quot;line&quot;] and &quot;E21&quot; in st[&quot;line&quot;]
-+    # core failure -&gt; NOT READY + revert instruction
-+    st2 = gate(run_tests_fn=lambda: (False, &quot;1 failed&quot;),
-+               rehearse_core_fn=lambda: True,
-+               rehearse_engines_fn=lambda: {}, write=False)
-+    assert st2[&quot;line&quot;].startswith(&quot;NOT READY&quot;) and &quot;17:26&quot; in st2[&quot;line&quot;]
-+    print(&quot;preopen_gate demo OK: READY line lists trading vs diary-only; core failure -&gt; NOT READY + revert.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    elif &quot;--line&quot; in sys.argv:
-+        print(line())
-+    else:
-+        st = gate()
-+        print(st[&quot;line&quot;])
-+        sys.exit(0 if not st[&quot;core_failed&quot;] else 1)
-diff --git a/scripts/site_v2.py b/scripts/site_v2.py
-index d4bc6e788..47f765ea6 100644
---- a/scripts/site_v2.py
-+++ b/scripts/site_v2.py
-@@ -245,6 +245,7 @@ def _leaderboard():
-     chat = &quot;&quot;.join(&quot;&lt;div class=&#x27;m&#x27;&gt;%s&lt;/div&gt;&quot; % esc(m.get(&quot;text&quot;)) for m in msgs[:40]) or &quot;&lt;div class=&#x27;m sub&#x27;&gt;no messages yet&lt;/div&gt;&quot;
-     body = (_head(&quot;Leaderboard — E1 desk&quot;) + _nav(&quot;index.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Leaderboard&lt;/h1&gt;&quot;
-             &quot;&lt;div class=&#x27;cards&#x27;&gt;&quot; + cards + &quot;&lt;/div&gt;&quot;
-+            + _engine_books_table() +
-             &quot;&lt;div class=&#x27;grid2&#x27; style=&#x27;margin-top:16px&#x27;&gt;&lt;div&gt;&quot;
-             &quot;&lt;h2&gt;Traders&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Account&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
-             &quot;&lt;tbody&gt;&quot; + trows + &quot;&lt;/tbody&gt;&lt;/table&gt;&quot;
-@@ -275,6 +276,42 @@ def _acct_equity(v):
-     return None
- 
- 
-+def _engine_books_table():
-+    &quot;&quot;&quot;R-ALL-ENGINES-TOMORROW item 4: two rows per fixed-rule engine — a FLAT book and an ADAPTIVE book, each
-+    its own Rs 2,00,000 account. Server-rendered from paper_account, so every value is real (day one = the
-+    start balance until the engine trades).&quot;&quot;&quot;
-+    try:
-+        from engine1_rebuild import paper_account as ACC
-+    except Exception:
-+        return &quot;&quot;
-+    engines = getattr(ACC, &quot;NEW_ENGINES&quot;, [])
-+    labels = {&quot;E21&quot;: &quot;E21 overnight&quot;, &quot;E9&quot;: &quot;E9 pairs&quot;, &quot;E3&quot;: &quot;E3 calendar&quot;, &quot;YT&quot;: &quot;YouTube&quot;,
-+              &quot;E7&quot;: &quot;E7 cash-futures&quot;, &quot;E12&quot;: &quot;E12 two-exchange&quot;, &quot;E14&quot;: &quot;E14 retail&quot;, &quot;E4&quot;: &quot;E4 options&quot;}
-+    rows = &quot;&quot;
-+    for e in engines:
-+        for book in (&quot;FLAT&quot;, &quot;ADAPTIVE&quot;):
-+            name = &quot;%s-%s&quot; % (e, book)
-+            try:
-+                a = ACC.account(name)
-+                eq = a.get(&quot;equity&quot;)
-+                trades = a.get(&quot;closed&quot;) if a.get(&quot;closed&quot;) is not None else (a.get(&quot;trades&quot;) or 0)
-+                made = (eq - a.get(&quot;start_equity&quot;)) if (eq is not None and a.get(&quot;start_equity&quot;) is not None) else None
-+            except Exception:
-+                eq, trades, made = None, 0, None
-+            rows += (&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&quot;
-+                     &quot;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+                         esc(labels.get(e, e)), esc(book.title()), rup(eq),
-+                         (&quot;gain&quot; if (made or 0) &gt;= 0 else &quot;loss&quot;), (R(made) if made is not None else &quot;—&quot;),
-+                         esc(trades)))
-+    if not rows:
-+        return &quot;&quot;
-+    return (&quot;&lt;h2&gt;Engine books&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Every fixed-rule engine runs two books on its own &quot;
-+            &quot;Rs 2,00,000 paper account: a flat book (Rs 1,000 a trade) and an adaptive book (sizing follows its &quot;
-+            &quot;own record). Both start today.&lt;/p&gt;&quot;
-+            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Account&lt;/th&gt;&lt;th&gt;Made&lt;/th&gt;&lt;th&gt;Trades&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
-+            &quot;&lt;tbody&gt;&quot; + rows + &quot;&lt;/tbody&gt;&lt;/table&gt;&quot;)
-+
-+
- def _engines():
-     live = _data(&quot;live.json&quot;)
-     engines = live.get(&quot;engines&quot;) or []
-@@ -512,10 +549,28 @@ def _data_page():
-             &quot;today; amber means nothing yet.&lt;/p&gt;&quot; + (lanes or &quot;&lt;div class=&#x27;panel sub&#x27;&gt;no streams yet&lt;/div&gt;&quot;) +
-             &quot;&lt;h2&gt;Live diaries&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Every fixed-rule engine runs its rule live from day one, scored &quot;
-             &quot;daily after real costs, no real money.&lt;/p&gt;&quot; + (drows or &quot;&lt;div class=&#x27;panel sub&#x27;&gt;diaries open at the next session&lt;/div&gt;&quot;) +
-+            &quot;&lt;h2&gt;Export the day&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Each day&#x27;s recorded streams are zipped after the close and &quot;
-+            &quot;kept forever — recorded data is never deleted.&lt;/p&gt;&quot; + _exports_section() +
-             &quot;&lt;/main&gt;&quot;)
-     _write(&quot;data.html&quot;, body + _foot())
- 
- 
-+def _exports_section():
-+    &quot;&quot;&quot;R-ALL-ENGINES-TOMORROW item 4: one &#x27;Export the day (zip)&#x27; entry per day that has been exported. The zip
-+    is published beside the site (site/v2/exports/&lt;day&gt;.zip is copied there at build time when it fits).&quot;&quot;&quot;
-+    exp = os.path.join(REPO, &quot;site&quot;, &quot;v2&quot;, &quot;exports&quot;)
-+    rows = &quot;&quot;
-+    if os.path.isdir(exp):
-+        for z in sorted(glob.glob(os.path.join(exp, &quot;*.zip&quot;)), reverse=True):
-+            day = os.path.basename(z)[:-4]
-+            mb = os.path.getsize(z) / 1e6
-+            rows += (&quot;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0;display:flex;gap:10px;align-items:baseline&#x27;&gt;&quot;
-+                     &quot;&lt;b&gt;%s&lt;/b&gt;&lt;span class=&#x27;sub&#x27;&gt;%.1f MB&lt;/span&gt;&quot;
-+                     &quot;&lt;a href=&#x27;exports/%s.zip&#x27; download style=&#x27;margin-left:auto&#x27;&gt;Export the day (zip) →&lt;/a&gt;&lt;/div&gt;&quot; % (
-+                         esc(day), mb, esc(day)))
-+    return rows or &quot;&lt;div class=&#x27;panel sub&#x27;&gt;the first day&#x27;s export appears here after tomorrow&#x27;s close&lt;/div&gt;&quot;
-+
-+
- def _results():
-     bt = _data(&quot;backtest.json&quot;)
-     summ = bt.get(&quot;summary&quot;) or {}
-diff --git a/site/v2/ask.html b/site/v2/ask.html
-index 67e8dc13f..538e3825e 100644
---- a/site/v2/ask.html
-+++ b/site/v2/ask.html
-@@ -34,4 +34,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
- .tabs button.on{background:var(--card);color:var(--ink)}
- .tabpane{display:none}.tabpane.on{display:block}
- .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Ask the desk&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every question someone outside the desk asked us to check, and what came back — in plain words, after real costs. Newest first.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#3&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;You noticed the stock trades were being held about four days or more — is that being checked?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;The 210-stock book — the same idea applied to individual names, held for a few days — measured trade-by-trade with the hold time recorded, full costs and spread off.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;937 trades, +1.88R after full costs (crossing the spread), average hold about four days. Positive — but small enough that it is still statistically no different from zero.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;If there is any edge here it is in individual stocks held for a few days — mildly positive after real costs, but not yet proven. It could still be luck; live paper will tell.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#2&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index intraday — in and out the same day — work?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY intraday on 1-, 5- and 15-minute bars, flat by the close, full costs and spread subtracted.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;11 trades, and it lost: −3.81R after full costs (crossing the spread). A small sample, but nothing good in it.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;Intraday index trading lost money here. Small sample, so not a hard verdict — but there is no sign of an edge to chase.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#1&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index itself do better than trading individual stocks?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY, through their futures, held for several days (roll-aware), on the same rules the stock book uses. Costs and the buy/sell spread taken off in full.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;0 trades taken. Not one index setup ever cleared its own cost, so there was nothing to trade.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;On this data the index gave no multi-day edge to trade at all — worse than the stock book, which at least trades.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T01:55:50.490505+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Ask the desk&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every question someone outside the desk asked us to check, and what came back — in plain words, after real costs. Newest first.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#3&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;You noticed the stock trades were being held about four days or more — is that being checked?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;The 210-stock book — the same idea applied to individual names, held for a few days — measured trade-by-trade with the hold time recorded, full costs and spread off.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;937 trades, +1.88R after full costs (crossing the spread), average hold about four days. Positive — but small enough that it is still statistically no different from zero.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;If there is any edge here it is in individual stocks held for a few days — mildly positive after real costs, but not yet proven. It could still be luck; live paper will tell.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#2&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index intraday — in and out the same day — work?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY intraday on 1-, 5- and 15-minute bars, flat by the close, full costs and spread subtracted.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;11 trades, and it lost: −3.81R after full costs (crossing the spread). A small sample, but nothing good in it.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;Intraday index trading lost money here. Small sample, so not a hard verdict — but there is no sign of an edge to chase.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#1&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index itself do better than trading individual stocks?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY, through their futures, held for several days (roll-aware), on the same rules the stock book uses. Costs and the buy/sell spread taken off in full.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;0 trades taken. Not one index setup ever cleared its own cost, so there was nothing to trade.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;On this data the index gave no multi-day edge to trade at all — worse than the stock book, which at least trades.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T02:06:16.573252+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-diff --git a/site/v2/data.html b/site/v2/data.html
-index c56a4cc2a..7bd56cc43 100644
---- a/site/v2/data.html
-+++ b/site/v2/data.html
-@@ -34,4 +34,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
- .tabs button.on{background:var(--card);color:var(--ink)}
- .tabpane{display:none}.tabpane.on{display:block}
- .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27; class=&#x27;on&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Data&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;What the desk is recording, and how much came in today. Green means it recorded today; amber means nothing yet.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Order-book depth (5 levels)&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27; style=&#x27;margin-left:auto&#x27;&gt;Recorded today · last 15:30&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;164,202 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Option chains&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Arbitrage ticks&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;NSE / BSE two-exchange&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Retail positioning&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Public flows (FII/DII, etc.)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Macro &amp;amp; overnight (VIX, US close)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Breadth (computed)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Calendar / events&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Price bars (1-minute)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Overnight marks (E21)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;YouTube transcript library&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27; style=&#x27;margin-left:auto&#x27;&gt;Recorded today · last —&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;352 readings today&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;Live diaries&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Every fixed-rule engine runs its rule live from day one, scored daily after real costs, no real money.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E12 — two-exchange&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When the same stock&amp;#x27;s price on NSE and BSE differs by more than costs, take the two-sided trade on the stream; unwind as the prices converge.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E14 — retail&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Follow the measured retail-flow signal on the stream, sized to 1R, with the stock&amp;#x27;s own stop.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E21 — overnight&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Hold the index future overnight when the day&amp;#x27;s own overnight-return condition fires; flat by the next session&amp;#x27;s rules. Real overnight cost charged.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E3 — calendar&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Around a stock&amp;#x27;s own dated events (dividends, splits, and the like), take the position the event&amp;#x27;s historical drift points to, held for the studied window.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E4 — options&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Sell a defined-risk option spread on Nifty / BankNifty when the volatility forecast says the premium is rich; hold to the studied exit. Defined risk, no naked options.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E7 — cash-futures&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When a stock&amp;#x27;s future trades far enough from its cash price to clear costs, take the two-sided basis trade on the stream; unwind as the gap closes.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E9 — pairs&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When two stocks that usually move together drift apart by more than their own typical gap, bet the gap narrows; exit when it closes or the stop is hit.&lt;/p&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T01:55:50.490505+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27; class=&#x27;on&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Data&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;What the desk is recording, and how much came in today. Green means it recorded today; amber means nothing yet.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Order-book depth (5 levels)&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27; style=&#x27;margin-left:auto&#x27;&gt;Recorded today · last 15:30&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;164,202 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Option chains&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Arbitrage ticks&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;NSE / BSE two-exchange&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Retail positioning&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Public flows (FII/DII, etc.)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Macro &amp;amp; overnight (VIX, US close)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Breadth (computed)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Calendar / events&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Price bars (1-minute)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;Overnight marks (E21)&lt;/b&gt;&lt;span class=&#x27;pill warn&#x27; style=&#x27;margin-left:auto&#x27;&gt;Idle — no data today&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;0 readings today&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;YouTube transcript library&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27; style=&#x27;margin-left:auto&#x27;&gt;Recorded today · last —&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;352 readings today&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;Live diaries&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Every fixed-rule engine runs its rule live from day one, scored daily after real costs, no real money.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E12 — two-exchange&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When the same stock&amp;#x27;s price on NSE and BSE differs by more than costs, take the two-sided trade on the stream; unwind as the prices converge.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E14 — retail&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Follow the measured retail-flow signal on the stream, sized to 1R, with the stock&amp;#x27;s own stop.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E21 — overnight&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Hold the index future overnight when the day&amp;#x27;s own overnight-return condition fires; flat by the next session&amp;#x27;s rules. Real overnight cost charged.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E3 — calendar&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Around a stock&amp;#x27;s own dated events (dividends, splits, and the like), take the position the event&amp;#x27;s historical drift points to, held for the studied window.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E4 — options&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Sell a defined-risk option spread on Nifty / BankNifty when the volatility forecast says the premium is rich; hold to the studied exit. Defined risk, no naked options.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E7 — cash-futures&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When a stock&amp;#x27;s future trades far enough from its cash price to clear costs, take the two-sided basis trade on the stream; unwind as the gap closes.&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:8px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b&gt;E9 — pairs&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;diary: day 0&lt;/span&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;0 trades · +0.0 R&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;When two stocks that usually move together drift apart by more than their own typical gap, bet the gap narrows; exit when it closes or the stop is hit.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;Export the day&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Each day&#x27;s recorded streams are zipped after the close and kept forever — recorded data is never deleted.&lt;/p&gt;&lt;div class=&#x27;panel sub&#x27;&gt;the first day&#x27;s export appears here after tomorrow&#x27;s close&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T02:06:16.573252+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-diff --git a/site/v2/deliverables.html b/site/v2/deliverables.html
-index f49a4ff9f..567bcad3a 100644
---- a/site/v2/deliverables.html
-+++ b/site/v2/deliverables.html
-@@ -34,4 +34,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
- .tabs button.on{background:var(--card);color:var(--ink)}
- .tabpane{display:none}.tabpane.on{display:block}
- .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27; class=&#x27;on&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Deliverables&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;The paper accounts, carried day to day, and the tests the desk was asked to run. Nothing here is real money.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Desk account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹6,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E10 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E11 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1-FLAT account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1-ADAPTIVE account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;desk account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹6,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;The full workbook&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p style=&#x27;margin:0&#x27;&gt;Every call, its simulated fill and its cost, and the calibrated execution test: &lt;a href=&#x27;../execution-checklist.xlsx&#x27; download&gt;download the execution workbook →&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;What was asked&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;See &lt;a href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt; for the questions and what came back.&lt;/p&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T01:55:50.490505+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27; class=&#x27;on&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Deliverables&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;The paper accounts, carried day to day, and the tests the desk was asked to run. Nothing here is real money.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Desk account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹6,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E10 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E11 account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1-FLAT account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;E1-ADAPTIVE account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹2,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;desk account&lt;/div&gt;&lt;div class=&#x27;big&#x27;&gt;₹6,00,000&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;paper only&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;The full workbook&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p style=&#x27;margin:0&#x27;&gt;Every call, its simulated fill and its cost, and the calibrated execution test: &lt;a href=&#x27;../execution-checklist.xlsx&#x27; download&gt;download the execution workbook →&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;What was asked&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;See &lt;a href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt; for the questions and what came back.&lt;/p&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T02:06:16.573252+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-diff --git a/site/v2/engine-E1.html b/site/v2/engine-E1.html
-index b8ffc84ae..24490d80b 100644
---- a/site/v2/engine-E1.html
-+++ b/site/v2/engine-E1.html
-@@ -34,4 +34,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
- .tabs button.on{background:var(--card);color:var(--ink)}
- .tabpane{display:none}.tabpane.on{display:block}
- .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1067&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1065&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1064&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1059&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1058&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.1%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1053&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1049&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1043&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1023&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;998&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;992&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.6%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;990&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;975&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;972&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;955&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Signal&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;DABUR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;HINDUNILVR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;JSWENERGY&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;SHREECEM&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;The certified book re-run as if it had to cross a real order book — measured spread, market impact and fees on every trade.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Fill assumption&lt;/th&gt;&lt;th&gt;Made&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;At the mid (before cost)&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;+15.4 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;At the real spread&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-87.5 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;With the calibrated cost&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-89.9 R&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Even at the real measured spread the edge does not survive: most of the cost is the fixed exchange-and-tax charge on every trade.&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;ol class=&#x27;sub&#x27;&gt;&lt;li&gt;Search each stock&#x27;s own history for a behaviour that repeats.&lt;/li&gt;&lt;li&gt;Prove it on test years, then on sealed months never seen while building.&lt;/li&gt;&lt;li&gt;Keep it only if its move clears the real cost of trading.&lt;/li&gt;&lt;li&gt;Trade it on paper, scored daily after real costs.&lt;/li&gt;&lt;/ol&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T01:55:50.490505+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
-\ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=</pre></div></main></body></html>
++&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1067&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1065&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1064&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1059&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1058&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.1%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1053&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1049&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1043&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1023&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;998&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;992&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.6%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;990&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next m</pre></div></main></body></html>
