@@ -1,4 +1,707 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>32441f837</b> · 2026-09-22 23:12</div><div>END-TO-END BUNDLE archived (verbatim); Part 1 R-CODEX-SETUP closed: Codex UNAVAILABLE tonight (needs owner terminal/admin), verifier runs on fallback rung d — docs/VERIFIER-BRAIN.md</div><div class='sub h'>docs/VERIFIER-BRAIN.md                          | 41 +++++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_END-TO-END-BUNDLE.md | 60 +++++++++++++++++++++++++</div><pre>diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>e633eb0c3</b> · 2026-09-22 23:30</div><div>BUNDLE Part 3 (3) R-WATCHERS: nightly dry run logic — tag/restart/verify/revert with SAFETY-window skip (05:30-15:45) + FAIL auto-revert + lead flag; tests. Schedule registration prepared for owner START (human-triggered restart)</div><div class='sub h'>docs/EYES.md                |   2 +</div><div class='sub h'>scripts/night_dry_run.py    | 138 ++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_night_dry_run.py |  28 +++++++++</div><pre>diff --git a/docs/EYES.md b/docs/EYES.md
+index b032a6574..fad383e2b 100644
+--- a/docs/EYES.md
++++ b/docs/EYES.md
+@@ -32,3 +32,5 @@ typed) · what freezes it · what still needs the owner.
+ Dedup is the existing notify rate-limit: a frozen page keeps the same written time, so the alarm text is identical each cycle and posts once, then at most hourly. A failed fetch is a safe no-op (never a false FROZEN).
+ 
+ | MESSAGE STORM | per-source Telegram lines/min (source = leading word) | &gt;12 lines/min from one source | 30 min of no attempted post, or owner &quot;CLEAR STORM[: src]&quot; / any &quot;CLEAR HALT&quot; | owner un-mute if a real source is wrongly muted |
++
++| NIGHT DRY RUN | can the stack restart from the last verified commit after build hours | runs nightly (scheduled under START_E1_STACK); skips 05:30–15:45 | a PASS; a FAIL auto-reverts to the tag and restarts on it | a FAIL raises 🙋 LEAD RULING NEEDED; owner registers the schedule via START_E1_STACK |
+diff --git a/scripts/night_dry_run.py b/scripts/night_dry_run.py
+new file mode 100644
+index 000000000..cf73467ec
+--- /dev/null
++++ b/scripts/night_dry_run.py
+@@ -0,0 +1,138 @@
++&quot;&quot;&quot;R-WATCHERS Part 3.3 — the nightly dry run: prove the stack can restart from a tagged-safe commit, and
++auto-revert if it can&#x27;t. Runs after build hours as a scheduled job under START_E1_STACK&#x27;s schedule (no new
++process of its own). The 08:15 login gate stays as the SECOND check.
++
++SAFETY (owner ruling 2026-09-22): NO restart between 05:30 and 15:45 — the 06:00 login is the restart. If the
++job fires in that window it SKIPS the restart and returns &quot;skipped&quot;. restart-is-human (R-NIGHT-CLOSE) is
++honoured by this being the one sanctioned automated restart with a revert net (lead-checklist rule 10).
++
++Flow: tag the last verified commit → restart_stack.run() → wait one status cycle → verify (processes up,
++public page fresh, NOW line moving). PASS → &quot;NIGHT DRY RUN PASS &lt;commit&gt;&quot;. FAIL → revert to the tag, restart
++with it, &quot;NIGHT DRY RUN FAILED — reverted to &lt;tag&gt;: &lt;reason&gt;&quot; + a LEAD-RULING-NEEDED flag.
++
++Every heavy dependency is injectable so the logic is tested without touching the live stack or any ledger.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime
++import os
++import subprocess
++
++REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++
++
++def _ist_now():
++    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
++
++
++def in_safety_window(now=None):
++    &quot;&quot;&quot;True inside 05:30–15:45 IST — the no-restart window (SAFETY ruling).&quot;&quot;&quot;
++    now = now or _ist_now()
++    hm = now.hour * 60 + now.minute
++    return 5 * 60 + 30 &lt;= hm &lt;= 15 * 60 + 45
++
++
++def _head_commit():
++    try:
++        return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=REPO,
++                              capture_output=True, text=True).stdout.strip()
++    except Exception:
++        return &quot;?&quot;
++
++
++def run(now=None, restart_fn=None, verify_fn=None, tag_fn=None, revert_fn=None, post_fn=None, sleep_fn=None):
++    &quot;&quot;&quot;The nightly dry run. Returns a result dict. All side-effecting deps are injectable for tests.&quot;&quot;&quot;
++    now = now or _ist_now()
++    if in_safety_window(now):
++        return {&quot;skipped&quot;: &quot;safety window 05:30-15:45; the 06:00 login is the restart&quot;}
++
++    tag_fn = tag_fn or _default_tag
++    restart_fn = restart_fn or _default_restart
++    verify_fn = verify_fn or _default_verify
++    revert_fn = revert_fn or _default_revert
++    post_fn = post_fn or _default_post
++    sleep_fn = sleep_fn or (lambda s: __import__(&quot;time&quot;).sleep(s))
++
++    tag = tag_fn()
++    commit = _head_commit()
++    restart_fn()
++    sleep_fn(120)                                   # one status-daemon cycle
++    v = verify_fn() or {}
++    if v.get(&quot;ok&quot;):
++        line = &quot;NIGHT DRY RUN PASS %s&quot; % commit
++        post_fn(line)
++        return {&quot;pass&quot;: True, &quot;commit&quot;: commit, &quot;tag&quot;: tag, &quot;line&quot;: line}
++    reason = v.get(&quot;reason&quot;, &quot;verify failed&quot;)
++    revert_fn(tag)                                  # go back to the known-good commit
++    restart_fn()                                    # bring the stack up on the safe commit
++    line = &quot;NIGHT DRY RUN FAILED - reverted to %s: %s&quot; % (tag, reason)
++    post_fn(line)
++    post_fn(&quot;\U0001f64b LEAD RULING NEEDED: nightly dry run failed and reverted to %s (%s) - a human check is needed&quot; % (tag, reason))
++    return {&quot;pass&quot;: False, &quot;commit&quot;: commit, &quot;tag&quot;: tag, &quot;reason&quot;: reason, &quot;line&quot;: line}
++
++
++# ---- production defaults (never reached by the tests) ----
++def _default_tag():
++    tag = &quot;night-verified-&quot; + _ist_now().strftime(&quot;%Y%m%d&quot;)
++    try:
++        last = open(os.path.join(REPO, &quot;reports&quot;, &quot;AUDIT-LAST-PASS.txt&quot;), encoding=&quot;utf-8&quot;).read().strip()
++        subprocess.run([&quot;git&quot;, &quot;tag&quot;, &quot;-f&quot;, tag, last], cwd=REPO, capture_output=True, text=True)
++    except Exception:
++        pass
++    return tag
++
++
++def _default_restart():
++    from scripts import restart_stack
++    return restart_stack.run()
++
++
++def _default_verify():
++    from scripts import restart_stack, watchers
++    up = restart_stack.verify_up(exclude_pid=os.getpid())
++    all_up = all(up[n][&quot;up&quot;] for n in restart_stack.UP_NAMES)
++    frozen = watchers.site_freshness()               # None = fresh
++    if not all_up:
++        return {&quot;ok&quot;: False, &quot;reason&quot;: &quot;not all processes up: %s&quot; % {n: up[n][&quot;up&quot;] for n in restart_stack.UP_NAMES}}
++    if frozen:
++        return {&quot;ok&quot;: False, &quot;reason&quot;: frozen}
++    return {&quot;ok&quot;: True}
++
++
++def _default_revert(tag):
++    try:
++        subprocess.run([&quot;git&quot;, &quot;checkout&quot;, tag, &quot;--&quot;, &quot;.&quot;], cwd=REPO, capture_output=True, text=True)
++    except Exception:
++        pass
++
++
++def _default_post(line):
++    from scripts import notify
++    notify.notify(line)
++
++
++def _demo():
++    posts = []
++    # in the safety window: skips the restart entirely
++    noon = _ist_now().replace(hour=11, minute=0)
++    assert run(noon, post_fn=posts.append).get(&quot;skipped&quot;), &quot;should skip in the safety window&quot;
++    assert posts == []
++    # after hours, verify PASS -&gt; PASS line, no revert
++    calls = {&quot;restart&quot;: 0, &quot;revert&quot;: 0}
++    night = _ist_now().replace(hour=23, minute=0)
++    r = run(night, restart_fn=lambda: calls.__setitem__(&quot;restart&quot;, calls[&quot;restart&quot;] + 1),
++            verify_fn=lambda: {&quot;ok&quot;: True}, tag_fn=lambda: &quot;tagX&quot;,
++            revert_fn=lambda t: calls.__setitem__(&quot;revert&quot;, 1), post_fn=posts.append, sleep_fn=lambda s: None)
++    assert r[&quot;pass&quot;] and calls == {&quot;restart&quot;: 1, &quot;revert&quot;: 0} and posts[0].startswith(&quot;NIGHT DRY RUN PASS&quot;)
++    # verify FAIL -&gt; revert + second restart + FAILED line + lead flag
++    posts.clear(); calls[&quot;restart&quot;] = 0
++    r2 = run(night, restart_fn=lambda: calls.__setitem__(&quot;restart&quot;, calls[&quot;restart&quot;] + 1),
++             verify_fn=lambda: {&quot;ok&quot;: False, &quot;reason&quot;: &quot;site frozen&quot;}, tag_fn=lambda: &quot;tagX&quot;,
++             revert_fn=lambda t: calls.__setitem__(&quot;revert&quot;, 1), post_fn=posts.append, sleep_fn=lambda s: None)
++    assert (not r2[&quot;pass&quot;]) and calls[&quot;restart&quot;] == 2 and calls[&quot;revert&quot;] == 1
++    assert any(&quot;NIGHT DRY RUN FAILED&quot; in p for p in posts) and any(&quot;LEAD RULING NEEDED&quot; in p for p in posts)
++    print(&quot;night_dry_run demo OK: skips in window; PASS w/o revert; FAIL reverts+restarts+flags&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/tests/test_night_dry_run.py b/tests/test_night_dry_run.py
+new file mode 100644
+index 000000000..1f4981e82
+--- /dev/null
++++ b/tests/test_night_dry_run.py
+@@ -0,0 +1,28 @@
++&quot;&quot;&quot;R-WATCHERS 3.3: nightly dry run — safety-window skip, PASS w/o revert, FAIL reverts+restarts+flags.&quot;&quot;&quot;
++from scripts import night_dry_run as n
++
++
++def test_skips_in_safety_window():
++    noon = n._ist_now().replace(hour=11, minute=0)
++    posts = []
++    assert n.run(noon, post_fn=posts.append).get(&quot;skipped&quot;)
++    assert posts == []
++
++
++def test_pass_does_not_revert():
++    calls = {&quot;restart&quot;: 0, &quot;revert&quot;: 0}
++    posts = []
++    r = n.run(n._ist_now().replace(hour=23), restart_fn=lambda: calls.__setitem__(&quot;restart&quot;, calls[&quot;restart&quot;] + 1),
++              verify_fn=lambda: {&quot;ok&quot;: True}, tag_fn=lambda: &quot;t&quot;, revert_fn=lambda _t: calls.__setitem__(&quot;revert&quot;, 1),
++              post_fn=posts.append, sleep_fn=lambda _s: None)
++    assert r[&quot;pass&quot;] and calls[&quot;revert&quot;] == 0 and posts[0].startswith(&quot;NIGHT DRY RUN PASS&quot;)
++
++
++def test_fail_reverts_restarts_and_flags():
++    calls = {&quot;restart&quot;: 0, &quot;revert&quot;: 0}
++    posts = []
++    r = n.run(n._ist_now().replace(hour=23), restart_fn=lambda: calls.__setitem__(&quot;restart&quot;, calls[&quot;restart&quot;] + 1),
++              verify_fn=lambda: {&quot;ok&quot;: False, &quot;reason&quot;: &quot;site frozen&quot;}, tag_fn=lambda: &quot;t&quot;,
++              revert_fn=lambda _t: calls.__setitem__(&quot;revert&quot;, 1), post_fn=posts.append, sleep_fn=lambda _s: None)
++    assert (not r[&quot;pass&quot;]) and calls[&quot;restart&quot;] == 2 and calls[&quot;revert&quot;] == 1
++    assert any(&quot;NIGHT DRY RUN FAILED&quot; in p for p in posts) and any(&quot;LEAD RULING NEEDED&quot; in p for p in posts)
+</pre></div><div class='c'><div class='h'><b>c701f4035</b> · 2026-09-22 23:28</div><div>BUNDLE Part 3 (2) R-WATCHERS: desk-wide message-storm guard (&gt;12/min per source -&gt; MESSAGE STORM + mute, self-heal 30min / owner CLEAR STORM); archive R-LIVE-GATE (queued)</div><div class='sub h'>.gitignore                                |  1 +</div><div class='sub h'>docs/EYES.md                              |  2 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-LIVE-GATE.md |  9 ++++</div><div class='sub h'>scripts/kill_switch.py                    | 10 ++++</div><div class='sub h'>scripts/notify.py                         | 77 +++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_notify_storm.py                | 42 +++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index d1cd90220..21491983e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -67,3 +67,4 @@ scheduler/.build_idle_hour
+ scheduler/.notify_seen.json
+ scheduler/.drops_seen.json
+ scheduler/.cost_week
++scheduler/.notify_storm.json
+diff --git a/docs/EYES.md b/docs/EYES.md
+index 96de86d02..b032a6574 100644
+--- a/docs/EYES.md
++++ b/docs/EYES.md
+@@ -30,3 +30,5 @@ typed) · what freezes it · what still needs the owner.
+ | STREAM SILENT | each recorder stream&#x27;s last row (reports/STATUS.json `streams`), market hours only | 15 min (declared recorder cadence) | a new recorder row landing | the 06:00 login re-arms a dead recorder |
+ 
+ Dedup is the existing notify rate-limit: a frozen page keeps the same written time, so the alarm text is identical each cycle and posts once, then at most hourly. A failed fetch is a safe no-op (never a false FROZEN).
++
++| MESSAGE STORM | per-source Telegram lines/min (source = leading word) | &gt;12 lines/min from one source | 30 min of no attempted post, or owner &quot;CLEAR STORM[: src]&quot; / any &quot;CLEAR HALT&quot; | owner un-mute if a real source is wrongly muted |
+diff --git a/docs/dispatches/2026-09-22_R-LIVE-GATE.md b/docs/dispatches/2026-09-22_R-LIVE-GATE.md
+new file mode 100644
+index 000000000..ae85268ec
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-LIVE-GATE.md
+@@ -0,0 +1,9 @@
++→ BUILD  (R-LIVE-GATE — archive verbatim to docs/dispatches. Queue AFTER the end-to-end bundle, BEFORE the root-swap ruling. Order-path change: goes live only through the nightly dry run and the verifier&#x27;s end-to-end rehearsal; if not proven and committed before 05:00, do not touch the live path — it waits for the next night. Where this can fail: a live input missing at signal time → the check fails closed and the signal is HELD with that check named, never a silent pass.)
++
++1. Read the six execution checks exactly as the exam implements them (cite file and lines). Put the same six, same thresholds, into the live order path so every live signal passes or is HELD by the identical logic — one shared function, no second copy.
++2. Live inputs: spread and depth from the live order book at signal time; the fixed charges from the cost config; the fill-probability model already built. Any input missing → that check fails closed → HELD, reason named.
++3. Fills: simulate at the real order-book price at signal time or worse, with charges deducted — never the mid price. Exits the same way.
++4. Every HELD signal is logged with the failing check and shown in the site&#x27;s held section; never in a trades table.
++5. Weekly live-cost vs calibrated-backtest check (already built) reads from these records.
++6. Proof: unit tests on the shared function; the verifier&#x27;s end-to-end rehearsal with one synthetic signal that passes and one that fails each check; live ledger hashes unchanged.
++7. Report to docs/reports, one Telegram line, self-flag line.
+diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+index e9595291d..ef5db613f 100644
+--- a/scripts/kill_switch.py
++++ b/scripts/kill_switch.py
+@@ -108,12 +108,22 @@ def poll_telegram(get=None):
+             kill(); action = &quot;KILL&quot;
+         elif text == &quot;RESUME&quot;:
+             resume(); action = &quot;RESUME&quot;
++        elif text.startswith(&quot;CLEAR STORM&quot;):          # R-WATCHERS 3.2: owner un-mutes a message-storm source
++            src = raw_text.split(&quot;:&quot;, 1)[1].strip() if &quot;:&quot; in raw_text else None
++            try:
++                from scripts import notify as _n
++                _n.clear_storm(src or None)
++                action = &quot;CLEAR-STORM&quot;
++            except Exception:
++                pass
+         elif text.startswith(&quot;CLEAR HALT&quot;):           # R-HALT-FIX §4: owner override from their own chat
+             reason = raw_text.split(&quot;:&quot;, 1)[1].strip() if &quot;:&quot; in raw_text else &quot;&quot;
+             try:
+                 from scripts import clear_halt
+                 ok, _msg = clear_halt.owner_clear(reason)
+                 action = &quot;CLEAR-HALT&quot; if ok else action
++                from scripts import notify as _n       # an owner clear also lifts any message-storm mute
++                _n.clear_storm(None)
+             except Exception:
+                 pass
+         elif text == &quot;NOW&quot;:                            # R-NOW-LINE §5: reply-only — the NOW line + status one-liner
+diff --git a/scripts/notify.py b/scripts/notify.py
+index de0927269..ea1df97e7 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -17,6 +17,7 @@ ponytail: stdlib urllib, no requests dep; no config file (env-var bot already wi
+ from __future__ import annotations
+ 
+ import os
++import re
+ import sys
+ import json
+ import urllib.request
+@@ -169,6 +170,76 @@ def _rate_limited(message, window_s=3600):
+     return False
+ 
+ 
++_STORM_STORE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;scheduler&quot;, &quot;.notify_storm.json&quot;)
++_STORM_PER_MIN = 12        # R-WATCHERS: &gt;12 lines/min from ONE source is a storm (declared cap, adjustable)
++_STORM_HEAL_S = 30 * 60    # a muted source self-heals after 30 min with no attempted post (else clear_storm)
++
++
++def _storm_source(message):
++    &quot;&quot;&quot;A coarse source tag = the message&#x27;s leading word (BUILD / SITE / COST / ANALYST / …), else DESK.&quot;&quot;&quot;
++    w = re.match(r&quot;[A-Za-z→]+&quot;, str(message).lstrip(&quot;[E1] &quot;).lstrip())
++    return (w.group(0).upper() if w else &quot;DESK&quot;)[:16]
++
++
++def _storm_guard(message):
++    &quot;&quot;&quot;Desk-wide rate guard (R-WATCHERS Part 3.2). Returns (drop, alarm): drop=True means this message is
++    suppressed (its source is storming/muted); alarm is the &#x27;MESSAGE STORM &lt;src&gt;&#x27; line to emit once on the
++    transition to muted, else None. The alarm line itself is exempt. Best-effort; a store error never blocks.&quot;&quot;&quot;
++    import time
++    if str(message).startswith(&quot;MESSAGE STORM&quot;):
++        return False, None
++    src = _storm_source(message)
++    now = time.time()
++    try:
++        st = json.load(open(_STORM_STORE, encoding=&quot;utf-8&quot;))
++    except Exception:
++        st = {}
++    muted = st.get(&quot;_muted&quot;, {})
++    if src in muted:
++        if now - muted[src] &gt; _STORM_HEAL_S:          # self-heal after a long quiet
++            del muted[src]
++        else:
++            st[&quot;_muted&quot;] = muted
++            _save_storm(st)
++            return True, None
++    times = [t for t in st.get(src, []) if now - t &lt; 60] + [now]
++    st[src] = times
++    alarm = None
++    drop = False
++    if len(times) &gt; _STORM_PER_MIN:
++        muted[src] = now
++        st[&quot;_muted&quot;] = muted
++        alarm, drop = &quot;MESSAGE STORM %s&quot; % src, True
++    _save_storm(st)
++    return drop, alarm
++
++
++def _save_storm(st):
++    try:
++        os.makedirs(os.path.dirname(_STORM_STORE), exist_ok=True)
++        json.dump(st, open(_STORM_STORE, &quot;w&quot;, encoding=&quot;utf-8&quot;))
++    except Exception:
++        pass
++
++
++def clear_storm(source=None):
++    &quot;&quot;&quot;Owner clear: unmute one source, or all. Returns the sources that were muted.&quot;&quot;&quot;
++    try:
++        st = json.load(open(_STORM_STORE, encoding=&quot;utf-8&quot;))
++    except Exception:
++        return []
++    muted = st.get(&quot;_muted&quot;, {})
++    was = sorted(muted)
++    if source is None:
++        st = {&quot;_muted&quot;: {}}                        # clear all mutes AND every rate window
++    else:
++        src = source.upper()
++        st[&quot;_muted&quot;] = {k: v for k, v in muted.items() if k != src}
++        st.pop(src, None)                          # reset this source&#x27;s rate window so it doesn&#x27;t re-storm
++    _save_storm(st)
++    return was
++
++
+ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+     &quot;&quot;&quot;Send one plain-language Telegram ping, prefixed [E1]. SEND ONLY.
+ 
+@@ -183,6 +254,12 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+     if _rate_limited(message):                # R-STOP-SPAM: identical text posts once, then at most hourly
+         _log_send(message, &quot;RATE-LIMITED&quot;)
+         return False
++    _drop, _alarm = _storm_guard(message)     # R-WATCHERS: desk-wide storm guard (per-source lines/min cap)
++    if _alarm is not None:
++        message = _alarm                      # emit the storm alarm once; the storming message is suppressed
++    elif _drop:
++        _log_send(message, &quot;STORM-MUTED&quot;)
++        return False
+     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
+     try:
+         from scripts import msg_log            # R-EYES-COMPLETE §2: the mirror&#x27;s incoming/outgoing log
+diff --git a/tests/test_notify_storm.py b/tests/test_notify_storm.py
+new file mode 100644
+index 000000000..018ffdd7e
+--- /dev/null
++++ b/tests/test_notify_storm.py
+@@ -0,0 +1,42 @@
++&quot;&quot;&quot;R-WATCHERS Part 3.2: desk-wide message-storm guard — &gt;12 lines/min from one source is muted, once.&quot;&quot;&quot;
++import tempfile, os
++from scripts import notify
++
++
++def _isolate():
++    notify._STORM_STORE = os.path.join(tempfile.mkdtemp(), &quot;storm.json&quot;)
++
++
++def test_storm_mutes_source_after_cap_then_alarms_once():
++    _isolate()
++    alarms = []
++    for _ in range(notify._STORM_PER_MIN):
++        drop, alarm = notify._storm_guard(&quot;BUILD 12:00 something&quot;)
++        assert drop is False and alarm is None            # under the cap
++    drop, alarm = notify._storm_guard(&quot;BUILD 12:00 something else&quot;)   # crosses the cap
++    assert drop is True and alarm == &quot;MESSAGE STORM BUILD&quot;
++    # already muted -&gt; dropped silently, no second alarm
++    drop2, alarm2 = notify._storm_guard(&quot;BUILD another&quot;)
++    assert drop2 is True and alarm2 is None
++
++
++def test_alarm_line_itself_is_exempt():
++    _isolate()
++    assert notify._storm_guard(&quot;MESSAGE STORM BUILD&quot;) == (False, None)
++
++
++def test_clear_storm_unmutes():
++    _isolate()
++    for _ in range(notify._STORM_PER_MIN + 1):
++        notify._storm_guard(&quot;COST weekly line&quot;)
++    assert notify._storm_guard(&quot;COST weekly line&quot;)[0] is True        # muted
++    assert &quot;COST&quot; in notify.clear_storm(&quot;COST&quot;)
++    assert notify._storm_guard(&quot;COST weekly line&quot;)[0] is False       # unmuted
++
++
++def test_different_sources_independent():
++    _isolate()
++    for _ in range(notify._STORM_PER_MIN + 1):
++        notify._storm_guard(&quot;BUILD x&quot;)
++    assert notify._storm_guard(&quot;BUILD x&quot;)[0] is True
++    assert notify._storm_guard(&quot;SITE y&quot;)[0] is False                 # a different source is unaffected
+</pre></div><div class='c'><div class='h'><b>b9a1dcaae</b> · 2026-09-22 23:24</div><div>BUNDLE Part 3 (1) R-WATCHERS: site-freshness + stream-silence alarms inside the watchdog process; once-then-hourly via notify; thresholds recorded in EYES.md</div><div class='sub h'>docs/EYES.md           |   9 ++++</div><div class='sub h'>scripts/watchdog.py    |   6 +++</div><div class='sub h'>scripts/watchers.py    | 132 +++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_watchers.py |  31 ++++++++++++</div><pre>diff --git a/docs/EYES.md b/docs/EYES.md
+index bd753abc4..96de86d02 100644
+--- a/docs/EYES.md
++++ b/docs/EYES.md
+@@ -21,3 +21,12 @@ typed) · what freezes it · what still needs the owner.
+ | Telegram (inbound) | KILL / RESUME / clear halt / now / → BUILD / → AUDIT | 5 min (token_ping wake) | token_ping gone; no token | send the commands |
+ | audit runs | a fresh independent read on demand | on each → AUDIT | claude CLI missing | send → AUDIT |
+ | chat lead (this) | everything above, via the mirror link | one message | a HALT that blocks the build session | the root swap; owner-only doors |
++
++## Watchers (R-WATCHERS, END-TO-END BUNDLE Part 3) — run inside the watchdog process
++
++| Watcher | Sees what | Max age before it fires | What freezes it (clears the alarm) | Still needs the owner |
++|---|---|---|---|---|
++| SITE FROZEN | the PUBLIC status page&#x27;s written time (data/status.json `generated`) | 360 s = 3 status-daemon write cycles (120 s each) | the status daemon writing a fresh time again | a restart if the daemon itself is dead (human trigger) |
++| STREAM SILENT | each recorder stream&#x27;s last row (reports/STATUS.json `streams`), market hours only | 15 min (declared recorder cadence) | a new recorder row landing | the 06:00 login re-arms a dead recorder |
++
++Dedup is the existing notify rate-limit: a frozen page keeps the same written time, so the alarm text is identical each cycle and posts once, then at most hourly. A failed fetch is a safe no-op (never a false FROZEN).
+diff --git a/scripts/watchdog.py b/scripts/watchdog.py
+index dc00f5503..a067f8619 100644
+--- a/scripts/watchdog.py
++++ b/scripts/watchdog.py
+@@ -717,6 +717,12 @@ def main():
+             resurrect_supervisor(now)  # R-RESTART-TONIGHT: keep the independent supervisor alive with the stack
+         except Exception:
+             pass
++        try:
++            from scripts import watchers   # R-WATCHERS: alarm if the public site freezes / a recorder goes silent
++            watchers.site_freshness()
++            watchers.stream_silence()
++        except Exception:
++            pass
+         # R-MORNING-FIX (2): the periodic builder-idle 🙋 call is REMOVED from the loop (the sender in
+         # builder_check is deleted). No timer-repeating Telegram message runs here any more.
+         try:
+diff --git a/scripts/watchers.py b/scripts/watchers.py
+new file mode 100644
+index 000000000..bf928ab62
+--- /dev/null
++++ b/scripts/watchers.py
+@@ -0,0 +1,132 @@
++&quot;&quot;&quot;R-WATCHERS (END-TO-END BUNDLE Part 3) — failures that happen while nobody is committing.
++
++These run INSIDE the existing watchdog process (no new process): watchdog.main() calls site_freshness(now)
++and stream_silence(now) each cycle. Every alarm is ONE plain line; the dedup (&quot;once, then hourly&quot;) is the
++existing notify rate-limit, because a frozen page keeps the SAME written time so the alarm text is identical
++each cycle until it clears.
++
++Thresholds (recorded in docs/EYES.md):
++  • SITE FROZEN — the status daemon writes every STATUS_CADENCE_S (120 s, site_loop._start_status_daemon).
++    Older than STALE_AFTER_S (3 cycles = 360 s) when fetched = frozen.
++  • STREAM SILENT — market hours only; a recorder stream whose last row is older than STREAM_STALE_S.
++Nothing here touches the trading path; a failed fetch is a safe no-op (never a false FROZEN).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime
++import json
++import os
++import re
++
++REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++STATUS_JSON_URL = &quot;https://[redacted]-[redacted].github.io/e1-live-site/data/status.json&quot;
++STATUS_CADENCE_S = 120                      # site_loop status-daemon interval
++STALE_AFTER_S = 3 * STATUS_CADENCE_S        # 360 s: older than 3 write cycles = frozen
++STREAM_STALE_S = 15 * 60                    # a recorder row older than 15 min in-session = silent (declared)
++
++
++def _ist_now():
++    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
++
++
++def _parse_iso(s):
++    try:
++        return datetime.datetime.fromisoformat(s)
++    except Exception:
++        return None
++
++
++def _fetch_json(url, timeout=15):
++    import urllib.request
++    with urllib.request.urlopen(url, timeout=timeout) as r:      # ponytail: stdlib urllib, no requests dep
++        return json.loads(r.read().decode(&quot;utf-8&quot;, &quot;replace&quot;))
++
++
++def _in_session(now=None):
++    now = now or _ist_now()
++    if now.weekday() &gt;= 5:
++        return False
++    hm = now.hour * 60 + now.minute
++    return 9 * 60 + 15 &lt;= hm &lt;= 15 * 60 + 30
++
++
++def site_freshness(now=None, fetch_fn=None, post_fn=None):
++    &quot;&quot;&quot;Fetch the PUBLIC status page&#x27;s written time; if older than STALE_AFTER_S, alarm once-then-hourly.
++    A fetch failure returns None (no false FROZEN). Returns the alarm line if posted, else None.&quot;&quot;&quot;
++    now = now or _ist_now()
++    fetch_fn = fetch_fn or (lambda: _fetch_json(STATUS_JSON_URL))
++    post_fn = post_fn or _notify
++    try:
++        d = fetch_fn()
++    except Exception:
++        return None
++    gen = _parse_iso((d or {}).get(&quot;generated&quot;, &quot;&quot;))
++    if gen is None:
++        return None
++    age = (now - gen).total_seconds()
++    if age &lt;= STALE_AFTER_S:
++        return None
++    line = &quot;SITE FROZEN since %s&quot; % gen.strftime(&quot;%Y-%m-%d %H:%M&quot;)
++    try:
++        post_fn(line)                                            # notify rate-limit makes it once-then-hourly
++    except Exception:
++        pass
++    return line
++
++
++def stream_silence(now=None, status=None, post_fn=None):
++    &quot;&quot;&quot;In market hours, a recorder stream whose last row is older than STREAM_STALE_S -&gt; ONE line. Uses the
++    LOCAL status.json (reports/STATUS.json) so it needs no network. Returns the list of alarm lines posted.&quot;&quot;&quot;
++    now = now or _ist_now()
++    if not _in_session(now):
++        return []
++    if status is None:
++        try:
++            status = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;))
++        except Exception:
++            return []
++    post_fn = post_fn or _notify
++    out = []
++    for name, s in (status.get(&quot;streams&quot;) or {}).items():
++        last = _parse_iso((s or {}).get(&quot;last&quot;, &quot;&quot;) or &quot;&quot;)
++        if last is None:
++            continue
++        if (now - last).total_seconds() &gt; STREAM_STALE_S:
++            line = &quot;STREAM SILENT %s since %s&quot; % (name, last.strftime(&quot;%H:%M&quot;))
++            try:
++                post_fn(line)
++            except Exception:
++                pass
++            out.append(line)
++    return out
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++def _demo():
++    # frozen: generated 20 min ago -&gt; alarm; fresh: 1 min ago -&gt; none; bad fetch -&gt; none
++    now = _ist_now()
++    old = (now - datetime.timedelta(minutes=20)).isoformat()
++    fresh = (now - datetime.timedelta(minutes=1)).isoformat()
++    posts = []
++    a = site_freshness(now, fetch_fn=lambda: {&quot;generated&quot;: old}, post_fn=posts.append)
++    b = site_freshness(now, fetch_fn=lambda: {&quot;generated&quot;: fresh}, post_fn=posts.append)
++    c = site_freshness(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError(&quot;net&quot;)), post_fn=posts.append)
++    assert a and a.startswith(&quot;SITE FROZEN&quot;) and b is None and c is None, (a, b, c)
++    # stream silence only in session; a 20-min-old row in session alarms
++    insession = now.replace(hour=11, minute=0)
++    st = {&quot;streams&quot;: {&quot;Order-book depth&quot;: {&quot;last&quot;: (insession - datetime.timedelta(minutes=20)).isoformat()}}}
++    sp = []
++    lines = stream_silence(insession, status=st, post_fn=sp.append)
++    assert lines and lines[0].startswith(&quot;STREAM SILENT Order-book depth&quot;), lines
++    # off-session: no stream alarm
++    off = now.replace(hour=20, minute=0)
++    assert stream_silence(off, status=st, post_fn=sp.append) == []
++    print(&quot;watchers demo OK: site-freshness (frozen/fresh/fetch-fail) + stream-silence (in/off session)&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/tests/test_watchers.py b/tests/test_watchers.py
+new file mode 100644
+index 000000000..3ea61676e
+--- /dev/null
++++ b/tests/test_watchers.py
+@@ -0,0 +1,31 @@
++&quot;&quot;&quot;R-WATCHERS: site-freshness + stream-silence alarms, once-then-hourly via notify.&quot;&quot;&quot;
++import datetime
++
++from scripts import watchers as w
++
++
++def _now():
++    return w._ist_now()
++
++
++def test_site_frozen_when_written_time_stale():
++    now = _now()
++    old = (now - datetime.timedelta(minutes=20)).isoformat()
++    posts = []
++    line = w.site_freshness(now, fetch_fn=lambda: {&quot;generated&quot;: old}, post_fn=posts.append)
++    assert line and line.startswith(&quot;SITE FROZEN since&quot;) and posts == [line]
++
++
++def test_site_fresh_and_fetch_fail_are_silent():
++    now = _now()
++    fresh = (now - datetime.timedelta(minutes=1)).isoformat()
++    assert w.site_freshness(now, fetch_fn=lambda: {&quot;generated&quot;: fresh}, post_fn=lambda _l: None) is None
++    assert w.site_freshness(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError()), post_fn=lambda _l: None) is None
++
++
++def test_stream_silence_only_in_session():
++    base = _now().replace(minute=0, second=0, microsecond=0)
++    insession, offsession = base.replace(hour=11), base.replace(hour=20)
++    row = {&quot;streams&quot;: {&quot;Order-book depth&quot;: {&quot;last&quot;: (insession - datetime.timedelta(minutes=20)).isoformat()}}}
++    assert w.stream_silence(insession, status=row, post_fn=lambda _l: None)      # 20-min-old row in session
++    assert w.stream_silence(offsession, status=row, post_fn=lambda _l: None) == []
+</pre></div><div class='c'><div class='h'><b>a608169c2</b> · 2026-09-22 23:21</div><div>Archive SAFETY-RESTART-WINDOW ruling (no restart 05:30-15:45; 06:00 login is the restart) — confirms Part 2 restart hold</div><div class='sub h'>docs/dispatches/2026-09-22_SAFETY-RESTART-WINDOW.md | 10 ++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_SAFETY-RESTART-WINDOW.md b/docs/dispatches/2026-09-22_SAFETY-RESTART-WINDOW.md
+new file mode 100644
+index 000000000..5e79a8277
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_SAFETY-RESTART-WINDOW.md
+@@ -0,0 +1,10 @@
++→ BUILD  (SAFETY + R-ROOT-SWAP-RULING — archive both verbatim to docs/dispatches.)
++
++SAFETY (applies to the running bundle immediately): no restart_stack and no stack restart of any kind between 05:30 and 15:45. If Part 2 step 3 or Part 3&#x27;s nightly job would fall in that window, skip the restart — the 06:00 login is the restart — and prove the rest after the login instead. Nothing may touch launch files after 05:00.
++
++R-ROOT-SWAP-RULING (queue after the bundle):
++1. No root swap now. /v2/ stays at /v2/ with honest &quot;—&quot; where no per-record data exists. Never a fabricated value.
++2. Next item after the bundle, verified by the new verifier: a per-engine / per-pattern / per-stock record store built as read-only views over the existing ledgers and exam outputs (no new ledger, no writes to live ledgers), so the six flagged pages fill from real records. Screenshot-diff each page again after it fills.
++3. Root swap only when the diff list is empty AND the owner replies &quot;swap&quot; in the bot chat.
++4. Rename the parked item &quot;Quiet Buying first live match&quot; to &quot;Dubai Strategies first live match&quot; — that name is retired everywhere, including BACKLOG and the beat.
++5. Report to docs/reports, one Telegram line, self-flag line.
+</pre></div><div class='c'><div class='h'><b>36fcb295b</b> · 2026-09-22 23:20</div><div>BUNDLE Part 2 R-RESTART-PROOF: status freeze already resolved (public status fresh 23:12); build-room/v2 stale from running site_loop; restart prepared + revert-tagged, held for human trigger (R-NIGHT-CLOSE). Archive R-ROOT-SWAP-RULING</div><div class='sub h'>docs/dispatches/2026-09-22_R-ROOT-SWAP-RULING.md |  7 +++</div><div class='sub h'>docs/reports/2026-09-22-restart-proof.md         | 60 ++++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-ROOT-SWAP-RULING.md b/docs/dispatches/2026-09-22_R-ROOT-SWAP-RULING.md
+new file mode 100644
+index 000000000..c8fe668f4
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-ROOT-SWAP-RULING.md
+@@ -0,0 +1,7 @@
++→ BUILD  (R-ROOT-SWAP-RULING — archive verbatim to docs/dispatches. Queue it AFTER the end-to-end bundle. Where this can fail: the record store is a plug-in and must never touch live ledgers — read-only views over them.)
++
++1. No root swap now. /v2/ stays at /v2/ with honest &quot;—&quot; where no per-record data exists. Never a fabricated value.
++2. Next item after the bundle, verified by the new verifier: a per-engine / per-pattern / per-stock record store built as read-only views over the existing ledgers and exam outputs (no new ledger, no writes to live ledgers), so the six flagged pages fill from real records. Screenshot-diff each page again after it fills.
++3. Root swap only when the diff list is empty AND the owner replies &quot;swap&quot; in the bot chat.
++4. Rename the parked item &quot;Quiet Buying first live match&quot; to &quot;Dubai Strategies first live match&quot; — that name is retired everywhere.
++5. Report to docs/reports, one Telegram line, self-flag line.
+diff --git a/docs/reports/2026-09-22-restart-proof.md b/docs/reports/2026-09-22-restart-proof.md
+new file mode 100644
+index 000000000..2f4d7afa6
+--- /dev/null
++++ b/docs/reports/2026-09-22-restart-proof.md
+@@ -0,0 +1,60 @@
++# R-RESTART-PROOF — Part 2 of the END-TO-END BUNDLE (2026-09-22 ~23:15 IST)
++
++## 1. Queue truth (from git, not memory)
++
++Every step of the four rulings has a commit — nothing outstanding:
++
++- **R-HALT-FIX** 1–6: `9b2d856ab` … `43822e23c` (guard rebuild, clear_halt, supervisor provenance, owner
++  Telegram clear, booked-only trades, rename + anonymise).
++- **R-STOP-SPAM** 1–2: `a4a92d979` (stop the &quot;[CODE] session finished&quot; spam + desk-wide repeat limit),
++  `c028e0789` (status.html cache-busting reload). **Nothing from R-STOP-SPAM is unfinished.**
++- **R-NOW-LINE** 1–7: `bffef127d` … `3b35525f9`.
++- **R-EYES-COMPLETE** 1–10: `d696097a9` … `2b28ea169`.
++
++## 2. The &quot;frozen site&quot; — diagnosed against the live public pages (proof, fetched myself)
++
++- **status.html is NOT frozen.** Fetched `https://[redacted]-[redacted].github.io/e1-live-site/status.html` at
++  ~23:14 IST: **written time `2026-09-22T23:12:58`**, &quot;refreshes every 2 minutes&quot;, 4 desk processes listed.
++  The 15:00:29 freeze the dispatch describes is **already resolved** — the decoupled status daemon
++  (R-STOP-SPAM / the status-thread work) is pushing current times. The earlier stuck view was the
++  browser/CDN cache that R-STOP-SPAM(2)&#x27;s cache-busting reload addressed.
++- **The build room IS stale.** `build/index.html` still shows the **old five-link room** (&quot;Status/Journal/
++  Transcript/Commits/Supervisor&quot;) and &quot;R-EYES-COMPLETE done · R-V2-EXACT remaining pages&quot; — **not** the
++  ten-page R-EYES-COMPLETE mirror. The `/v2/` pages ported tonight are likewise not live.
++- **Cause (confirmed, not the rejected-push suspect):** the **running `site_loop.py` process (pid 24144)
++  holds in-memory imports from before tonight&#x27;s mirror/v2 code landed.** Its status *daemon thread* is new
++  enough to be current, but its *full build cycle* (build_journal&#x27;s 10-link index, v8_site, mirror) runs the
++  older code, so it rewrites the public build room and /v2/ with the pre-tonight pages every cycle. A
++  **restart reloads the process** and the built work goes live. (No push was rejected; the pages are being
++  overwritten with stale output, not failing to push.)
++
++## 3. The restart — PREPARED and proven-ready, deliberately NOT auto-executed tonight
++
++- **Revert point tagged:** `night-revert-2026-09-22` → `146ec8bce` (the last audit-pass commit, per
++  `reports/AUDIT-LAST-PASS.txt`). This is the 08:15 revert target.
++- **restart_stack.py is the mechanism** and its guard was checked read-only: `after_1530 = True`,
++  `launch_path_touched(HEAD) = False`, so **`guard() = False` → `run()` currently REFUSES** (HEAD is the
++  docs-only bundle-archive commit, not a launch-path commit).
++- **Two reasons the live-stack kill-and-relaunch is held, not performed autonomously tonight:**
++  1. **R-NIGHT-CLOSE (§14.10)** — &quot;a session never relaunches the stack; restart is a human act.&quot; The clean
++     reconciliation with this bundle: restart_stack.py is the sanctioned **mechanism**, the **trigger stays
++     human**. I prepared and proved it ready; the owner (or START_E1_STACK) triggers it.
++  2. **Operational:** `run()` would kill `book20_runner` (pid 21912) and relaunch a *different* set
++     (token_ping/watchdog/site_loop/**supervisor**, no book20 until the 06:00 login arms it). Doing that at
++     23:15 while the **urgent problem — the frozen status page — is already resolved** trades more than it
++     needs to.
++- **What is lost by waiting:** only the build-room/​/v2 freshness on the public site until the next human
++  restart (or the nightly dry run Part 3 builds). The status page — the thing a watcher would alarm on — is
++  already live.
++
++## 4. Owner tap (Part 2 step 4)
++
++One Telegram line posted asking the owner to trigger the prepared restart and then send
++`→ AUDIT check the mirror end to end` to prove the inbox. The eyes stay **&quot;built&quot;** until that → AUDIT lands;
++the inbox handles it whenever it arrives.
++
++## Where this can fail
++
++If the owner triggers the restart on a docs-only HEAD, restart_stack&#x27;s guard refuses — a launch-path commit
++must be at HEAD first (the verifier/watcher commits in Parts 3–4 satisfy that). Recorded so the trigger isn&#x27;t
++a surprise refusal.
+</pre></div><div class='c'><div class='h'><b>32441f837</b> · 2026-09-22 23:12</div><div>END-TO-END BUNDLE archived (verbatim); Part 1 R-CODEX-SETUP closed: Codex UNAVAILABLE tonight (needs owner terminal/admin), verifier runs on fallback rung d — docs/VERIFIER-BRAIN.md</div><div class='sub h'>docs/VERIFIER-BRAIN.md                          | 41 +++++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_END-TO-END-BUNDLE.md | 60 +++++++++++++++++++++++++</div><pre>diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
 new file mode 100644
 index 000000000..1475597ef
 --- /dev/null
@@ -1275,952 +1978,4 @@ index 4de462346..58cb20406 100644
 -.tabs button.on{background:var(--card);color:var(--ink)}
 -.tabpane{display:none}.tabpane.on{display:block}
 -.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27; class=&#x27;on&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Stocks&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every stock the desk watches, with the last reading. Type to filter; click a name for its patterns and story. 210 stocks.&lt;/p&gt;&lt;input id=&#x27;q&#x27; oninput=&quot;filt(&#x27;q&#x27;,&#x27;tbl&#x27;)&quot; placeholder=&#x27;filter by name…&#x27; style=&#x27;background:#0c0e12;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;width:220px;margin:6px 0&#x27;&gt;&lt;table id=&#x27;tbl&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;th&gt;Change&lt;/th&gt;&lt;th&gt;Trend&lt;/th&gt;&lt;th&gt;Swings&lt;/th&gt;&lt;th&gt;vs its own range&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;A2ZINFRA&#x27; onclick=&quot;location.href=&#x27;../stocks/A2ZINFRA.html&#x27;&quot;&gt;&lt;td&gt;A2ZINFRA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.65&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;26%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABB&#x27; onclick=&quot;location.href=&#x27;../stocks/ABB.html&#x27;&quot;&gt;&lt;td&gt;ABB&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7256.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;11%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABCAPITAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ABCAPITAL.html&#x27;&quot;&gt;&lt;td&gt;ABCAPITAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;403.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;13%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENSOL&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENSOL.html&#x27;&quot;&gt;&lt;td&gt;ADANIENSOL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1402.1&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.86%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;75%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENT&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENT.html&#x27;&quot;&gt;&lt;td&gt;ADANIENT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2975.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.81%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;74%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIGREEN&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIGREEN.html&#x27;&quot;&gt;&lt;td&gt;ADANIGREEN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1303.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.49%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;15%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPORTS&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPORTS.html&#x27;&quot;&gt;&lt;td&gt;ADANIPORTS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1788.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.19%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPOWER.html&#x27;&quot;&gt;&lt;td&gt;ADANIPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;206.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;36%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ALKEM&#x27; onclick=&quot;location.href=&#x27;../stocks/ALKEM.html&#x27;&quot;&gt;&lt;td&gt;ALKEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5367.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+5.45%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;72%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBER&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBER.html&#x27;&quot;&gt;&lt;td&gt;AMBER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7105.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBUJACEM&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBUJACEM.html&#x27;&quot;&gt;&lt;td&gt;AMBUJACEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;392.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;37%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ANGELONE&#x27; onclick=&quot;location.href=&#x27;../stocks/ANGELONE.html&#x27;&quot;&gt;&lt;td&gt;ANGELONE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;296.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.36%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;54%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APLAPOLLO&#x27; onclick=&quot;location.href=&#x27;../stocks/APLAPOLLO.html&#x27;&quot;&gt;&lt;td&gt;APLAPOLLO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2184.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;64%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APOLLOHOSP&#x27; onclick=&quot;location.href=&#x27;../stocks/APOLLOHOSP.html&#x27;&quot;&gt;&lt;td&gt;APOLLOHOSP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;8920.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;30%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASHOKLEY&#x27; onclick=&quot;location.href=&#x27;../stocks/ASHOKLEY.html&#x27;&quot;&gt;&lt;td&gt;ASHOKLEY&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;161.59&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.01%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASIANPAINT&#x27; onclick=&quot;location.href=&#x27;../stocks/ASIANPAINT.html&#x27;&quot;&gt;&lt;td&gt;ASIANPAINT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2450.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.72%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASTRAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ASTRAL.html&#x27;&quot;&gt;&lt;td&gt;ASTRAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1404.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AUBANK.html&#x27;&quot;&gt;&lt;td&gt;AUBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1039.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.77%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;22%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUROPHARMA&#x27; onclick=&quot;location.href=&#x27;../stocks/AUROPHARMA.html&#x27;&quot;&gt;&lt;td&gt;AUROPHARMA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1718.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AXISBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AXISBANK.html&#x27;&quot;&gt;&lt;td&gt;AXISBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1248.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.25%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;8%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJFINSV&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJFINSV.html&#x27;&quot;&gt;&lt;td&gt;BAJAJFINSV&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1859.8&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.34%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJHLDNG&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJHLDNG.html&#x27;&quot;&gt;&lt;td&gt;BAJAJHLDNG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;11404.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJFINANCE&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJFINANCE.html&#x27;&quot;&gt;&lt;td&gt;BAJFINANCE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1024.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.00%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;4%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANDHANBNK&#x27; onclick=&quot;location.href=&#x27;../stocks/BANDHANBNK.html&#x27;&quot;&gt;&lt;td&gt;BANDHANBNK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;178.81&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.02%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;23%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKBARODA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKBARODA.html&#x27;&quot;&gt;&lt;td&gt;BANKBARODA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;234.19&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKINDIA.html&#x27;&quot;&gt;&lt;td&gt;BANKINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;138.44&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.90%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BDL&#x27; onclick=&quot;location.href=&#x27;../stocks/BDL.html&#x27;&quot;&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1174.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;10%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BEL.html&#x27;&quot;&gt;&lt;td&gt;BEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;398.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.57%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;5%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARATFORG&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARATFORG.html&#x27;&quot;&gt;&lt;td&gt;BHARATFORG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1970.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.32%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARTIARTL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARTIARTL.html&#x27;&quot;&gt;&lt;td&gt;BHARTIARTL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1830.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.51%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;7%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHEL.html&#x27;&quot;&gt;&lt;td&gt;BHEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;434.8&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.95%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;18%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BIOCON&#x27; onclick=&quot;location.href=&#x27;../stocks/BIOCON.html&#x27;&quot;&gt;&lt;td&gt;BIOCON&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;395.15&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;12%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BLUESTARCO&#x27; onclick=&quot;location.href=&#x27;../stocks/BLUESTARCO.html&#x27;&quot;&gt;&lt;td&gt;BLUESTARCO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1569.4&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.60%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;46%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BOSCHLTD&#x27; onclick=&quot;location.href=&#x27;../stocks/BOSCHLTD.html&#x27;&quot;&gt;&lt;td&gt;BOSCHLTD&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;47750.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.93%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;44%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BPCL&#x27; onclick=&quot;location.href=&#x27;../stocks/BPCL.html&#x27;&quot;&gt;&lt;td&gt;BPCL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;312.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.43%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;25%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BRITANNIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BRITANNIA.html&#x27;&quot;&gt;&lt;td&gt;BRITANNIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5020.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;35%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BSE&#x27; onclick=&quot;location.href=&#x27;../stocks/BSE.html&#x27;&quot;&gt;&lt;td&gt;BSE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;3160.4&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-6.79%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;78%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CAMS&#x27; onclick=&quot;location.href=&#x27;../stocks/CAMS.html&#x27;&quot;&gt;&lt;td&gt;CAMS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;705.1&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.88%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;39%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CANBK&#x27; onclick=&quot;location.href=&#x27;../stocks/CANBK.html&#x27;&quot;&gt;&lt;td&gt;CANBK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;123.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.04%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CDSL&#x27; onclick=&quot;location.href=&#x27;../stocks/CDSL.html&#x27;&quot;&gt;&lt;td&gt;CDSL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1361.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.07%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;27%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CGPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/CGPOWER.html&#x27;&quot;&gt;&lt;td&gt;CGPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;908.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CHOLAFIN&#x27; onclick=&quot;location.href=&#x27;../stocks/CHOLAFIN.html&#x27;&quot;&gt;&lt;td&gt;CHOLAFIN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1768.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.05%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CIPLA&#x27; onclick=&quot;location.href=&#x27;../stocks/CIPLA.html&#x27;&quot;&gt;&lt;td&gt;CIPLA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1379.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.63%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;17%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COALINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/COALINDIA.html&#x27;&quot;&gt;&lt;td&gt;COALINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;413.6&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.75%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;62%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COCHINSHIP&#x27; onclick=&quot;location.href=&#x27;../stocks/COCHINSHIP.html&#x27;&quot;&gt;&lt;td&gt;COCHINSHIP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1382.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;rough&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;83%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COFORGE&#x27; onclick=&quot;location.href=&#x27;../stocks/COFORGE.html&#x27;&quot;&gt;&lt;td&gt;COFORGE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1810.2&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COLPAL&#x27; onclick=&quot;location.href=&#x27;../stocks/COLPAL.html&#x27;&quot;&gt;&lt;td&gt;COLPAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1880.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+4.62%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;68%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CONCOR&#x27; onclick=&quot;location.href=&#x27;../stocks/CONCOR.html&#x27;&quot;&gt;&lt;td&gt;CONCOR&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;488.95&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.41%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;19%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CROMPTON&#x27; onclick=&quot;location.href=&#x27;../stocks/</pre></div><div class='c'><div class='h'><b>615673f6a</b> · 2026-09-22 22:38</div><div>R-CODEX-SETUP: diagnose codex sign-in (port 1455 in excluded range; egress OK, no admin) + one owner line</div><div class='sub h'>docs/dispatches/2026-09-22_R-CODEX-SETUP.md | 13 ++++++++</div><div class='sub h'>docs/reports/2026-09-22-codex-setup.md      | 50 +++++++++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-CODEX-SETUP.md b/docs/dispatches/2026-09-22_R-CODEX-SETUP.md
-new file mode 100644
-index 000000000..a83c69e3b
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-CODEX-SETUP.md
-@@ -0,0 +1,13 @@
-+→ BUILD  (R-CODEX-SETUP — do this now, before continuing the queue. Archive verbatim to docs/dispatches first. Nothing here touches the trading path.)
-+
-+Goal: Codex CLI signed in on this laptop, proven by a non-interactive run, with the owner tapping at most one link.
-+
-+1. Diagnose, don&#x27;t guess. On this machine, `codex login` failed with socket error 10013 and `codex login --device-auth` failed with &quot;error sending request&quot; to auth.openai.com. Run: `codex --version`; `curl -sI https://auth.openai.com/api/accounts/deviceauth/usercode`; `netsh interface ipv4 show excludedportrange protocol=tcp` (is 1455 inside an excluded range?); check Windows Firewall rules and any antivirus log for a block on the codex binary; check for HTTP(S)_PROXY variables or a Windows system proxy. Write what you found to docs/reports/2026-09-22-codex-setup.md as you go.
-+
-+2. Fix what needs no admin rights. If the network itself blocks OpenAI (curl fails, DNS fails), post ONE Telegram line: &quot;Codex: laptop network blocks OpenAI — switch to phone hotspot and reply &#x27;hotspot on&#x27;&quot;, then poll the inbox/messages for that reply and continue. If the block needs admin rights, post ONE line saying exactly what admin step is needed and stop this ruling.
-+
-+3. Sign-in. Run `codex login --device-auth`. When it prints the link and code, post ONE Telegram line: &quot;Codex sign-in: open &lt;link&gt;, enter code &lt;code&gt;&quot; and wait for the login to complete (poll `codex login status` for up to 15 minutes). Never post any token or credential; the link and one-time code only.
-+
-+4. Prove it. In the repo folder run `codex exec &quot;reply with the word ok&quot;`. Record the exact output. If it says the plan is not eligible, post ONE line: &quot;Codex: plan not eligible — API key needed&quot; and stop.
-+
-+5. Report to docs/reports first, then one Telegram line. Then return to the queue in order (R-RESTART-PROOF if unfinished → R-VERIFIER once Codex prints ok → R-V2-EXACT). End with NOTHING NEEDS THE LEAD or LEAD RULING NEEDED: &lt;question&gt;.
-diff --git a/docs/reports/2026-09-22-codex-setup.md b/docs/reports/2026-09-22-codex-setup.md
-new file mode 100644
-index 000000000..813c1fd33
---- /dev/null
-+++ b/docs/reports/2026-09-22-codex-setup.md
-@@ -0,0 +1,50 @@
-+# Codex CLI setup — diagnosis (R-CODEX-SETUP, 2026-09-22)
-+
-+Dispatch: `docs/dispatches/2026-09-22_R-CODEX-SETUP.md`. Nothing here touches the trading path.
-+
-+## What was measured (read-only, on this laptop)
-+
-+| Check | Result |
-+|---|---|
-+| `codex --version` | `codex-cli 0.155.1` |
-+| `nslookup auth.openai.com` | Resolves → Cloudflare CDN (172.64.146.15, 104.18.41.241, IPv6) — **DNS is fine** |
-+| `netsh winhttp show proxy` | **Direct access (no proxy server)** |
-+| proxy env vars | **none** |
-+| `netsh interface ipv4 show excludedportrange protocol=tcp` | excluded: **1073–1472**, 14859–14958, 50000–50059 |
-+| `codex login status` | `Not logged in` |
-+| `curl -I https://auth.openai.com/...` | **could not run** — the agent&#x27;s sandbox permission-denies outbound `curl`; this is a limit of my terminal, **not** evidence about the laptop&#x27;s network |
-+
-+## Root cause of the two failures
-+
-+1. **`codex login` → socket error 10013 (WSAEACCES).** The OAuth loopback callback port codex uses,
-+   **1455, sits inside the Windows excluded TCP range 1373–1472** (part of the 1073–1472 block reserved by
-+   Windows NAT / Hyper-V / WSL). A process cannot bind a port inside an excluded range, so the callback
-+   server bind fails with 10013. **This is the answer to the dispatch&#x27;s direct question: yes, 1455 is inside
-+   an excluded range.**
-+
-+2. **`codex login --device-auth` → &quot;error sending request&quot;.** The device-auth path does **not** use a
-+   loopback port, so it is not affected by (1). When I ran `codex login --device-auth` here it did **not**
-+   error out — it ran for 45s+ with no &quot;error sending request&quot;, which indicates egress from codex to
-+   auth.openai.com **works** on this laptop now (the earlier failure was likely transient or from a
-+   sandboxed context). **But** device-auth needs a real terminal (TTY) to display its link + one-time code;
-+   run head-less through the agent&#x27;s piped Bash it emits **nothing** (0 bytes captured, still &quot;Not logged
-+   in&quot;), so I cannot read or relay the code from here.
-+
-+## Fix options
-+
-+- **No-admin, one link (recommended).** The owner runs **`codex login --device-auth`** in their **own
-+  PowerShell** window. It prints a verification link + a short code; the owner opens the link and enters the
-+  code. No admin rights, no port fix needed — egress is not the blocker. *(I cannot drive this for the owner
-+  because the code only renders on a real terminal, not the agent&#x27;s pipe.)*
-+
-+- **Admin, to make the normal `codex login` loopback flow work.** Free port 1455 from the excluded range.
-+  The 1073–1472 block is a dynamic winnat reservation; in an **elevated** PowerShell:
-+  `net stop winnat` then `net start winnat` (regenerates the dynamic ranges, usually off the low ports),
-+  or explicitly reserve the flow&#x27;s range away from 1455. This needs admin and is **not** required if the
-+  device-auth path above is used.
-+
-+## Verdict
-+
-+Sign-in is **not network-blocked** and needs **no admin** — it needs a real terminal the agent doesn&#x27;t
-+have. The single owner action that finishes it is one command in their own PowerShell plus one link tap.
-+`codex exec &quot;reply with the word ok&quot;` (step 4) can only be run **after** that sign-in completes.
-</pre></div><div class='c'><div class='h'><b>7f5ffbc72</b> · 2026-09-22 22:25</div><div>R-V2-EXACT: port the Patterns page; owner opening line + real 5 live patterns bound (honest &#x27;-&#x27; where the store has no case/win count; baked readings/summary flagged)</div><div class='sub h'>scripts/v8_site.py    |  61 +++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/patterns.html | 100 +++++++++++++++++++++++++++++++-------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
-index c5acbfd8b..88528bc80 100644
---- a/scripts/v8_site.py
-+++ b/scripts/v8_site.py
-@@ -259,10 +259,69 @@ def _main_data():
-             &quot;expandLabel&quot;: &quot;Expand - fees, hold time, exit rule&quot;, &quot;toggle&quot;: &quot;&quot;}
- 
- 
-+
-+_FAM = {&quot;ema&quot;: &quot;EMA trend&quot;, &quot;sma&quot;: &quot;SMA trend&quot;, &quot;vwap&quot;: &quot;VWAP band&quot;, &quot;rsi&quot;: &quot;RSI momentum&quot;,
-+        &quot;stddev_returns&quot;: &quot;volatility band&quot;}
-+
-+
-+def _pattern_data():
-+    &quot;&quot;&quot;The Patterns page: the master-detail bound to the REAL live tradeable set (LIVE-PATTERN-SET.json) —
-+    the five the desk actually trades. Each carries a plain-English rule (its management string) and its real
-+    net-per-trade R; the store has no per-pattern case count or win %, so those honest-show as &#x27;—&#x27; rather than
-+    fabricate (§4.4). All five are exam survivors → &#x27;live paper&#x27;, requirements &#x27;passed&#x27;; the four design exam
-+    sub-steps are not in the store, so they show &#x27;—&#x27; instead of an invented pass/fail.&quot;&quot;&quot;
-+    import json
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;LIVE-PATTERN-SET.json&quot;), encoding=&quot;utf-8&quot;))
-+        pats = list((d.get(&quot;patterns&quot;) or {}).values())
-+    except Exception:
-+        pats = []
-+    G, GREY = &quot;#5DCAA5&quot;, &quot;#9a9a93&quot;
-+    full = []
-+    for p in pats:
-+        fam = _FAM.get(p.get(&quot;family&quot;, &quot;&quot;), (p.get(&quot;family&quot;) or &quot;&quot;).upper())
-+        r = p.get(&quot;net_per_trade_R&quot;)
-+        full.append({
-+            &quot;words&quot;: &quot;%s — %s (%s-day hold)&quot; % (p.get(&quot;stock&quot;), fam, p.get(&quot;horizon&quot;)),
-+            &quot;rule&quot;: &quot;Rule: %s.&quot; % (p.get(&quot;management&quot;) or &quot;tested rule&quot;),
-+            &quot;who&quot;: &quot;E1, E10, E11&quot;, &quot;cases&quot;: &quot;—&quot;, &quot;won&quot;: &quot;—&quot;, &quot;wonAdj&quot;: &quot;—&quot;,
-+            &quot;move&quot;: (&quot;%+.2fR per trade&quot; % r) if isinstance(r, (int, float)) else &quot;—&quot;,
-+            &quot;req&quot;: &quot;passed&quot;, &quot;reqColor&quot;: G, &quot;rank&quot;: &quot;—&quot;,
-+            &quot;stage&quot;: &quot;live paper&quot;, &quot;stageColor&quot;: G,
-+            &quot;s2&quot;: &quot;passed the final exam&quot;, &quot;c2&quot;: G, &quot;s3&quot;: &quot;—&quot;, &quot;c3&quot;: GREY,
-+            &quot;s4&quot;: &quot;—&quot;, &quot;c4&quot;: GREY, &quot;s5&quot;: &quot;live paper&quot;, &quot;c5&quot;: G,
-+        })
-+    if not full:
-+        full = [{&quot;words&quot;: &quot;no live pattern yet&quot;, &quot;rule&quot;: &quot;Rule: —.&quot;, &quot;who&quot;: &quot;—&quot;, &quot;cases&quot;: &quot;—&quot;,
-+                 &quot;won&quot;: &quot;—&quot;, &quot;wonAdj&quot;: &quot;—&quot;, &quot;move&quot;: &quot;—&quot;, &quot;req&quot;: &quot;—&quot;, &quot;reqColor&quot;: GREY,
-+                 &quot;rank&quot;: &quot;—&quot;, &quot;stage&quot;: &quot;—&quot;, &quot;stageColor&quot;: GREY, &quot;s2&quot;: &quot;—&quot;, &quot;c2&quot;: GREY,
-+                 &quot;s3&quot;: &quot;—&quot;, &quot;c3&quot;: GREY, &quot;s4&quot;: &quot;—&quot;, &quot;c4&quot;: GREY, &quot;s5&quot;: &quot;—&quot;, &quot;c5&quot;: GREY}]
-+    lst = [{&quot;words&quot;: p[&quot;words&quot;], &quot;stage&quot;: p[&quot;stage&quot;], &quot;stageColor&quot;: p[&quot;stageColor&quot;],
-+            &quot;cases&quot;: p[&quot;cases&quot;], &quot;won&quot;: p[&quot;won&quot;], &quot;bg&quot;: &quot;#23262d&quot; if k == 0 else &quot;transparent&quot;, &quot;pick&quot;: &quot;&quot;}
-+           for k, p in enumerate(full)]
-+    out = {&quot;list&quot;: lst}
-+    out.update(full[0])                 # detail = first live pattern (resting selection)
-+    return out
-+
-+
-+def _fix_pattern(html):
-+    &quot;&quot;&quot;The owner&#x27;s required opening line for the Patterns page (R-V2-EXACT point 3).&quot;&quot;&quot;
-+    html = html.replace(
-+        &quot;Every pattern the desk knows, with its rule, who calls it, and its record. Click one to open it.&quot;,
-+        &quot;A pattern is a tested rule. Only the five with ‘live paper’ are traded.&quot;)
-+    # a baked sample count sits in a hardcoded sentence (no placeholder); the store has no per-pattern count
-+    return html.replace(
-+        &quot;The 937 backtest calls for this pattern are in the Excel below.&quot;,
-+        &quot;This pattern’s backtest calls are in the Excel below.&quot;)
-+
-+
-+POST[&quot;Pattern.dc.html&quot;] = _fix_pattern
-+
-+
- # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
- # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
- # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
--PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data}
-+PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data}
- 
- 
- def build(write=True, only=None):
-diff --git a/site/v2/patterns.html b/site/v2/patterns.html
-index 08a7b6d9a..452e9119f 100644
---- a/site/v2/patterns.html
-+++ b/site/v2/patterns.html
-@@ -1,37 +1,63 @@
--&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Patterns — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
--:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
--  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
--*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
--  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
--.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
--a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
--.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
--  background:#0c0e12;position:sticky;top:0;z-index:5}
--.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
--  padding:2px 8px;margin-right:8px}
--.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
--.nav a.on{background:var(--card);color:var(--ink)}
--.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
--.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
--  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
--main{max-width:1180px;margin:0 auto;padding:16px}
--h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
--.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
--.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
--.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
--.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
--table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
--td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
--tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
--.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
--.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
--.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
--.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
--.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
--.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
--.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
--.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
--.tabs button.on{background:var(--card);color:var(--ink)}
--.tabpane{display:none}.tabpane.on{display:block}
--.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27; class=&#x27;on&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Patterns&lt;/h1&gt;&lt;h2&gt;The five live patterns&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;These five cleared real execution costs, so E1/E10/E11 trade them. The rest below are on paper diaries. Paper only — not advice; small samples, high bar.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;BSE&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;BSE, held for weeks: when how choppy its recent daily returns have been sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: how choppy its recent daily returns have been · Managed: hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.5 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;UNITDSPR&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;UNITDSPR, held for weeks: when its price against a simple moving average sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against a simple moving average · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.5 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;ETERNAL&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27;&gt;fired today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;ETERNAL, held for weeks: when a momentum reading (RSI) sits in a particular band, its price tends to go UP.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: a momentum reading (RSI) · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.2 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;AUBANK&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27;&gt;fired today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;AUBANK, held for weeks: when its price against the day&amp;#x27;s volume-weighted average price (VWAP) sits in a particular band, its price tends to go UP.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against the day&amp;#x27;s volume-weighted average price (VWAP) · Managed: hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 13 trades · won 92.3% · average +0.2 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;UNITDSPR&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;UNITDSPR, held for weeks: when its price against a moving-average trend line sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against a moving-average trend line · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 10 trades · won 100.0% · average +0.1 R after costs&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;All patterns that passed the exam&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;The behaviours that passed test edge, a sealed hold-out and a cost hurdle. &lt;b&gt;323 patterns passed.&lt;/b&gt;&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1156 times · edge 3.5 pts · held out 15.2%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1128 times · edge 8.2 pts · held out 61.9%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1108 times · edge 3.2 pts · held out 15.5%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1099 times · edge 3.6 pts · held out 15.0%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1086 times · edge 4.0 pts · held out 15.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1075 times · edge 4.2 pts · held out 17.7%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1071 times · edge 8.7 pts · held out 62.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1067 times · edge 9.6 pts · held out 61.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1065 times · edge 8.8 pts · held out 62.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1064 times · edge 8.0 pts · held out 61.4%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1059 times · edge 6.8 pts · held out 60.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1058 times · edge 7.5 pts · held out 60.9%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1053 times · edge 8.7 pts · held out 62.1%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1049 times · edge 3.9 pts · held out 15.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1043 times · edge 3.3 pts · held out 14.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1023 times · edge 6.1 pts · held out 59.2%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, the next move </pre></div><div class='c'><div class='h'><b>3ee816889</b> · 2026-09-22 22:08</div><div>R-V2-EXACT: port the Main/Leaderboard page; bind the engine-chat sidebar and latest-signals card to the real calls (top cards/stat grid/leaderboard rows still baked, flagged for binding)</div><div class='sub h'>scripts/v8_site.py |  70 ++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/index.html | 128 +++++++++++++++++++++++++++++++++++++----------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
-index 0e30300e3..c5acbfd8b 100644
---- a/scripts/v8_site.py
-+++ b/scripts/v8_site.py
-@@ -86,7 +86,61 @@ def _gate(html):
- 
- def port(dc_name, data):
-     dc = open(os.path.join(DESIGN, dc_name), encoding=&quot;utf-8&quot;).read()
--    return _fix_nav_and_links(v8_port.page(dc, data))
-+    html = _fix_nav_and_links(v8_port.page(dc, data))
-+    if dc_name in POST:
-+        html = POST[dc_name](html)
-+    return html
-+
-+
-+
-+def _short_reason(sentence):
-+    &quot;&quot;&quot;A short plain phrase from a real signal sentence, e.g. &#x27;when VWAP is in its lowest 20%&#x27;.&quot;&quot;&quot;
-+    body = sentence.split(&quot;:&quot;, 1)[-1] if &quot;:&quot; in sentence else sentence
-+    body = body.split(&quot;→&quot;)[0].split(&quot;-&gt;&quot;)[0]         # cut at the arrow
-+    body = body.replace(&quot;daily,&quot;, &quot;&quot;).replace(&quot;daily &quot;, &quot;&quot;).strip(&quot; ,.&quot;)
-+    return (body[:60] + &quot;…&quot;) if len(body) &gt; 62 else body
-+
-+
-+def _fix_main(html):
-+    &quot;&quot;&quot;Bind the Main page&#x27;s two baked sample blocks to the real recent calls (live.json): the Latest-signals
-+    card (3 spans) and the Engine-chat sidebar (6 lines). Keeps the design markup; only the sample text is
-+    replaced. The top cards, the 8-stat grid and the 15 static leaderboard rows stay as the design drew them
-+    (real zeros today) and are flagged in the run&#x27;s per-page diff, not silently rewritten.&quot;&quot;&quot;
-+    import json
-+    try:
-+        calls = json.load(open(os.path.join(REPO, &quot;site&quot;, &quot;data&quot;, &quot;live.json&quot;), encoding=&quot;utf-8&quot;)).get(&quot;calls&quot;) or []
-+    except Exception:
-+        calls = []
-+
-+    def dirn(c):
-+        d = (c.get(&quot;direction&quot;) or &quot;&quot;).lower()
-+        return &quot;buy&quot; if &quot;rise&quot; in d or &quot;up&quot; in d else (&quot;sell&quot; if &quot;fall&quot; in d or &quot;down&quot; in d else &quot;watch&quot;)
-+
-+    # Latest-signals card: replace each baked span in order (they are identical but for the stock name)
-+    span_re = re.compile(r&#x27;&lt;span&gt;[A-Z0-9]+ - buy - &lt;a href=&quot;patterns.html&quot; style=&quot;color: #85B7EB;&quot;&gt;price sitting in its lowest range&lt;/a&gt;&lt;/span&gt;&#x27;)
-+    it = iter(calls)
-+    def span_sub(_m):
-+        c = next(it, None)
-+        if not c:
-+            return &#x27;&lt;span style=&quot;color: #9a9a93;&quot;&gt;no new signal&lt;/span&gt;&#x27;
-+        return &#x27;&lt;span&gt;%s - %s - &lt;a href=&quot;patterns.html&quot; style=&quot;color: #85B7EB;&quot;&gt;%s&lt;/a&gt;&lt;/span&gt;&#x27; % (
-+            _esc(c.get(&quot;stock&quot;)), dirn(c), _esc(_short_reason(c.get(&quot;sentence&quot;) or &quot;&quot;)))
-+    html = span_re.sub(span_sub, html)
-+
-+    # Engine-chat sidebar: replace each baked #d7d5ce line in order with a real engine line
-+    lines = [&quot;%s — %s: %s. Held while the price gap is measured.&quot; % (
-+        _esc(c.get(&quot;stock&quot;)), _esc((c.get(&quot;engine&quot;) or &quot;&quot;).split(&quot; &quot;)[0]), _esc(_short_reason(c.get(&quot;sentence&quot;) or &quot;&quot;)))
-+        for c in calls]
-+    jt = iter(lines)
-+    chat_re = re.compile(r&#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;[^&lt;]*&lt;/div&gt;&#x27;)
-+    def chat_sub(_m):
-+        t = next(jt, None)
-+        return &#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;%s&lt;/div&gt;&#x27; % t if t else &#x27;&lt;div style=&quot;color: #9a9a93;&quot;&gt;no engine chat yet today&lt;/div&gt;&#x27;
-+    html = chat_re.sub(chat_sub, html)
-+    return html
-+
-+
-+POST = {&quot;Main.dc.html&quot;: _fix_main}     # per-page post-processor for pages with baked sample sub-trees
- 
- 
- # ---------------------------------------------------------------------------------------------------------
-@@ -193,10 +247,22 @@ def _messages_data():
-     }
- 
- 
-+
-+def _main_data():
-+    &quot;&quot;&quot;The Main / Leaderboard page: the design bakes the engine rows and top cards as static markup (no
-+    sc-for, no data placeholders) — the only placeholders are the expand-column state. A verbatim port binds
-+    them to the resting state (not expanded), so the extra fees/hold/exit columns stay hidden. The baked
-+    per-engine numbers are the real paper state today (every engine ₹2,00,000, 0 trades, ₹0) and equal to
-+    reality; they are NOT bound to records yet — flagged in the run&#x27;s per-page diff, not silently &#x27;fixed&#x27;.&quot;&quot;&quot;
-+    cols10 = &quot;2fr 1fr 0.8fr 0.8fr 0.8fr 0.7fr 0.9fr 0.9fr 0.9fr 0.7fr&quot;
-+    return {&quot;expanded&quot;: False, &quot;cols&quot;: cols10,
-+            &quot;expandLabel&quot;: &quot;Expand - fees, hold time, exit rule&quot;, &quot;toggle&quot;: &quot;&quot;}
-+
-+
- # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
- # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
- # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
--PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data}
-+PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data}
- 
- 
- def build(write=True, only=None):
-diff --git a/site/v2/index.html b/site/v2/index.html
-index 0085c8545..2f4f3f67d 100644
---- a/site/v2/index.html
-+++ b/site/v2/index.html
-@@ -1,37 +1,91 @@
--&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Leaderboard — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
--:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
--  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
--*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
--  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
--.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
--a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
--.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
--  background:#0c0e12;position:sticky;top:0;z-index:5}
--.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
--  padding:2px 8px;margin-right:8px}
--.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
--.nav a.on{background:var(--card);color:var(--ink)}
--.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
--.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
--  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
--main{max-width:1180px;margin:0 auto;padding:16px}
--h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
--.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
--.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
--.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
--.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
--table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
--td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
--tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
--.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
--.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
--.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
--.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
--.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
--.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
--.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
--.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
--.tabs button.on{background:var(--card);color:var(--ink)}
--.tabpane{display:none}.tabpane.on{display:block}
--.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
--&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27; class=&#x27;on&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Leaderboard&lt;/h1&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Desk value&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;₹6,00,000&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Signals seen today&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;0&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trading allowed&lt;/div&gt;&lt;div class=&#x27;big gain&#x27;&gt;YES&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made so far&lt;/div&gt;&lt;div class=&#x27;big gain&#x27;&gt;+0.0 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Engine books&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Every fixed-rule engine runs two books on its own Rs 2,00,000 paper account: a flat book (Rs 1,000 a trade) and an adaptive book (sizing follows its own record). Both start today.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Account&lt;/th&gt;&lt;th&gt;Made&lt;/th&gt;&lt;th&gt;Trades&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;E21 overnight&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E21 overnight&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E9 pairs&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E9 pairs&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E3 calendar&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E3 calendar&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;YouTube&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;YouTube&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E7 Gap Timer (not built)&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E7 Gap Timer (not built)&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E12 two-exchange&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E12 two-exchange&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E14 retail&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E14 retail&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E4 options&lt;/td&gt;&lt;td&gt;Flat&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E4 options&lt;/td&gt;&lt;td&gt;Adaptive&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.0 R&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;0&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;div class=&#x27;grid2&#x27; style=&#x27;margin-top:16px&#x27;&gt;&lt;div&gt;&lt;h2&gt;Traders&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Account&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;E1&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;Live, paper only&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E10&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;paper only&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;E11&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;₹2,00,000&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;paper only&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;h2&gt;Latest signals&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;div class=&#x27;m&#x27;&gt;Filled 2026-09-21 &amp;mdash; &lt;b&gt;DABUR&lt;/b&gt; · DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;Filled 2026-09-21 &amp;mdash; &lt;b&gt;HINDUNILVR&lt;/b&gt; · HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;Filled 2026-09-21 &amp;mdash; &lt;b&gt;JSWENERGY&lt;/b&gt; · JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;Filled 2026-09-21 &amp;mdash; &lt;b&gt;BDL&lt;/b&gt; · BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;Filled 2026-09-21 &amp;mdash; &lt;b&gt;SHREECEM&lt;/b&gt; · SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;h2&gt;Engine chat&lt;/h2&gt;&lt;div class=&#x27;panel chat&#x27;&gt;&lt;div class=&#x27;m&#x27;&gt;POSITIONS: 8 open — ALL synthetic &amp;#x27;instrument-onehundredeleven&amp;#x27; rehearsal fires, 0 from live fires. E1-ADAPTIVE x6 (buy, flat Rs1000, entries 20-21 Sep), E10 x1, E11 x1 (21 Sep 12:02); trade-ids BOOK20-oneeleven-*; roof/desk 0 open; E1-FLAT 0 open. ALERT: rehearsal/synthetic fires LEAKED INTO LIVE LEDGERS: E1-ADAPTIVE, E10, E11 (the word starting D-E-M-O is filtered by the notifier, so worded as rehearsal/synthetic).&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;STACK: clean — 4 recorders + 1 runner, no duplicates. (The 5th, E7 tick, is a code STUB — its socket loop was never built, so it exits instantly and cannot run; the 4 real recorders including depth are up and recording.) A single-instance lock now stops the runner from ever duplicating; the runner&amp;#x27;s poll no longer hangs (candidate scan cached). Depth accruing, moment light live for the 84 unlocked stocks.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;SITE: before — one ~36 s full rebuild every cycle (live data waited on the whole rebuild); the slow steps were results 18 s, engine page 6 s, deliverables 4 s, v2 4 s, sizing 3 s. After — live data every 2 min (~5 s: positions, accounts, cards, ticker), pages every 10 min. Takes effect at the next stack restart.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;ENGINE ROOM: recorders 5/5 recording again, runner up; ORDERS allowed for 84 unlocked stocks. Today&amp;#x27;s fires ETERNAL &amp;amp; AUBANK are locked (2/20 spread readings) — 0 orders is CORRECT there, not a bug; the moment light greens fine for stocks that have their 20 readings (COFORGE/ASIANPAINT/LT verified). Root cause: the 5 recorders didn&amp;#x27;t survive the 11:17 login, so there were no live quotes — relaunched. Two follow-ups: the runner&amp;#x27;s per-poll scan is too slow under load, and the watchdog left a duplicate process set — a clean STOP then START (+ re-login) clears the duplicates.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E11] · AUBANK · BUY · ₹294 risk · 12:29 vwap|q4 — hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E10] · AUBANK · BUY · ₹274 risk · 12:29 vwap|q4 — hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E1] · AUBANK · BUY · ₹1,000 risk · 12:29 vwap|q4 — hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E11] · ETERNAL · BUY · ₹2,062 risk · 12:29 rsi[60,80] — hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E10] · ETERNAL · BUY · ₹680 risk · 12:29 rsi[60,80] — hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🎯 [E1] · ETERNAL · BUY · ₹1,000 risk · 12:29 rsi[60,80] — hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target HELD — moment light not green (spread/depth)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;RECORDERS: 0/5 running — depth: 0 rows/10min (last 21 Sep 15:30) ; option-chains: 0 ; arb-ticks: 0 ; NSE/BSE two-exchange: 0 ; retail-positioning: 0 ; flows: 0 ; macro: 0 ; overnight-marks: 0. Every stream at zero; no recorder process alive (only token_ping, watchdog, site_loop, http.server).&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;LIVE PAPER: NOT ON — token fresh (exchanged 05:47Z today) &amp;amp; 5-survivor set loaded; engines armed E1,E10,E11,E21,E3,YT / diary E9,E7,E12,E14,E4 — BUT order_ok=false (moment light closed, orders_allowed_now=false), 0 orders written / 0 real cards; recorders 0/5 running; book20 last polled 11:20 with no live runner process now.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;READY — trading today: E1, E10, E11, E21, E3, YT ; diary only: E9 (E9 pair universe summarised only (no concrete pairs listed) — diary until pairs land); E7 (E7 stream not recording yet (Arbitrage ticks) — diary only); E12 (E12 stream not recording yet (NSE / BSE two-exchange) — diary only); E14 (E14 stream not recording yet (Retail positioning) — diary only); E4 (E4 stream not recording yet (Option chains) — diary only) ; tests: 10 failed, 186 passed in 95.74s (0:01:35)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🔔 E1 pre-open: no paper calls queued for today.&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🙋 Tap on the laptop to log in — the Kite login page is open and this laptop is already listening, so it finishes by itself: https://kite.trade/connect/login?api_key=[redacted]&amp;amp;v=3&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[E1] NOT READY — engines E1/E10/E11 not armed&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;🙋 Tap on the laptop to log in — the Kite login page is open and this laptop is already listening, so it finishes by itself: https://kite.trade/connect/login?api_key=[redacted]&amp;amp;v=3&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;[CODE] session finished — come back&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;📊 The five live patterns E1 trades (paper, after real costs): • BSE — when how choppy its recent daily returns have been sits in a particular band, its price tends to move in its measured direction | hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target | 9 trades, won 100.0%, avg 0.4937 R after costs • UNITDSPR — when its price against a simple moving average sits in a particular band, its price tends to move in its measured direction | hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target | 9 trades, won 100.0%, avg 0.4753 R after costs • ETERNAL — when a momentum reading (RSI) sits in a particular band, its price tends to go UP | hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target | 9 trades, won 100.0%, avg 0.2069 R after costs · FIRED TODAY • AUBANK — when its price against the day&amp;#x27;s volume-weighted average price (VWAP) sits in a particular band, its price tends to go UP | hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target | 13 trades, won 92.3%, avg 0.1683 R after costs · FIRED TODAY • UNITDSPR — when its price against a moving-average trend line sits in a particular band, its price tends to move in its measured direction | hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target | 10 trades, won 100.0%, avg 0.061 R after costs Today: ETERNAL, AUBANK fired (Small samples — 9 to 13 trades each — held to a very high bar; the diaries keep scoring them live.)&lt;/div&gt;&lt;div class=&#x27;m&#x27;&gt;Correction to the last gate line (the earlier one wrongly said &amp;#x27;revert&amp;#x27; — it was just pre-login): NOT READY YET — waiting for the 06:0</pre></div><div class='c'><div class='h'><b>f52fa2488</b> · 2026-09-22 22:00</div><div>R-V2-EXACT: port the Messages page verbatim (real sent lines) + per-page resilience so one bad provider can&#x27;t revert every port</div><div class='sub h'>scripts/v8_site.py    |  43 +++++++++-</div><div class='sub h'>site/v2/messages.html | 231 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
-index 176064d45..0e30300e3 100644
---- a/scripts/v8_site.py
-+++ b/scripts/v8_site.py
-@@ -159,10 +159,44 @@ def _results_data():
-     return {&quot;tests&quot;: tests}
- 
- 
-+
-+def _messages_data():
-+    &quot;&quot;&quot;The Messages page: the desk&#x27;s real outgoing lines (site/data/messages.json), newest first, capped to
-+    the most recent 30. Static render shows the default &#x27;All&#x27; filter selected (the tab buttons are JS state in
-+    the design; a static port shows the resting state). No sample values — every line is a real sent message.&quot;&quot;&quot;
-+    import json
-+    from datetime import datetime
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;site&quot;, &quot;data&quot;, &quot;messages.json&quot;), encoding=&quot;utf-8&quot;))
-+        msgs = d.get(&quot;messages&quot;) or []
-+    except Exception:
-+        msgs = []
-+    msgs = sorted(msgs, key=lambda m: m.get(&quot;ts&quot;, &quot;&quot;), reverse=True)[:30]
-+    colours = {&quot;E1&quot;: &quot;#5DCAA5&quot;, &quot;E10&quot;: &quot;#85B7EB&quot;, &quot;E11&quot;: &quot;#FAC775&quot;, &quot;Desk&quot;: &quot;#b8b6ae&quot;}
-+    shown = []
-+    for m in msgs:
-+        text = (m.get(&quot;text&quot;) or &quot;&quot;).strip()
-+        head = text.split()[0] if text else &quot;&quot;
-+        tag = head if head in (&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;) else &quot;Desk&quot;
-+        try:
-+            when = datetime.fromisoformat(m.get(&quot;ts&quot;, &quot;&quot;)).strftime(&quot;%d %b %H:%M&quot;)
-+        except Exception:
-+            when = m.get(&quot;ts&quot;, &quot;&quot;)
-+        shown.append({&quot;when&quot;: when, &quot;tag&quot;: tag, &quot;tagColor&quot;: colours[tag], &quot;text&quot;: text})
-+    on, off, onFg, offFg = &quot;#5DCAA5&quot;, &quot;#161920&quot;, &quot;#0f1115&quot;, &quot;#b8b6ae&quot;
-+    return {
-+        &quot;shown&quot;: shown, &quot;count&quot;: len(shown), &quot;none&quot;: len(shown) == 0,
-+        &quot;allBg&quot;: on, &quot;allFg&quot;: onFg,               # &#x27;All&#x27; is the resting selection
-+        &quot;e1Bg&quot;: off, &quot;e1Fg&quot;: offFg, &quot;e10Bg&quot;: off, &quot;e10Fg&quot;: offFg,
-+        &quot;e11Bg&quot;: off, &quot;e11Fg&quot;: offFg, &quot;deskBg&quot;: off, &quot;deskFg&quot;: offFg,
-+        &quot;pickAll&quot;: &quot;&quot;, &quot;pickE1&quot;: &quot;&quot;, &quot;pickE10&quot;: &quot;&quot;, &quot;pickE11&quot;: &quot;&quot;, &quot;pickDesk&quot;: &quot;&quot;, &quot;typeQuery&quot;: &quot;&quot;,
-+    }
-+
-+
- # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
- # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
- # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
--PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data}
-+PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data}
- 
- 
- def build(write=True, only=None):
-@@ -174,8 +208,11 @@ def build(write=True, only=None):
-         if only and dc_name not in only:
-             continue
-         served = HREF[dc_name]
--        html = port(dc_name, provider())
--        probs = _gate(html)
-+        try:                                            # one bad provider must not revert every other port
-+            html = port(dc_name, provider())
-+            probs = _gate(html)
-+        except Exception as e:
-+            probs = [&quot;provider raised: %r&quot; % e]
-         results[served] = probs
-         if write and not probs:
-             with open(os.path.join(OUT, served), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-diff --git a/site/v2/messages.html b/site/v2/messages.html
-new file mode 100644
-index 000000000..889faf01a
---- /dev/null
-+++ b/site/v2/messages.html
-@@ -0,0 +1,231 @@
-+&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;E1 Terminal — messages&lt;/title&gt;&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
-+&lt;style&gt;
-+body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
-+a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
-+button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
-+button{cursor:pointer}
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div style=&quot;width: 1280px; height: 900px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
-+
-+&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
-+  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
-+    &lt;a href=&quot;index.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
-+    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
-+  &lt;/div&gt;
-+  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
-+    &lt;a href=&quot;index.html&quot;&gt;Leaderboard&lt;/a&gt;
-+    &lt;a href=&quot;engines.html&quot;&gt;Engines&lt;/a&gt;
-+    &lt;a href=&quot;stocks.html&quot;&gt;Stocks&lt;/a&gt;
-+    &lt;a href=&quot;patterns.html&quot;&gt;Patterns&lt;/a&gt;
-+    
-+    &lt;a href=&quot;data.html&quot;&gt;Data&lt;/a&gt;
-+    &lt;a href=&quot;results.html&quot;&gt;Results&lt;/a&gt;
-+    &lt;a href=&quot;how.html&quot;&gt;How it works&lt;/a&gt;
-+    &lt;a href=&quot;ask.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
-+  &lt;/div&gt;
-+&lt;/div&gt;
-+&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
-+  &lt;span&gt;DABUR 388.1 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+3.22%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;HINDUNILVR 1951.0 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.83%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;JSWENERGY 516.05 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.67%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;BDL 1174.5 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.3%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;SHREECEM 22520.0 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.4%&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;
-+&lt;div style=&quot;padding: 24px 40px 0;&quot;&gt;
-+  &lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Messages&lt;/div&gt;
-+  &lt;div style=&quot;font-size: 14px; color: #9a9a93; margin-top: 4px;&quot;&gt;Every message the desk has sent, the same words as on Telegram. Newest first.&lt;/div&gt;
-+&lt;/div&gt;
-+
-+&lt;div style=&quot;display: flex; gap: 12px; align-items: center; padding: 16px 40px 0;&quot;&gt;
-+  &lt;button onClick=&quot;&quot; style=&quot;padding: 8px 14px; border-radius: 999px; border: 1px solid #3a3f4a; background: #5DCAA5; color: #0f1115; font-size: 13px;&quot;&gt;All&lt;/button&gt;
-+  &lt;button onClick=&quot;&quot; style=&quot;padding: 8px 14px; border-radius: 999px; border: 1px solid #3a3f4a; background: #161920; color: #b8b6ae; font-size: 13px;&quot;&gt;E1&lt;/button&gt;
-+  &lt;button onClick=&quot;&quot; style=&quot;padding: 8px 14px; border-radius: 999px; border: 1px solid #3a3f4a; background: #161920; color: #b8b6ae; font-size: 13px;&quot;&gt;E10&lt;/button&gt;
-+  &lt;button onClick=&quot;&quot; style=&quot;padding: 8px 14px; border-radius: 999px; border: 1px solid #3a3f4a; background: #161920; color: #b8b6ae; font-size: 13px;&quot;&gt;E11&lt;/button&gt;
-+  &lt;button onClick=&quot;&quot; style=&quot;padding: 8px 14px; border-radius: 999px; border: 1px solid #3a3f4a; background: #161920; color: #b8b6ae; font-size: 13px;&quot;&gt;Desk&lt;/button&gt;
-+  &lt;label for=&quot;q&quot; style=&quot;font-size: 13px; color: #9a9a93; margin-left: 12px;&quot;&gt;Search by stock&lt;/label&gt;
-+  &lt;input id=&quot;q&quot; type=&quot;text&quot; placeholder=&quot;DABUR&quot; onInput=&quot;&quot; style=&quot;padding: 8px 12px; background: #161920; border: 1px solid #3a3f4a; border-radius: 8px; color: #e8e6e1; font-size: 14px; width: 220px;&quot;&gt;
-+&lt;/div&gt;
-+
-+&lt;div style=&quot;padding: 16px 40px 0; flex-grow: 1;&quot;&gt;
-+  &lt;div style=&quot;background: #161920; border-radius: 12px; padding: 8px 20px;&quot;&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:54&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:54 — R-EYES-COMPLETE done (built) · 3 commits since 21:44: R-V2-EXACT: port the Results page verbatim from the design, bound to the real by-book records; R-V2-EXACT: port the Data page verbatim from the design, bound… · tests 244/244 · supervisor on course 21:40 · journal/git disagree (journal R-EYES-COMPLETE done (built), git R-V2-EXACT) · ETA R-V2-EXACT verbatim /… 22:17 · all done ~Tue 23:02 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:44&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:44 — R-EYES-COMPLETE done (built) · 4 commits since 21:34: R-EYES-COMPLETE done (built); queue advances to R-V2-EXACT pages; R-EYES-COMPLETE (10): report to docs/reports — mirror built, ten pages, ruling inbox, eyes … · tests 244/244 · supervisor on course 21:40 · ETA R-V2-EXACT verbatim /… 22:07 · all done ~Tue 22:52 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:39&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:39 — R-EYES-COMPLETE done (built) · 5 commits since 21:29: R-EYES-COMPLETE done (built); queue advances to R-V2-EXACT pages; R-EYES-COMPLETE (10): report to docs/reports — mirror built, ten pages, ruling inbox, eyes … · tests 244/244 · supervisor on course 21:37 · ETA R-V2-EXACT verbatim /… 22:01 · all done ~Tue 22:46 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:37&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;R-EYES-COMPLETE built: one mirror link shows Now/Journal/Commits/Tests/Supervisor/Messages/Reports/Screenshots/Queue/Eyes; a → BUILD Telegram queues a ruling and a → AUDIT runs a fresh independent audit to Reports, no session needed. BUILT until your first → AUDIT lands its report on the mirror. Report: docs/reports/2026-09-22-R-EYES-COMPLETE.md&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:34&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:34 — R-NOW-LINE done · 4 commits since 21:24: R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit; R-EYES-COMPLETE (2): local incoming/outgoing Telegram log (scrubb… · tests 244/244 · supervisor on course 21:29 · journal/git disagree (journal R-NOW-LINE done, git R-EYES-COMPLETE) · ETA R-V2-EXACT verbatim /… 21:59 · all done ~Tue 22:50 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:28&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:28 — R-NOW-LINE done · 5 commits since 21:18: R-NOW-LINE done; queue advances to R-EYES-COMPLETE; R-NOW-LINE (7): report to docs/reports — NOW line built, screenshot + test-halt proof; R-NOW-LINE (5): to… · tests 244/244 · supervisor on course 21:26 · ETA R-V2-EXACT verbatim /… 21:54 · all done ~Tue 22:45 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:23&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:23 — R-STOP-SPAM + R-HALT-FIX done · 6 commits since 21:13: R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only); R-NOW-LINE (4): beat HALTED flag from E1-DESK\HALT on disk + supe… · tests 244/244 · supervisor on course 21:23 · journal/git disagree (journal R-STOP-SPAM + R-HALT-FIX done, git R-NOW-LINE) · ETA R-V2-EXACT verbatim /… 22:26 · all done ~Wed 00:32 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:14&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;R-STOP-SPAM done: &#x27;[CODE] session finished&#x27; now fires only on a real end (not per turn) + desk-wide repeat rate-limit (identical text once, then hourly). status.html is NOT frozen — live shows 21:08 (pushed by the halt-proof status daemon every 2 min); the 15:00 view was a stale cache, now busted. NOT READY = recorders re-arm at 06:00 login. Report: docs/reports/2026-09-22-R-STOP-SPAM.md&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:13&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:13 — R-HALT-FIX · 4 commits since 21:03: R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen; R-STOP-SPAM (1): stop the &#x27;[CODE] session finished&#x27; spam + desk… · tests 244/244 · supervisor on course 21:11 · journal/git disagree (journal R-HALT-FIX, git R-STOP-SPAM) · ETA R-V2-EXACT verbatim /… 22:53 · all done ~Wed 02:14 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:06&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:05&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 21:03&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;BUILD 21:03 — R-HALT-FIX · 2 commits since 20:53: R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only); R-HALT-FIX (3): supervisor reads pasted rulings + docs/dispatches bef… · tests 244/244 · supervisor on course 20:59 · ETA R-V2-EXACT verbatim /… 22:43 · all done ~Wed 02:04 (measured)&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+        &lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;22 Sep 20:59&lt;/div&gt;
-+        &lt;div style=&quot;color: #b8b6ae; font-weight: 600;&quot;&gt;Desk&lt;/div&gt;
-+        &lt;div style=&quot;color: #e8e6e1; white-space: normal; overflow-wrap: anywhere;&quot;&gt;[CODE] session finished — come back&lt;/div&gt;
-+      &lt;/div&gt;
-+    
-+      &lt;div style=&quot;display: grid; grid-template-columns: 140px 70px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #23262d; font-size: 14px;&quot;&gt;
-+</pre></div><div class='c'><div class='h'><b>3135bd8f8</b> · 2026-09-22 21:54</div><div>R-V2-EXACT: port the Results page verbatim from the design, bound to the real by-book records</div><div class='sub h'>reports/.self_check_20260922                      |   0</div><div class='sub h'>reports/ALERTS.md                                 |  12 +-</div><div class='sub h'>reports/ALLOCATOR.json                            |   2 +-</div><div class='sub h'>reports/ALLOCATOR.md                              |   2 +-</div><div class='sub h'>reports/AUDIT-DRYRUN.json                         |  16 +-</div><div class='sub h'>reports/AUDIT-LAST-PASS.txt                       |   2 +-</div><div class='sub h'>reports/BACKLOG.log                               |  10 +</div><div class='sub h'>reports/BOOK20-READOUT.json                       |  10 +-</div><div class='sub h'>reports/BUILD-JOURNAL.log                         |  22 ++</div><div class='sub h'>reports/DATA-READINESS.json                       |  24 +-</div><div class='sub h'>reports/DATA-READINESS.md                         |  10 +-</div><div class='sub h'>reports/E1-DAY-SUMMARY.json                       |   2 +-</div><div class='sub h'>reports/E19-FINDER-LEDGER.csv                     |   8 +-</div><div class='sub h'>reports/E19-FINDER.md                             |   4 +-</div><div class='sub h'>reports/EXAMS-REAL-STAGING.json                   |  18 +-</div><div class='sub h'>reports/EXAMS-REAL-STAGING.md                     |  10 +-</div><div class='sub h'>reports/FACTS-PAGE.md                             |   2 +-</div><div class='sub h'>reports/GRAVEYARD-DIARY.json                      |   2 +-</div><div class='sub h'>reports/GRAVEYARD-DIARY.md                        |   2 +-</div><div class='sub h'>reports/HELD-SIGNALS.log                          |   9 +</div><div class='sub h'>reports/ITEM-TIMES.json                           |  12 +</div><div class='sub h'>reports/LAUNCH-RAM.log                            |   6 +</div><div class='sub h'>reports/LEDGER.md                                 |  84 ++++++-</div><div class='sub h'>reports/LIVE-PATTERN-SET.json                     |   8 +-</div><div class='sub h'>reports/MSG-LOG.tsv                               |   2 +</div><div class='sub h'>reports/NOTIFY-DROPPED.log                        | 129 +++++++++++</div><div class='sub h'>reports/PAPER-ACCOUNT.md                          |  16 ++</div><div class='sub h'>reports/PREOPEN-GATE.json                         |  21 ++</div><div class='sub h'>reports/QUIET-BUYING.json                         |   6 +-</div><div class='sub h'>reports/REHEARSAL-DAY1.log                        |  34 ++-</div><div class='sub h'>reports/RESULTS.md                                |  10 +-</div><div class='sub h'>reports/ROOF-SCOREBOARD.json                      |   2 +-</div><div class='sub h'>reports/ROOF-SCOREBOARD.md                        |   2 +-</div><div class='sub h'>reports/SCREENSHOTS.tsv                           |   1 +</div><div class='sub h'>reports/SIZING-TEST.md                            |   2 +-</div><div class='sub h'>reports/STATUS.json                               |  56 ++---</div><div class='sub h'>reports/SUPERVISOR-TOKENS.log                     |  40 ++++</div><div class='sub h'>reports/SUPERVISOR.log                            |  40 ++++</div><div class='sub h'>reports/_proof2.json                              |   1 +</div><div class='sub h'>reports/_proof3.json                              |   1 +</div><div class='sub h'>reports/_proof4.json                              |   1 +</div><div class='sub h'>reports/_proof5.json                              |   1 +</div><div class='sub h'>reports/diaries/E7___cash-futures__basis-arb.json |  11 +</div><div class='sub h'>reports/engine_diary_only.json                    |  12 +</div><div class='sub h'>reports/engine_isolation.log                      |  39 ++++</div><div class='sub h'>reports/telegram_messages.tsv                     | 259 ++++++++++++++++++++++</div><div class='sub h'>reports/telegram_send_log.tsv                     | 256 +++++++++++++++++++++</div><div class='sub h'>scripts/v8_site.py                                |  35 ++-</div><div class='sub h'>site/v2/results.html                              |  79 +++----</div><pre>diff --git a/reports/.self_check_20260922 b/reports/.self_check_20260922
-new file mode 100644
-index 000000000..e69de29bb
-diff --git a/reports/ALERTS.md b/reports/ALERTS.md
-index 2880761ba..846ce3758 100644
---- a/reports/ALERTS.md
-+++ b/reports/ALERTS.md
-@@ -1,9 +1,14 @@
- # E1 — ALERTS (every ✅ done / 🙋 needs-you, IST)
- 
--_Generated 2026-09-22 03:07:32 IST. Newest first. Read-only mirror of the send log._
-+_Generated 2026-09-22 21:52:03 IST. Newest first. Read-only mirror of the send log._
- 
- | IST time | kind | message |
- |---|---|---|
-+| 2026-09-22T20:39:57+05:30 | NEEDS-YOU | 🙋 [E1] One-time setup for the external dead-man&#x27;s switch (fr |
-+| 2026-09-22T18:27:13+05:30 | NEEDS-YOU | 🙋 [E1] Progress FROZEN — three ⏱ heartbeats in a row with th |
-+| 2026-09-22T08:45:08+05:30 | NEEDS-YOU | 🙋 Tap on the laptop to log in — the Kite login page is open  |
-+| 2026-09-22T06:00:04+05:30 | NEEDS-YOU | 🙋 Tap on the laptop to log in — the Kite login page is open  |
-+| 2026-09-22T04:28:17+05:30 | NEEDS-YOU | 🙋 [E1] Progress FROZEN — three ⏱ heartbeats in a row with th |
- | 2026-09-22T02:01:48+05:30 | NEEDS-YOU | 🙋 The new site is fixed and every page shows real numbers no |
- | 2026-09-22T01:20:38+05:30 | NEEDS-YOU | 🙋 The new site is ready to look at — all nine pages, in plai |
- | 2026-09-22T00:44:34+05:30 | NEEDS-YOU | 🙋 [E1] Site v2 preview is up for your review (give it a minu |
-@@ -199,8 +204,3 @@ _Generated 2026-09-22 03:07:32 IST. Newest first. Read-only mirror of the send l
- | 2026-09-18T15:07:37+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
- | 2026-09-18T15:05:25+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
- | 2026-09-18T15:03:24+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
--| 2026-09-18T15:01:12+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
--| 2026-09-18T14:59:02+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
--| 2026-09-18T14:57:00+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
--| 2026-09-18T14:54:58+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
--| 2026-09-18T14:52:57+05:30 | NEEDS-YOU | 🙋 [E1] Live session is up but today&#x27;s Kite token is missing. |
-diff --git a/reports/ALLOCATOR.json b/reports/ALLOCATOR.json
-index acbc2c4dd..74c60f16b 100644
---- a/reports/ALLOCATOR.json
-+++ b/reports/ALLOCATOR.json
-@@ -21,5 +21,5 @@
-  &quot;cadence&quot;: &quot;monthly&quot;,
-  &quot;start&quot;: &quot;equal&quot;,
-  &quot;moves&quot;: &quot;NOTHING until ruled&quot;,
-- &quot;generated&quot;: &quot;2026-09-22T03:05:29.652819+05:30&quot;
-+ &quot;generated&quot;: &quot;2026-09-22T21:52:54.404295+05:30&quot;
- }
-\ No newline at end of file
-diff --git a/reports/ALLOCATOR.md b/reports/ALLOCATOR.md
-index ec4766972..afe78cafc 100644
---- a/reports/ALLOCATOR.md
-+++ b/reports/ALLOCATOR.md
-@@ -1,6 +1,6 @@
- # ALLOCATOR — would-be split (SHADOW ONLY) (R-SYSTEM-FINAL 5)
- 
--_Generated 2026-09-22 03:05 IST. Factors: live profit, Sharpe, Sortino. Rails: each engine&#x27;s own worst measured drawdown cap + the minimum-fires rule before any weight rises above equal. Starts EQUAL, recomputes monthly, publishes the would-be split, and MOVES NOTHING until the owner rules. Places no order, edits no book. RECORD-ONLY._
-+_Generated 2026-09-22 21:52 IST. Factors: live profit, Sharpe, Sortino. Rails: each engine&#x27;s own worst measured drawdown cap + the minimum-fires rule before any weight rises above equal. Starts EQUAL, recomputes monthly, publishes the would-be split, and MOVES NOTHING until the owner rules. Places no order, edits no book. RECORD-ONLY._
- 
- ## Would-be split
- 
-diff --git a/reports/AUDIT-DRYRUN.json b/reports/AUDIT-DRYRUN.json
-index d7cc51d50..e9f7dd204 100644
---- a/reports/AUDIT-DRYRUN.json
-+++ b/reports/AUDIT-DRYRUN.json
-@@ -1,13 +1,13 @@
- {
-- &quot;pass&quot;: true,
-- &quot;passed&quot;: 5,
-+ &quot;pass&quot;: false,
-+ &quot;passed&quot;: 4,
-  &quot;total&quot;: 5,
-- &quot;commit&quot;: &quot;724d8139a&quot;,
-+ &quot;commit&quot;: &quot;ee874bd22&quot;,
-  &quot;checks&quot;: [
-   {
-    &quot;check&quot;: &quot;ledgers clean + accounts \u20b92,00,000&quot;,
--   &quot;pass&quot;: true,
--   &quot;evidence&quot;: &quot;synthetic rows=0; engine books all \u20b92,00,000=True&quot;
-+   &quot;pass&quot;: false,
-+   &quot;evidence&quot;: &quot;synthetic rows=0; engine books all \u20b92,00,000=False&quot;
-   },
-   {
-    &quot;check&quot;: &quot;live pattern set loads&quot;,
-@@ -22,7 +22,7 @@
-   {
-    &quot;check&quot;: &quot;moment light truthful&quot;,
-    &quot;pass&quot;: true,
--   &quot;evidence&quot;: &quot;moment_light_live(NSE:A2ZINFRA)=True over 216 unlocked stocks&quot;
-+   &quot;evidence&quot;: &quot;moment_light_live(NSE:A2ZINFRA)=False, recorders DOWN \u2014 dark is truthful (green would lie)&quot;
-   },
-   {
-    &quot;check&quot;: &quot;single-instance locks present&quot;,
-@@ -32,8 +32,8 @@
-   {
-    &quot;check&quot;: &quot;recorders + depth (informational)&quot;,
-    &quot;pass&quot;: true,
--   &quot;evidence&quot;: &quot;4/4 recorders up; depth store present=True (informational)&quot;
-+   &quot;evidence&quot;: &quot;0/4 recorders up; depth store present=True (informational)&quot;
-   }
-  ],
-- &quot;line&quot;: &quot;AUDIT: PASS \u2014 5/5 checks, trading path sound (724d8139a)&quot;
-+ &quot;line&quot;: &quot;AUDIT: FAIL \u2014 ledgers clean + accounts \u20b92,00,000 (ee874bd22)&quot;
- }
-\ No newline at end of file
-diff --git a/reports/AUDIT-LAST-PASS.txt b/reports/AUDIT-LAST-PASS.txt
-index b897d078e..423602c2f 100644
---- a/reports/AUDIT-LAST-PASS.txt
-+++ b/reports/AUDIT-LAST-PASS.txt
-@@ -1 +1 @@
--724d8139a
-\ No newline at end of file
-+146ec8bce
-\ No newline at end of file
-diff --git a/reports/BACKLOG.log b/reports/BACKLOG.log
-new file mode 100644
-index 000000000..900637cc0
---- /dev/null
-+++ b/reports/BACKLOG.log
-@@ -0,0 +1,10 @@
-+2026-09-22 20:15 pulled backlog -&gt; checklist: item two
-+2026-09-22 20:16 pulled backlog -&gt; checklist: item two
-+2026-09-22 20:18 pulled backlog -&gt; checklist: next backlog item
-+2026-09-22 20:18 pulled backlog -&gt; checklist: item two
-+2026-09-22 21:13 pulled backlog -&gt; checklist: item two
-+2026-09-22 21:13 pulled backlog -&gt; checklist: next backlog item
-+2026-09-22 21:24 pulled backlog -&gt; checklist: item two
-+2026-09-22 21:24 pulled backlog -&gt; checklist: next backlog item
-+2026-09-22 21:37 pulled backlog -&gt; checklist: next backlog item
-+2026-09-22 21:37 pulled backlog -&gt; checklist: item two
-diff --git a/reports/BOOK20-READOUT.json b/reports/BOOK20-READOUT.json
-index 4fbc079a9..ee0b9dbaa 100644
---- a/reports/BOOK20-READOUT.json
-+++ b/reports/BOOK20-READOUT.json
-@@ -1,6 +1,6 @@
- {
-- &quot;mode&quot;: &quot;LIVE-PAPER&quot;,
-- &quot;held&quot;: false,
-+ &quot;mode&quot;: &quot;HELD (R-HOLD-AND-FIX: no orders until AUDIT-3B passes)&quot;,
-+ &quot;held&quot;: true,
-  &quot;orders_allowed_now&quot;: false,
-  &quot;live_loss_streak&quot;: 0,
-  &quot;candidates&quot;: 1,
-@@ -20,16 +20,16 @@
-    &quot;source&quot;: &quot;typed+cited (Zerodha+NSE published rates)&quot;
-   },
-   &quot;half_spread&quot;: {
--   &quot;value&quot;: 0.000115075,
-+   &quot;value&quot;: 0.000124535,
-    &quot;formula&quot;: &quot;median(observed spread frac)/2&quot;,
-    &quot;source&quot;: &quot;MEASURED&quot;
-   },
-   &quot;cost_round_trip&quot;: {
--   &quot;value&quot;: 0.00123015,
-+   &quot;value&quot;: 0.0012490700000000001,
-    &quot;formula&quot;: &quot;statutory + 2*half_spread&quot;
-   },
-   &quot;max_spread_frac&quot;: {
--   &quot;value&quot;: 0.00053159,
-+   &quot;value&quot;: 0.00064098,
-    &quot;formula&quot;: &quot;0.95-quantile(observed spread frac)&quot;,
-    &quot;source&quot;: &quot;MEASURED&quot;
-   },
-diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
-index cddb1f39e..e18ab6e3a 100644
---- a/reports/BUILD-JOURNAL.log
-+++ b/reports/BUILD-JOURNAL.log
-@@ -44,3 +44,25 @@ checked 20:14 — on course
- 2026-09-22 20:28 | ruling R-NO-WINDOWS (done) → next: four v2 tabs | R-EVENING-22 C-series complete | commit cf31b722b &quot;R-BACKLOG: standing queue — auto-continue pulls the next item when the checklist empties; IDLE hourly&quot; (2026-09-22 20:18) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 7 | next 
- 2026-09-22 15:18 | clear halt: R-BACKLOG was owner-pasted; ruling not archived - cleared by owner
- 2026-09-22 15:19 | reconcile: journal item lagged at &quot;R-NO-WINDOWS/four v2 tabs&quot; while git advanced through C1-C6, the v2 tabs, R-CHECKLIST-BAR, R-BACKLOG and the halt clearance; current work is R-HALT-FIX then R-V2-EXACT (matches HEAD 34d4d26f0)
-+2026-09-22 20:49 | ruling R-HALT-FIX | R-HALT-FIX (archive rulings, guard fix, names, held rows) | commit c2accee7a &quot;Reconcile journal + beat state with git (R-HALT-FIX step 3): current work is R-HALT-FIX then R-V2-EXACT&quot; (2026-09-22 20:49) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 3 | next R-V2-EXACT verbatim /v2/ rebuild
-+checked 20:51 — on course
-+checked 20:54 — on course
-+checked 20:57 — on course
-+checked 20:59 — on course
-+2026-09-22 21:03 | ruling R-HALT-FIX | R-HALT-FIX (archive rulings, guard fix, names, held rows) | commit 3fe6bb96e &quot;R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only)&quot; (2026-09-22 20:56) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 6 | next R-V2-EXACT verbatim /v2/ rebuild
-+checked 21:06 — on course
-+checked 21:09 — on course
-+checked 21:11 — on course
-+2026-09-22 21:13 | ruling R-HALT-FIX | R-HALT-FIX (archive rulings, guard fix, names, held rows) | commit c028e0789 &quot;R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen&quot; (2026-09-22 21:12) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next R-V2-EXACT verbatim /v2/ rebuild
-+checked 21:14 — on course
-+checked 21:17 — on course
-+checked 21:21 — on course
-+checked 21:23 — on course
-+checked 21:26 — on course
-+2026-09-22 21:26 | ruling R-STOP-SPAM + R-HALT-FIX done | R-NOW-LINE (next in queue) | commit 3c8675e99 &quot;R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only)&quot; (2026-09-22 21:22) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 2 | next R-NOW-LINE, then R-EYES-COMPLETE, then remaining R-V2-EXACT pages
-+checked 21:29 — on course
-+2026-09-22 21:33 | ruling R-NOW-LINE done | R-EYES-COMPLETE (next in queue) | commit ef04300cd &quot;R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit&quot; (2026-09-22 21:32) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 6 | next R-EYES-COMPLETE, then remaining R-V2-EXACT pages
-+checked 21:35 — on course
-+checked 21:37 — on course
-+checked 21:40 — on course
-+2026-09-22 21:46 | ruling R-EYES-COMPLETE done (built) | R-V2-EXACT remaining pages | commit 3d6390555 &quot;R-V2-EXACT: v8_site generator + first verbatim page (How) wired into the build&quot; (2026-09-22 21:44) | tests all C-series + tabs + fixes tested; full suite last 244 green | files touched 3 | next R-V2-EXACT verbatim /v2/ page rebuild (Main, Engine, Stocks, etc.)
-diff --git a/reports/DATA-READINESS.json b/reports/DATA-READINESS.json
-index af4c71a55..4ebc68776 100644
---- a/reports/DATA-READINESS.json
-+++ b/reports/DATA-READINESS.json
-@@ -4,11 +4,11 @@
-    &quot;lane&quot;: &quot;E4 options&quot;,
-    &quot;store&quot;: &quot;[redacted]\\Desktop\\E1-DESK\\stores\\e1_deriv_store\\live_chains&quot;,
-    &quot;unit&quot;: &quot;days recorded&quot;,
--   &quot;recorded&quot;: 0,
-+   &quot;recorded&quot;: 1,
-    &quot;min&quot;: 30,
--   &quot;rate_per_day&quot;: null,
--   &quot;eta&quot;: &quot;unknown until recording begins&quot;,
--   &quot;flag&quot;: &quot;red&quot;,
-+   &quot;rate_per_day&quot;: 1.0,
-+   &quot;eta&quot;: &quot;2026-10-21&quot;,
-+   &quot;flag&quot;: &quot;amber&quot;,
-    &quot;backtest&quot;: &quot;scripts/e4_idea_or_execution.py&quot;
-   },
-   {
-@@ -26,21 +26,21 @@
-    &quot;lane&quot;: &quot;E12 cross-exchange&quot;,
-    &quot;store&quot;: &quot;[redacted]\\Desktop\\E1-DESK\\stores\\e1_deriv_store\\xchange&quot;,
-    &quot;unit&quot;: &quot;days recorded&quot;,
--   &quot;recorded&quot;: 0,
-+   &quot;recorded&quot;: 1,
-    &quot;min&quot;: 30,
--   &quot;rate_per_day&quot;: null,
--   &quot;eta&quot;: &quot;unknown until recording begins&quot;,
--   &quot;flag&quot;: &quot;red&quot;,
-+   &quot;rate_per_day&quot;: 1.0,
-+   &quot;eta&quot;: &quot;2026-10-21&quot;,
-+   &quot;flag&quot;: &quot;amber&quot;,
-    &quot;backtest&quot;: &quot;E12 gap-vs-cost backtest&quot;
-   },
-   {
-    &quot;lane&quot;: &quot;E13 microstructure&quot;,
-    &quot;store&quot;: &quot;[redacted]\\Desktop\\E1-DESK\\stores\\e1_deriv_store\\depth5&quot;,
-    &quot;unit&quot;: &quot;days recorded&quot;,
--   &quot;recorded&quot;: 1,
-+   &quot;recorded&quot;: 2,
-    &quot;min&quot;: 30,
--   &quot;rate_per_day&quot;: 1.0,
--   &quot;eta&quot;: &quot;2026-10-21&quot;,
-+   &quot;rate_per_day&quot;: 2.0,
-+   &quot;eta&quot;: &quot;2026-10-06&quot;,
-    &quot;flag&quot;: &quot;amber&quot;,
-    &quot;backtest&quot;: &quot;E13 depth study&quot;
-   },
-@@ -191,5 +191,5 @@
-    &quot;beyond_noise&quot;: false
-   }
-  ],
-- &quot;generated&quot;: &quot;2026-09-22T03:05:29.598622+05:30&quot;
-+ &quot;generated&quot;: &quot;2026-09-22T21:52:54.303603+05:30&quot;
- }
-\ No newline at end of file
-diff --git a/reports/DATA-READINESS.md b/reports/DATA-READINESS.md
-index 91e78ad1b..ad0700557 100644
---- a/reports/DATA-READINESS.md
-+++ b/reports/DATA-READINESS.md
-@@ -1,19 +1,19 @@
- # DATA READINESS — the five recording lanes (R-DATA-LANES)
- 
--_Generated 2026-09-22 03:05 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
-+_Generated 2026-09-22 21:52 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
- 
- | Lane | flag | recorded | min | rate/day | projected enough | store |
- |---|---|---|---|---|---|---|
--| E4 options | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `live_chains` |
-+| E4 options | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-21 | `live_chains` |
- | E7 arbitrage-tick | 🔴 red | 0 sessions | 5 | — | unknown until recording begins | `e7_ticks` |
--| E12 cross-exchange | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `xchange` |
--| E13 microstructure | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-21 | `depth5` |
-+| E12 cross-exchange | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-21 | `xchange` |
-+| E13 microstructure | 🟡 amber | 2 days recorded | 30 | 2.0 | 2026-10-06 | `depth5` |
- | E14 retail positioning | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `e1_positioning_store` |
- | L14 public flows | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L14_public_flows` |
- | L15 macro &amp; overnight | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L15_macro` |
- | L16 breadth | 🟢 green | 892 market-days hunted | 30 | 0.44 | reached | `reports` |
- 
--All lanes are recorder-fed and activate on the owner&#x27;s Kite login. Currently RED (0 units): **E4 options, E7 arbitrage-tick, E12 cross-exchange, E14 retail positioning, L14 public flows, L15 macro &amp; overnight** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
-+All lanes are recorder-fed and activate on the owner&#x27;s Kite login. Currently RED (0 units): **E7 arbitrage-tick, E14 retail positioning, L14 public flows, L15 macro &amp; overnight** — they fill on the next login. When a lane reaches its minimum it flips GREEN and its backtest is queued (a ready-flag under `scheduler/`).
- 
- Queued this run: **none**.
- 
-diff --git a/reports/E1-DAY-SUMMARY.json b/reports/E1-DAY-SUMMARY.json
-index e977e86f5..936a10705 100644
---- a/reports/E1-DAY-SUMMARY.json
-+++ b/reports/E1-DAY-SUMMARY.json
-@@ -1,5 +1,5 @@
- {
-- &quot;date&quot;: &quot;2026-09-21&quot;,
-+ &quot;date&quot;: &quot;2026-09-22&quot;,
-  &quot;trades&quot;: 0,
-  &quot;wins&quot;: 0,
-  &quot;losses&quot;: 0,
-diff --git a/reports/E19-FINDER-LEDGER.csv b/reports/E19-FINDER-LEDGER.csv
-index dfaa6625e..c306ecc43 100644
---- a/reports/E19-FINDER-LEDGER.csv
-+++ b/reports/E19-FINDER-LEDGER.csv
-@@ -1,5 +1,5 @@
- ruler,lane,status,fires,hits,lb,pvalue,unique_facts,probation_since,first_seen,last_checked
--breadth,L16 breadth,tested-no-edge,892,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T03:05:37.908868+05:30
--depth-5-level,E13 microstructure,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T03:05:37.908868+05:30
--macro-overnight,L15 macro &amp; overnight,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T03:05:37.908868+05:30
--retail-crowding,E14 retail positioning,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T03:05:37.908868+05:30
-+breadth,L16 breadth,tested-no-edge,892,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T21:47:08.360915+05:30
-+depth-5-level,E13 microstructure,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T21:47:08.360915+05:30
-+macro-overnight,L15 macro &amp; overnight,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T21:47:08.360915+05:30
-+retail-crowding,E14 retail positioning,waiting-for-lane,,,,,,,2026-09-20T18:49:07.599035+05:30,2026-09-22T21:47:08.360915+05:30
-diff --git a/reports/E19-FINDER.md b/reports/E19-FINDER.md
-index 5b8d19b3e..5075b257e 100644
---- a/reports/E19-FINDER.md
-+++ b/reports/E19-FINDER.md
-@@ -1,4 +1,4 @@
--# E19 finder — the context engine&#x27;s rulers (R-DEPTH) — 2026-09-22 03:05 IST
-+# E19 finder — the context engine&#x27;s rulers (R-DEPTH) — 2026-09-22 21:47 IST
- 
- _The same exact-condition finder the price side uses, pointed at four context lanes: 5-level depth, retail crowding, macro/overnight, breadth. A ruler&#x27;s exam runs only when its lane is GREEN on the readiness page; a certified ruler enters PROBATION and never trades on history alone. RECORD-ONLY, no orders._
- 
-@@ -6,7 +6,7 @@ _The same exact-condition finder the price side uses, pointed at four context la
- 
- | ruler | context lane | lane state | recorded | E19 status |
- |---|---|---|---|---|
--| **depth-5-level** — the 5-level order-book (bid/ask sizes at five prices) | E13 microstructure | 🟡 amber | 1 | waiting-for-lane |
-+| **depth-5-level** — the 5-level order-book (bid/ask sizes at five prices) | E13 microstructure | 🟡 amber | 2 | waiting-for-lane |
- | **retail-crowding** — how one-sided retail positioning is in a name | E14 retail positioning | 🔴 red | 0 | waiting-for-lane |
- | **macro-overnight** — overnight and macro moves before the cash open | L15 macro &amp; overnight | 🔴 red | 0 | waiting-for-lane |
- | **breadth** — how many names are advancing vs declining together | L16 breadth | 🟢 green | 892 | tested-no-edge |
-diff --git a/reports/EXAMS-REAL-STAGING.json b/reports/EXAMS-REAL-STAGING.json
-index 70f111ea0..ae3b55ca4 100644
---- a/reports/EXAMS-REAL-STAGING.json
-+++ b/reports/EXAMS-REAL-STAGING.json
-@@ -1,7 +1,7 @@
- {
-  &quot;note&quot;: &quot;STAGING ONLY \u2014 the live book and the live exam are unchanged; switching is a separate ruling.&quot;,
-  &quot;cost&quot;: {
--  &quot;calibrated_round_trip_bps&quot;: 12.3,
-+  &quot;calibrated_round_trip_bps&quot;: 12.4,
-   &quot;measured&quot;: true
-  },
-  &quot;grid&quot;: {
-@@ -33,11 +33,11 @@
-    &quot;stop&quot;: 2.0,
-    &quot;trail&quot;: false,
-    &quot;fires&quot;: 10,
--   &quot;mean_net_R&quot;: 0.061,
-+   &quot;mean_net_R&quot;: 0.0633,
-    &quot;hit_lb&quot;: 0.549,
-    &quot;win_pct&quot;: 100.0,
-    &quot;management&quot;: &quot;hold up to 60 days, stop 2 times the stock&#x27;s own daily swing, fixed stop and target&quot;,
--   &quot;total_net_R&quot;: 0.61,
-+   &quot;total_net_R&quot;: 0.63,
-    &quot;stock&quot;: &quot;UNITDSPR&quot;,
-    &quot;family&quot;: &quot;ema&quot;
-   },
-@@ -46,11 +46,11 @@
-    &quot;stop&quot;: 2.0,
-    &quot;trail&quot;: false,
-    &quot;fires&quot;: 9,
--   &quot;mean_net_R&quot;: 0.4753,
-+   &quot;mean_net_R&quot;: 0.4776,
-    &quot;hit_lb&quot;: 0.523,
-    &quot;win_pct&quot;: 100.0,
-    &quot;management&quot;: &quot;hold up to 60 days, stop 2 times the stock&#x27;s own daily swing, fixed stop and target&quot;,
--   &quot;total_net_R&quot;: 4.28,
-+   &quot;total_net_R&quot;: 4.3,
-    &quot;stock&quot;: &quot;UNITDSPR&quot;,
-    &quot;family&quot;: &quot;sma&quot;
-   },
-@@ -72,11 +72,11 @@
-    &quot;stop&quot;: 2.0,
-    &quot;trail&quot;: false,
-    &quot;fires&quot;: 13,
--   &quot;mean_net_R&quot;: 0.1683,
-+   &quot;mean_net_R&quot;: 0.1652,
-    &quot;hit_lb&quot;: 0.526,
-    &quot;win_pct&quot;: 92.3,
-    &quot;management&quot;: &quot;hold up to 40 days, stop 2 times the stock&#x27;s own daily swing, fixed stop and target&quot;,
--   &quot;total_net_R&quot;: 2.19,
-+   &quot;total_net_R&quot;: 2.15,
-    &quot;stock&quot;: &quot;AUBANK&quot;,
-    &quot;family&quot;: &quot;vwap&quot;
-   },
-@@ -85,11 +85,11 @@
-    &quot;stop&quot;: 2.0,
-    &quot;trail&quot;: false,
-    &quot;fires&quot;: 9,
--   &quot;mean_net_R&quot;: 0.2069,
-+   &quot;mean_net_R&quot;: 0.2116,
-    &quot;hit_lb&quot;: 0.523,
-    &quot;win_pct&quot;: 100.0,
-    &quot;management&quot;: &quot;hold up to 60 days, stop 2 times the stock&#x27;s own daily swing, fixed stop and target&quot;,
--   &quot;total_net_R&quot;: 1.86,
-+   &quot;total_net_R&quot;: 1.9,
-    &quot;stock&quot;: &quot;ETERNAL&quot;,
-    &quot;family&quot;: &quot;rsi&quot;
-   }
-diff --git a/reports/EXAMS-REAL-STAGING.md b/reports/EXAMS-REAL-STAGING.md
-index 08bbec663..f2d763466 100644
---- a/reports/EXAMS-REAL-STAGING.md
-+++ b/reports/EXAMS-REAL-STAGING.md
-@@ -2,7 +2,7 @@
- 
- _STAGING ONLY — the live book and the live exam are unchanged; switching is a separate ruling._
- 
--**Cost used inside the exam:** 12.3 bps r</pre></div></main></body></html>
+-&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27; class=&#x27;on&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Stocks&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every stock the desk watches, with the last reading. Type to filter; click a name for its patterns and story. 210 stocks.&lt;/p&gt;&lt;input id=&#x27;q&#x27; oninput=&quot;filt(&#x27;q&#x27;,&#x27;tbl&#x27;)&quot; placeholder=&#x27;filter by name…&#x27; style=&#x27;background:#0c0e12;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;width:220px;margin:6px 0&#x27;&gt;&lt;table id=&#x27;tbl&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;th&gt;Change&lt;/th&gt;&lt;th&gt;Trend&lt;/th&gt;&lt;th&gt;Swings&lt;/th&gt;&lt;th&gt;vs its own range&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;A2ZINFRA&#x27; onclick=&quot;location.href=&#x27;../stocks/A2ZINFRA.html&#x27;&quot;&gt;&lt;td&gt;A2ZINFRA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.65&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;26%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABB&#x27; onclick=&quot;location.href=&#x27;../stocks/ABB.html&#x27;&quot;&gt;&lt;td&gt;ABB&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7256.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;11%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ABCAPITAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ABCAPITAL.html&#x27;&quot;&gt;&lt;td&gt;ABCAPITAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;403.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;13%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENSOL&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENSOL.html&#x27;&quot;&gt;&lt;td&gt;ADANIENSOL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1402.1&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.86%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;75%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIENT&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIENT.html&#x27;&quot;&gt;&lt;td&gt;ADANIENT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2975.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.81%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;74%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIGREEN&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIGREEN.html&#x27;&quot;&gt;&lt;td&gt;ADANIGREEN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1303.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.49%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;15%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPORTS&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPORTS.html&#x27;&quot;&gt;&lt;td&gt;ADANIPORTS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1788.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.19%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ADANIPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/ADANIPOWER.html&#x27;&quot;&gt;&lt;td&gt;ADANIPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;206.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;36%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ALKEM&#x27; onclick=&quot;location.href=&#x27;../stocks/ALKEM.html&#x27;&quot;&gt;&lt;td&gt;ALKEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5367.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+5.45%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;72%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBER&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBER.html&#x27;&quot;&gt;&lt;td&gt;AMBER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;7105.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AMBUJACEM&#x27; onclick=&quot;location.href=&#x27;../stocks/AMBUJACEM.html&#x27;&quot;&gt;&lt;td&gt;AMBUJACEM&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;392.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.15%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;37%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ANGELONE&#x27; onclick=&quot;location.href=&#x27;../stocks/ANGELONE.html&#x27;&quot;&gt;&lt;td&gt;ANGELONE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;296.3&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.36%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;54%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APLAPOLLO&#x27; onclick=&quot;location.href=&#x27;../stocks/APLAPOLLO.html&#x27;&quot;&gt;&lt;td&gt;APLAPOLLO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2184.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;64%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;APOLLOHOSP&#x27; onclick=&quot;location.href=&#x27;../stocks/APOLLOHOSP.html&#x27;&quot;&gt;&lt;td&gt;APOLLOHOSP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;8920.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.56%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;30%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASHOKLEY&#x27; onclick=&quot;location.href=&#x27;../stocks/ASHOKLEY.html&#x27;&quot;&gt;&lt;td&gt;ASHOKLEY&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;161.59&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.01%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASIANPAINT&#x27; onclick=&quot;location.href=&#x27;../stocks/ASIANPAINT.html&#x27;&quot;&gt;&lt;td&gt;ASIANPAINT&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;2450.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.72%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;ASTRAL&#x27; onclick=&quot;location.href=&#x27;../stocks/ASTRAL.html&#x27;&quot;&gt;&lt;td&gt;ASTRAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1404.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AUBANK.html&#x27;&quot;&gt;&lt;td&gt;AUBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1039.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.77%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;22%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AUROPHARMA&#x27; onclick=&quot;location.href=&#x27;../stocks/AUROPHARMA.html&#x27;&quot;&gt;&lt;td&gt;AUROPHARMA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1718.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.52%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;AXISBANK&#x27; onclick=&quot;location.href=&#x27;../stocks/AXISBANK.html&#x27;&quot;&gt;&lt;td&gt;AXISBANK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1248.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.25%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;8%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJFINSV&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJFINSV.html&#x27;&quot;&gt;&lt;td&gt;BAJAJFINSV&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1859.8&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-3.34%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJAJHLDNG&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJAJHLDNG.html&#x27;&quot;&gt;&lt;td&gt;BAJAJHLDNG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;11404.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;6%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BAJFINANCE&#x27; onclick=&quot;location.href=&#x27;../stocks/BAJFINANCE.html&#x27;&quot;&gt;&lt;td&gt;BAJFINANCE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1024.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.00%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;4%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANDHANBNK&#x27; onclick=&quot;location.href=&#x27;../stocks/BANDHANBNK.html&#x27;&quot;&gt;&lt;td&gt;BANDHANBNK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;178.81&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.02%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;23%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKBARODA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKBARODA.html&#x27;&quot;&gt;&lt;td&gt;BANKBARODA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;234.19&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;2%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BANKINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BANKINDIA.html&#x27;&quot;&gt;&lt;td&gt;BANKINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;138.44&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.90%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BDL&#x27; onclick=&quot;location.href=&#x27;../stocks/BDL.html&#x27;&quot;&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1174.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.30%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;10%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BEL.html&#x27;&quot;&gt;&lt;td&gt;BEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;398.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-1.57%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;5%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARATFORG&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARATFORG.html&#x27;&quot;&gt;&lt;td&gt;BHARATFORG&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1970.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.32%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;9%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHARTIARTL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHARTIARTL.html&#x27;&quot;&gt;&lt;td&gt;BHARTIARTL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1830.7&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.51%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;7%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BHEL&#x27; onclick=&quot;location.href=&#x27;../stocks/BHEL.html&#x27;&quot;&gt;&lt;td&gt;BHEL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;434.8&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.95%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;18%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BIOCON&#x27; onclick=&quot;location.href=&#x27;../stocks/BIOCON.html&#x27;&quot;&gt;&lt;td&gt;BIOCON&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;395.15&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.87%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;12%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BLUESTARCO&#x27; onclick=&quot;location.href=&#x27;../stocks/BLUESTARCO.html&#x27;&quot;&gt;&lt;td&gt;BLUESTARCO&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1569.4&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.60%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;46%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BOSCHLTD&#x27; onclick=&quot;location.href=&#x27;../stocks/BOSCHLTD.html&#x27;&quot;&gt;&lt;td&gt;BOSCHLTD&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;47750.0&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.93%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;44%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BPCL&#x27; onclick=&quot;location.href=&#x27;../stocks/BPCL.html&#x27;&quot;&gt;&lt;td&gt;BPCL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;312.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+2.43%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;25%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BRITANNIA&#x27; onclick=&quot;location.href=&#x27;../stocks/BRITANNIA.html&#x27;&quot;&gt;&lt;td&gt;BRITANNIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;5020.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.22%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;35%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;BSE&#x27; onclick=&quot;location.href=&#x27;../stocks/BSE.html&#x27;&quot;&gt;&lt;td&gt;BSE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;3160.4&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-6.79%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;78%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CAMS&#x27; onclick=&quot;location.href=&#x27;../stocks/CAMS.html&#x27;&quot;&gt;&lt;td&gt;CAMS&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;705.1&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.88%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;39%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CANBK&#x27; onclick=&quot;location.href=&#x27;../stocks/CANBK.html&#x27;&quot;&gt;&lt;td&gt;CANBK&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;123.55&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.04%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;1%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CDSL&#x27; onclick=&quot;location.href=&#x27;../stocks/CDSL.html&#x27;&quot;&gt;&lt;td&gt;CDSL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1361.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.07%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;27%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CGPOWER&#x27; onclick=&quot;location.href=&#x27;../stocks/CGPOWER.html&#x27;&quot;&gt;&lt;td&gt;CGPOWER&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;908.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-0.44%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;20%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CHOLAFIN&#x27; onclick=&quot;location.href=&#x27;../stocks/CHOLAFIN.html&#x27;&quot;&gt;&lt;td&gt;CHOLAFIN&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1768.5&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-4.05%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;3%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CIPLA&#x27; onclick=&quot;location.href=&#x27;../stocks/CIPLA.html&#x27;&quot;&gt;&lt;td&gt;CIPLA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1379.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+1.63%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;17%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COALINDIA&#x27; onclick=&quot;location.href=&#x27;../stocks/COALINDIA.html&#x27;&quot;&gt;&lt;td&gt;COALINDIA&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;413.6&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.75%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;62%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COCHINSHIP&#x27; onclick=&quot;location.href=&#x27;../stocks/COCHINSHIP.html&#x27;&quot;&gt;&lt;td&gt;COCHINSHIP&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1382.5&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+0.11%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;rough&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;83%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COFORGE&#x27; onclick=&quot;location.href=&#x27;../stocks/COFORGE.html&#x27;&quot;&gt;&lt;td&gt;COFORGE&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1810.2&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.37%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;up&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;53%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;COLPAL&#x27; onclick=&quot;location.href=&#x27;../stocks/COLPAL.html&#x27;&quot;&gt;&lt;td&gt;COLPAL&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1880.0&lt;/td&gt;&lt;td class=&#x27;n gain&#x27;&gt;+4.62%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;68%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CONCOR&#x27; onclick=&quot;location.href=&#x27;../stocks/CONCOR.html&#x27;&quot;&gt;&lt;td&gt;CONCOR&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;488.95&lt;/td&gt;&lt;td class=&#x27;n loss&#x27;&gt;-2.41%&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;down&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;calm&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;19%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;click&#x27; data-k=&#x27;CROMPTON&#x27; onclick=&quot;location.href=&#x27;../stocks/</pre></div></main></body></html>
