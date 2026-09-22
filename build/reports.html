@@ -1,0 +1,75 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-22 21:35 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>2026-09-22-R-STOP-SPAM.md</h3><pre># R-STOP-SPAM — report (2026-09-22)
+
+## 1. The &quot;[CODE] session finished — come back&quot; spam
+- **Sender:** `scripts/alert_done.py`, the Stop hook wired in `.claude/settings.json`. It fired on EVERY turn
+  end; with the auto-continue loop re-issuing work, that was one line per turn.
+- **Fix:** alert_done now returns early when `auto_continue.should_continue()` is true (the session is not
+  really ending). It fires only on a real end. Plus a **desk-wide rate limit** in `notify()`: identical text
+  sends once, then at most hourly (logged RATE-LIMITED). Different text (beat/status) is unaffected.
+- Commit: a4a92d979. Test: tests/test_notify_ratelimit.py.
+
+## 2. status.html &quot;frozen since 15:00:29&quot;
+- **From the logs / live, not memory:** the page is NOT frozen now. The e1-live-site clone pushed at
+  21:04:07, 21:04:30, 21:06:35, 21:06:52, 21:08:52; the live URL reads `updated 21:08:50` — within the last
+  2-minute cycle. `git log origin/main..HEAD` is empty → **no rejected/unpushed commit**. The
+  &quot;rejected push after another clone committed&quot; hypothesis is **disconfirmed**, not assumed.
+- **Root cause of the earlier 15:00→~17:45 freeze:** the 2-minute LIGHT cycle had grown to ~90s — the
+  &quot;stocks ready&quot; scan (~62s over 216 stocks) and the /build/ transcript scrub had been placed in it — so
+  status only refreshed on the ~10-minute FULL cycle, and a heavy full cycle stalled it. Fixed earlier by
+  caching the stocks-ready count (15 min), moving build_journal to the full cycle + bounding its scrub, and
+  DECOUPLING status into its own daemon thread with a targeted `publish_status` (commit 146ec8bce), then
+  restarting. It has updated every 2 minutes since ~17:45 — including THROUGH the 20:22 halt, because the
+  status writer is the `status-daemon` thread in site_loop, separate from the (blocked) build session
+  (halt-proof).
+- **This commit** adds a cache-busting JS reload to status.html so an OPEN TAB always pulls the current file
+  (a plain meta-refresh can be served stale by the CDN — the likely reason the owner still saw 15:00:29).
+- **Why NOT READY:** the vitals ready line needs a recorder up; **0 recorders are running** — they re-arm at
+  the 06:00 Kite login (`_arm_recorder`), and it is evening / market closed. Token valid, 216 stocks ready,
+  orders allowed, audit passed — only the recorders are missing, which is expected off-hours.
+- **Why the owner saw &quot;no runner&quot;:** that was the pre-restart 15:00 view. The runner IS up now
+  (`book20_runner`, last poll 21:06:51) — the watchdog&#x27;s resurrect_runner brought it back.
+
+## Proof
+- Live: https://[redacted]-[redacted].github.io/e1-live-site/status.html — `updated 21:08:50` (last cycle).
+- Clone pushes every ~2 min through the halt; unpushed empty.
+</pre><h3>2026-09-22-R-NOW-LINE.md</h3><pre># R-NOW-LINE — report (2026-09-22) — BUILT (not yet confirmed live by the auditor)
+
+One link shows what the build session is doing right now, at most one status cycle old, even under a halt.
+
+## Steps + commits
+1. NOW writer — .claude/hooks/now_writer.py (PostToolUse): overwrites E1-DESK\now.txt every tool call with
+   `time · dispatch item (from BUILD-STATE, not typed) · tool · file/first-words-of-command · last output line`,
+   every field through the transcript scrubber; never env/tokens/full output; never raises. **bffef127d**
+2. NOW on the page — vitals prints the NOW line at the top of status.html with age; older than 3 status cycles
+   (6 min) it shows NOW (STALE) in the warn colour; the build room shows the same line. **51c15cfed**
+3. Halt-proof push — the status WRITER (site_loop&#x27;s status daemon) writes AND pushes status.html via the
+   targeted publish_status, never the build session. Proven with a TEST halt path (never the real HALT), no
+   Telegram, no ledger. Real-world proof: the daemon pushed at 21:04/21:06/21:08 DURING the 20:22 halt.
+   **1978f4744**
+4. Beat truth — the BUILD beat&#x27;s HALTED flag is read from E1-DESK\HALT ON DISK at beat time (not the log), with
+   the supervisor&#x27;s last log entry as a second line; every BUILD and LIVE bar line ends with the status link.
+   **bba854dc1**
+5. Telegram &quot;now&quot; — token_ping (its inbound poller) answers &quot;now&quot; from the owner&#x27;s chat with the NOW line + the
+   status one-liner; reply-only, changes nothing. **3c8675e99**
+6. Tests — now_writer (never blocks, scrubber applied), now_line (stale marking), halt_proof_push, beat_truth
+   (halted-from-disk), now_reply. All 13 related test files green.
+
+## Proof
+- Screenshot: status.html top shows `NOW · 2026-09-22 21:25:47 · R-NOW-LINE built · Bash · rebuild status.html
+  · NOW line proof · just now`, above the LIVE bar.
+- Test-halt proof: test_halt_proof_push creates a TEST halt file, shows vitals.build keeps writing a fresh
+  status.html and _status_tick pushes via publish_status, then deletes the test file — the real HALT untouched.
+
+BUILT, not live: the running site_loop still carries the pre-R-NOW-LINE vitals; the NOW line goes live on the
+next stack restart (a human/owner act). The auditor confirms it in the running loop next.
+</pre><h3>2026-09-22-213120-audit.md</h3><pre># Audit 2026-09-22-213120
+
+_Fresh independent audit (→ AUDIT). Reason: check the ledgers_
+
+**Verdict: PASS — ledgers clean**
+
+## Full reply
+
+looks fine.
+AUDIT-VERDICT: PASS — ledgers clean
+</pre></main></body></html>
