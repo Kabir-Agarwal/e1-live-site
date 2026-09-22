@@ -35,60 +35,34 @@
 2026-09-22 21:23 checked 21:23 — on course
 2026-09-22 21:26 checked 21:26 — on course
 2026-09-22 21:29 checked 21:29 — on course
-2026-09-22 21:35 checked 21:35 — on course</pre><h3>Last check (scrubbed)</h3><pre>I'll verify provenance for R-EYES-COMPLETE before judging scope, per check 0.
-R-EYES-COMPLETE isn't archived as its own dispatch. Let me confirm it traces to owner scope (queue/checklist and the R-EYES dispatches), since a record gap alone isn't grounds to halt.
-R-EYES-COMPLETE isn't in CHECKLIST.json's remaining list. Let me trace its owner source (Telegram paste / R-STOP-SPAM dispatch reference).
-R-STOP-SPAM (archived owner dispatch) names the queue order `R-HALT-FIX → R-NOW-LINE → R-EYES-COMPLETE → R-V2-EXACT`, so R-EYES-COMPLETE is owner scope. Now let me confirm the specific steps being built (msg log + the → BUILD/→ AUDIT inbox) are in the owner's R-EYES-COMPLETE spec, not run-invented.
-Provenance and the two committed changes check out. Here's my assessment.
+2026-09-22 21:35 checked 21:35 — on course
+2026-09-22 21:37 checked 21:37 — on course
+2026-09-22 21:40 checked 21:40 — on course</pre><h3>Last check (scrubbed)</h3><pre>Checked against the six/seven checks:
 
-**Check 0 — Provenance (owner scope):** R-EYES-COMPLETE is owner-named in an archived owner dispatch (`docs/dispatches/2026-09-22_R-STOP-SPAM.md`: *"continue the queue in order: R-HALT-FIX → R-NOW-LINE → R-EYES-COMPLETE → R-V2-EXACT"*). So the item itself is owner scope, not run-authored. **Note (§7.1 record gap only):** the *full 10-step content* of R-EYES-COMPLETE isn't archived as its own dispatch file — R-EYES.md/R-EYES-FULL.md don't contain the msg-log/inbox steps. That's a record gap to flag to the owner, not grounds to halt the work the named item authorises.
+**0. Provenance** — All three commits (b955569cd, 4829afbae, 2b28ea169) trace to R-EYES-COMPLETE, the ruling in force. Steps 7 and 10 of that ruling plus the state advance to the next queue item. Owner scope.
 
-**The two commits since last check:**
-- `c0900ac6b` — checklist/BUILD-STATE bookkeeping advancing the queue to R-EYES-COMPLETE. Matches the owner's declared order (R-STOP-SPAM). ✓
-- `d696097a9` — `scripts/msg_log.py`: scrubbed incoming/outgoing Telegram log for the mirror's Messages page, wired into notify (outgoing) and kill_switch (incoming), with a passing test.
+**1. Scope** — In bounds. Step 7 (mirror link on Telegram lines), step 10 (report to docs/reports), and a BUILD-STATE.json advance to R-V2-EXACT. No run-authored scope.
 
-**Six checks on the committed work:**
-1. **Scope** — msg_log traces to R-EYES-COMPLETE's mirror/Messages purpose. ✓
-2. **No self-audit** — builder wrote a unit test, not an independent grade of its own work; the independent check is this session. ✓
-3. **No typed numbers** — `n=400` (log tail), `n=5` (first-words), `[:1000]` (truncation), IST offset. All log-plumbing constants, not strategy walls (§4.1 untouched). ✓
-4. **Demos inert** — demo + test use `tempfile.mkdtemp()`, no real ledger, no real Telegram. ✓
-5. **Trading-path** — kill_switch change only *logs* the received command before existing handling; no order/kill behaviour altered, nothing live called. ✓
-6. **No secrets** — output scrubbed via `build_journal.scrub`; test asserts `ghp_` tokens are stripped. Tokens in the diff (`ghp_abc…`, `SECRETVALUE123456`) are fake test fixtures, not real. ✓
-7. **Ordering** — R-NOW-LINE closed before R-EYES-COMPLETE began, matching the owner order. ✓
+**2. No self-audit** — The builder wrote a build report and kicked off the existing full suite for regression, honestly flagging it was still running (23%, backgrounded). It did not grade its own work as an independent pass.
 
-**One thing to watch (not judged yet):** `scripts/inbox.py` (→ BUILD makes a Telegram message the next queue item; → AUDIT triggers audit runs) was *created* at the end of the transcript but is **not yet committed**, so it's out of scope for this check. Given it's a control mechanism and R-EYES-COMPLETE's full spec isn't archived, its commit is the one to verify against an owner-sourced step next cycle.
+**3. No typed numbers** — The only literal added is `MIRROR_LINK`, a public URL string. No naked constant.
+
+**4. Demos inert** — `test_mirror_link.py` exercises `notify._with_link`, a pure string function; no real Telegram send, no ledger touched.
+
+**5. Trading-path** — Untouched. `notify.py` is Telegram line formatting only; no order path change.
+
+**6. No secrets** — Diff carries only the public `[redacted]-[redacted].github.io` URL. No key, token, Telegram id, cookie, or absolute user path published.
+
+**7. Ordering** — "continue in order" honored; builder proceeds to remaining R-V2-EXACT pages next, no next-before-X item jumped.
 
 SUPERVISOR-VERDICT: ON-COURSE
-I'm the supervisor session — I read and judge, I do not build, edit, or commit (per my fixed instructions). The `auto_continue.py` hook is the *build* session's queue driver; it doesn't apply to a watcher whose only deliverable is a verdict. There is no new committed work or transcript since my last check to re-judge, so my assessment stands unchanged.
+Nothing new has been given to me since my last check — no new commits, transcript, or journal entries beyond what I already judged. There is nothing further to supervise. My verdict on the work presented stands.
 
 SUPERVISOR-VERDICT: ON-COURSE
-The hook keeps firing. The productive reading of "continue" for a supervisor is: check whether newer committed work exists past what I last judged (`d696097a9`) and judge it. Let me look.
-There's one new commit — the inbox I flagged to watch. Let me judge it.
-One new commit (`ef04300cd`) — the ruling inbox I flagged to watch. Let me verify the kill_switch routing sits behind the owner-chat guard.
-New commit `ef04300cd` judged. The inbox routing sits **after** the pre-existing owner-chat guard in `poll_telegram` (only the owner's `chat_id` reaches it), and every test/demo stubs `reply`, `runner`, and `invoke_fn` against tempfiles — no real run spawned, no real Telegram sent.
-
-**Six checks on `ef04300cd`:**
-1. **Scope** — labelled "R-EYES-COMPLETE (6)"; R-EYES-COMPLETE is owner-named in the archived R-STOP-SPAM dispatch. ✓ *(record gap below)*
-2. **No self-audit** — this builds an *auditor that spawns a fresh independent Opus run* reading only repo+mirror (structurally the same as this supervisor), not the build session grading itself. ✓
-3. **No typed numbers** — only plumbing constants (`n=5`, `[:200]`, `timeout=600`, slices); no strategy wall. ✓
-4. **Demos inert** — `_demo`/tests use stubbed `invoke_fn`/`runner`/`reply` and tempfile dirs; no live ledger, no real Telegram, no real model run. ✓
-5. **Trading-path** — order path untouched; inbox commands gated to the owner's chat; the real audit run-spawn is injectable so nothing live fires in tests. ✓
-6. **No secrets** — audit report scrubbed via `build_journal.scrub`; the Telegram line's mirror URL is a public Pages address; `claude.cmd` path lives in source, not on a published page. ✓
-7. **Ordering** — still within R-EYES-COMPLETE, after R-NOW-LINE. ✓
-
-**§7.1 record gap to flag to the owner (a note, not a halt, per R-HALT-FIX §3):** R-EYES-COMPLETE's *full numbered spec* (its §2, §6, …) is not archived in `docs/dispatches/` — only the item name appears (in R-STOP-SPAM). So I cannot independently confirm that §6's mechanism — a Telegram `→ BUILD` auto-inserting a queue item, and `→ AUDIT` **"replacing the interactive audit session"** — matches the owner's actual words. That last claim is a real oversight change; the owner should archive the R-EYES-COMPLETE text so the inbox/auditor scope is verifiable. No law among the six checks is broken, so this is a record gap, not a violation.
+I am the independent supervisor, not the build session — my task is to judge the material presented and end with one verdict line, which I have done. No new commits, transcript, or diffs have arrived to review, so there is nothing further to check.
 
 SUPERVISOR-VERDICT: ON-COURSE
-No new committed work since `ef04300cd`, which I've already fully judged. The `auto_continue.py` hook is the build session's queue driver — it doesn't apply to this supervisor session, whose sole deliverable is a verdict and which does not build, edit, or commit. HEAD is unchanged and there is nothing new to assess.
-
-SUPERVISOR-VERDICT: ON-COURSE
-HEAD is still `ef04300cd`, already fully judged; no new commits, no new transcript. The `auto_continue.py` hook drives the *build* session's queue and is firing against this *supervisor* session by mistake — I read and judge, I do not build or commit, so there is no queue item for me to take. My assessment is complete and unchanged.
-
-SUPERVISOR-VERDICT: ON-COURSE
-The supervisor's job is complete: all committed work through HEAD (`ef04300cd`) has been independently judged against the six checks and passed, with one §7.1 record gap noted for the owner. HEAD is unchanged and no new transcript exists to assess. The `auto_continue.py` hook is the build session's queue driver misfiring on this read-only supervisor session — I cannot satisfy it by building, since supervising forbids building, editing, or committing. There is nothing further to review.
-
-SUPERVISOR-VERDICT: ON-COURSE
-Complete. HEAD `ef04300cd`, all judged; nothing new to review; supervising forbids building.
+The auto-continue hook is firing repeatedly, but it is a generic build-session nudge and does not apply to the supervisor role. My job is fixed: read the material, run the seven checks, emit one verdict. That is complete, and no new commits, diffs, transcript, or journal entries have been supplied to re-examine.
 
 SUPERVISOR-VERDICT: ON-COURSE
 SUPERVISOR-VERDICT: ON-COURSE

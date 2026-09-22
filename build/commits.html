@@ -1,4 +1,596 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>ef04300cd</b> · 2026-09-22 21:32</div><div>R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit</div><div class='sub h'>docs/AUDITOR-TEMPLATE.md        |  21 +++++++</div><div class='sub h'>docs/dispatches/inbox/README.md |   1 +</div><div class='sub h'>scripts/auditor.py              | 120 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/inbox.py                | 111 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py          |   8 +++</div><div class='sub h'>tests/test_inbox.py             |  36 ++++++++++++</div><pre>diff --git a/docs/AUDITOR-TEMPLATE.md b/docs/AUDITOR-TEMPLATE.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3d6390555</b> · 2026-09-22 21:44</div><div>R-V2-EXACT: v8_site generator + first verbatim page (How) wired into the build</div><div class='sub h'>scripts/site_build.py |   5 ++</div><div class='sub h'>scripts/v8_site.py    | 136 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_v8_site.py |  23 +++++++++</div><pre>diff --git a/scripts/site_build.py b/scripts/site_build.py
+index 463387e10..b5635a5c0 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -719,6 +719,11 @@ def build(snapshot=None):
+         engine_page.build()                             # R-DEEP-DIVE: site/engine-e1.html (deep dive)
+         from scripts import site_v2
+         site_v2.build()                                # R-NIGHT-2 Part B: site/v2/ preview
++        try:
++            from scripts import v8_site                 # R-V2-EXACT: overwrite ported pages with the verbatim design
++            v8_site.build()
++        except Exception:
++            pass
+         from scripts import build_journal              # R-EYES-FULL: the /build/ room (heavy: transcript scrub
+         build_journal.build()                          # + commit diffs) — full cycle only, keeps status 2-min fresh
+         try:                                           # R-MORNING-22 item 4: capture today&#x27;s E21 15:25/09:20
+diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+new file mode 100644
+index 000000000..110688895
+--- /dev/null
++++ b/scripts/v8_site.py
+@@ -0,0 +1,136 @@
++&quot;&quot;&quot;R-V2-EXACT — build /v2/ VERBATIM from the approved design (design/v8/*.dc.html) via the v8_port engine.
++
++Each design page is ported keeping its markup/CSS exactly; placeholders and repeated rows bind to real records.
++The nav is fixed to the README order (Leaderboard · Engines · Stocks · Patterns · Data · Results · How it works ·
++[Ask the desk]) with Deliverables removed (it lives only at /deliverables/), and the .dc.html links rewritten to
++the served .html names. A gate refuses any page that still shows a sample value (DABUR / 937 / 69%),
++[object Object], undefined, NaN or an un-bound {{placeholder}}.
++
++Ported page-by-page: static pages first (How, Ask), then the data pages bind their records. The per-page data
++providers live here. v8_site.build() overwrites the matching site/v2/ pages produced by the old builders, so the
++verbatim ports win as each one lands.&quot;&quot;&quot;
++from __future__ import annotations
++
++import os
++import re
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++from scripts import v8_port
++
++REPO = ds._REPO
++DESIGN = os.path.join(REPO, &quot;design&quot;, &quot;v8&quot;)
++OUT = os.path.join(REPO, &quot;site&quot;, &quot;v2&quot;)
++
++# design file -&gt; served name (Deliverables is NOT built here — it is the separate /deliverables/ site, ADD a)
++HREF = {
++    &quot;Main.dc.html&quot;: &quot;index.html&quot;, &quot;Engine.dc.html&quot;: &quot;engines.html&quot;, &quot;Stocks.dc.html&quot;: &quot;stocks.html&quot;,
++    &quot;Pattern.dc.html&quot;: &quot;patterns.html&quot;, &quot;Data.dc.html&quot;: &quot;data.html&quot;, &quot;Results.dc.html&quot;: &quot;results.html&quot;,
++    &quot;How.dc.html&quot;: &quot;how.html&quot;, &quot;Ask.dc.html&quot;: &quot;ask.html&quot;, &quot;Stock.dc.html&quot;: &quot;stock.html&quot;,
++    &quot;Messages.dc.html&quot;: &quot;messages.html&quot;,
++}
++# the README&#x27;s FABRICATED sample data that must never survive on the real site. DABUR and ₹2,00,000 are dropped
++# from the gate because they are also REAL values (DABUR is a live ticker stock; ₹2,00,000 is the real capital) —
++# the ticker/data binding replaces the baked sample rows, and 937 (a fake trade count) + 69% (a fake win rate)
++# are the un-bound-data markers that cannot appear in real records.
++SAMPLE_VALUES = [&quot;937&quot;, &quot;69%&quot;]
++
++
++def _live_tape():
++    &quot;&quot;&quot;The real ticker tape from site/data/live.json (tape.stocks: stock/last/change_pct).&quot;&quot;&quot;
++    import json
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;site&quot;, &quot;data&quot;, &quot;live.json&quot;), encoding=&quot;utf-8&quot;))
++        t = (d.get(&quot;tape&quot;) or {}).get(&quot;stocks&quot;) or []
++        return t if isinstance(t, list) else []
++    except Exception:
++        return []
++
++
++def _fix_ticker(html):
++    &quot;&quot;&quot;Replace the design&#x27;s BAKED ticker (sample stocks NIFTY/DABUR/…) with the real live tape (or an empty
++    ticker if the tape is unavailable) — no sample stock may remain on the real site.&quot;&quot;&quot;
++    tape = _live_tape()
++    spans = &quot;&quot;
++    for s in tape[:40]:
++        chg = s.get(&quot;change_pct&quot;)
++        colour = &quot;#5DCAA5&quot; if (chg or 0) &gt;= 0 else &quot;#F09595&quot;
++        chg_s = (&quot;%+g%%&quot; % chg) if chg is not None else &quot;&quot;
++        spans += &quot;&lt;span&gt;%s %s &lt;span style=\&quot;color: %s;\&quot;&gt;%s&lt;/span&gt;&lt;/span&gt;&quot; % (
++            _esc(s.get(&quot;stock&quot;)), _esc(s.get(&quot;last&quot;)), colour, _esc(chg_s))
++    # the baked run starts at the first &lt;span&gt;NIFTY … and ends at the ticker div&#x27;s closing &lt;/div&gt;
++    return re.sub(r&quot;(?s)&lt;span&gt;NIFTY .*?(&lt;/div&gt;)&quot;, spans + r&quot;\1&quot;, html, count=1)
++
++
++def _esc(x):
++    import html as _h
++    return _h.escape(&quot;&quot; if x is None else str(x))
++
++
++def _fix_nav_and_links(html):
++    for dc, served in HREF.items():
++        html = html.replace(dc, served)
++    html = re.sub(r&#x27;&lt;a href=&quot;[Dd]eliverables\.(?:dc\.)?html&quot;[^&gt;]*&gt;\s*Deliverables\s*&lt;/a&gt;&#x27;, &quot;&quot;, html)
++    html = _fix_ticker(html)
++    return html
++
++
++def _gate(html):
++    problems = [(&quot;sample value %r&quot; % s) for s in SAMPLE_VALUES if s in html]
++    for bad in (&quot;[object Object]&quot;, &quot;undefined&quot;, &quot;&gt;NaN&lt;&quot;, &quot;{{&quot;):
++        if bad in html:
++            problems.append(bad)
++    return problems
++
++
++def port(dc_name, data):
++    dc = open(os.path.join(DESIGN, dc_name), encoding=&quot;utf-8&quot;).read()
++    return _fix_nav_and_links(v8_port.page(dc, data))
++
++
++# ---------------------------------------------------------------------------------------------------------
++# per-page data providers (static pages need none; data pages fill these in as they are ported)
++# ---------------------------------------------------------------------------------------------------------
++def _how_data():
++    return {}          # How is descriptive prose (real system numbers); no records to bind
++
++
++def _ask_data():
++    return {}
++
++
++# the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
++# Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
++# Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data}
++
++
++def build(write=True, only=None):
++    &quot;&quot;&quot;Port the pages we have providers for, overwriting the old site/v2/ pages. Returns {served: problems}.
++    A page with gate problems is NOT written (the last-good page stays).&quot;&quot;&quot;
++    os.makedirs(OUT, exist_ok=True)
++    results = {}
++    for dc_name, provider in PROVIDERS.items():
++        if only and dc_name not in only:
++            continue
++        served = HREF[dc_name]
++        html = port(dc_name, provider())
++        probs = _gate(html)
++        results[served] = probs
++        if write and not probs:
++            with open(os.path.join(OUT, served), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(html)
++    return results
++
++
++def _demo():
++    r = build(write=False)
++    for name, probs in r.items():
++        assert not probs, (name, probs)
++    print(&quot;v8_site demo OK: %d design pages ported clean (no sample values, no {{}}): %s&quot; % (
++        len(r), &quot;, &quot;.join(sorted(r))))
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo() if &quot;--demo&quot; in sys.argv else print(build())
+diff --git a/tests/test_v8_site.py b/tests/test_v8_site.py
+new file mode 100644
+index 000000000..b4e9e564d
+--- /dev/null
++++ b/tests/test_v8_site.py
+@@ -0,0 +1,23 @@
++&quot;&quot;&quot;R-V2-EXACT: v8_site ports the design pages verbatim, fixes the nav (no Deliverables), binds the ticker, and
++the gate refuses any surviving sample value / placeholder.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import v8_site
++
++
++def test_how_ports_clean_and_verbatim():
++    r = v8_site.build(write=False)
++    assert r.get(&quot;how.html&quot;) == []                       # no sample value / {{}} survives
++    html = v8_site.port(&quot;How.dc.html&quot;, {})
++    assert &quot;&lt;x-dc&gt;&quot; not in html and &quot;text/x-dc&quot; not in html and &quot;1280px&quot; in html   # wrapper gone, markup kept
++    assert &#x27;href=&quot;Deliverables&#x27; not in html and &quot;&gt;Deliverables&lt;&quot; not in html       # deliverables off the nav
++
++
++def test_ticker_baked_sample_replaced():
++    html = v8_site.port(&quot;How.dc.html&quot;, {})
++    assert &quot;DABUR 512.30&quot; not in html                    # the baked sample ticker row is gone
++    assert &quot;NIFTY 24,812&quot; not in html
++
++
++if __name__ == &quot;__main__&quot;:
++    test_how_ports_clean_and_verbatim(); test_ticker_baked_sample_replaced(); print(&quot;test_v8_site OK&quot;)
+</pre></div><div class='c'><div class='h'><b>2b28ea169</b> · 2026-09-22 21:38</div><div>R-EYES-COMPLETE done (built); queue advances to R-V2-EXACT pages</div><div class='sub h'>reports/BUILD-STATE.json | 6 +++---</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+index 932a13597..9a1a731b1 100644
+--- a/reports/BUILD-STATE.json
++++ b/reports/BUILD-STATE.json
+@@ -1,7 +1,7 @@
+ {
+- &quot;ruling&quot;: &quot;R-NOW-LINE done&quot;,
+- &quot;item&quot;: &quot;R-EYES-COMPLETE (next in queue)&quot;,
++ &quot;ruling&quot;: &quot;R-EYES-COMPLETE done (built)&quot;,
++ &quot;item&quot;: &quot;R-V2-EXACT remaining pages&quot;,
+  &quot;tests&quot;: &quot;all C-series + tabs + fixes tested; full suite last 244 green&quot;,
+- &quot;next&quot;: &quot;R-EYES-COMPLETE, then remaining R-V2-EXACT pages&quot;,
++ &quot;next&quot;: &quot;R-V2-EXACT verbatim /v2/ page rebuild (Main, Engine, Stocks, etc.)&quot;,
+  &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
+ }
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>4829afbae</b> · 2026-09-22 21:37</div><div>R-EYES-COMPLETE (10): report to docs/reports — mirror built, ten pages, ruling inbox, eyes map</div><div class='sub h'>docs/reports/2026-09-22-R-EYES-COMPLETE.md | 34 ++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-R-EYES-COMPLETE.md b/docs/reports/2026-09-22-R-EYES-COMPLETE.md
+new file mode 100644
+index 000000000..5c419b1a4
+--- /dev/null
++++ b/docs/reports/2026-09-22-R-EYES-COMPLETE.md
+@@ -0,0 +1,34 @@
++# R-EYES-COMPLETE — report (2026-09-22) — BUILT (live once the first → AUDIT report lands)
++
++One link — the build room — mirrors everything the owner would otherwise paste, written by the status-writer
++process, and the lead&#x27;s rulings reach the builder by Telegram without opening a session.
++
++## Steps + commits
++1. One link / mirror pages — the /build/ index links all ten pages: Now (status.html top) · Journal · Commits
++   · Tests · Supervisor · Messages · Reports · Screenshots · Queue · Eyes. Each page shows its own written
++   time; the status writer (site_loop&#x27;s halt-proof daemon, via build_journal→mirror) writes them each cycle.
++   **db81dc744**
++2. Messages — scripts/msg_log.py records every line sent (notify→outgoing) and command received
++   (kill_switch→incoming) to reports/MSG-LOG.tsv, scrubbed, newest first. **d696097a9**
++3. Reports — every end-of-dispatch/audit/supervisor report is written to docs/reports/*.md before posting; the
++   Reports page renders them newest first (this file included). **db81dc744**
++4. Screenshots — mirror.record_screenshot(time·ruling·page) → the Screenshots page. **db81dc744**
++5. Queue — mirror.queue_state derives archived/in-progress/pending/done from docs/dispatches (+ inbox) and the
++   checklist; next_pending() feeds the beat&#x27;s next, never typed. **db81dc744**
++6. Ruling inbox — a → BUILD Telegram (owner chat) is archived verbatim to docs/dispatches/inbox/&lt;time&gt;.md and
++   inserted at the front of the checklist (auto-continue takes it next); a → AUDIT triggers a fresh independent
++   Opus audit (docs/AUDITOR-TEMPLATE.md, reads repo+mirror) whose report lands on Reports + one Telegram line.
++   The bot replies &quot;queued: &lt;first words&gt;&quot;. Interactive audit retired. **ef04300cd**
++7. Every Telegram line ends with the mirror link. **b955569cd**
++8. Eyes map — docs/EYES.md, linked from status.html: every watcher × (sees what · how old at most · what
++   freezes it · what still needs the owner). **db81dc744**
++9. Tests per step, all committed; no test sends a real Telegram line or touches a ledger.
++
++## Mirror link
++https://[redacted]-[redacted].github.io/e1-live-site/build/index.html
++
++## BUILT, not live
++The running token_ping/site_loop still carry the pre-R-EYES-COMPLETE code, so the inbox routing, the mirror
++pages and the daemon writing them go live on the next stack restart (a human/owner act). The END-TO-END PROOF
++is the owner&#x27;s first &quot;→ AUDIT&quot; from Telegram: it must appear on Queue, run, and land on Reports without anyone
++opening a session. Until that report exists on the mirror, this is BUILT, not live.
+</pre></div><div class='c'><div class='h'><b>b955569cd</b> · 2026-09-22 21:36</div><div>R-EYES-COMPLETE (7): every Telegram line ends with the mirror link (build room)</div><div class='sub h'>scripts/notify.py         | 17 ++++++++++-------</div><div class='sub h'>tests/test_mirror_link.py | 18 ++++++++++++++++++</div><pre>diff --git a/scripts/notify.py b/scripts/notify.py
+index c66584d5f..de0927269 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -62,15 +62,18 @@ def _log_send(message: str, result: str) -&gt; None:
+ _SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
+ 
+ 
++MIRROR_LINK = &quot;https://[redacted]-[redacted].github.io/e1-live-site/build/index.html&quot;
++
++
+ def _with_link(message: str) -&gt; str:
+-    &quot;&quot;&quot;R-E1-ALERT-OWN + R-E1-THREE-EMOJIS: a summons (🙋), a completion (✅), or a session-finish ([CODE])
+-    line carries a tap-to-open link to the live site (which MacroDroid can open). The ⏱ progress lines and
+-    other info lines are untouched, and a message that already has the link is not doubled.&quot;&quot;&quot;
++    &quot;&quot;&quot;R-EYES-COMPLETE §7: EVERY Telegram line ends with the mirror link (the build room — one link that shows
++    Now/Journal/Commits/Tests/Supervisor/Messages/Reports/Screenshots/Queue/Eyes). A line that already carries
++    an e1-live-site link (the beat/live-bar carry the status page, which the mirror contains) is not doubled.
++    (Supersedes the earlier status-only rule for alert lines.)&quot;&quot;&quot;
+     m = str(message)
+-    is_alert = (&quot;\U0001f64b&quot; in m) or (&quot;✅&quot; in m) or m.lstrip().startswith(&quot;[CODE]&quot;)
+-    if is_alert and _SITE not in m:
+-        return m.rstrip() + &quot; — open &quot; + _SITE
+-    return m
++    if &quot;github.io/e1-live-site&quot; in m:
++        return m
++    return m.rstrip() + &quot; · &quot; + MIRROR_LINK
+ 
+ 
+ def _creds() -&gt; tuple[str | None, str | None]:
+diff --git a/tests/test_mirror_link.py b/tests/test_mirror_link.py
+new file mode 100644
+index 000000000..d662f51db
+--- /dev/null
++++ b/tests/test_mirror_link.py
+@@ -0,0 +1,18 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (7): every Telegram line ends with the mirror link; not doubled if one is present.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import notify
++
++
++def test_plain_line_gets_mirror_link():
++    out = notify._with_link(&quot;STACK: restarted 21:00&quot;)
++    assert out.endswith(notify.MIRROR_LINK) and &quot;/build/index.html&quot; in out
++
++
++def test_line_with_status_link_not_doubled():
++    out = notify._with_link(&quot;LIVE PAPER done · https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;)
++    assert out.count(&quot;github.io/e1-live-site&quot;) == 1       # not doubled
++
++
++if __name__ == &quot;__main__&quot;:
++    test_plain_line_gets_mirror_link(); test_line_with_status_link_not_doubled(); print(&quot;test_mirror_link OK&quot;)
+</pre></div><div class='c'><div class='h'><b>db81dc744</b> · 2026-09-22 21:35</div><div>R-EYES-COMPLETE (1,3,4,5,8): mirror pages — Queue/Reports/Messages/Tests/Screenshots/Eyes</div><div class='sub h'>docs/EYES.md             |  23 ++++++</div><div class='sub h'>scripts/build_journal.py |  13 +++-</div><div class='sub h'>scripts/mirror.py        | 180 +++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py        |   2 +</div><div class='sub h'>tests/test_mirror.py     |  30 ++++++++</div><pre>diff --git a/docs/EYES.md b/docs/EYES.md
+new file mode 100644
+index 000000000..bd753abc4
+--- /dev/null
++++ b/docs/EYES.md
+@@ -0,0 +1,23 @@
++# EYES — every watcher on the desk (R-EYES-COMPLETE §8)
++
++Linked from status.html. For each watcher: what it sees · how old at most (from the writer&#x27;s cadence, not
++typed) · what freezes it · what still needs the owner.
++
++| Watcher | Sees what | How old at most | What freezes it | Still needs the owner |
++|---|---|---|---|---|
++| status.html | token, processes, streams, gates, orders, audit, the NOW line | 2 min (status daemon cycle) | the site_loop process dying | nothing — the daemon is halt-proof |
++| /build/ Now | the current tool scene from now.txt | 2 min (status daemon) | the build session gone (now.txt stops) | nothing |
++| /build/ Journal | append-only build log | 10 min (full site cycle) | the full cycle stalling | nothing |
++| /build/ Commits | tonight&#x27;s commits + scrubbed diffs | 10 min (full cycle) | the full cycle stalling | nothing |
++| /build/ Tests | the last commit&#x27;s test result | when tests are recorded | tests not run | nothing |
++| /build/ Supervisor | the independent watcher&#x27;s checks | 30 min idle / after every commit | the supervisor process gone | a real HALT reason to look at |
++| /build/ Messages | every line sent + command received | 10 min (full cycle) | the full cycle stalling | nothing |
++| /build/ Reports | every end-of-dispatch + audit report | 10 min (full cycle) | the full cycle stalling | nothing |
++| /build/ Screenshots | every screenshot with time/ruling/page | 10 min (full cycle) | the full cycle stalling | nothing |
++| /build/ Queue | rulings archived / in progress / pending / done | 10 min (full cycle) | the full cycle stalling | nothing |
++| supervisor | scope + standing laws, after every commit | 30 min idle | its process gone; token limit | overturn a wrong HALT with one line |
++| watchdog | recorders + runner + supervisor alive | its own tick | its process gone | restart the stack (human act) |
++| dead-man (silence alarm) | no supervisor check for 30 min | 5 min (token_ping wake) | token_ping gone | nothing |
++| Telegram (inbound) | KILL / RESUME / clear halt / now / → BUILD / → AUDIT | 5 min (token_ping wake) | token_ping gone; no token | send the commands |
++| audit runs | a fresh independent read on demand | on each → AUDIT | claude CLI missing | send → AUDIT |
++| chat lead (this) | everything above, via the mirror link | one message | a HALT that blocks the build session | the root swap; owner-only doors |
+diff --git a/scripts/build_journal.py b/scripts/build_journal.py
+index 7167599cb..e6be1980a 100644
+--- a/scripts/build_journal.py
++++ b/scripts/build_journal.py
+@@ -354,7 +354,13 @@ def _index_body(slug, have_transcript):
+         &quot;&lt;li&gt;&lt;a href=&#x27;journal.html&#x27;&gt;Journal&lt;/a&gt; — append-only build log&lt;/li&gt;&quot;
+         &quot;%s&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;commits.html&#x27;&gt;Commits&lt;/a&gt; — tonight&#x27;s commits with full diffs&lt;/li&gt;&quot;
+-        &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&lt;/ul&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;messages.html&#x27;&gt;Messages&lt;/a&gt; — every line sent + command received&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;reports.html&#x27;&gt;Reports&lt;/a&gt; — end-of-dispatch + audit reports, newest first&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;tests.html&#x27;&gt;Tests&lt;/a&gt; — the last recorded test result&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;screenshots.html&#x27;&gt;Screenshots&lt;/a&gt; — with time, ruling, page&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;queue.html&#x27;&gt;Queue&lt;/a&gt; — rulings archived / in progress / pending / done&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;eyes.html&#x27;&gt;Eyes map&lt;/a&gt; — every watcher on the desk&lt;/li&gt;&lt;/ul&gt;&quot;
+         &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: %s&lt;/p&gt;&quot;
+         % (_html.escape(st.get(&quot;ruling&quot;, &quot;—&quot;)), _html.escape(st.get(&quot;item&quot;, &quot;&quot;)), tlink,
+            _html.escape(st.get(&quot;flag&quot;, &quot;NOTHING NEEDS THE LEAD&quot;))))
+@@ -380,6 +386,11 @@ def build(write=True):
+         for name, content in pages.items():
+             with open(os.path.join(OUT, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+                 f.write(content)
++        try:
++            from scripts import mirror                     # R-EYES-COMPLETE: Queue/Reports/Messages/Tests/Shots/Eyes
++            mirror.build()
++        except Exception:
++            pass
+         sup = os.path.join(OUT, &quot;supervisor&quot;, &quot;index.html&quot;)   # placeholder until supervisor.py writes its own
+         if not os.path.exists(sup):
+             os.makedirs(os.path.dirname(sup), exist_ok=True)
+diff --git a/scripts/mirror.py b/scripts/mirror.py
+new file mode 100644
+index 000000000..3edce1ea2
+--- /dev/null
++++ b/scripts/mirror.py
+@@ -0,0 +1,180 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (1,3,4,5,8): the extra mirror pages under /build/, written by the status writer every cycle.
++
++  Queue       — rulings archived / in progress / pending / done, from docs/dispatches (+ inbox) and the checklist.
++  Reports     — every docs/reports/*.md (end-of-dispatch + audit + supervisor verdicts), newest first, scrubbed.
++  Messages    — the incoming/outgoing Telegram log (scrubbed), newest first.
++  Tests       — the last recorded test result.
++  Screenshots — every recorded screenshot with time · ruling · page.
++  Eyes        — docs/EYES.md, the watcher map.
++Each page shows its own written time at the top. next_pending() feeds the beat&#x27;s &#x27;next:&#x27; (never typed).&quot;&quot;&quot;
++from __future__ import annotations
++
++import glob
++import html as _h
++import json
++import os
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;)
++SHOTS_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;SCREENSHOTS.tsv&quot;)
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _scrub(s):
++    try:
++        from scripts import build_journal
++        return build_journal.scrub(str(s or &quot;&quot;))
++    except Exception:
++        return str(s or &quot;&quot;)
++
++
++def _page(title, body):
++    stamp = &quot;written %s&quot; % _now().strftime(&quot;%Y-%m-%d %H:%M IST&quot;)   # every page shows its own written time
++    try:
++        from scripts import build_journal
++        return build_journal._page(title, &quot;&lt;p style=&#x27;color:#9a9a93;font-size:12px&#x27;&gt;%s · &lt;a href=&#x27;index.html&#x27;&gt;&quot;
++                                   &quot;build room&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;%s&lt;/h1&gt;%s&quot; % (stamp, _h.escape(title), body))
++    except Exception:
++        return &quot;&lt;!doctype html&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;title&gt;%s&lt;/title&gt;&lt;p&gt;%s&lt;/p&gt;&lt;h1&gt;%s&lt;/h1&gt;%s&quot; % (
++            title, stamp, title, body)
++
++
++# ---------------------------------------------------------------------------------------------------------
++# Queue (§5)
++# ---------------------------------------------------------------------------------------------------------
++def queue_state():
++    archived = sorted(os.path.basename(p)[:-3] for p in glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;*.md&quot;)))
++    inbox = sorted(os.path.basename(p)[:-3] for p in glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;inbox&quot;, &quot;*.md&quot;))
++                   if not p.endswith(&quot;README.md&quot;))
++    try:
++        c = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;), encoding=&quot;utf-8&quot;))
++    except Exception:
++        c = {}
++    pending = [x for x in (c.get(&quot;remaining&quot;) or []) if x]
++    done = [x for x in (c.get(&quot;done&quot;) or []) if x]
++    try:
++        item = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;), encoding=&quot;utf-8&quot;)).get(&quot;item&quot;)
++    except Exception:
++        item = None
++    return {&quot;archived&quot;: archived, &quot;inbox&quot;: inbox, &quot;in_progress&quot;: item, &quot;pending&quot;: pending, &quot;done&quot;: done}
++
++
++def next_pending():
++    &quot;&quot;&quot;The beat&#x27;s &#x27;next:&#x27; — the first pending checklist item, else the next backlog item. Never typed.&quot;&quot;&quot;
++    q = queue_state()
++    if q[&quot;pending&quot;]:
++        return q[&quot;pending&quot;][0]
++    try:
++        from scripts import backlog
++        return backlog.next_item()
++    except Exception:
++        return None
++
++
++def _queue_page():
++    q = queue_state()
++    def ul(items):
++        return &quot;&lt;ul&gt;&quot; + &quot;&quot;.join(&quot;&lt;li&gt;%s&lt;/li&gt;&quot; % _h.escape(str(x)) for x in items) + &quot;&lt;/ul&gt;&quot; if items else &quot;&lt;p class=&#x27;sub&#x27;&gt;none&lt;/p&gt;&quot;
++    body = (&quot;&lt;h3&gt;In progress&lt;/h3&gt;&lt;p&gt;%s&lt;/p&gt;&lt;h3&gt;Pending (auto-continue takes these in order)&lt;/h3&gt;%s&quot;
++            &quot;&lt;h3&gt;Inbox rulings (→ BUILD)&lt;/h3&gt;%s&lt;h3&gt;Done&lt;/h3&gt;%s&lt;h3&gt;Archived rulings&lt;/h3&gt;%s&quot;
++            % (_h.escape(str(q[&quot;in_progress&quot;] or &quot;—&quot;)), ul(q[&quot;pending&quot;]), ul(q[&quot;inbox&quot;]),
++               ul(q[&quot;done&quot;][-40:]), ul(q[&quot;archived&quot;])))
++    return _page(&quot;Queue&quot;, body)
++
++
++# ---------------------------------------------------------------------------------------------------------
++# Reports (§3), Messages (§2 render), Tests, Screenshots (§4), Eyes (§8)
++# ---------------------------------------------------------------------------------------------------------
++def _reports_page():
++    files = sorted(glob.glob(os.path.join(REPO, &quot;docs&quot;, &quot;reports&quot;, &quot;*.md&quot;)), reverse=True)   # newest first
++    blocks = []
++    for p in files[:40]:
++        try:
++            txt = _scrub(open(p, encoding=&quot;utf-8&quot;).read())
++        except Exception:
++            continue
++        blocks.append(&quot;&lt;h3&gt;%s&lt;/h3&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot; % (_h.escape(os.path.basename(p)), _h.escape(txt[:40000])))
++    return _page(&quot;Reports&quot;, &quot;&quot;.join(blocks) or &quot;&lt;p class=&#x27;sub&#x27;&gt;no reports yet&lt;/p&gt;&quot;)
++
++
++def _messages_page():
++    try:
++        from scripts import msg_log
++        rows = msg_log.recent(400)
++    except Exception:
++        rows = []
++    trs = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++        _h.escape(r[0][:19].replace(&quot;T&quot;, &quot; &quot;)), _h.escape(r[1]), _h.escape(r[2])) for r in rows)
++    return _page(&quot;Messages&quot;, &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;Text&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
++                 % (trs or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no messages yet&lt;/td&gt;&lt;/tr&gt;&quot;))
++
++
++def _tests_page():
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;LAST-TESTS.json&quot;), encoding=&quot;utf-8&quot;))
++        body = &quot;&lt;p&gt;Last recorded suite: &lt;b&gt;%s / %s&lt;/b&gt; at %s.&lt;/p&gt;&quot; % (d.get(&quot;passed&quot;), d.get(&quot;total&quot;), d.get(&quot;at&quot;))
++    except Exception:
++        body = &quot;&lt;p class=&#x27;sub&#x27;&gt;no recorded test result yet&lt;/p&gt;&quot;
++    return _page(&quot;Tests&quot;, body)
++
++
++def record_screenshot(name, ruling, page):
++    &quot;&quot;&quot;A session records a screenshot it took (R-EYES-COMPLETE §4).&quot;&quot;&quot;
++    try:
++        os.makedirs(os.path.dirname(SHOTS_LOG), exist_ok=True)
++        with open(SHOTS_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;%s\t%s\t%s\t%s\n&quot; % (_now().isoformat(), _scrub(name), _scrub(ruling), _scrub(page)))
++    except Exception:
++        pass
++
++
++def _screenshots_page():
++    try:
++        rows = [l.split(&quot;\t&quot;) for l in open(SHOTS_LOG, encoding=&quot;utf-8&quot;).read().splitlines() if l.strip()]
++        rows = [r for r in rows if len(r) == 4][::-1]
++    except Exception:
++        rows = []
++    trs = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++        _h.escape(r[0][:19]), _h.escape(r[2]), _h.escape(r[3]), _h.escape(r[1])) for r in rows)
++    return _page(&quot;Screenshots&quot;, &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Ruling&lt;/th&gt;&lt;th&gt;Page&lt;/th&gt;&lt;th&gt;Name&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
++                 % (trs or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;4&#x27;&gt;no screenshots recorded yet&lt;/td&gt;&lt;/tr&gt;&quot;))
++
++
++def _eyes_page():
++    try:
++        txt = open(os.path.join(REPO, &quot;docs&quot;, &quot;EYES.md&quot;), encoding=&quot;utf-8&quot;).read()
++    except Exception:
++        txt = &quot;(no EYES.md)&quot;
++    return _page(&quot;Eyes map&quot;, &quot;&lt;pre&gt;%s&lt;/pre&gt;&quot; % _h.escape(txt))
++
++
++def build(write=True):
++    pages = {&quot;queue.html&quot;: _queue_page(), &quot;reports.html&quot;: _reports_page(), &quot;messages.html&quot;: _messages_page(),
++             &quot;tests.html&quot;: _tests_page(), &quot;screenshots.html&quot;: _screenshots_page(), &quot;eyes.html&quot;: _eyes_page()}
++    if write:
++        os.makedirs(OUT, exist_ok=True)
++        for name, html in pages.items():
++            with open(os.path.join(OUT, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(html)
++    return sorted(pages)
++
++
++def _demo():
++    for name, html in {&quot;q&quot;: _queue_page(), &quot;r&quot;: _reports_page(), &quot;m&quot;: _messages_page(), &quot;t&quot;: _tests_page(),
++                       &quot;s&quot;: _screenshots_page(), &quot;e&quot;: _eyes_page()}.items():
++        assert &quot;written &quot; in html and &quot;&lt;h1&gt;&quot; in html
++    assert isinstance(next_pending(), (str, type(None)))
++    print(&quot;mirror demo OK: 6 pages, each with a written time; next_pending() = %s&quot; % (next_pending() or &quot;—&quot;)[:40])
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo() if &quot;--demo&quot; in sys.argv else print(build())
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index 0d43bb490..5978495b8 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -310,6 +310,8 @@ def _write_html(s):
+             &quot;&lt;p class=&#x27;big&#x27;&gt;&quot; + _h.escape(s[&quot;plain&quot;]) + &quot;&lt;/p&gt;&quot;
+             &quot;&lt;p class=&#x27;sub&#x27;&gt;&quot; + _h.escape(s[&quot;ready_line&quot;]) + &quot; · updated &quot; + _h.escape(s[&quot;generated&quot;]) +
+             &quot; · refreshes every 2 minutes&lt;/p&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;build/index.html&#x27; style=&#x27;color:#7db4ff&#x27;&gt;build room&lt;/a&gt; · &quot;
++            &quot;&lt;a href=&#x27;build/eyes.html&#x27; style=&#x27;color:#7db4ff&#x27;&gt;eyes map&lt;/a&gt;&lt;/p&gt;&quot;   # R-EYES-COMPLETE §8&quot;
+             &quot;&lt;h3&gt;Processes&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Process&lt;/th&gt;&lt;th&gt;PID&lt;/th&gt;&lt;th&gt;Since&lt;/th&gt;&lt;/tr&gt;&quot; + rows + &quot;&lt;/table&gt;&quot;
+             &quot;&lt;h3&gt;Streams (rows in the last 10 min)&lt;/h3&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Stream&lt;/th&gt;&lt;th&gt;Rows&lt;/th&gt;&lt;th&gt;Last&lt;/th&gt;&lt;/tr&gt;&quot;
+             + streams + &quot;&lt;/table&gt;&quot;
+diff --git a/tests/test_mirror.py b/tests/test_mirror.py
+new file mode 100644
+index 000000000..eece7cdbf
+--- /dev/null
++++ b/tests/test_mirror.py
+@@ -0,0 +1,30 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (1,3,4,5,8): the mirror pages build with a written time; the queue derives next_pending.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import mirror
++
++
++def test_pages_have_written_time():
++    for fn in (mirror._queue_page, mirror._reports_page, mirror._messages_page, mirror._tests_page,
++               mirror._screenshots_page, mirror._eyes_page):
++        html = fn()
++        assert &quot;written &quot; in html and &quot;&lt;h1&gt;&quot; in html
++
++
++def test_queue_state_and_next_pending():
++    q = mirror.queue_state()
++    assert set(q) &gt;= {&quot;archived&quot;, &quot;inbox&quot;, &quot;in_progress&quot;, &quot;pending&quot;, &quot;done&quot;}
++    assert isinstance(q[&quot;archived&quot;], list) and q[&quot;archived&quot;]      # dispatches exist
++    assert mirror.next_pending() is None or isinstance(mirror.next_pending(), str)
++
++
++def test_record_screenshot_shows_on_page():
++    mirror.SHOTS_LOG = os.path.join(tempfile.mkdtemp(), &quot;shots.tsv&quot;)
++    mirror.record_screenshot(&quot;status.png&quot;, &quot;R-NOW-LINE&quot;, &quot;status.html&quot;)
++    html = mirror._screenshots_page()
++    assert &quot;R-NOW-LINE&quot; in html and &quot;status.html&quot; in html
++
++
++if __name__ == &quot;__main__&quot;:
++    test_pages_have_written_time(); test_queue_state_and_next_pending(); test_record_screenshot_shows_on_page()
++    print(&quot;test_mirror OK&quot;)
+</pre></div><div class='c'><div class='h'><b>ef04300cd</b> · 2026-09-22 21:32</div><div>R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit</div><div class='sub h'>docs/AUDITOR-TEMPLATE.md        |  21 +++++++</div><div class='sub h'>docs/dispatches/inbox/README.md |   1 +</div><div class='sub h'>scripts/auditor.py              | 120 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/inbox.py                | 111 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py          |   8 +++</div><div class='sub h'>tests/test_inbox.py             |  36 ++++++++++++</div><pre>diff --git a/docs/AUDITOR-TEMPLATE.md b/docs/AUDITOR-TEMPLATE.md
 new file mode 100644
 index 000000000..3a757e6a8
 --- /dev/null
@@ -1005,397 +1597,4 @@ index 000000000..01e7abf1f
 +
 +if __name__ == &quot;__main__&quot;:
 +    test_writes_one_scrubbed_line(); test_never_raises_on_garbage(); print(&quot;test_now_writer OK&quot;)
-</pre></div><div class='c'><div class='h'><b>43822e23c</b> · 2026-09-22 21:14</div><div>R-HALT-FIX (6) test: ask_the_desk client is anonymised (&#x27;A desk client&#x27;, no person&#x27;s name)</div><div class='sub h'>tests/test_ask_the_desk.py | 4 ++--</div><pre>diff --git a/tests/test_ask_the_desk.py b/tests/test_ask_the_desk.py
-index 27af15244..5324ebafd 100644
---- a/tests/test_ask_the_desk.py
-+++ b/tests/test_ask_the_desk.py
-@@ -1,5 +1,5 @@
- &quot;&quot;&quot;R-ASK-THE-DESK (as amended by R-EVENING-22 D1): the two index-test requests moved to the separate
--/deliverables/ page and were removed here, leaving Nikhil&#x27;s stock-hold request. Plain language, stable
-+/deliverables/ page and were removed here, leaving an anonymised client stock-hold request. Plain language, stable
- numbering, numbers that match for-nikhil.html, and no scope a run invented.&quot;&quot;&quot;
- from scripts import ask_the_desk as A
- 
-@@ -11,7 +11,7 @@ def test_module_demo():
- def test_remaining_entry_is_nikhils_stock_hold_and_dated():
-     ns = [e[&quot;n&quot;] for e in A.ENTRIES]
-     assert ns == [1]                                        # D1: only the stock-hold request remains here
--    assert all(e[&quot;who&quot;] == &quot;Nikhil&quot; and e[&quot;ruling&quot;] == &quot;R-INDEX-TESTS&quot; for e in A.ENTRIES)
-+    assert all(e[&quot;who&quot;] == &quot;A desk client&quot; and e[&quot;ruling&quot;] == &quot;R-INDEX-TESTS&quot; for e in A.ENTRIES)
-     assert all(e[&quot;date&quot;] == &quot;2026-09-18&quot; for e in A.ENTRIES)
-     # the entry carries all six required fields
-     for e in A.ENTRIES:
-</pre></div><div class='c'><div class='h'><b>c028e0789</b> · 2026-09-22 21:12</div><div>R-STOP-SPAM (2): status.html cache-busting reload + report — the page is current, not frozen</div><div class='sub h'>docs/reports/2026-09-22-R-STOP-SPAM.md | 34 ++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/vitals.py                      |  4 +++-</div><pre>diff --git a/docs/reports/2026-09-22-R-STOP-SPAM.md b/docs/reports/2026-09-22-R-STOP-SPAM.md
-new file mode 100644
-index 000000000..65430a9ca
---- /dev/null
-+++ b/docs/reports/2026-09-22-R-STOP-SPAM.md
-@@ -0,0 +1,34 @@
-+# R-STOP-SPAM — report (2026-09-22)
-+
-+## 1. The &quot;[CODE] session finished — come back&quot; spam
-+- **Sender:** `scripts/alert_done.py`, the Stop hook wired in `.claude/settings.json`. It fired on EVERY turn
-+  end; with the auto-continue loop re-issuing work, that was one line per turn.
-+- **Fix:** alert_done now returns early when `auto_continue.should_continue()` is true (the session is not
-+  really ending). It fires only on a real end. Plus a **desk-wide rate limit** in `notify()`: identical text
-+  sends once, then at most hourly (logged RATE-LIMITED). Different text (beat/status) is unaffected.
-+- Commit: a4a92d979. Test: tests/test_notify_ratelimit.py.
-+
-+## 2. status.html &quot;frozen since 15:00:29&quot;
-+- **From the logs / live, not memory:** the page is NOT frozen now. The e1-live-site clone pushed at
-+  21:04:07, 21:04:30, 21:06:35, 21:06:52, 21:08:52; the live URL reads `updated 21:08:50` — within the last
-+  2-minute cycle. `git log origin/main..HEAD` is empty → **no rejected/unpushed commit**. The
-+  &quot;rejected push after another clone committed&quot; hypothesis is **disconfirmed**, not assumed.
-+- **Root cause of the earlier 15:00→~17:45 freeze:** the 2-minute LIGHT cycle had grown to ~90s — the
-+  &quot;stocks ready&quot; scan (~62s over 216 stocks) and the /build/ transcript scrub had been placed in it — so
-+  status only refreshed on the ~10-minute FULL cycle, and a heavy full cycle stalled it. Fixed earlier by
-+  caching the stocks-ready count (15 min), moving build_journal to the full cycle + bounding its scrub, and
-+  DECOUPLING status into its own daemon thread with a targeted `publish_status` (commit 146ec8bce), then
-+  restarting. It has updated every 2 minutes since ~17:45 — including THROUGH the 20:22 halt, because the
-+  status writer is the `status-daemon` thread in site_loop, separate from the (blocked) build session
-+  (halt-proof).
-+- **This commit** adds a cache-busting JS reload to status.html so an OPEN TAB always pulls the current file
-+  (a plain meta-refresh can be served stale by the CDN — the likely reason the owner still saw 15:00:29).
-+- **Why NOT READY:** the vitals ready line needs a recorder up; **0 recorders are running** — they re-arm at
-+  the 06:00 Kite login (`_arm_recorder`), and it is evening / market closed. Token valid, 216 stocks ready,
-+  orders allowed, audit passed — only the recorders are missing, which is expected off-hours.
-+- **Why the owner saw &quot;no runner&quot;:** that was the pre-restart 15:00 view. The runner IS up now
-+  (`book20_runner`, last poll 21:06:51) — the watchdog&#x27;s resurrect_runner brought it back.
-+
-+## Proof
-+- Live: https://[redacted]-[redacted].github.io/e1-live-site/status.html — `updated 21:08:50` (last cycle).
-+- Clone pushes every ~2 min through the halt; unpushed empty.
-diff --git a/scripts/vitals.py b/scripts/vitals.py
-index a4d55c03c..df79bc540 100644
---- a/scripts/vitals.py
-+++ b/scripts/vitals.py
-@@ -267,9 +267,11 @@ def _write_html(s):
-     gates = &quot; · &quot;.join(&quot;%s: %s&quot; % (k, v) for k, v in (s[&quot;gates&quot;] or {}).items())
-     page = (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
-             &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
--            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&quot;
-             &quot;&lt;meta http-equiv=&#x27;Cache-Control&#x27; content=&#x27;no-cache, no-store, must-revalidate&#x27;&gt;&quot;
-             &quot;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&quot;
-+            # R-STOP-SPAM (2): a CACHE-BUSTING reload (not a plain meta-refresh, which the CDN can serve stale)
-+            # so an open tab always pulls the current file every 2 min.
-+            &quot;&lt;script&gt;setTimeout(function(){location.replace(&#x27;status.html?t=&#x27;+Date.now())},120000)&lt;/script&gt;&quot;
-             &quot;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
-             &quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
-             &quot;main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}&quot;
-</pre></div><div class='c'><div class='h'><b>a4a92d979</b> · 2026-09-22 21:08</div><div>R-STOP-SPAM (1): stop the &#x27;[CODE] session finished&#x27; spam + desk-wide repeat rate limit</div><div class='sub h'>.gitignore                                |  1 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-STOP-SPAM.md | 15 +++++++++++++++</div><div class='sub h'>scripts/alert_done.py                     | 19 ++++++++++++++++++-</div><div class='sub h'>scripts/notify.py                         | 29 +++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_notify_ratelimit.py            | 24 ++++++++++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
-index 7e85ce406..823b7e88c 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -64,3 +64,4 @@ scheduler/.live_bar_posted
- reports/_green_count.json
- design/v8.zip
- scheduler/.build_idle_hour
-+scheduler/.notify_seen.json
-diff --git a/docs/dispatches/2026-09-22_R-STOP-SPAM.md b/docs/dispatches/2026-09-22_R-STOP-SPAM.md
-new file mode 100644
-index 000000000..f8a9fbfb5
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-STOP-SPAM.md
-@@ -0,0 +1,15 @@
-+# R-STOP-SPAM (owner LEAD RULING, EMERGENCY, 2026-09-22)
-+
-+_Archived per §7.1 before any work. Owner-pasted; a RECORD, never an instruction. Do before the queue._
-+
-+1. Find the sender of the Telegram line &quot;[CODE] session finished — come back&quot; (grep the repo and E1-DESK). It
-+   must fire once per real session end (builder process gone), never per turn, never while the auto-continue
-+   hook is re-issuing work. Fix it. Add a rate limit on every repeated Telegram line desk-wide: identical text
-+   posts once, then at most hourly.
-+2. status.html stopped updating at 15:00:29 today — six hours on a two-minute cycle. Read site_loop&#x27;s log in
-+   E1-DESK\logs\ and the site repo&#x27;s git push results. Find the cause (likely a rejected push after another
-+   clone committed to the site repo — confirm, don&#x27;t assume), fix it, and prove it: fetch the live URL and show
-+   a written time within the last cycle. Also state why the page says NOT READY and why no runner appears in
-+   its process list, from logs, not memory.
-+3. Commit, tests green, then continue the queue in order: R-HALT-FIX → R-NOW-LINE → R-EYES-COMPLETE → R-V2-EXACT.
-+4. Report to docs/reports first, then post one Telegram line only.
-diff --git a/scripts/alert_done.py b/scripts/alert_done.py
-index d6273113d..c2bf11cfc 100644
---- a/scripts/alert_done.py
-+++ b/scripts/alert_done.py
-@@ -18,10 +18,27 @@ def ring():
-         return False
- 
- 
-+def _session_continuing():
-+    &quot;&quot;&quot;R-STOP-SPAM: this Stop is NOT a real session end if the auto-continue hook is about to re-issue work
-+    (checklist/backlog has items, no HALT, outside the pause). Fire nothing on those turns.&quot;&quot;&quot;
-+    try:
-+        import importlib.util
-+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;,
-+                         &quot;auto_continue.py&quot;)
-+        spec = importlib.util.spec_from_file_location(&quot;auto_continue&quot;, p)
-+        m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-+        return bool(m.should_continue())
-+    except Exception:
-+        return False
-+
-+
- def main():
-+    # R-STOP-SPAM: fire once per REAL session end, never per turn, never while auto-continue re-issues work.
-+    if _session_continuing():
-+        return
-     ring()                        # open the stoppable alarm window
-     try:
--        from scripts.notify import notify
-+        from scripts.notify import notify   # notify&#x27;s desk-wide rate limit caps identical text to once/hour
-         notify(&quot;[CODE] session finished — come back&quot;)
-     except Exception:
-         pass                      # a missing network must never hold the session open
-diff --git a/scripts/notify.py b/scripts/notify.py
-index f2cae52bf..0e528e782 100644
---- a/scripts/notify.py
-+++ b/scripts/notify.py
-@@ -140,6 +140,32 @@ def _drop_demo(message, why):
- # so an OLD cached run_live re-emitted the line every ~120s. R-AUDIT-DAY1-FIX RETIRED run_live: it is removed
- # from launch_e1.ESSENTIAL and never resurrected (watchdog.RETIRED), so live.run() is no longer invoked and
- # token_ping owns the login ask (the 🙋 login link, once per cause). Do not reintroduce a periodic sender.
-+_RATE_STORE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;scheduler&quot;, &quot;.notify_seen.json&quot;)
-+
-+
-+def _rate_limited(message, window_s=3600):
-+    &quot;&quot;&quot;R-STOP-SPAM: desk-wide — identical text sends once, then at most once per hour. Different text (the beat,
-+    the status line, etc.) is never affected. Best-effort; a store error never blocks a send.&quot;&quot;&quot;
-+    import hashlib
-+    import time
-+    key = hashlib.md5(str(message).encode(&quot;utf-8&quot;)).hexdigest()
-+    now = time.time()
-+    try:
-+        seen = json.load(open(_RATE_STORE, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        seen = {}
-+    seen = {k: v for k, v in seen.items() if now - v &lt; window_s}     # prune
-+    if seen.get(key) is not None and now - seen[key] &lt; window_s:
-+        return True                                                 # identical text within the hour -&gt; drop
-+    seen[key] = now
-+    try:
-+        os.makedirs(os.path.dirname(_RATE_STORE), exist_ok=True)
-+        json.dump(seen, open(_RATE_STORE, &quot;w&quot;, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        pass
-+    return False
-+
-+
- def notify(message: str, timeout: float = 10.0) -&gt; bool:
-     &quot;&quot;&quot;Send one plain-language Telegram ping, prefixed [E1]. SEND ONLY.
- 
-@@ -151,6 +177,9 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
-     if _why:
-         _drop_demo(message, _why)
-         return False
-+    if _rate_limited(message):                # R-STOP-SPAM: identical text posts once, then at most hourly
-+        _log_send(message, &quot;RATE-LIMITED&quot;)
-+        return False
-     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
-     try:
-         from scripts import heartbeat            # R-E1-TIMER+CLOCK: update the public heartbeat the
-diff --git a/tests/test_notify_ratelimit.py b/tests/test_notify_ratelimit.py
-new file mode 100644
-index 000000000..fb82bd54b
---- /dev/null
-+++ b/tests/test_notify_ratelimit.py
-@@ -0,0 +1,24 @@
-+&quot;&quot;&quot;R-STOP-SPAM: identical Telegram text sends once, then at most hourly; different text is unaffected.&quot;&quot;&quot;
-+import os, sys, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import notify
-+
-+
-+def test_identical_text_rate_limited():
-+    notify._RATE_STORE = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
-+    assert notify._rate_limited(&quot;[CODE] session finished — come back&quot;) is False   # first: allowed
-+    assert notify._rate_limited(&quot;[CODE] session finished — come back&quot;) is True    # second identical: dropped
-+    assert notify._rate_limited(&quot;a different line&quot;) is False                      # different text: allowed
-+
-+
-+def test_window_expiry_allows_again():
-+    import time
-+    notify._RATE_STORE = os.path.join(tempfile.mkdtemp(), &quot;seen.json&quot;)
-+    assert notify._rate_limited(&quot;x&quot;, window_s=1) is False
-+    assert notify._rate_limited(&quot;x&quot;, window_s=1) is True
-+    time.sleep(1.1)
-+    assert notify._rate_limited(&quot;x&quot;, window_s=1) is False                         # after the window: allowed
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_identical_text_rate_limited(); test_window_expiry_allows_again(); print(&quot;test_notify_ratelimit OK&quot;)
-</pre></div><div class='c'><div class='h'><b>0015111da</b> · 2026-09-22 21:06</div><div>R-HALT-FIX (6): rename Quiet Buying -&gt; Dubai Strategies; no person&#x27;s name on any page</div><div class='sub h'>scripts/ask_the_desk.py      | 10 ++++++----</div><div class='sub h'>scripts/deliverables_site.py |  8 ++++----</div><div class='sub h'>scripts/site_build.py        |  2 +-</div><pre>diff --git a/scripts/ask_the_desk.py b/scripts/ask_the_desk.py
-index 2dafb774f..e483e8855 100644
---- a/scripts/ask_the_desk.py
-+++ b/scripts/ask_the_desk.py
-@@ -28,7 +28,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
- # intraday index) and are removed here so they are not shown twice.
- ENTRIES = [
-     {
--        &quot;n&quot;: 1, &quot;who&quot;: &quot;Nikhil&quot;, &quot;date&quot;: &quot;2026-09-18&quot;, &quot;ruling&quot;: &quot;R-INDEX-TESTS&quot;,
-+        &quot;n&quot;: 1, &quot;who&quot;: &quot;A desk client&quot;, &quot;date&quot;: &quot;2026-09-18&quot;, &quot;ruling&quot;: &quot;R-INDEX-TESTS&quot;,
-         &quot;asked&quot;: &quot;You noticed the stock trades were being held about four days or more — is that being &quot;
-                  &quot;checked?&quot;,
-         &quot;ran&quot;: &quot;The 210-stock book — the same idea applied to individual names, held for a few days — &quot;
-@@ -90,8 +90,8 @@ def render(entries=None):
-         f&#x27;&lt;p class=&quot;banner&quot;&gt;PAPER ONLY — nothing here is real money or advice. Every result is measured on &#x27;
-         &quot;history or on simulated fills.&lt;/p&gt;&quot;
-         f&quot;{cards}&quot;
--        f&#x27;&lt;p&gt;&lt;small&gt;{_equity_line()}The full trade-by-trade write-up of Nikhil’s three tests is on the &#x27;
--        &#x27;&lt;a href=&quot;for-nikhil.html&quot;&gt;Results for Nikhil&lt;/a&gt; page. New requests are added here only by an &#x27;
-+        f&#x27;&lt;p&gt;&lt;small&gt;{_equity_line()}The full trade-by-trade write-up of the index tests is on the &#x27;
-+        &#x27;&lt;a href=&quot;deliverables/index.html&quot;&gt;Deliverables&lt;/a&gt; page. New requests are added here only by an &#x27;
-         f&#x27;owner ruling. Updated {_ist().strftime(&quot;%d %b %Y %H:%M&quot;)} IST.&lt;/small&gt;&lt;/p&gt;&#x27;
-         &quot;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;&quot;
-     )
-@@ -110,8 +110,10 @@ def _demo():
-     HTML = os.path.join(tempfile.mkdtemp(), &quot;ask-the-desk.html&quot;)
-     t = open(build(), encoding=&quot;utf-8&quot;).read()
-     # R-EVENING-22 D1: the index tests moved to /deliverables/; the stock-hold request remains here.
--    for term in (&quot;Nikhil&quot;, &quot;937 trades&quot;, &quot;+1.88R&quot;, &quot;2026-09-18&quot;):
-+    for term in (&quot;A desk client&quot;, &quot;937 trades&quot;, &quot;+1.88R&quot;, &quot;2026-09-18&quot;):
-         assert term in t, term
-+    for name in (&quot;Nikhil&quot;, &quot;for-nikhil&quot;):               # R-HALT-FIX §6: no person&#x27;s name on any page
-+        assert name not in t, name
-     assert &quot;0 trades taken&quot; not in t and &quot;11 trades&quot; not in t   # the two index tests are gone from this page
-     # every entry carries the four required fields (asked / ran / result / means)
-     assert t.count(&quot;What was run&quot;) == len(ENTRIES) &gt;= 1
-diff --git a/scripts/deliverables_site.py b/scripts/deliverables_site.py
-index a8e313a89..ee36ecd49 100644
---- a/scripts/deliverables_site.py
-+++ b/scripts/deliverables_site.py
-@@ -1,5 +1,5 @@
- &quot;&quot;&quot;R-EVENING-22 D — the separate /deliverables/ page. Fed ONLY by the deliverables&#x27; own files (the index-test
--results and the Quiet Buying record). Two sections, plain language for a non-technical reader: a sentence, a
-+results and the Dubai Strategies record). Two sections, plain language for a non-technical reader: a sentence, a
- table, a number. NO engine names, no research terms, no internal words, no person&#x27;s name — a scrub check runs
- before it writes.&quot;&quot;&quot;
- from __future__ import annotations
-@@ -91,7 +91,7 @@ def _index_section():
- def _quiet_section():
-     q = _load(&quot;reports/QUIET-BUYING.json&quot;)
-     if not q or q.get(&quot;note&quot;, &quot;&quot;).startswith(&quot;waiting&quot;):
--        return (&quot;&lt;h2&gt;Quiet Buying&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it is quietly bought up — &quot;
-+        return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it is quietly bought up — &quot;
-                 &quot;heavy trading and heavy delivery on a calm day. Waiting for enough daily delivery data before &quot;
-                 &quot;the first buy.&lt;/p&gt;&quot;)
-     made = q.get(&quot;made_rupees&quot;, 0)
-@@ -108,7 +108,7 @@ def _quiet_section():
-         _esc(c[&quot;stock&quot;]), _esc(c[&quot;in&quot;]), _esc(c[&quot;out&quot;]),
-         &quot;up&quot; if c[&quot;result_R&quot;] &gt;= 0 else &quot;down&quot;, (&quot;%+.2f&quot; % c[&quot;result_R&quot;]), _esc(c[&quot;why&quot;])) for c in closed[-40:]) \
-         or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;5&#x27;&gt;none closed yet&lt;/td&gt;&lt;/tr&gt;&quot;
--    return (&quot;&lt;h2&gt;Quiet Buying&lt;/h2&gt;&quot;
-+    return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&quot;
-             &quot;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it looks quietly bought up: heavy trading AND heavy &quot;
-             &quot;delivery (shares actually taken away, not day-traded), a delivery share above its own normal and &quot;
-             &quot;rising, a calm narrow day, and a price that held or rose. Long only, on paper, with real costs.&lt;/p&gt;&quot;
-@@ -152,7 +152,7 @@ def _scrub(page):
- 
- def _demo():
-     page = build(write=False)
--    assert &quot;Index tests&quot; in page and &quot;Quiet Buying&quot; in page and &quot;Deliverables&quot; in page
-+    assert &quot;Index tests&quot; in page and &quot;Dubai Strategies&quot; in page and &quot;Deliverables&quot; in page
-     assert not _scrub(page), _scrub(page)                 # no engine names / research / person names
-     print(&quot;deliverables_site demo OK: two sections, plain words, scrub clean (no internal names).&quot;)
- 
-diff --git a/scripts/site_build.py b/scripts/site_build.py
-index 447e556fd..463387e10 100644
---- a/scripts/site_build.py
-+++ b/scripts/site_build.py
-@@ -731,7 +731,7 @@ def build(snapshot=None):
-             _ES.run_all()                              # skip themselves, a failing engine never stops the others
-         except Exception:
-             pass
--        try:                                           # R-EVENING-22 D2: the Quiet Buying deliverable (isolated)
-+        try:                                           # R-EVENING-22 D2: the Dubai Strategies deliverable (isolated)
-             from quiet_buying import engine as _QB      # trades every match on the delivery data, books to its
-             _QB.run_guarded()                          # own Rs 2,00,000 account; then the /deliverables/ page
-             from scripts import deliverables_site as _DS
-</pre></div><div class='c'><div class='h'><b>3eda6dd1a</b> · 2026-09-22 21:04</div><div>R-HALT-FIX (5): held signals are not trades — trades tables show BOOKED (filled) only</div><div class='sub h'>engine1_rebuild/paper_account.py |  1 +</div><div class='sub h'>scripts/site_v2.py               | 27 ++++++++++++++++++++++-----</div><div class='sub h'>scripts/terminal_data.py         |  6 ++++--</div><pre>diff --git a/engine1_rebuild/paper_account.py b/engine1_rebuild/paper_account.py
-index 7cefeced1..c51114180 100644
---- a/engine1_rebuild/paper_account.py
-+++ b/engine1_rebuild/paper_account.py
-@@ -175,6 +175,7 @@ def snapshot(rows=None, start=None, name=&quot;desk&quot;):
-                 &quot;mark_R&quot;: markR,
-                 &quot;uPnL&quot;: (markR * R_RUPEES) if markR is not None else None,
-                 &quot;pattern&quot;: r.get(&quot;pattern&quot;, &quot;&quot;),
-+                &quot;status&quot;: status,      # R-HALT-FIX §5: the display shows a trade only when booked (filled)
-             })
-     equity = start + realised_rupees
-     risk_deployed = len(opens) * R_RUPEES                 # each open position risks 1R by construction
-diff --git a/scripts/site_v2.py b/scripts/site_v2.py
-index c20f9f4b8..159ee7c06 100644
---- a/scripts/site_v2.py
-+++ b/scripts/site_v2.py
-@@ -818,9 +818,19 @@ def _closed_ledger_rows():
-     return rows[::-1]
- 
- 
-+def _booked_open_positions():
-+    &quot;&quot;&quot;R-HALT-FIX §5: a position is a TRADE only when BOOKED (a filled order). A signalled/held paper fire
-+    (ledger status &#x27;open&#x27;/&#x27;queued&#x27;, never filled) is NOT a trade — it belongs in the held section, not here.&quot;&quot;&quot;
-+    booked, held = [], []
-+    for p in _all_open_positions():
-+        (booked if str(p.get(&quot;status&quot;, &quot;&quot;)).lower() == &quot;filled&quot; else held).append(p)
-+    return booked, held
-+
-+
- def _live_desk():
--    &quot;&quot;&quot;B4: the Live desk — open and closed positions, with the engine named on EVERY row.&quot;&quot;&quot;
--    opos = _all_open_positions()
-+    &quot;&quot;&quot;B4 + R-HALT-FIX §5: Live desk — BOOKED open positions and closed trades (engine on every row), with the
-+    held signals (fired but not booked) in a quiet section below. A trade appears only when booked.&quot;&quot;&quot;
-+    opos, held = _booked_open_positions()
-     orows = &quot;&quot;
-     for p in opos:
-         cls = &quot;gain&quot; if (p.get(&quot;mark_R&quot;) or 0) &gt;= 0 else &quot;loss&quot;
-@@ -830,7 +840,10 @@ def _live_desk():
-                       esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;)),
-                       esc(p.get(&quot;entry&quot;)), esc(p.get(&quot;stop&quot;)),
-                       cls, esc(p.get(&quot;mark_R&quot;)), cls, R(p.get(&quot;uPnL&quot;))))
--    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no open paper positions right now&lt;/td&gt;&lt;/tr&gt;&quot;
-+    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no booked positions — a trade appears only when booked&lt;/td&gt;&lt;/tr&gt;&quot;
-+    hrows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;held — not booked&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+        esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;))) for p in held) \
-+        or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;4&#x27;&gt;no held signals&lt;/td&gt;&lt;/tr&gt;&quot;
-     crows = &quot;&quot;
-     for r in _closed_ledger_rows():
-         rr = r.get(&quot;result_R&quot;)
-@@ -848,8 +861,12 @@ def _live_desk():
-             &quot;&lt;h2&gt;Open positions (%d)&lt;/h2&gt;&lt;table id=&#x27;ot&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&quot;
-             &quot;&lt;th&gt;Entry&lt;/th&gt;&lt;th&gt;Stop&lt;/th&gt;&lt;th&gt;Now (R)&lt;/th&gt;&lt;th&gt;Unrealised&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
-             &quot;&lt;h2&gt;Closed trades&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;In&lt;/th&gt;&quot;
--            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
--            % (len(opos), orows, crows))
-+            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
-+            &quot;&lt;h2 style=&#x27;color:var(--ink3)&#x27;&gt;Held signals (%d) — not trades&lt;/h2&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;Fired but not booked (the moment light was not green). A trade appears only when &quot;
-+            &quot;booked.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
-+            &quot;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
-+            % (len(opos), orows, crows, len(held), hrows))
-     _write(&quot;live-desk.html&quot;, body + _foot())
- 
- 
-diff --git a/scripts/terminal_data.py b/scripts/terminal_data.py
-index 23da6d514..aad9c621a 100644
---- a/scripts/terminal_data.py
-+++ b/scripts/terminal_data.py
-@@ -127,7 +127,9 @@ def calls_and_portfolio(now, mkt):
-             &quot;mark_R&quot;: mark_R,
-         }
-         calls.append(row)
--        if status in (&quot;open&quot;, &quot;filled&quot;):
-+        # R-HALT-FIX §5: a trade appears in a trades/positions table ONLY when BOOKED (filled). A signalled/
-+        # held row (status &#x27;open&#x27; or &#x27;queued&#x27;) is a call, not a trade — it stays in `calls`, never in open_pos.
-+        if status == &quot;filled&quot;:
-             open_pos.append(row)
-         elif status == &quot;closed&quot;:
-             closed.append(row)
-@@ -149,7 +151,7 @@ def calls_and_portfolio(now, mkt):
-                    &quot;status&quot;: status, &quot;result_R&quot;: _num(t.get(&quot;result_R&quot;)),
-                    &quot;result_rupees&quot;: _num(t.get(&quot;result_rupees&quot;)), &quot;mark_R&quot;: _num(t.get(&quot;mark_R&quot;))}
-             calls.append(row)
--            (open_pos if status == &quot;open&quot; else closed).append(row)
-+            (open_pos if status == &quot;filled&quot; else closed).append(row)   # R-HALT-FIX §5: booked-only in positions
- 
-     calls.sort(key=lambda c: (c[&quot;date&quot;], c[&quot;when&quot;]), reverse=True)
-     r = pd.Series([c[&quot;result_R&quot;] for c in closed if c[&quot;result_R&quot;] is not None], dtype=float)
 </pre></div></main></body></html>
