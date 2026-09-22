@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 01:58 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 02:10 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
 
 VERDICT: FAIL
 
@@ -7,7 +7,27 @@ VERDICT: FAIL
 
 ## evidence
 
-verifier brain raised: TypeError(&#x27;expected string or bytes-like object&#x27;)
+I&#x27;ll act as the independent verifier. Let me read the template, the verify-map, and the touched files, then run the checks.
+Now let me run the checks. This is a trading-path change (signal/order/ledger), so per VERIFY-MAP I run the module&#x27;s demo and the tests. Let me start.
+Demo passes. Now the touched-module tests and the full suite (VERIFY-MAP &quot;always&quot; row).
+Now the full suite. Let me check free RAM first per the R-VERIFIER standing rule, then run it.
+The full-suite invocation hits module-name collisions across directories — a known collection quirk, not a test failure. Let me find how this repo actually runs its suite.
+The canonical suite is `pytest tests/` (root-level collision is documented). Before the heavy full run, let me verify the specific reuse and gating claims with running evidence, and check the proof-marker state.
+Reuse targets confirmed, all called (no reimplementation), and the proof marker is absent → fail-safe active. Now confirm the disclosed `stop_atr` finding, then launch the full suite (background, ~21 min).
+Finding confirmed: `stop_atr` is only used inside `if manage:`, and all five patterns are `trail=False` → stop_atr:2.0 is inert metadata, exactly as disclosed. Now the full `tests/` suite (the documented non-colliding invocation). Running it in the background.
+While the suite runs, let me confirm the &quot;reuses the EOD path&quot; claim — that the queued rows conform&#x27;s `queue_orders` writes are actually consumed by the existing `process_eod_positions` → `simulate_trade` next-open path.
+EOD-path reuse confirmed: `process_eod_positions` fills `EOD-`/`queued` rows via `paper.simulate_trade` at the next daily open using the row&#x27;s template+horizon — no second fill copy. All targeted claims are substantiated. Now I wait on the full suite. Let me check interim progress.
+The suite is running (output buffers until the end with `-q`). I&#x27;ll wait for the completion notification rather than poll. Let me schedule a fallback check in case it hangs.
+I&#x27;ve completed the targeted verification and launched the full `tests/` suite. Waiting on its result before issuing the verdict. Progress so far:
+
+- ✅ `python -m engine1_rebuild.conform` → `conform demo OK: 5 live patterns; decisions reuse evening._fire_today + LB.checklist`
+- ✅ `pytest tests/test_conform.py` → `3 passed`
+- ✅ Reuse targets exist and are actually called (no reimplementation): `evening._fire_today`, `LB.checklist`, `paper.append_rows`, `evening.process_eod_positions`
+- ✅ Fail-safe active: proof marker `reports/EXAM-CONFORM-PROVEN` does **not** exist → nothing writes to the live ledger
+- ✅ EOD-path reuse: `process_eod_positions` fills conform&#x27;s `EOD-CONFORM-…`/`queued` rows via `paper.simulate_trade` at next daily open
+- ✅ Disclosed `stop_atr`-inert finding is accurate (all five patterns `trail=False`; `simulate_trade` only uses `stop_atr` under `if manage:`)
+
+The full `tests/` suite (~21 min, ~330 tests) is running in the background; I&#x27;ll post the VERDICT once it returns its `N passed` line.
 </pre><h3>2026-09-23-exam-conform-status.md</h3><pre># R-EXAM-CONFORM — status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)
 
 ## What is DONE and safe (committed 0aa11e331)
