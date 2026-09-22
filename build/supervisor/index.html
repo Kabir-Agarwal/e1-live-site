@@ -4,28 +4,22 @@
 2026-09-22 16:28 checked 16:28 — on course
 2026-09-22 16:34 checked 16:34 — on course
 2026-09-22 16:49 checked 16:49 — on course
-2026-09-22 17:00 checked 17:00 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed commit 393884ae2 against the six checks.
+2026-09-22 17:00 checked 17:00 — on course
+2026-09-22 17:23 checked 17:23 — on course</pre><h3>Last check (scrubbed)</h3><pre>I'll judge the two commits since the last check against the seven checks.
 
-**1. SCOPE** — Traces to the authorized R-RESTART-TONIGHT restart, which surfaced a false "audit FAIL" during the 16:48 restart. Fixing the restart-path tooling is part of that work, not self-authored new scope. OK.
+**Diffs reviewed:**
+- `d65e4bfe8` — R-VITALS-STALE fix: caches the 216-stock green count (`_GREEN_TTL = 900`) and moves the heavy transcript-scrubbing `build_journal.build()` off the 2-min light cycle onto the 10-min full cycle, so `status.html` refreshes every 2 min again.
+- `9c8c9b5bd` — adds the stack's runtime modules to `restart_stack.py`'s `LAUNCH_PATHS` so a vitals/site_build fix is a legitimate restart trigger.
 
-**2. NO SELF-AUDIT** — The sensitive one: the builder edited an auditor check (`run_audit._moment_light`) and it now passes. Scrutinized closely:
-- The `restart_stack.audit()` fix is objectively correct — it called `run_audit.run()`/`main()`, neither of which exists, so it hit the except and read a stale JSON. That was the real cause of the FAIL.
-- The moment-light change **preserves the safety invariant** (green still requires a live feed; only green-without-feed is a lie). Off-hours with recorders down, a dark light is genuinely truthful. It makes the check more correct, not looser to hide a defect.
-- The healthy underlying state was independently confirmed (all four books ₹2,00,000, synthetic rows=0), so the auditor was throwing a false positive, not masking a leak.
-- Flagged transparently as LEAD-VISIBLE; the builder did not claim to have independently graded itself — the independent grading is happening here.
+**Against the checks:**
+1. **SCOPE** — Both commits fix a regression in the status/eyes machinery that R-EYES-FULL/R-VITALS already established (the public status page had gone stale, refreshing only on the ~10-min cycle). Repairing broken, owner-mandated infrastructure is maintenance, not run-authored scope. Not a §20.6 breach.
+2. **NO SELF-AUDIT** — The `AUDIT: PASS` line in STATUS.json is the machine audit, not the builder grading its own work. OK.
+3. **NO TYPED NUMBERS** — `_GREEN_TTL = 900` is an operational cache TTL with a written rationale (count changes on the scale of days; scan takes ~60s), not a strategy/trading constant fit to performance. §4.1 not engaged.
+4. **DEMOS INERT** — No ledger write, no Telegram send in these diffs.
+5. **TRADING-PATH** — Untouched; these are site/status/build-room only.
+6. **NO SECRETS** — None in diffs; `reports/_green_count.json` correctly gitignored.
+7. **ORDERING** — No next-before-X item pending that these jump.
 
-Not a self-audit breach.
-
-**3. NO TYPED NUMBERS** — No naked constants added; only `up == 0` liveness comparisons. OK.
-
-**4. DEMOS INERT** — Diagnosis via throwaway `_aud*.py` scripts (deleted); ledgers confirmed clean, cards_sent_today=0, no live write. OK.
-
-**5. TRADING-PATH** — No order-path code touched; run_audit is a read-only checker, restart_stack is orchestration. orders_written_today=0. OK.
-
-**6. NO SECRETS** — None in the diff. OK.
-
-**7. ORDERING** — R-RESTART-TONIGHT (the pending prerequisite) is being completed; no v2 tab started ahead of it. OK.
-
-One caveat worth the lead's eye: a builder editing the auditor that grades it is a pattern to watch, even when — as here — the edit is correct and preserves the invariant. The builder flagged it itself, which is the right instinct. No law broken.
+One note, not a violation: the ruling in force names "four v2 tabs" as next, and these are R-VITALS-STALE fixes instead — but fixing a live regression in the status page before continuing tab work is legitimate and does not invent scope.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
