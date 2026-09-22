@@ -1,4 +1,231 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>868d24f1b</b> · 2026-09-22 17:48</div><div>ADD: desk Telegram links point to plain pages (status.html), never the script-built root</div><div class='sub h'>scripts/alarm.py         |  2 +-</div><div class='sub h'>scripts/lead_digest.py   |  2 +-</div><div class='sub h'>scripts/notify.py        |  5 ++++-</div><div class='sub h'>tests/test_desk_links.py | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/alarm.py b/scripts/alarm.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>20ef607ba</b> · 2026-09-22 17:54</div><div>B4: build the four missing v2 tabs — Live desk, Portfolio, Backtest, Messages</div><div class='sub h'>scripts/site_v2.py    | 159 +++++++++++++++++++++++++++++++++++++++++++++++++-</div><div class='sub h'>tests/test_v2_tabs.py |  37 ++++++++++++</div><pre>diff --git a/scripts/site_v2.py b/scripts/site_v2.py
+index 4f0efa6e4..c20f9f4b8 100644
+--- a/scripts/site_v2.py
++++ b/scripts/site_v2.py
+@@ -21,9 +21,10 @@ from engine1_rebuild import datastore as ds
+ REPO = ds._REPO
+ V2 = os.path.join(REPO, &quot;site&quot;, &quot;v2&quot;)
+ DATA = os.path.join(REPO, &quot;site&quot;, &quot;data&quot;)
+-NAV = [(&quot;index.html&quot;, &quot;Leaderboard&quot;), (&quot;engines.html&quot;, &quot;Engines&quot;), (&quot;stocks.html&quot;, &quot;Stocks&quot;),
+-       (&quot;patterns.html&quot;, &quot;Patterns&quot;), (&quot;deliverables.html&quot;, &quot;Deliverables&quot;), (&quot;data.html&quot;, &quot;Data&quot;),
+-       (&quot;results.html&quot;, &quot;Results&quot;), (&quot;how.html&quot;, &quot;How it works&quot;)]
++NAV = [(&quot;index.html&quot;, &quot;Leaderboard&quot;), (&quot;live-desk.html&quot;, &quot;Live desk&quot;), (&quot;portfolio.html&quot;, &quot;Portfolio&quot;),
++       (&quot;engines.html&quot;, &quot;Engines&quot;), (&quot;stocks.html&quot;, &quot;Stocks&quot;), (&quot;patterns.html&quot;, &quot;Patterns&quot;),
++       (&quot;backtest.html&quot;, &quot;Backtest&quot;), (&quot;results.html&quot;, &quot;Results&quot;), (&quot;deliverables.html&quot;, &quot;Deliverables&quot;),
++       (&quot;messages.html&quot;, &quot;Messages&quot;), (&quot;data.html&quot;, &quot;Data&quot;), (&quot;how.html&quot;, &quot;How it works&quot;)]
+ 
+ 
+ class RenderGateError(Exception):
+@@ -786,6 +787,157 @@ def no_jargon_ok(where=None):
+     return hits
+ 
+ 
++def _all_open_positions():
++    &quot;&quot;&quot;Every open paper position across the engine books, each already tagged with its engine. Deduped.&quot;&quot;&quot;
++    from engine1_rebuild import paper_account as ACC
++    seen, out = set(), []
++    for key in ACC.accounts_summary():
++        try:
++            for p in (ACC.account(key).get(&quot;open_positions&quot;) or []):
++                k = (p.get(&quot;engine&quot;) or key, p.get(&quot;stock&quot;), p.get(&quot;entry&quot;))
++                if k in seen:
++                    continue
++                seen.add(k)
++                out.append(dict(p, engine=p.get(&quot;engine&quot;) or key))
++        except Exception:
++            pass
++    return out
++
++
++def _closed_ledger_rows():
++    &quot;&quot;&quot;Closed paper trades from the E1 paper ledger (status closed / has an exit), newest first.&quot;&quot;&quot;
++    import csv
++    path = os.path.join(REPO, &quot;engine1_rebuild&quot;, &quot;paper&quot;, &quot;ledger.csv&quot;)
++    rows = []
++    try:
++        for r in csv.DictReader(open(path, encoding=&quot;utf-8&quot;)):
++            if (r.get(&quot;status&quot;) == &quot;closed&quot;) or r.get(&quot;exit_date&quot;):
++                rows.append(r)
++    except Exception:
++        pass
++    return rows[::-1]
++
++
++def _live_desk():
++    &quot;&quot;&quot;B4: the Live desk — open and closed positions, with the engine named on EVERY row.&quot;&quot;&quot;
++    opos = _all_open_positions()
++    orows = &quot;&quot;
++    for p in opos:
++        cls = &quot;gain&quot; if (p.get(&quot;mark_R&quot;) or 0) &gt;= 0 else &quot;loss&quot;
++        orows += (&quot;&lt;tr data-k=&#x27;%s&#x27;&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&quot;
++                  &quot;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++                      esc((str(p.get(&quot;stock&quot;, &quot;&quot;)) + &quot; &quot; + str(p.get(&quot;engine&quot;, &quot;&quot;))).upper()),
++                      esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;)),
++                      esc(p.get(&quot;entry&quot;)), esc(p.get(&quot;stop&quot;)),
++                      cls, esc(p.get(&quot;mark_R&quot;)), cls, R(p.get(&quot;uPnL&quot;))))
++    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no open paper positions right now&lt;/td&gt;&lt;/tr&gt;&quot;
++    crows = &quot;&quot;
++    for r in _closed_ledger_rows():
++        rr = r.get(&quot;result_R&quot;)
++        cls = &quot;gain&quot; if _num(rr) &gt;= 0 else &quot;loss&quot;
++        crows += (&quot;&lt;tr&gt;&lt;td&gt;E1&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&quot;
++                  &quot;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++                      esc(r.get(&quot;stock&quot;)), esc(r.get(&quot;direction&quot;)), esc(r.get(&quot;entry_date&quot;)),
++                      esc(r.get(&quot;exit_date&quot;)), cls, esc(rr), esc(r.get(&quot;exit_reason&quot;))))
++    crows = crows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;7&#x27;&gt;no closed paper trades yet&lt;/td&gt;&lt;/tr&gt;&quot;
++    body = (_head(&quot;Live desk — E1 desk&quot;) + _nav(&quot;live-desk.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Live desk&lt;/h1&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every open and closed paper position, with the engine on each row. Paper only.&lt;/p&gt;&quot;
++            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;input id=&#x27;fq&#x27; placeholder=&#x27;filter open positions…&#x27; oninput=\&quot;filt(&#x27;fq&#x27;,&#x27;ot&#x27;)\&quot; &quot;
++            &quot;style=&#x27;width:100%%;padding:8px;background:var(--card);color:var(--ink);border:1px solid var(--line);&quot;
++            &quot;border-radius:8px&#x27;&gt;&lt;/div&gt;&quot;
++            &quot;&lt;h2&gt;Open positions (%d)&lt;/h2&gt;&lt;table id=&#x27;ot&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&quot;
++            &quot;&lt;th&gt;Entry&lt;/th&gt;&lt;th&gt;Stop&lt;/th&gt;&lt;th&gt;Now (R)&lt;/th&gt;&lt;th&gt;Unrealised&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
++            &quot;&lt;h2&gt;Closed trades&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;In&lt;/th&gt;&quot;
++            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
++            % (len(opos), orows, crows))
++    _write(&quot;live-desk.html&quot;, body + _foot())
++
++
++def _portfolio():
++    &quot;&quot;&quot;B4: the Portfolio — every paper book with its equity and profit/loss.&quot;&quot;&quot;
++    from engine1_rebuild import paper_account as ACC
++    summ = ACC.accounts_summary()
++    start = getattr(ACC, &quot;ENGINE_START&quot;, 200000)
++    rows = &quot;&quot;
++    for k, eq in summ.items():
++        pnl = _num(eq) - start
++        cls = &quot;gain&quot; if pnl &gt;= 0 else (&quot;loss&quot; if pnl &lt; 0 else &quot;sub&quot;)
++        rows += &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++            esc(k), R(eq, plus=False), cls, R(pnl))
++    rows = rows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no books yet&lt;/td&gt;&lt;/tr&gt;&quot;
++    total_eq = sum(_num(v) for v in summ.values())
++    body = (_head(&quot;Portfolio — E1 desk&quot;) + _nav(&quot;portfolio.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Portfolio&lt;/h1&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every paper book, its current equity and profit or loss since it started at %s. &quot;
++            &quot;Paper only, carried day to day.&lt;/p&gt;&quot;
++            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Total equity across all books&lt;/span&gt;&lt;div class=&#x27;big&#x27;&gt;%s&lt;/div&gt;&lt;/div&gt;&quot;
++            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Equity&lt;/th&gt;&lt;th&gt;P&amp;amp;L&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
++            % (R(start, plus=False), R(total_eq, plus=False), rows))
++    _write(&quot;portfolio.html&quot;, body + _foot())
++
++
++def _backtest():
++    &quot;&quot;&quot;B4: the Backtest tab — the measured history in full, its own address.&quot;&quot;&quot;
++    bt = _data(&quot;backtest.json&quot;)
++    summ = bt.get(&quot;summary&quot;) or {}
++    by_book = bt.get(&quot;by_book&quot;) or []
++    perf = bt.get(&quot;performance&quot;) or {}
++    brows = &quot;&quot;
++    for b in (by_book if isinstance(by_book, list) else []):
++        brows += &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
++            esc(b.get(&quot;book&quot;) or b.get(&quot;name&quot;) or b.get(&quot;label&quot;)),
++            esc(b.get(&quot;trades&quot;) if b.get(&quot;trades&quot;) is not None else b.get(&quot;N&quot;)),
++            R(b.get(&quot;net_R&quot;) if b.get(&quot;net_R&quot;) is not None else b.get(&quot;total_R&quot;)))
++    brows = brows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;the per-book split publishes with the next backtest&lt;/td&gt;&lt;/tr&gt;&quot;
++    body = (_head(&quot;Backtest — E1 desk&quot;) + _nav(&quot;backtest.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Backtest&lt;/h1&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;The desk&#x27;s measured history, after costs. Paper and history only — not a promise.&lt;/p&gt;&quot;
++            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;%s trades measured · win rate %s · made %s after costs · &quot;
++            &quot;steadiness %s&lt;/span&gt;&lt;/div&gt;&quot;
++            &quot;&lt;h2&gt;By book&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Trades&lt;/th&gt;&lt;th&gt;After costs&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
++            &quot;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27; style=&#x27;margin-top:10px&#x27;&gt;Every score is &lt;b&gt;conditioned on survivorship&lt;/b&gt; and &quot;
++            &quot;&lt;b&gt;design-effect uncorrected&lt;/b&gt; until the point-in-time universe and the fire-clustering recorder &quot;
++            &quot;land.&lt;/p&gt;&lt;/main&gt;&quot; % (esc(summ.get(&quot;N&quot;)), pct(summ.get(&quot;win_pct&quot;)), R(summ.get(&quot;total_R&quot;)),
++                                  esc(perf.get(&quot;sharpe&quot;)), brows))
++    _write(&quot;backtest.html&quot;, body + _foot())
++
++
++def _is_trader_message(text):
++    &quot;&quot;&quot;The Messages tab shows the TRADER-facing desk log; build telemetry (BUILD/SUPERVISOR beats, commit
++    chatter with ruling codes or file names) lives in /build/, not here.&quot;&quot;&quot;
++    import re as _re
++    t = str(text or &quot;&quot;)
++    if t.startswith((&quot;BUILD &quot;, &quot;SUPERVISOR&quot;, &quot;📊 Build room&quot;)):
++        return False
++    if _re.search(r&quot;\bR-[A-Z]&quot;, t) or &quot;.py&quot; in t or &quot;loading&quot; in t.lower():
++        return False
++    return True
++
++
++def _messages():
++    &quot;&quot;&quot;B4: the Messages tab — the plain trader-facing log of what the desk sent to Telegram.&quot;&quot;&quot;
++    m = _data(&quot;messages.json&quot;)
++    msgs = m.get(&quot;messages&quot;) if isinstance(m, dict) else (m if isinstance(m, list) else [])
++    msgs = [e for e in (msgs or []) if _is_trader_message(e.get(&quot;text&quot;))]
++    rows = &quot;&quot;
++    for e in list(msgs)[:400]:
++        ts = str(e.get(&quot;ts&quot;, &quot;&quot;))[:16].replace(&quot;T&quot;, &quot; &quot;)
++        rows += &quot;&lt;tr&gt;&lt;td class=&#x27;sub n&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (esc(ts), esc(e.get(&quot;text&quot;)))
++    rows = rows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;2&#x27;&gt;no trader messages recorded yet&lt;/td&gt;&lt;/tr&gt;&quot;
++    body = (_head(&quot;Messages — E1 desk&quot;) + _nav(&quot;messages.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Messages&lt;/h1&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every line the desk sent to Telegram, newest first — the same plain language, &quot;
++            &quot;kept for %s days.&lt;/p&gt;&quot;
++            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Message&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
++            % (esc(m.get(&quot;days&quot;)) if isinstance(m, dict) else &quot;30&quot;, rows))
++    _write(&quot;messages.html&quot;, body + _foot())
++
++
++def _num(x):
++    try:
++        return float(x)
++    except (TypeError, ValueError):
++        return 0.0
++
++
+ def build(publish_gate=True):
+     &quot;&quot;&quot;Generate every page into a STAGING dir, run the build gate, and only swap the pages into site/v2/ when
+     the gate is clean. On failure it raises RenderGateError and leaves the last-good site/v2/ untouched — so a
+@@ -800,6 +952,7 @@ def build(publish_gate=True):
+     try:
+         _leaderboard(); _engines(); _stocks(); _patterns(); _deliverables(); _data_page(); _results(); _how(); _ask()
+         _scoreboard()
++        _live_desk(); _portfolio(); _backtest(); _messages()      # B4: the four tabs the swap was waiting on
+         problems = render_gate(staging) if publish_gate else []
+         jargon = no_jargon_ok(staging) if publish_gate else []
+         if problems or jargon:
+diff --git a/tests/test_v2_tabs.py b/tests/test_v2_tabs.py
+new file mode 100644
+index 000000000..4f55c4561
+--- /dev/null
++++ b/tests/test_v2_tabs.py
+@@ -0,0 +1,37 @@
++&quot;&quot;&quot;B4: the four tabs the root swap was waiting on exist in v2 and carry their content.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import site_v2
++
++
++def test_four_tabs_present_and_linked():
++    site_v2.build()
++    for name in (&quot;live-desk.html&quot;, &quot;portfolio.html&quot;, &quot;backtest.html&quot;, &quot;messages.html&quot;):
++        p = os.path.join(site_v2.V2, name)
++        assert os.path.exists(p), name
++    # every page links the four in the nav
++    idx = open(os.path.join(site_v2.V2, &quot;index.html&quot;), encoding=&quot;utf-8&quot;).read()
++    for href in (&quot;live-desk.html&quot;, &quot;portfolio.html&quot;, &quot;backtest.html&quot;, &quot;messages.html&quot;):
++        assert href in idx, href
++
++
++def test_live_desk_names_the_engine_per_row():
++    site_v2.build()
++    t = open(os.path.join(site_v2.V2, &quot;live-desk.html&quot;), encoding=&quot;utf-8&quot;).read()
++    assert &quot;Live desk&quot; in t and &quot;Open positions&quot; in t and &quot;Closed trades&quot; in t
++    assert &quot;&lt;th&gt;Engine&lt;/th&gt;&quot; in t                       # the engine is a column on every position row
++
++
++def test_portfolio_and_backtest_and_messages_content():
++    site_v2.build()
++    port = open(os.path.join(site_v2.V2, &quot;portfolio.html&quot;), encoding=&quot;utf-8&quot;).read()
++    assert &quot;Portfolio&quot; in port and &quot;Total equity&quot; in port and &quot;P&amp;amp;L&quot; in port
++    bt = open(os.path.join(site_v2.V2, &quot;backtest.html&quot;), encoding=&quot;utf-8&quot;).read()
++    assert &quot;Backtest&quot; in bt and &quot;By book&quot; in bt
++    msg = open(os.path.join(site_v2.V2, &quot;messages.html&quot;), encoding=&quot;utf-8&quot;).read()
++    assert &quot;Messages&quot; in msg and &quot;[object Object]&quot; not in msg
++
++
++if __name__ == &quot;__main__&quot;:
++    test_four_tabs_present_and_linked(); test_live_desk_names_the_engine_per_row()
++    test_portfolio_and_backtest_and_messages_content(); print(&quot;test_v2_tabs OK&quot;)
+</pre></div><div class='c'><div class='h'><b>868d24f1b</b> · 2026-09-22 17:48</div><div>ADD: desk Telegram links point to plain pages (status.html), never the script-built root</div><div class='sub h'>scripts/alarm.py         |  2 +-</div><div class='sub h'>scripts/lead_digest.py   |  2 +-</div><div class='sub h'>scripts/notify.py        |  5 ++++-</div><div class='sub h'>tests/test_desk_links.py | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/alarm.py b/scripts/alarm.py
 index 1b180adb8..302e223fc 100644
 --- a/scripts/alarm.py
 +++ b/scripts/alarm.py
@@ -1425,317 +1652,4 @@ index b8d07fdc9..27af15244 100644
          assert term in body, term
 +    for gone in (&quot;0 trades taken&quot;, &quot;11 trades&quot;):
 +        assert gone not in body, gone
-</pre></div><div class='c'><div class='h'><b>3616a0fa1</b> · 2026-09-22 16:10</div><div>R-ETA: machine-measured schedule — ETA in the BUILD line + a table on /build/</div><div class='sub h'>docs/dispatches/2026-09-22_R-ETA.md |  10 +++</div><div class='sub h'>reports/CHECKLIST.json              |  10 +++</div><div class='sub h'>scripts/build_beat.py               |  15 ++++-</div><div class='sub h'>scripts/build_journal.py            |  36 +++++++++-</div><div class='sub h'>scripts/eta.py                      | 130 ++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_eta.py                   |  42 ++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-ETA.md b/docs/dispatches/2026-09-22_R-ETA.md
-new file mode 100644
-index 000000000..d63937f09
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-ETA.md
-@@ -0,0 +1,10 @@
-+# R-ETA (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction._
-+
-+keep a machine-measured schedule for the checklist. For every item record start and finish times from the
-+journal; size each remaining item by the measured time of the most similar finished items; measure the
-+builder&#x27;s current pace (items and commits per hour over the last 3 hours, excluding halts and pauses). From
-+these compute an ETA per remaining item and a total, recomputed every 10 minutes and shown in the BUILD line
-+as &quot;ETA &lt;item&gt; HH:MM · all done ~&lt;day HH:MM&gt; (measured)&quot;. Never a typed or guessed duration; if fewer than
-+three finished items exist, print &quot;ETA: measuring&quot;. Show the same table on /build/.
-diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
-new file mode 100644
-index 000000000..74e2b07d9
---- /dev/null
-+++ b/reports/CHECKLIST.json
-@@ -0,0 +1,10 @@
-+{
-+ &quot;remaining&quot;: [
-+  &quot;v2 tab: Live desk positions&quot;,
-+  &quot;v2 tab: Portfolio&quot;,
-+  &quot;v2 tab: Backtest&quot;,
-+  &quot;v2 tab: Messages&quot;,
-+  &quot;R-EVENING-22 C-series (strategy research)&quot;
-+ ],
-+ &quot;note&quot;: &quot;Owner-named remaining items only (four v2 tabs from the B4 rule; C-series from R-EVENING-22). Never machine-invented (CLAUDE.md 20.6).&quot;
-+}
-diff --git a/scripts/build_beat.py b/scripts/build_beat.py
-index 0798dac7f..6e385505a 100644
---- a/scripts/build_beat.py
-+++ b/scripts/build_beat.py
-@@ -94,14 +94,23 @@ def line(now=None):
-     git_ruling = _ruling_prefix(head_subj)
-     disagree = &quot; · journal/git disagree (journal %s, git %s)&quot; % (ruling, git_ruling) \
-                if (ruling and git_ruling and _ruling_prefix(ruling) and _ruling_prefix(ruling) != git_ruling) else &quot;&quot;
-+    eta = _eta()
-     if commits:
-         head = ruling or (item or &quot;—&quot;)
-         msgs = &quot;; &quot;.join(commits)
-         if len(msgs) &gt; 160:
-             msgs = msgs[:157] + &quot;…&quot;
--        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s&quot; % (
--            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree)
--    return &quot;%s — no commits · %s · supervisor %s%s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree)
-+        return &quot;%s — %s · %d commit%s since %s: %s · tests %s · supervisor %s%s · %s&quot; % (
-+            label, head, len(commits), &quot;&quot; if len(commits) == 1 else &quot;s&quot;, since, msgs, _tests(), sup, disagree, eta)
-+    return &quot;%s — no commits · %s · supervisor %s%s · %s&quot; % (label, item or ruling or &quot;—&quot;, sup, disagree, eta)
-+
-+
-+def _eta():
-+    try:
-+        from scripts import eta
-+        return eta.line()
-+    except Exception:
-+        return &quot;ETA: measuring&quot;
- 
- 
- def halt_line(now=None):
-diff --git a/scripts/build_journal.py b/scripts/build_journal.py
-index cfb25a3a6..f96754983 100644
---- a/scripts/build_journal.py
-+++ b/scripts/build_journal.py
-@@ -110,17 +110,42 @@ def scrub(text):
- # ---------------------------------------------------------------------------------------------------------
- # STATE the session sets (ruling / section / item / next / tests / flag)
- # ---------------------------------------------------------------------------------------------------------
-+ITEM_TIMES = os.path.join(REPO, &quot;reports&quot;, &quot;ITEM-TIMES.json&quot;)   # {item: {start, finish}} — R-ETA measured durations
-+
-+
- def set_state(**kw):
-     &quot;&quot;&quot;Update the journal header fields. Called by the build session as it works (machine-written from the
--    session&#x27;s own state, not typed prose).&quot;&quot;&quot;
-+    session&#x27;s own state, not typed prose). On an item change, stamps the old item&#x27;s finish and the new one&#x27;s
-+    start into ITEM-TIMES.json so R-ETA can measure real durations.&quot;&quot;&quot;
-     st = _state()
-+    old_item = st.get(&quot;item&quot;)
-     st.update({k: v for k, v in kw.items() if v is not None})
-     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-     with open(STATE_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-         json.dump(st, f, indent=1)
-+    new_item = st.get(&quot;item&quot;)
-+    if kw.get(&quot;item&quot;) and new_item != old_item:
-+        _stamp_item(old_item, new_item)
-     return st
- 
- 
-+def _stamp_item(old_item, new_item):
-+    try:
-+        times = json.load(open(ITEM_TIMES, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        times = {}
-+    now = _now().isoformat()
-+    if old_item and old_item in times and not times[old_item].get(&quot;finish&quot;):
-+        times[old_item][&quot;finish&quot;] = now
-+    if new_item:
-+        times.setdefault(new_item, {&quot;start&quot;: now, &quot;finish&quot;: None})
-+    try:
-+        os.makedirs(os.path.dirname(ITEM_TIMES), exist_ok=True)
-+        json.dump(times, open(ITEM_TIMES, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+
-+
- def _state():
-     try:
-         return json.load(open(STATE_FILE, encoding=&quot;utf-8&quot;))
-@@ -271,10 +296,15 @@ def _journal_body():
-     except Exception:
-         pass
-     flag = st.get(&quot;flag&quot;, &quot;NOTHING NEEDS THE LEAD&quot;)
-+    try:
-+        from scripts import eta
-+        eta_html = eta.table_html()
-+    except Exception:
-+        eta_html = &quot;&quot;
-     body = (&quot;&lt;h1&gt;Build journal&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Append-only, machine-written every 2 minutes. &quot;
-             &quot;No keys, no tokens, no names. &lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot;
--            &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: &lt;b&gt;%s&lt;/b&gt;&lt;/p&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot;
--            % (_html.escape(flag), _html.escape(&quot;\n&quot;.join(tail))))
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: &lt;b&gt;%s&lt;/b&gt;&lt;/p&gt;%s&lt;pre&gt;%s&lt;/pre&gt;&quot;
-+            % (_html.escape(flag), eta_html, _html.escape(&quot;\n&quot;.join(tail))))
-     return _page(&quot;Build journal&quot;, body)
- 
- 
-diff --git a/scripts/eta.py b/scripts/eta.py
-new file mode 100644
-index 000000000..64d1cd569
---- /dev/null
-+++ b/scripts/eta.py
-@@ -0,0 +1,130 @@
-+&quot;&quot;&quot;R-ETA — a machine-measured schedule for the checklist. NOTHING here is a typed or guessed duration.
-+
-+- Item start/finish come from reports/ITEM-TIMES.json (stamped by build_journal.set_state on every item change).
-+- Each remaining item (reports/CHECKLIST.json — owner-named items only, never invented) is SIZED by the
-+  measured median minutes of finished items.
-+- Pace = commits/hour and items/hour over the last 3 hours (git + finished-item stamps), excluding halted time.
-+- ETA per remaining item and a total, recomputed on demand. Shown in the BUILD line and as a table on /build/.
-+
-+If fewer than three finished items exist, there is nothing to measure from, so it prints &quot;ETA: measuring&quot;.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import statistics
-+import subprocess
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+ITEM_TIMES = os.path.join(REPO, &quot;reports&quot;, &quot;ITEM-TIMES.json&quot;)
-+CHECKLIST = os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)     # {&quot;remaining&quot;: [&quot;item&quot;, ...]} — owner-named only
-+MIN_FINISHED = 3
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _load(path, default):
-+    try:
-+        return json.load(open(path, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        return default
-+
-+
-+def _finished():
-+    &quot;&quot;&quot;[(item, minutes)] for items with both a start and a finish.&quot;&quot;&quot;
-+    out = []
-+    for item, t in (_load(ITEM_TIMES, {}) or {}).items():
-+        s, f = t.get(&quot;start&quot;), t.get(&quot;finish&quot;)
-+        if s and f:
-+            try:
-+                mins = (datetime.fromisoformat(f) - datetime.fromisoformat(s)).total_seconds() / 60.0
-+                if mins &gt; 0:
-+                    out.append((item, mins))
-+            except Exception:
-+                pass
-+    return out
-+
-+
-+def _remaining():
-+    return [x for x in (_load(CHECKLIST, {}) or {}).get(&quot;remaining&quot;, []) if x]
-+
-+
-+def _commits_per_hour(hours=3):
-+    try:
-+        out = subprocess.run([&quot;git&quot;, &quot;log&quot;, &quot;--since=%d hours ago&quot; % hours, &quot;--format=%h&quot;], cwd=REPO,
-+                             capture_output=True, text=True, timeout=20).stdout
-+        n = len([l for l in out.splitlines() if l.strip()])
-+        return n / float(hours)
-+    except Exception:
-+        return 0.0
-+
-+
-+def measure():
-+    &quot;&quot;&quot;The measured numbers, or None fields when there is not enough data. Never guesses.&quot;&quot;&quot;
-+    finished = _finished()
-+    durations = [m for _, m in finished]
-+    median_min = statistics.median(durations) if durations else None
-+    remaining = _remaining()
-+    cph = _commits_per_hour(3)
-+    # items/hour over the window that produced these finished items
-+    iph = None
-+    if len(finished) &gt;= MIN_FINISHED and median_min:
-+        iph = 60.0 / median_min                      # measured throughput from the median item time
-+    return {&quot;finished&quot;: finished, &quot;median_min&quot;: median_min, &quot;remaining&quot;: remaining,
-+            &quot;commits_per_hour&quot;: round(cph, 2), &quot;items_per_hour&quot;: round(iph, 2) if iph else None}
-+
-+
-+def schedule():
-+    &quot;&quot;&quot;Per-remaining-item ETA + a total finish time, all measured. None when &lt; 3 finished items.&quot;&quot;&quot;
-+    m = measure()
-+    if len(m[&quot;finished&quot;]) &lt; MIN_FINISHED or not m[&quot;median_min&quot;]:
-+        return None
-+    now = _now()
-+    rows, cursor = [], now
-+    for item in m[&quot;remaining&quot;]:
-+        cursor = cursor + timedelta(minutes=m[&quot;median_min&quot;])
-+        rows.append({&quot;item&quot;: item, &quot;eta&quot;: cursor.strftime(&quot;%H:%M&quot;), &quot;size_min&quot;: round(m[&quot;median_min&quot;])})
-+    total = cursor if rows else now
-+    return {&quot;rows&quot;: rows, &quot;all_done&quot;: total, &quot;median_min&quot;: round(m[&quot;median_min&quot;]),
-+            &quot;commits_per_hour&quot;: m[&quot;commits_per_hour&quot;]}
-+
-+
-+def line():
-+    &quot;&quot;&quot;The ETA fragment for the BUILD line. &#x27;ETA: measuring&#x27; until three items are finished-and-measured.&quot;&quot;&quot;
-+    sch = schedule()
-+    if not sch or not sch[&quot;rows&quot;]:
-+        return &quot;ETA: measuring&quot; if not sch else &quot;ETA: nothing left (measured)&quot;
-+    nxt = sch[&quot;rows&quot;][0]
-+    return &quot;ETA %s %s · all done ~%s (measured)&quot; % (
-+        _short(nxt[&quot;item&quot;]), nxt[&quot;eta&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;))
-+
-+
-+def _short(item, n=22):
-+    item = str(item)
-+    return item if len(item) &lt;= n else item[:n - 1] + &quot;…&quot;
-+
-+
-+def table_html():
-+    sch = schedule()
-+    if not sch:
-+        return (&quot;&lt;h3&gt;Schedule&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;ETA: measuring — need at least %d finished items with &quot;
-+                &quot;measured durations before an ETA can be computed (no guessed times).&lt;/p&gt;&quot; % MIN_FINISHED)
-+    rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s min&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+        _short(r[&quot;item&quot;], 60), r[&quot;size_min&quot;], r[&quot;eta&quot;]) for r in sch[&quot;rows&quot;]) or \
-+        &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no remaining items&lt;/td&gt;&lt;/tr&gt;&quot;
-+    return (&quot;&lt;h3&gt;Schedule (measured)&lt;/h3&gt;&lt;p class=&#x27;sub&#x27;&gt;Each item sized at the median finished-item time &quot;
-+            &quot;(%d min); pace %.1f commits/hour. All done ~%s.&lt;/p&gt;&quot;
-+            &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Remaining item&lt;/th&gt;&lt;th&gt;Size&lt;/th&gt;&lt;th&gt;ETA&lt;/th&gt;&lt;/tr&gt;%s&lt;/table&gt;&quot;
-+            % (sch[&quot;median_min&quot;], sch[&quot;commits_per_hour&quot;], sch[&quot;all_done&quot;].strftime(&quot;%a %H:%M&quot;), rows))
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    print(line())
-diff --git a/tests/test_eta.py b/tests/test_eta.py
-new file mode 100644
-index 000000000..9f65ed1b4
---- /dev/null
-+++ b/tests/test_eta.py
-@@ -0,0 +1,42 @@
-+&quot;&quot;&quot;R-ETA: measures from finished-item durations only; &#x27;ETA: measuring&#x27; below three; never a guessed time.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+from datetime import datetime, timedelta, timezone
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import eta as E
-+
-+IST = timezone(timedelta(hours=5, minutes=30))
-+
-+
-+def _iso(mins_ago):
-+    return (datetime.now(IST) - timedelta(minutes=mins_ago)).isoformat()
-+
-+
-+def _isolate():
-+    d = tempfile.mkdtemp()
-+    E.ITEM_TIMES = os.path.join(d, &quot;it.json&quot;)
-+    E.CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
-+
-+
-+def test_measuring_below_three():
-+    _isolate()
-+    json.dump({&quot;A&quot;: {&quot;start&quot;: _iso(60), &quot;finish&quot;: _iso(30)}}, open(E.ITEM_TIMES, &quot;w&quot;))
-+    json.dump({&quot;remaining&quot;: [&quot;X&quot;, &quot;Y&quot;]}, open(E.CHECKLIST, &quot;w&quot;))
-+    assert E.schedule() is None
-+    assert E.line() == &quot;ETA: measuring&quot;
-+
-+
-+def test_schedule_from_three_finished():
-+    _isolate()
-+    # three finished items, ~20 min each -&gt; median 20
-+    json.dump({&quot;A&quot;: {&quot;start&quot;: _iso(120), &quot;finish&quot;: _iso(100)},
-+               &quot;B&quot;: {&quot;start&quot;: _iso(100), &quot;finish&quot;: _iso(80)},
-+               &quot;C&quot;: {&quot;start&quot;: _iso(80), &quot;finish&quot;: _iso(60)}}, open(E.ITEM_TIMES, &quot;w&quot;))
-+    json.dump({&quot;remaining&quot;: [&quot;Live desk positions&quot;, &quot;Portfolio&quot;]}, open(E.CHECKLIST, &quot;w&quot;))
-+    sch = E.schedule()
-+    assert sch and len(sch[&quot;rows&quot;]) == 2
-+    assert 15 &lt;= sch[&quot;median_min&quot;] &lt;= 25
-+    assert E.line().startswith(&quot;ETA &quot;) and &quot;measured&quot; in E.line()
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_measuring_below_three(); test_schedule_from_three_finished(); print(&quot;test_eta OK&quot;)
 </pre></div></main></body></html>
