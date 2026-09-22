@@ -1,4 +1,62 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>daf38692a</b> · 2026-09-23 00:12</div><div>R-EYE-EMOJI: 👀/🙈 freshness eye (from the PUBLIC page, fetched) on every BUILD line + 08:30 READY line; restart line becomes &#x27;EYES LIVE&#x27; posted only after the public page is confirmed &lt;2min; 3x🙈 blocks. Tested</div><div class='sub h'>.gitignore               |  1 +</div><div class='sub h'>docs/EYES.md             |  4 ++++</div><div class='sub h'>scripts/build_beat.py    | 13 ++++++++++++-</div><div class='sub h'>scripts/preopen_gate.py  |  6 ++++++</div><div class='sub h'>scripts/restart_stack.py | 30 ++++++++++++++++++++++++++----</div><div class='sub h'>scripts/watchers.py      | 36 ++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_watchers.py   | 17 +++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>144310b53</b> · 2026-09-23 00:30</div><div>R-FRESH-LINK fix: tag is ?fresh=HHMMSS not ?t= (the lead&#x27;s fetch tool strips ?t=). Confirmed</div><div class='sub h'>scripts/notify.py | 7 ++-----</div><pre>diff --git a/scripts/notify.py b/scripts/notify.py
+index 66938e701..59878dd3e 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -85,11 +85,8 @@ def _freshen_links(m):
+ 
+     def _one(mt):
+         url = mt.group(0)
+-        if &quot;t=&quot; in url.split(&quot;?&quot;, 1)[-1]:            # already tagged -&gt; refresh it
+-            base = re.sub(r&quot;[?&amp;]t=\d+&quot;, &quot;&quot;, url)
+-        else:
+-            base = url
+-        return base + (&quot;&amp;&quot; if &quot;?&quot; in base else &quot;?&quot;) + &quot;t=&quot; + tag
++        base = re.sub(r&quot;[?&amp;](?:fresh|t)=\d+&quot;, &quot;&quot;, url)   # strip any existing tag (&#x27;t&#x27; the lead&#x27;s tool caches on)
++        return base + (&quot;&amp;&quot; if &quot;?&quot; in base else &quot;?&quot;) + &quot;fresh=&quot; + tag   # &#x27;fresh&#x27; gets through the fetch cache
+     return re.sub(r&quot;https://\S*github\.io/e1-live-site/\S*&quot;, _one, m)
+ 
+ 
+</pre></div><div class='c'><div class='h'><b>788ce197f</b> · 2026-09-23 00:26</div><div>R-FRESH-LINK: every e1-live-site link posted to Telegram carries a fresh ?t=HHMMSS tag (defeats the lead&#x27;s URL-cache); applies to already-present links too. Confirmed with one posted link</div><div class='sub h'>docs/dispatches/2026-09-23_R-FRESH-LINK.md |  1 +</div><div class='sub h'>scripts/notify.py                          | 22 +++++++++++++++++++---</div><pre>diff --git a/docs/dispatches/2026-09-23_R-FRESH-LINK.md b/docs/dispatches/2026-09-23_R-FRESH-LINK.md
+new file mode 100644
+index 000000000..5748cc7af
+--- /dev/null
++++ b/docs/dispatches/2026-09-23_R-FRESH-LINK.md
+@@ -0,0 +1 @@
++→ BUILD  (R-FRESH-LINK — standing) Every link the desk posts to Telegram carries a fresh tag: ?t=&lt;HHMMSS at post time&gt; on status.html and all build pages. Reason: the lead&#x27;s fetch tool caches by exact URL; a changing tag defeats it. Confirm with one posted link.
+diff --git a/scripts/notify.py b/scripts/notify.py
+index ea1df97e7..66938e701 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -72,9 +72,25 @@ def _with_link(message: str) -&gt; str:
+     an e1-live-site link (the beat/live-bar carry the status page, which the mirror contains) is not doubled.
+     (Supersedes the earlier status-only rule for alert lines.)&quot;&quot;&quot;
+     m = str(message)
+-    if &quot;github.io/e1-live-site&quot; in m:
+-        return m
+-    return m.rstrip() + &quot; · &quot; + MIRROR_LINK
++    if &quot;github.io/e1-live-site&quot; not in m:
++        m = m.rstrip() + &quot; · &quot; + MIRROR_LINK
++    return _freshen_links(m)
++
++
++def _freshen_links(m):
++    &quot;&quot;&quot;R-FRESH-LINK (standing): every e1-live-site link the desk posts carries a fresh ?t=&lt;HHMMSS at post time&gt;
++    so the lead&#x27;s URL-caching fetch tool cannot serve a stale page. Applies to already-present links too.&quot;&quot;&quot;
++    import datetime
++    tag = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime(&quot;%H%M%S&quot;)
++
++    def _one(mt):
++        url = mt.group(0)
++        if &quot;t=&quot; in url.split(&quot;?&quot;, 1)[-1]:            # already tagged -&gt; refresh it
++            base = re.sub(r&quot;[?&amp;]t=\d+&quot;, &quot;&quot;, url)
++        else:
++            base = url
++        return base + (&quot;&amp;&quot; if &quot;?&quot; in base else &quot;?&quot;) + &quot;t=&quot; + tag
++    return re.sub(r&quot;https://\S*github\.io/e1-live-site/\S*&quot;, _one, m)
+ 
+ 
+ def _creds() -&gt; tuple[str | None, str | None]:
+</pre></div><div class='c'><div class='h'><b>daf38692a</b> · 2026-09-23 00:12</div><div>R-EYE-EMOJI: 👀/🙈 freshness eye (from the PUBLIC page, fetched) on every BUILD line + 08:30 READY line; restart line becomes &#x27;EYES LIVE&#x27; posted only after the public page is confirmed &lt;2min; 3x🙈 blocks. Tested</div><div class='sub h'>.gitignore               |  1 +</div><div class='sub h'>docs/EYES.md             |  4 ++++</div><div class='sub h'>scripts/build_beat.py    | 13 ++++++++++++-</div><div class='sub h'>scripts/preopen_gate.py  |  6 ++++++</div><div class='sub h'>scripts/restart_stack.py | 30 ++++++++++++++++++++++++++----</div><div class='sub h'>scripts/watchers.py      | 36 ++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_watchers.py   | 17 +++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
 index 21491983e..5d2280df2 100644
 --- a/.gitignore
 +++ b/.gitignore
