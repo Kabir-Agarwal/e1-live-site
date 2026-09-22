@@ -1,4 +1,258 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>0aa11e331</b> · 2026-09-23 00:05</div><div>R-EXAM-CONFORM fail-safe: book20_runner HELDs EVERY fire &#x27;awaiting R-EXAM-CONFORM proof&#x27; until the conforming logic is proven (no order under the old 20d/1xATR/trail management). Fail-closed on a missing proof marker; tested. Archive the conform amendment</div><div class='sub h'>.../2026-09-23_R-EXAM-CONFORM-AMENDMENT.md         |  9 ++++++++</div><div class='sub h'>engine1_rebuild/book20_runner.py                   | 24 ++++++++++++++++++++--</div><div class='sub h'>tests/test_fix_3e.py                               | 24 ++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md b/docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>daf38692a</b> · 2026-09-23 00:12</div><div>R-EYE-EMOJI: 👀/🙈 freshness eye (from the PUBLIC page, fetched) on every BUILD line + 08:30 READY line; restart line becomes &#x27;EYES LIVE&#x27; posted only after the public page is confirmed &lt;2min; 3x🙈 blocks. Tested</div><div class='sub h'>.gitignore               |  1 +</div><div class='sub h'>docs/EYES.md             |  4 ++++</div><div class='sub h'>scripts/build_beat.py    | 13 ++++++++++++-</div><div class='sub h'>scripts/preopen_gate.py  |  6 ++++++</div><div class='sub h'>scripts/restart_stack.py | 30 ++++++++++++++++++++++++++----</div><div class='sub h'>scripts/watchers.py      | 36 ++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_watchers.py   | 17 +++++++++++++++++</div><pre>diff --git a/.gitignore b/.gitignore
+index 21491983e..5d2280df2 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -68,3 +68,4 @@ scheduler/.notify_seen.json
+ scheduler/.drops_seen.json
+ scheduler/.cost_week
+ scheduler/.notify_storm.json
++scheduler/.eye_streak
+diff --git a/docs/EYES.md b/docs/EYES.md
+index fad383e2b..5d82e2bb4 100644
+--- a/docs/EYES.md
++++ b/docs/EYES.md
+@@ -34,3 +34,7 @@ Dedup is the existing notify rate-limit: a frozen page keeps the same written ti
+ | MESSAGE STORM | per-source Telegram lines/min (source = leading word) | &gt;12 lines/min from one source | 30 min of no attempted post, or owner &quot;CLEAR STORM[: src]&quot; / any &quot;CLEAR HALT&quot; | owner un-mute if a real source is wrongly muted |
+ 
+ | NIGHT DRY RUN | can the stack restart from the last verified commit after build hours | runs nightly (scheduled under START_E1_STACK); skips 05:30–15:45 | a PASS; a FAIL auto-reverts to the tag and restarts on it | a FAIL raises 🙋 LEAD RULING NEEDED; owner registers the schedule via START_E1_STACK |
++
++## R-EYE-EMOJI (2026-09-23) — the freshness eye on every desk line
++
++Every BUILD line, the 08:30 READY line, and the restart announcement carry a 👀/🙈 read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page). 👀 = public written time under 2 min old; 🙈 = older, with that time shown. A failed fetch is 🙈, never a false 👀. Three 🙈 in a row sets `blocked` (fixing the page becomes the only work). The restart line stays silent until the public page is confirmed under 2 min old, then posts &quot;👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT…&quot;. Helper: `watchers.public_eye` / `watchers.eye_prefix`.
+diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+index 13c66425f..dcf3529fc 100644
+--- a/scripts/build_beat.py
++++ b/scripts/build_beat.py
+@@ -109,11 +109,22 @@ def _tail(line):
+     return out
+ 
+ 
++def _eye():
++    &quot;&quot;&quot;R-EYE-EMOJI: 👀/🙈 prefix from the PUBLIC status page (fetched, never the local file). Best-effort —
++    a failure returns &#x27;&#x27; rather than a false 👀.&quot;&quot;&quot;
++    try:
++        from scripts import watchers
++        px, _e = watchers.eye_prefix()
++        return px
++    except Exception:
++        return &quot;&quot;
++
++
+ def line(now=None):
+     now = now or _now()
+     commits = _commits_since(SLOT_MIN)
+     ruling, item = _journal_state()
+-    label = &quot;BUILD %s&quot; % now.strftime(&quot;%H:%M&quot;)
++    label = &quot;%sBUILD %s&quot; % (_eye(), now.strftime(&quot;%H:%M&quot;))
+     since = (now - timedelta(minutes=SLOT_MIN)).strftime(&quot;%H:%M&quot;)
+     sup = _supervisor_state()
+     # journal-vs-git honesty check: the journal&#x27;s ruling vs the latest commit&#x27;s ruling prefix
+diff --git a/scripts/preopen_gate.py b/scripts/preopen_gate.py
+index d05be74c4..766f08abf 100644
+--- a/scripts/preopen_gate.py
++++ b/scripts/preopen_gate.py
+@@ -199,6 +199,12 @@ def post(notifier=None):
+             msg = vline                                  # the room is not actually up — do not claim READY
+     except Exception:
+         pass
++    try:                                                 # R-EYE-EMOJI: 👀/🙈 from the PUBLIC page (fetched)
++        from scripts import watchers
++        px, _e = watchers.eye_prefix()
++        msg = px + msg
++    except Exception:
++        pass
+     try:
+         (notifier or _notify)(msg)
+     except Exception:
+diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
+index f588ef603..c5e2a198a 100644
+--- a/scripts/restart_stack.py
++++ b/scripts/restart_stack.py
+@@ -151,6 +151,15 @@ def audit():
+         return {&quot;pass&quot;: False, &quot;line&quot;: None}
+ 
+ 
++def _build_rooms():
++    &quot;&quot;&quot;The real number of mirror rooms — the .html pages in the built /build/ room (never a typed count).&quot;&quot;&quot;
++    try:
++        d = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;)
++        return sum(1 for f in os.listdir(d) if f.endswith(&quot;.html&quot;))
++    except Exception:
++        return 0
++
++
+ def run(notifier=None, now=None):
+     &quot;&quot;&quot;Steps 1–5 with proofs. Returns the proof dict. Refuses unless guard() passes.&quot;&quot;&quot;
+     now = now or _now()
+@@ -168,11 +177,24 @@ def run(notifier=None, now=None):
+     au = audit()                                              # (4)
+     hhmm = _now().strftime(&quot;%H:%M&quot;)
+     all_up = all(up[n][&quot;up&quot;] and up[n][&quot;py310&quot;] for n in UP_NAMES)
+-    line = (&quot;STACK: restarted %s — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, &quot;
+-            &quot;08:15 gate armed, audit %s&quot; % (hhmm, &quot;PASS&quot; if au[&quot;pass&quot;] else &quot;FAIL&quot;)) if all_up else \
+-           (&quot;STACK: restart %s — NOT all up: %s&quot; % (hhmm, {n: up[n][&quot;up&quot;] for n in UP_NAMES}))
++    # R-EYE-EMOJI (1): announce the restart ONLY after the laptop confirms the PUBLIC page is under 2 min old;
++    # until then post NOTHING about the restart (a local read could show fresh while the owner sees a frozen page).
++    line = None
++    if all_up:
++        try:
++            from scripts import watchers
++            eye = watchers.public_eye()                       # fetches the PUBLIC status page
++            if eye[&quot;fresh&quot;]:
++                rooms = _build_rooms()
++                line = &quot;👀 EYES LIVE — status written %s · build room %d rooms · send → AUDIT check the mirror end to end&quot; % (
++                    eye[&quot;hhmm&quot;], rooms)
++        except Exception:
++            line = None
++    else:
++        line = &quot;STACK: restart %s — NOT all up: %s&quot; % (hhmm, {n: up[n][&quot;up&quot;] for n in UP_NAMES})
+     try:
+-        (notifier or _notify)(line)                          # (5)
++        if line:
++            (notifier or _notify)(line)                       # (5) — silent until the public page is fresh
+     except Exception:
+         pass
+     return {&quot;killed&quot;: killed, &quot;remaining_after_stop&quot;: remaining, &quot;up&quot;: up, &quot;armed&quot;: armed,
+diff --git a/scripts/watchers.py b/scripts/watchers.py
+index bf928ab62..6003fbbb6 100644
+--- a/scripts/watchers.py
++++ b/scripts/watchers.py
+@@ -101,6 +101,42 @@ def stream_silence(now=None, status=None, post_fn=None):
+     return out
+ 
+ 
++EYE_FRESH_S = 120                                   # R-EYE-EMOJI: public page under 2 min old = 👀, else 🙈
++EYE_STREAK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.eye_streak&quot;)   # gitignored: consecutive 🙈 count
++
++
++def public_eye(now=None, fetch_fn=None):
++    &quot;&quot;&quot;R-EYE-EMOJI: fetch the PUBLIC status page (never the local file) and return the freshness eye.
++    Returns {emoji, hhmm, fresh, streak, blocked}: 👀 when the public written time is under 2 min old, else
++    🙈 with that time. A failed fetch is 🙈 (fail toward the owner&#x27;s view, never a false 👀). `blocked` is True
++    once 🙈 has held 3 lines in a row — the caller then makes fixing the page the only work.&quot;&quot;&quot;
++    now = now or _ist_now()
++    fetch_fn = fetch_fn or (lambda: _fetch_json(STATUS_JSON_URL))
++    hhmm, fresh = &quot;?&quot;, False
++    try:
++        gen = _parse_iso((fetch_fn() or {}).get(&quot;generated&quot;, &quot;&quot;))
++        if gen is not None:
++            hhmm = gen.strftime(&quot;%H:%M&quot;)
++            fresh = (now - gen).total_seconds() &lt; EYE_FRESH_S
++    except Exception:
++        pass
++    try:
++        streak = 0 if fresh else int(open(EYE_STREAK, encoding=&quot;utf-8&quot;).read().strip() or &quot;0&quot;)
++        streak = 0 if fresh else streak + 1
++        os.makedirs(os.path.dirname(EYE_STREAK), exist_ok=True)
++        open(EYE_STREAK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(str(streak))
++    except Exception:
++        streak = 0 if fresh else 1
++    return {&quot;emoji&quot;: &quot;👀&quot; if fresh else &quot;🙈&quot;, &quot;hhmm&quot;: hhmm, &quot;fresh&quot;: fresh,
++            &quot;streak&quot;: streak, &quot;blocked&quot;: (not fresh) and streak &gt;= 3}
++
++
++def eye_prefix(now=None, fetch_fn=None):
++    &quot;&quot;&quot;The short prefix for a BUILD / READY line: &#x27;👀 &#x27; when fresh, else &#x27;🙈 status HH:MM · &#x27;.&quot;&quot;&quot;
++    e = public_eye(now, fetch_fn)
++    return (&quot;👀 &quot; if e[&quot;fresh&quot;] else &quot;🙈 status %s · &quot; % e[&quot;hhmm&quot;]), e
++
++
+ def _notify(msg):
+     from scripts import notify
+     notify.notify(msg)
+diff --git a/tests/test_watchers.py b/tests/test_watchers.py
+index 3ea61676e..434395dd5 100644
+--- a/tests/test_watchers.py
++++ b/tests/test_watchers.py
+@@ -29,3 +29,20 @@ def test_stream_silence_only_in_session():
+     row = {&quot;streams&quot;: {&quot;Order-book depth&quot;: {&quot;last&quot;: (insession - datetime.timedelta(minutes=20)).isoformat()}}}
+     assert w.stream_silence(insession, status=row, post_fn=lambda _l: None)      # 20-min-old row in session
+     assert w.stream_silence(offsession, status=row, post_fn=lambda _l: None) == []
++
++
++def test_public_eye_fresh_vs_stale(tmp_path):
++    import datetime as _dt
++    w.EYE_STREAK = str(tmp_path / &quot;streak&quot;)
++    now = w._ist_now()
++    fresh = w.public_eye(now, fetch_fn=lambda: {&quot;generated&quot;: (now - _dt.timedelta(seconds=30)).isoformat()})
++    assert fresh[&quot;emoji&quot;] == &quot;👀&quot; and fresh[&quot;fresh&quot;] and fresh[&quot;streak&quot;] == 0 and not fresh[&quot;blocked&quot;]
++    stale_iso = (now - _dt.timedelta(minutes=10)).isoformat()
++    for i in range(1, 4):
++        s = w.public_eye(now, fetch_fn=lambda: {&quot;generated&quot;: stale_iso})
++        assert s[&quot;emoji&quot;] == &quot;🙈&quot; and not s[&quot;fresh&quot;] and s[&quot;streak&quot;] == i
++    assert s[&quot;blocked&quot;] is True                       # 3 in a row -&gt; fixing the page is the only work
++    # a failed fetch is 🙈, never a false 👀
++    assert w.public_eye(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError()))[&quot;emoji&quot;] == &quot;🙈&quot;
++    px, _e = w.eye_prefix(now, fetch_fn=lambda: {&quot;generated&quot;: (now - _dt.timedelta(seconds=10)).isoformat()})
++    assert px == &quot;👀 &quot;
+</pre></div><div class='c'><div class='h'><b>d1a3b7441</b> · 2026-09-23 00:07</div><div>R-EXAM-CONFORM status: fail-safe live (Wed HELD-safe); full conformance proof BLOCKED on the held restart (dry run needs A&#x27;s restart) - lead ruling open. Archive R-EYE-EMOJI</div><div class='sub h'>docs/dispatches/2026-09-23_R-EYE-EMOJI.md      |  6 ++++</div><div class='sub h'>docs/reports/2026-09-23-exam-conform-status.md | 49 ++++++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-23_R-EYE-EMOJI.md b/docs/dispatches/2026-09-23_R-EYE-EMOJI.md
+new file mode 100644
+index 000000000..ea4d2f686
+--- /dev/null
++++ b/docs/dispatches/2026-09-23_R-EYE-EMOJI.md
+@@ -0,0 +1,6 @@
++→ BUILD  (R-EYE-EMOJI — archive verbatim; applies now and stays)
++
++1. The &quot;stack restarted&quot; line becomes: &quot;👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT check the mirror end to end&quot;. It is posted ONLY after the laptop fetches status.html over the public URL and the written time is under 2 minutes old. Until then post nothing about the restart.
++2. Every 10-minute BUILD line starts with 👀 if the public status page (fetched, not the local file) is under 2 minutes old, else 🙈 with the written time. Same for the 08:30 READY line.
++3. If 🙈 lasts 3 lines in a row, fixing the page is the only work until it turns 👀.
++Where this can fail: the fetch must be over the public URL, not the local file — a local read would show 👀 while the owner sees a frozen page.
+diff --git a/docs/reports/2026-09-23-exam-conform-status.md b/docs/reports/2026-09-23-exam-conform-status.md
+new file mode 100644
+index 000000000..b9451200c
+--- /dev/null
++++ b/docs/reports/2026-09-23-exam-conform-status.md
+@@ -0,0 +1,49 @@
++# R-EXAM-CONFORM — status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)
++
++## What is DONE and safe (committed 0aa11e331)
++
++**The fail-safe is live in code:** `book20_runner` now HELDs **every** fire with reason
++**&quot;awaiting R-EXAM-CONFORM proof&quot;** and writes **zero** orders until a proof marker
++(`reports/EXAM-CONFORM-PROVEN`) exists — which only the dry-run/verifier writes on a PASS. So **no paper order
++is placed under the old 20-day / 1×ATR / trail management**, exactly as the ruling requires. Fail-closed on a
++missing marker; tested (`test_exam_conform_failsafe_holds_all_fires` + the order-path suite, 27 green; a
++demo-leak into the E10/E11/adaptive books was found and closed in the same change).
++
++This means: **if nothing else happens, Wednesday is a HELD day for the five — safely.** That is the owner&#x27;s
++own step-4 fallback, now enforced by construction.
++
++## The blocker to PROVING the full conformance tonight
++
++The amendment&#x27;s step 2 proof path is: **tag → nightly dry run (tag/restart/verify/revert) → fresh-Claude
++supervisor**. Step (ii) states plainly: **&quot;the dry run needs A&#x27;s restart to have worked — A stays first.&quot;**
++
++A&#x27;s restart is **held**, and for a good reason established in `docs/reports/2026-09-22-site-emergency.md`:
++**the site push was never dead** — the repo has pushed every ~2 min all evening (latest 23:43:25), a
++cache-busted fetch shows the public file 42 s behind the laptop clock, and the &quot;15:00&quot; the owner saw was a
++CDN/browser cache. So the emergency premise was false, and I did not kill-and-relaunch the live stack at night
++against R-NIGHT-CLOSE (restart is human) when the 06:00 login is itself the restart. **That decision is a
++LEAD RULING I put to the owner and it is still open.**
++
++Therefore the **dry-run proof cannot run** until either the owner says &quot;restart now&quot; or the 06:00 login
++happens — and the 06:00 login is **after** the 05:00 launch-file cutoff. Under the amendment&#x27;s own timing
++(step 4: not PASS by 05:00 → HELD day), that path lands on **HELD day**.
++
++## The honest recommendation
++
++The full conformance is a **re-architecture of the order path&#x27;s fill/exit model** — from the live intraday
++touch (book20_runner.py:151) to the exam&#x27;s **next-day-open daily-bar** fill (paper.py:80/96/102), plus
++per-pattern management read from `LIVE-PATTERN-SET.json` and the six execution checks in one shared function.
++That is the single order path that places real paper trades. Doing it **correctly and independently proven**
++is worth a focused build; rushing it blind against a 05:00 cutoff, with the proof already blocked on the held
++restart, trades correctness for a deadline the fail-safe already covers safely.
++
++**So:** the fail-safe protects Wednesday now. The rewire proceeds the moment the restart is unblocked (owner
++&quot;restart now&quot;, or the 06:00 login), built carefully and proven — not half-landed overnight.
++
++## LEAD RULING NEEDED
++
++1. **The restart** — reply &quot;restart now&quot; and I run restart_stack.py + the dry run + the fresh-Claude
++   supervisor proof, and push for CONFORM PROVEN before 05:00. Otherwise it rides the 06:00 login and
++   Wednesday is a HELD day (safe, by the fail-safe).
++2. Confirm you want the full order-path re-architecture attempted overnight vs. built and proven in a focused
++   next session — the fail-safe means Wednesday is safe either way.
+</pre></div><div class='c'><div class='h'><b>0aa11e331</b> · 2026-09-23 00:05</div><div>R-EXAM-CONFORM fail-safe: book20_runner HELDs EVERY fire &#x27;awaiting R-EXAM-CONFORM proof&#x27; until the conforming logic is proven (no order under the old 20d/1xATR/trail management). Fail-closed on a missing proof marker; tested. Archive the conform amendment</div><div class='sub h'>.../2026-09-23_R-EXAM-CONFORM-AMENDMENT.md         |  9 ++++++++</div><div class='sub h'>engine1_rebuild/book20_runner.py                   | 24 ++++++++++++++++++++--</div><div class='sub h'>tests/test_fix_3e.py                               | 24 ++++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md b/docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md
 new file mode 100644
 index 000000000..4517fac5a
 --- /dev/null

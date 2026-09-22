@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Eyes map</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-22 21:35 IST · <a href='index.html'>build room</a></p><h1>Eyes map</h1><pre># EYES — every watcher on the desk (R-EYES-COMPLETE §8)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Eyes map</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 00:21 IST · <a href='index.html'>build room</a></p><h1>Eyes map</h1><pre># EYES — every watcher on the desk (R-EYES-COMPLETE §8)
 
 Linked from status.html. For each watcher: what it sees · how old at most (from the writer&#x27;s cadence, not
 typed) · what freezes it · what still needs the owner.
@@ -21,4 +21,21 @@ typed) · what freezes it · what still needs the owner.
 | Telegram (inbound) | KILL / RESUME / clear halt / now / → BUILD / → AUDIT | 5 min (token_ping wake) | token_ping gone; no token | send the commands |
 | audit runs | a fresh independent read on demand | on each → AUDIT | claude CLI missing | send → AUDIT |
 | chat lead (this) | everything above, via the mirror link | one message | a HALT that blocks the build session | the root swap; owner-only doors |
+
+## Watchers (R-WATCHERS, END-TO-END BUNDLE Part 3) — run inside the watchdog process
+
+| Watcher | Sees what | Max age before it fires | What freezes it (clears the alarm) | Still needs the owner |
+|---|---|---|---|---|
+| SITE FROZEN | the PUBLIC status page&#x27;s written time (data/status.json `generated`) | 360 s = 3 status-daemon write cycles (120 s each) | the status daemon writing a fresh time again | a restart if the daemon itself is dead (human trigger) |
+| STREAM SILENT | each recorder stream&#x27;s last row (reports/STATUS.json `streams`), market hours only | 15 min (declared recorder cadence) | a new recorder row landing | the 06:00 login re-arms a dead recorder |
+
+Dedup is the existing notify rate-limit: a frozen page keeps the same written time, so the alarm text is identical each cycle and posts once, then at most hourly. A failed fetch is a safe no-op (never a false FROZEN).
+
+| MESSAGE STORM | per-source Telegram lines/min (source = leading word) | &gt;12 lines/min from one source | 30 min of no attempted post, or owner &quot;CLEAR STORM[: src]&quot; / any &quot;CLEAR HALT&quot; | owner un-mute if a real source is wrongly muted |
+
+| NIGHT DRY RUN | can the stack restart from the last verified commit after build hours | runs nightly (scheduled under START_E1_STACK); skips 05:30–15:45 | a PASS; a FAIL auto-reverts to the tag and restarts on it | a FAIL raises 🙋 LEAD RULING NEEDED; owner registers the schedule via START_E1_STACK |
+
+## R-EYE-EMOJI (2026-09-23) — the freshness eye on every desk line
+
+Every BUILD line, the 08:30 READY line, and the restart announcement carry a 👀/🙈 read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page). 👀 = public written time under 2 min old; 🙈 = older, with that time shown. A failed fetch is 🙈, never a false 👀. Three 🙈 in a row sets `blocked` (fixing the page becomes the only work). The restart line stays silent until the public page is confirmed under 2 min old, then posts &quot;👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT…&quot;. Helper: `watchers.public_eye` / `watchers.eye_prefix`.
 </pre></main></body></html>

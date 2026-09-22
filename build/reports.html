@@ -1,4 +1,432 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-22 21:35 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>2026-09-22-R-STOP-SPAM.md</h3><pre># R-STOP-SPAM — report (2026-09-22)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 00:21 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>2026-09-23-exam-conform-status.md</h3><pre># R-EXAM-CONFORM — status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)
+
+## What is DONE and safe (committed 0aa11e331)
+
+**The fail-safe is live in code:** `book20_runner` now HELDs **every** fire with reason
+**&quot;awaiting R-EXAM-CONFORM proof&quot;** and writes **zero** orders until a proof marker
+(`reports/EXAM-CONFORM-PROVEN`) exists — which only the dry-run/verifier writes on a PASS. So **no paper order
+is placed under the old 20-day / 1×ATR / trail management**, exactly as the ruling requires. Fail-closed on a
+missing marker; tested (`test_exam_conform_failsafe_holds_all_fires` + the order-path suite, 27 green; a
+demo-leak into the E10/E11/adaptive books was found and closed in the same change).
+
+This means: **if nothing else happens, Wednesday is a HELD day for the five — safely.** That is the owner&#x27;s
+own step-4 fallback, now enforced by construction.
+
+## The blocker to PROVING the full conformance tonight
+
+The amendment&#x27;s step 2 proof path is: **tag → nightly dry run (tag/restart/verify/revert) → fresh-Claude
+supervisor**. Step (ii) states plainly: **&quot;the dry run needs A&#x27;s restart to have worked — A stays first.&quot;**
+
+A&#x27;s restart is **held**, and for a good reason established in `docs/reports/2026-09-22-site-emergency.md`:
+**the site push was never dead** — the repo has pushed every ~2 min all evening (latest 23:43:25), a
+cache-busted fetch shows the public file 42 s behind the laptop clock, and the &quot;15:00&quot; the owner saw was a
+CDN/browser cache. So the emergency premise was false, and I did not kill-and-relaunch the live stack at night
+against R-NIGHT-CLOSE (restart is human) when the 06:00 login is itself the restart. **That decision is a
+LEAD RULING I put to the owner and it is still open.**
+
+Therefore the **dry-run proof cannot run** until either the owner says &quot;restart now&quot; or the 06:00 login
+happens — and the 06:00 login is **after** the 05:00 launch-file cutoff. Under the amendment&#x27;s own timing
+(step 4: not PASS by 05:00 → HELD day), that path lands on **HELD day**.
+
+## The honest recommendation
+
+The full conformance is a **re-architecture of the order path&#x27;s fill/exit model** — from the live intraday
+touch (book20_runner.py:151) to the exam&#x27;s **next-day-open daily-bar** fill (paper.py:80/96/102), plus
+per-pattern management read from `LIVE-PATTERN-SET.json` and the six execution checks in one shared function.
+That is the single order path that places real paper trades. Doing it **correctly and independently proven**
+is worth a focused build; rushing it blind against a 05:00 cutoff, with the proof already blocked on the held
+restart, trades correctness for a deadline the fail-safe already covers safely.
+
+**So:** the fail-safe protects Wednesday now. The rewire proceeds the moment the restart is unblocked (owner
+&quot;restart now&quot;, or the 06:00 login), built carefully and proven — not half-landed overnight.
+
+## LEAD RULING NEEDED
+
+1. **The restart** — reply &quot;restart now&quot; and I run restart_stack.py + the dry run + the fresh-Claude
+   supervisor proof, and push for CONFORM PROVEN before 05:00. Otherwise it rides the 06:00 login and
+   Wednesday is a HELD day (safe, by the fail-safe).
+2. Confirm you want the full order-path re-architecture attempted overnight vs. built and proven in a focused
+   next session — the fail-safe means Wednesday is safe either way.
+</pre><h3>2026-09-22-watchers.md</h3><pre># R-WATCHERS — Part 3 of the END-TO-END BUNDLE (2026-09-22)
+
+Goal: failures that happen while nobody is committing are caught by the machine; new code never runs first at
+06:00. Three watchers, each inside an existing process (no new process), each tested, each recorded in
+`docs/EYES.md`.
+
+## 1. Freshness watch — inside the watchdog process (`scripts/watchers.py`, commit `b9a1dcaae`)
+
+- **SITE FROZEN** — every watchdog cycle fetches the PUBLIC `data/status.json`, reads its `generated` time;
+  older than **360 s** (3 × the 120 s status-daemon cadence) → one line `SITE FROZEN since &lt;written time&gt;`,
+  once then hourly (the frozen page keeps the same written time, so notify&#x27;s rate-limit dedups it). A failed
+  fetch is a safe no-op — never a false FROZEN.
+- **STREAM SILENT** — market hours only; a recorder stream (from local `reports/STATUS.json`) whose last row
+  is older than **15 min** → `STREAM SILENT &lt;name&gt; since &lt;time&gt;`.
+- Wired at `scripts/watchdog.py` in `main()`&#x27;s cycle beside the resurrectors.
+
+## 2. Message-rate / storm guard — desk-wide, in the sender (`scripts/notify.py`, commit `c701f4035`)
+
+- Identical text once-then-hourly was already in place (`_rate_limited`). Added: a per-source rate cap —
+  more than **12 lines/min** from one source (source = the line&#x27;s leading word: BUILD / SITE / COST / …) →
+  one `MESSAGE STORM &lt;source&gt;` line and that source is **muted**.
+- Un-mute: **30 min** of no attempted post (self-heal), or the owner sends `CLEAR STORM` / `CLEAR STORM: &lt;src&gt;`
+  / any `CLEAR HALT` (wired in `scripts/kill_switch.py`). The alarm line itself is exempt from the guard.
+
+## 3. Nightly dry run — scheduled under START_E1_STACK (`scripts/night_dry_run.py`, commit `e633eb0c3`)
+
+- After build hours: tag the last verified commit → `restart_stack.run()` → wait one status cycle → verify
+  (processes up, public page fresh, NOW line moving). **PASS** → `NIGHT DRY RUN PASS &lt;commit&gt;`. **FAIL** →
+  revert to the tag, restart on it, `NIGHT DRY RUN FAILED — reverted to &lt;tag&gt;: &lt;reason&gt;` + a 🙋 LEAD RULING
+  NEEDED. The 08:15 login gate stays as the second check.
+- **SAFETY (owner ruling 2026-09-22):** the job **skips the restart entirely inside 05:30–15:45** — the 06:00
+  login is the restart. `restart-is-human` (R-NIGHT-CLOSE) is honoured: this is the one sanctioned automated
+  restart, with a revert net, and the **schedule registration is left for the owner&#x27;s START_E1_STACK** rather
+  than auto-registered tonight (consistent with the Part 2 restart being held for a human trigger).
+
+## Tests
+
+`tests/test_watchers.py` (3), `tests/test_notify_storm.py` (4), `tests/test_night_dry_run.py` (3) — all green.
+Every heavy dependency (network fetch, restart, git revert, Telegram) is injected, so no test touches the live
+stack, a ledger, or sends a real line.
+
+## Where this can fail
+
+The nightly dry run&#x27;s restart obeys `restart_stack`&#x27;s own guard (needs a launch-path HEAD commit after 15:30)
+and the SAFETY window; if both aren&#x27;t satisfied it skips rather than half-restarts. Recorded in EYES.md per the
+observability rule (sees what · max age · what freezes it · what still needs the owner).
+</pre><h3>2026-09-22-verifier.md</h3><pre># R-VERIFIER v2 — Part 4 of the END-TO-END BUNDLE (2026-09-22)
+
+Goal: no build step counts as done until an independent verifier has RUN it and written PASS with observed
+evidence to the mirror; the gate refuses the next item until that PASS exists.
+
+## Built and tested
+
+- **Brain ladder** (`docs/VERIFIER-BRAIN.md`, `scripts/verifier.py::active_rung`): (a) Codex → (b)/(c) API key
+  in E1-DESK → (d) fresh independent Claude run. Re-read every run, so signing into Codex later upgrades it
+  with no code change. **Active rung tonight: (d)** — Codex is UNAVAILABLE (needs the owner&#x27;s terminal/admin).
+- **Template** (`docs/VERIFIER-TEMPLATE.md`): inputs = ruling + commit diff + claimed step; reads only repo +
+  mirror; never edits; a claim without running-evidence is FAIL; builder ≠ verifier.
+- **Verify-map** (`docs/VERIFY-MAP.md`): what the verifier RUNS per touched path — full suite always, scripts →
+  demo, hooks → simulated call + halt/clear, site → fetch public URL, processes → list, notifiers → watch
+  msg_log, **trading path → the end-to-end rehearsal + the twin run** (R-TWIN-TEST).
+- **Launcher** (`scripts/verifier.py::verify`): runs the rung&#x27;s brain (injectable), writes
+  `docs/reports/verify-&lt;commit&gt;.md` (VERDICT: PASS/FAIL), posts `VERIFY PASS|FAIL &lt;step&gt; &lt;commit&gt;`. A brain
+  error is FAIL, never a crash.
+- **Gate** (`scripts/verifier.py::gate_reason` + `.claude/hooks/auto_continue.py`): the auto-continue hook
+  refuses the next item until a verify-PASS exists for the last commit. **ADVISORY until the owner arms
+  `E1-DESK\VERIFIER-ARMED`** — this keeps the enforcement config outside the repo (step 6 independence) and
+  means it cannot deadlock the loop before the verifier is proven. Once armed: allow only on a verify-PASS.
+- Tests: `tests/test_verifier.py` (PASS/FAIL reports, gate advisory/armed, brain-exception-is-FAIL, rung
+  ladder) — green. The brain is injected, so no test spends a real run.
+
+## Remaining — and why it waits
+
+- **The trading-path end-to-end rehearsal harness (step 3) and the proof branch (step 8) are NOT built yet**,
+  deliberately:
+  1. **Blocked by tonight&#x27;s audit.** `docs/reports/2026-09-22-live-vs-exam-audit.md` found the live loop
+     manages every pattern at 20-day / 1×ATR / always-trail, but all five were certified at 40–60-day / 2×ATR
+     / fixed. **A rehearsal or twin run today would report a mismatch, not MATCH** — so the trading-path leg of
+     the verifier cannot yet produce a truthful PASS. It needs the owner&#x27;s ruling on that mismatch first.
+  2. **Safety.** The rehearsal must run the real `book20_runner` (the single order path, book20_runner.py:1)
+     in a context that provably cannot touch the live ledgers. That ledger-isolation is worth building only
+     once the mismatch above is resolved, so the rehearsal is asserting against the intended behaviour.
+- **The lead-checklist scoring (step 7)** — the supervisor scoring each archived ruling against
+  `docs/LEAD-CHECKLIST.md` on the Queue page — is a follow-on, non-trading-path item.
+
+## Where this can fail
+
+The gate arms from a file outside the repo; if the owner never places `E1-DESK\VERIFIER-ARMED`, the gate stays
+advisory and the loop is ungated (the pre-bundle behaviour). That is the safe default — it never traps the
+session — and is stated here so the arming step isn&#x27;t forgotten.
+</pre><h3>2026-09-22-v2-exact-pages.md</h3><pre># R-V2-EXACT — the ten pages, ported verbatim, per-page difference list (2026-09-22)
+
+All ten design pages (`design/v8/*.dc.html`) now port through `scripts/v8_port` + `scripts/v8_site`, keeping
+the markup/CSS exactly, with the nav fixed (Deliverables off) and the ticker bound to the real live tape. A
+gate refuses any surviving `937` / `69%` / `[object Object]` / `undefined` / `NaN` / un-bound `{{…}}`; every
+page passes. Each was screenshot-checked against the design where the browser pane was available (How, Data,
+Results, Messages, Main, Patterns, Stocks) and by gate + on-disk grep where it was not (Engine, Ask, Stock).
+
+**The root swap waits for the owner&#x27;s yes, and the difference list below is NOT empty — so no 🙋 is sent.**
+Every &quot;clean&quot; page is bound to real records; every remaining difference is baked illustrative data that needs
+a real record store, flagged here rather than fabricated (§4.4).
+
+| Page | Bound to real data | Still baked (the difference) |
+|---|---|---|
+| **How** | descriptive prose (real system numbers) | none |
+| **Data** | the 4 recorded streams (status/rows/last/days-to-judge/which-engine) | none |
+| **Messages** | the 30 most-recent real sent lines, All/E1/E10/E11/Desk | none |
+| **Results** | the 3 real books (trades/won/₹/avg-R from backtest.json) | none |
+| **Main** | engine-chat + latest-signals bound to real calls | top 4 cards (incl. stale &quot;84 of 210&quot;), 8-stat grid, 15 leaderboard rows |
+| **Patterns** | owner opening line; the real 5 live patterns + net-R | top summary counts, &quot;readings on DABUR&quot; sub-panel, 4 exam sub-steps |
+| **Stocks** | owner title &quot;…watches — 210&quot;; 210 real stocks (volume/trend/signal) | 8 readings the screener doesn&#x27;t carry (RSI/MFI/range/returns/gap) |
+| **Engine** | 17 engine descriptions; pattern rows on the live set | funnel counts, safety-check readings, today-specific step values |
+| **Ask** | engine-chat bound to real calls | the &quot;Example answer&quot; (design&#x27;s labelled illustration) |
+| **Stock** | engine-chat line bound to real calls | DABUR price/readings/per-pattern records, the 30-day chart |
+
+## What every remaining difference has in common
+
+They are all the design&#x27;s per-record illustrative figures — per-engine funnel counts, per-pattern win%/case
+counts, per-stock 35 readings, a stock&#x27;s 30-day range history — for which **no store on disk carries the
+number at the shape the design draws it**. Filling them truthfully needs a real per-engine / per-pattern /
+per-stock record store; inventing them is a §4.4 violation. The four fully-clean pages (How, Data, Messages,
+Results) are the ones whose every field already has a real source.
+
+## Live-site note
+
+`site_loop.py` loaded the porter into memory before these providers existed, so its ~10-min cycle rewrites
+`site/v2/` with the older pages. The ports are built, committed and correct on disk; they appear on the live
+site at the **next stack restart** (a human act, `START_E1_STACK.bat`). No root swap is performed.
+</pre><h3>2026-09-22-site-emergency.md</h3><pre># SITE EMERGENCY — R-RESTART-PROOF Part A (2026-09-22 ~23:45 IST)
+
+## The premise (dead push) is FALSE — the push is alive and current
+
+The owner fetched the public site at 23:37 and saw `status.html` written **15:00:29** → &quot;dead 7+ hours&quot;. I
+checked the actual push, not the cached page:
+
+- **The site repo pushes every ~2 minutes, continuously, with no gap.** `git -C ../e1-live-site log`:
+  … 16:02, 16:07, 16:14, 16:17, 16:26, 16:41, 16:57, 17:08, 17:18, 17:30, 17:42, 17:52, 17:55, 17:57, 18:01,
+  18:03, 18:07, 18:09, … 22:36, 22:38, 22:40, … 23:35, **23:37, 23:39, 23:41, 23:43:25** (&quot;status refresh&quot;).
+  There is **no 7-hour gap** — the &quot;dead window&quot; the owner named (after 16:17) is full of commits.
+- **Local write is fresh:** `reports/STATUS.json` `generated = 23:43:23`; laptop clock `23:44:05`.
+- **Latest push 23:43:25** — ~40 s after the local write.
+
+## The cause (cited): GitHub Pages CDN + browser caching of the bare URL — not a dead push
+
+A **cache-busted** fetch of the public URL returns the true current file:
+`…/data/status.json?cb=…` → `&quot;generated&quot;: &quot;2026-09-22T23:43:23&quot;` — i.e. **42 seconds** behind the laptop
+clock (23:44:05). A **bare** fetch of the same URL returned `23:33` (my 23:40 fetch) and `15:00` (the owner&#x27;s
+23:37 fetch) — different **cache** states of the same live file. The owner&#x27;s 15:00 is a hard **browser** cache;
+the CDN adds up to ~10 min on a cold fetch. **The file being served is stale; the file being pushed is fresh.**
+
+## Step (5) — public written time within 2 min of the laptop clock
+
+**PASS on the true content:** cache-busted public `generated` = 23:43:23 vs laptop 23:44:05 = **42 s &lt; 2 min.**
+The staleness is only the *bare-URL cache*, and it is fixed below.
+
+## The fix (committed d32291a47) — defeats the cold-fetch cache
+
+`status.html` now **redirects any un-cache-busted visit to a `?t=` URL immediately**, so the very first paint of
+even a cold bare-URL visit is the current file (then the existing 2-min busting reload continues). This closes
+the browser/CDN cache gap the owner hit. **It goes live at the next login** (the running `site_loop` holds the
+pre-fix code — same stale-import reason the mirror/​/v2 aren&#x27;t live yet).
+
+## Step (3) — the restart: NOT run, and why
+
+restart_stack.py was ordered on the premise the push was dead. **The push is alive**, so a restart does not fix
+anything about the push, and it cannot change CDN caching. A restart&#x27;s only effect tonight would be to load the
+new code (this cache-fix + the mirror + /v2/) — and **the SAFETY ruling&#x27;s own words are &quot;the 06:00 login is the
+restart&quot;**, which brings exactly that code live, with `restart-is-human` (R-NIGHT-CLOSE) intact. Killing and
+relaunching the live stack at 23:45 on a disproven emergency, when the 06:00 login does the same thing safely,
+is the more-trading, less-conservative option. **Held for the owner&#x27;s call.**
+
+## Where this can fail
+
+The cold-fetch cache-fix only takes effect once `site_loop` reloads (06:00 login or a human restart). Until
+then, a cold bare-URL visit can still show a CDN-cached time, even though the content is fresh (proven above)
+and an *open* page self-refreshes within 2 min via the existing reload.
+</pre><h3>2026-09-22-restart-proof.md</h3><pre># R-RESTART-PROOF — Part 2 of the END-TO-END BUNDLE (2026-09-22 ~23:15 IST)
+
+## 1. Queue truth (from git, not memory)
+
+Every step of the four rulings has a commit — nothing outstanding:
+
+- **R-HALT-FIX** 1–6: `9b2d856ab` … `43822e23c` (guard rebuild, clear_halt, supervisor provenance, owner
+  Telegram clear, booked-only trades, rename + anonymise).
+- **R-STOP-SPAM** 1–2: `a4a92d979` (stop the &quot;[CODE] session finished&quot; spam + desk-wide repeat limit),
+  `c028e0789` (status.html cache-busting reload). **Nothing from R-STOP-SPAM is unfinished.**
+- **R-NOW-LINE** 1–7: `bffef127d` … `3b35525f9`.
+- **R-EYES-COMPLETE** 1–10: `d696097a9` … `2b28ea169`.
+
+## 2. The &quot;frozen site&quot; — diagnosed against the live public pages (proof, fetched myself)
+
+- **status.html is NOT frozen.** Fetched `https://[redacted]-[redacted].github.io/e1-live-site/status.html` at
+  ~23:14 IST: **written time `2026-09-22T23:12:58`**, &quot;refreshes every 2 minutes&quot;, 4 desk processes listed.
+  The 15:00:29 freeze the dispatch describes is **already resolved** — the decoupled status daemon
+  (R-STOP-SPAM / the status-thread work) is pushing current times. The earlier stuck view was the
+  browser/CDN cache that R-STOP-SPAM(2)&#x27;s cache-busting reload addressed.
+- **The build room IS stale.** `build/index.html` still shows the **old five-link room** (&quot;Status/Journal/
+  Transcript/Commits/Supervisor&quot;) and &quot;R-EYES-COMPLETE done · R-V2-EXACT remaining pages&quot; — **not** the
+  ten-page R-EYES-COMPLETE mirror. The `/v2/` pages ported tonight are likewise not live.
+- **Cause (confirmed, not the rejected-push suspect):** the **running `site_loop.py` process (pid 24144)
+  holds in-memory imports from before tonight&#x27;s mirror/v2 code landed.** Its status *daemon thread* is new
+  enough to be current, but its *full build cycle* (build_journal&#x27;s 10-link index, v8_site, mirror) runs the
+  older code, so it rewrites the public build room and /v2/ with the pre-tonight pages every cycle. A
+  **restart reloads the process** and the built work goes live. (No push was rejected; the pages are being
+  overwritten with stale output, not failing to push.)
+
+## 3. The restart — PREPARED and proven-ready, deliberately NOT auto-executed tonight
+
+- **Revert point tagged:** `night-revert-2026-09-22` → `146ec8bce` (the last audit-pass commit, per
+  `reports/AUDIT-LAST-PASS.txt`). This is the 08:15 revert target.
+- **restart_stack.py is the mechanism** and its guard was checked read-only: `after_1530 = True`,
+  `launch_path_touched(HEAD) = False`, so **`guard() = False` → `run()` currently REFUSES** (HEAD is the
+  docs-only bundle-archive commit, not a launch-path commit).
+- **Two reasons the live-stack kill-and-relaunch is held, not performed autonomously tonight:**
+  1. **R-NIGHT-CLOSE (§14.10)** — &quot;a session never relaunches the stack; restart is a human act.&quot; The clean
+     reconciliation with this bundle: restart_stack.py is the sanctioned **mechanism**, the **trigger stays
+     human**. I prepared and proved it ready; the owner (or START_E1_STACK) triggers it.
+  2. **Operational:** `run()` would kill `book20_runner` (pid 21912) and relaunch a *different* set
+     (token_ping/watchdog/site_loop/**supervisor**, no book20 until the 06:00 login arms it). Doing that at
+     23:15 while the **urgent problem — the frozen status page — is already resolved** trades more than it
+     needs to.
+- **What is lost by waiting:** only the build-room/​/v2 freshness on the public site until the next human
+  restart (or the nightly dry run Part 3 builds). The status page — the thing a watcher would alarm on — is
+  already live.
+
+## 4. Owner tap (Part 2 step 4)
+
+One Telegram line posted asking the owner to trigger the prepared restart and then send
+`→ AUDIT check the mirror end to end` to prove the inbox. The eyes stay **&quot;built&quot;** until that → AUDIT lands;
+the inbox handles it whenever it arrives.
+
+## Where this can fail
+
+If the owner triggers the restart on a docs-only HEAD, restart_stack&#x27;s guard refuses — a launch-path commit
+must be at HEAD first (the verifier/watcher commits in Parts 3–4 satisfy that). Recorded so the trigger isn&#x27;t
+a surprise refusal.
+</pre><h3>2026-09-22-live-vs-exam-audit.md</h3><pre># AUDIT — do tomorrow&#x27;s LIVE paper trades match the exam? (read-only, 2026-09-22)
+
+Owner → AUDIT. Every claim is line-cited and was re-verified against the files (not taken from a report).
+The single live order path is `engine1_rebuild/book20_runner.py` (&quot;THE SINGLE ORDER PATH … the ONLY loop that
+may write a paper order&quot;, book20_runner.py:1). The exam that produced `reports/LIVE-PATTERN-SET.json` is
+`scripts/exams_real.py`, promoted by `scripts/live_pattern_set.py`.
+
+**Bottom line: NO — the live loop does not reproduce the certified management.** It applies a 20-day hold, a
+1×ATR stop and always-on trail/break-even/partial, while all five patterns were certified at 40–60-day holds,
+a **2×ATR** stop and **trail=false** (&quot;fixed stop and target&quot;).
+
+## 1. Sizing — exam has NO rupee size; live is flat ₹1,000, and the R-unit differs
+
+- **Live:** flat 1R = ₹1,000 — `money.py:12` `PAPER_R_RUPEES = 1000.0`; quantity `book20_runner.py:570`
+  `qty = max(1, round(money.PAPER_R_RUPEES / atr))`. The adaptive sizer is record-only
+  (`adaptive_sizing.py:14` &quot;RECORD-ONLY&quot;); E10/E11 only re-weight the same fill (`engine_book.py:87`).
+- **Exam:** pure R, **no position size assumed** — `net_per_trade_R` is `mean_net_R`
+  (`exams_real.py:131` `mean_net = statistics.mean(nets)`; promoted at `live_pattern_set.py` →
+  `&quot;net_per_trade_R&quot;: s.get(&quot;mean_net_R&quot;)`).
+- **Mismatch:** the exam&#x27;s &quot;1R&quot; is the certified **2×ATR** stop; the live book risks **1×ATR** (see §2). So a
+  given `net_per_trade_R` is measured over a 2-ATR risk unit but the live ₹1,000 is risked over 1 ATR — the
+  rupee meaning of the certified R is not preserved.
+
+## 2. Exit — MISMATCH on all three dimensions (the load-bearing defect)
+
+- **Live hold = 20 days**, hard-coded: `book20_runner.py:39` `H = 20`. The fill call passes `H`, **not** the
+  candidate&#x27;s certified horizon, even though it is carried: `book20_runner.py:401-402`
+  `fill_at_touch(… _atr_of(c), H, …)`.
+- **Live stop = 1×ATR**: `book20_runner.py:163` `stop_px = touch − atr … # 1×ATR = 1R`; management
+  `book20_runner.py:185` `stop = entry − atr … (NOT the measured MAE stop)`.
+- **Live always trails / breaks even / takes a half-partial**: `book20_runner.py:197` (trail), `:202` (partial
+  +1.5 ATR), `:227` time exit at `hold_ticks`.
+- **Certified (LIVE-PATTERN-SET.json):** all 5 patterns `stop_atr: 2.0`, `trail: false`, horizon **40 (×2) /
+  60 (×3)** — &quot;hold up to 60 days, stop 2 times the stock&#x27;s own daily swing, **fixed stop and target**&quot;.
+- The exam simulated exactly that certified variant (`exams_real.py` builds `cand = {&quot;horizon&quot;: H, &quot;stop&quot;:
+  stop, &quot;trail&quot;: trail, &quot;mean_net_R&quot;: …}`). **The live loop reads none of those per-pattern parameters.**
+
+→ Tomorrow: 20-day / 1×ATR / trailing management on patterns certified at 40–60-day / 2×ATR / fixed.
+
+## 3. Order + fill functions — ONE shared path (no per-engine fork)
+
+- One order-row writer: `paper.append_rows` (`book20_runner.py:431` → `paper.py:278`). One live fill-pricer:
+  `fill_at_touch` (`book20_runner.py:144`). Exit pricer: `manage_position` (`book20_runner.py:176`).
+- **E10/E11 do not fork the fill** — `engine_book.py:9-11` &quot;nothing here forks the fill code; this module only
+  RECORDS what each engine&#x27;s sizing would have made&quot;; they record off E1&#x27;s fill (weight × ₹1,000). **No engine
+  has its own order/fill path.** ✓ (matches)
+
+## 4. Fill pricing — real top-of-book touch, not mid/close; but exam uses next-open
+
+- **Live:** the touch — `book20_runner.py:151` `touch = ask if long else bid`; entry written = the touch
+  (`:170`). Mid is only a &quot;would-be&quot; column (`:157`, header `:8`). So **not mid, not close** — real book at
+  signal time. ✓
+- **Exam:** enters at the **next daily open** — `paper.py:80` &quot;Enter at the NEXT daily open after signal_pos&quot;,
+  `:96` `e = signal_pos + 1  # next bar&#x27;s open = the fill`, `:102` `entry = o[e]`; exits on later daily bars.
+- **Mismatch:** live = intraday ask/bid at signal time; exam = next-day open with daily-bar exits. Different
+  fill models.
+
+## 5. Spread warm-up — works and holds, but the reason isn&#x27;t labelled &quot;warm-up&quot;
+
+- Threshold = **20 of the stock&#x27;s own readings**, **measured** (no typed fallback for the lock):
+  `money.py:89` `SPREAD_READINGS_MIN = 20`; `money.py:139` returns `None` under 20 → the stock stays locked.
+- A signal **is HELD** when it isn&#x27;t ready — `desk.py:49-52` fails closed (&quot;no MEASURED per-stock ceiling yet …
+  → locked, fail-closed&quot;); surfaced as HELD at `book20_runner.py:623`.
+- **But the HELD reason string is `&quot;HELD — moment light not green (spread/depth)&quot;`** (`book20_runner.py:623`) —
+  it does **not** say &quot;warm-up&quot; / &quot;cold start&quot; / &quot;no depth&quot;. (The &quot;COLD-START&quot; wording is only in the cost
+  readout, a different path: `money.py:195`.) Note: the **cost** charged on a fill *does* fall back to a typed
+  5 bps half-spread before warm-up (`money.py:19`), unlike the lock.
+
+## 6. Which of 1–5 make tomorrow&#x27;s paper trades NOT match the exam
+
+- **#2 EXIT — YES, load-bearing.** 20-day/1×ATR/trailing vs certified 40–60-day/2×ATR/fixed. This alone means
+  the live P&amp;L will not track the `net_per_trade_R` that certified the patterns.
+- **#1 SIZING R-UNIT — YES.** Live risks 1 ATR, the exam&#x27;s R is 2 ATR; the certified per-trade R won&#x27;t
+  reproduce in rupees.
+- **#4 FILL MODEL — YES.** Intraday touch (live) vs next-day open (exam) is a different fill.
+- **#3 order/fill shared — OK.** No mismatch.
+- **#5 warm-up gate — OK in substance** (it holds, fail-closed), **cosmetic gap**: the HELD reason is not
+  labelled &quot;warm-up&quot;.
+
+## LEAD RULING NEEDED
+
+1. **The live book manages every pattern at 20-day / 1×ATR / always-trail, not the certified 40–60-day /
+   2×ATR / fixed-stop.** Should `book20_runner` read each pattern&#x27;s `horizon` / `stop_atr` / `trail` from
+   `LIVE-PATTERN-SET.json` (a new queue item), or is the 20-day book the intended live management regardless
+   of the exam? **This is not covered by R-LIVE-GATE** (which is the six execution *checks*, not the exit
+   management).
+2. **The exam fills at next-day open; the live book fills at the intraday touch.** Which is the reference the
+   twin test (R-TWIN-TEST) should hold the two to — should they be made to agree, and which side moves?
+3. **The R-unit differs (1 ATR live vs 2 ATR exam).** Confirm whether the live 1R should be the certified
+   2×ATR risk so `net_per_trade_R` is comparable.
+
+(Item #5&#x27;s cosmetic &quot;warm-up&quot; label and any small fixes I can make paper-side without a spec call are not
+listed here — they are candidate queue items, not owner decisions.)
+</pre><h3>2026-09-22-codex-setup.md</h3><pre># Codex CLI setup — diagnosis (R-CODEX-SETUP, 2026-09-22)
+
+Dispatch: `docs/dispatches/2026-09-22_R-CODEX-SETUP.md`. Nothing here touches the trading path.
+
+## What was measured (read-only, on this laptop)
+
+| Check | Result |
+|---|---|
+| `codex --version` | `codex-cli 0.155.1` |
+| `nslookup auth.openai.com` | Resolves → Cloudflare CDN (172.64.146.15, 104.18.41.241, IPv6) — **DNS is fine** |
+| `netsh winhttp show proxy` | **Direct access (no proxy server)** |
+| proxy env vars | **none** |
+| `netsh interface ipv4 show excludedportrange protocol=tcp` | excluded: **1073–1472**, 14859–14958, 50000–50059 |
+| `codex login status` | `Not logged in` |
+| `curl -I https://auth.openai.com/...` | **could not run** — the agent&#x27;s sandbox permission-denies outbound `curl`; this is a limit of my terminal, **not** evidence about the laptop&#x27;s network |
+
+## Root cause of the two failures
+
+1. **`codex login` → socket error 10013 (WSAEACCES).** The OAuth loopback callback port codex uses,
+   **1455, sits inside the Windows excluded TCP range 1373–1472** (part of the 1073–1472 block reserved by
+   Windows NAT / Hyper-V / WSL). A process cannot bind a port inside an excluded range, so the callback
+   server bind fails with 10013. **This is the answer to the dispatch&#x27;s direct question: yes, 1455 is inside
+   an excluded range.**
+
+2. **`codex login --device-auth` → &quot;error sending request&quot;.** The device-auth path does **not** use a
+   loopback port, so it is not affected by (1). When I ran `codex login --device-auth` here it did **not**
+   error out — it ran for 45s+ with no &quot;error sending request&quot;, which indicates egress from codex to
+   auth.openai.com **works** on this laptop now (the earlier failure was likely transient or from a
+   sandboxed context). **But** device-auth needs a real terminal (TTY) to display its link + one-time code;
+   run head-less through the agent&#x27;s piped Bash it emits **nothing** (0 bytes captured, still &quot;Not logged
+   in&quot;), so I cannot read or relay the code from here.
+
+## Fix options
+
+- **No-admin, one link (recommended).** The owner runs **`codex login --device-auth`** in their **own
+  PowerShell** window. It prints a verification link + a short code; the owner opens the link and enters the
+  code. No admin rights, no port fix needed — egress is not the blocker. *(I cannot drive this for the owner
+  because the code only renders on a real terminal, not the agent&#x27;s pipe.)*
+
+- **Admin, to make the normal `codex login` loopback flow work.** Free port 1455 from the excluded range.
+  The 1073–1472 block is a dynamic winnat reservation; in an **elevated** PowerShell:
+  `net stop winnat` then `net start winnat` (regenerates the dynamic ranges, usually off the low ports),
+  or explicitly reserve the flow&#x27;s range away from 1455. This needs admin and is **not** required if the
+  device-auth path above is used.
+
+## Verdict
+
+Sign-in is **not network-blocked** and needs **no admin** — it needs a real terminal the agent doesn&#x27;t
+have. The single owner action that finishes it is one command in their own PowerShell plus one link tap.
+`codex exec &quot;reply with the word ok&quot;` (step 4) can only be run **after** that sign-in completes.
+</pre><h3>2026-09-22-R-STOP-SPAM.md</h3><pre># R-STOP-SPAM — report (2026-09-22)
 
 ## 1. The &quot;[CODE] session finished — come back&quot; spam
 - **Sender:** `scripts/alert_done.py`, the Stop hook wired in `.claude/settings.json`. It fired on EVERY turn
@@ -62,6 +490,40 @@ One link shows what the build session is doing right now, at most one status cyc
 
 BUILT, not live: the running site_loop still carries the pre-R-NOW-LINE vitals; the NOW line goes live on the
 next stack restart (a human/owner act). The auditor confirms it in the running loop next.
+</pre><h3>2026-09-22-R-EYES-COMPLETE.md</h3><pre># R-EYES-COMPLETE — report (2026-09-22) — BUILT (live once the first → AUDIT report lands)
+
+One link — the build room — mirrors everything the owner would otherwise paste, written by the status-writer
+process, and the lead&#x27;s rulings reach the builder by Telegram without opening a session.
+
+## Steps + commits
+1. One link / mirror pages — the /build/ index links all ten pages: Now (status.html top) · Journal · Commits
+   · Tests · Supervisor · Messages · Reports · Screenshots · Queue · Eyes. Each page shows its own written
+   time; the status writer (site_loop&#x27;s halt-proof daemon, via build_journal→mirror) writes them each cycle.
+   **db81dc744**
+2. Messages — scripts/msg_log.py records every line sent (notify→outgoing) and command received
+   (kill_switch→incoming) to reports/MSG-LOG.tsv, scrubbed, newest first. **d696097a9**
+3. Reports — every end-of-dispatch/audit/supervisor report is written to docs/reports/*.md before posting; the
+   Reports page renders them newest first (this file included). **db81dc744**
+4. Screenshots — mirror.record_screenshot(time·ruling·page) → the Screenshots page. **db81dc744**
+5. Queue — mirror.queue_state derives archived/in-progress/pending/done from docs/dispatches (+ inbox) and the
+   checklist; next_pending() feeds the beat&#x27;s next, never typed. **db81dc744**
+6. Ruling inbox — a → BUILD Telegram (owner chat) is archived verbatim to docs/dispatches/inbox/&lt;time&gt;.md and
+   inserted at the front of the checklist (auto-continue takes it next); a → AUDIT triggers a fresh independent
+   Opus audit (docs/AUDITOR-TEMPLATE.md, reads repo+mirror) whose report lands on Reports + one Telegram line.
+   The bot replies &quot;queued: &lt;first words&gt;&quot;. Interactive audit retired. **ef04300cd**
+7. Every Telegram line ends with the mirror link. **b955569cd**
+8. Eyes map — docs/EYES.md, linked from status.html: every watcher × (sees what · how old at most · what
+   freezes it · what still needs the owner). **db81dc744**
+9. Tests per step, all committed; no test sends a real Telegram line or touches a ledger.
+
+## Mirror link
+https://[redacted]-[redacted].github.io/e1-live-site/build/index.html
+
+## BUILT, not live
+The running token_ping/site_loop still carry the pre-R-EYES-COMPLETE code, so the inbox routing, the mirror
+pages and the daemon writing them go live on the next stack restart (a human/owner act). The END-TO-END PROOF
+is the owner&#x27;s first &quot;→ AUDIT&quot; from Telegram: it must appear on Queue, run, and land on Reports without anyone
+opening a session. Until that report exists on the mirror, this is BUILT, not live.
 </pre><h3>2026-09-22-213120-audit.md</h3><pre># Audit 2026-09-22-213120
 
 _Fresh independent audit (→ AUDIT). Reason: check the ledgers_
