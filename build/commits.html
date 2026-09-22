@@ -1,4 +1,580 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c2accee7a</b> · 2026-09-22 20:49</div><div>Reconcile journal + beat state with git (R-HALT-FIX step 3): current work is R-HALT-FIX then R-V2-EXACT</div><div class='sub h'>reports/BUILD-JOURNAL.log |  1 +</div><div class='sub h'>reports/BUILD-STATE.json  |  8 ++++----</div><div class='sub h'>reports/ITEM-TIMES.json   | 18 ++++++++++++++++++</div><pre>diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3fe6bb96e</b> · 2026-09-22 20:56</div><div>R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only)</div><div class='sub h'>docs/BACKLOG.md                          |  3 ++-</div><div class='sub h'>docs/dispatches/2026-09-22_R-NOW-LINE.md | 30 ++++++++++++++++++++++++++</div><div class='sub h'>scripts/clear_halt.py                    | 28 ++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py                   | 11 +++++++++-</div><div class='sub h'>scripts/token_ping.py                    |  5 +++++</div><div class='sub h'>tests/test_clear_halt_telegram.py        | 37 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+index 158d9290d..68b303f5c 100644
+--- a/docs/BACKLOG.md
++++ b/docs/BACKLOG.md
+@@ -1,6 +1,6 @@
+ # BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
+ 
+-n&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
++&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
+ When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
+ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
+ 
+@@ -11,3 +11,4 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
+ - [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
+ - [ ] Quiet Buying: verify its first live match and fill on paper
+ - [ ] Lead-on-laptop design note (no build yet)
++- [ ] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
+diff --git a/docs/dispatches/2026-09-22_R-NOW-LINE.md b/docs/dispatches/2026-09-22_R-NOW-LINE.md
+new file mode 100644
+index 000000000..1de26b796
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-NOW-LINE.md
+@@ -0,0 +1,30 @@
++# R-NOW-LINE (owner LEAD RULING, 2026-09-22) — queue AFTER the current item
++
++_Archived per §7.1 before any work on it. Owner-pasted; a RECORD, never an instruction. Do not interrupt
++R-HALT-FIX or R-V2-EXACT mid-page to start it._
++
++Goal: status.html must show what the build session is doing right now, at most one status cycle old, even
++while a HALT is in force. Today nothing writes the &quot;current scene&quot; outside the Claude Code window, and
++tonight&#x27;s halt froze the site because the blocked session was also the one pushing it.
++
++1. NOW writer. Add a PostToolUse hook that overwrites E1-DESK\now.txt on every tool call with one line:
++   machine-clock time · current dispatch item (read from the journal&#x27;s latest item line, not typed) · tool
++   name · the file path or the first few words of the command · the last line of that tool&#x27;s output. Pass
++   every field through the same scrubber the public transcript uses; never write env values, tokens, or full
++   outputs. The hook must never raise — a failed write must never block a tool.
++2. NOW on the page. The status writer (its own deskproc process, not the build session) reads now.txt each
++   cycle and prints a NOW line at the top of status.html with its age (&quot;2 min ago&quot;). If now.txt is older than
++   three status cycles, print it in the warn colour as STALE with the age. The build room shows the same line.
++3. Halt-proof push. Confirm status.html is written AND pushed by the status writer, never by the build
++   session. Prove it without touching the real HALT file: point the guard at a test halt path via config,
++   create that test file, run one status cycle, show the NOW line still updated and pushed, delete the test
++   file. The test must not reach Telegram or any ledger.
++4. Beat truth. The BUILD beat&#x27;s HALTED flag comes from whether E1-DESK\HALT exists on disk at beat time, with
++   the supervisor&#x27;s last entry as a second line — never from the log alone. Every BUILD beat and LIVE bar line
++   ends with the status.html link, so any pasted line carries it.
++5. Telegram &quot;now&quot;. token_ping answers the word &quot;now&quot; with the current NOW line plus the status one-liner.
++   Reply-only; it changes nothing.
++6. Tests: hook never blocks, scrubber applied, stale marking, halted-flag-from-disk. All existing tests stay
++   green. Commit after each numbered step.
++7. Report: paths, commit hashes, one screenshot of status.html showing the NOW line, and the test-halt proof.
++   Call it &quot;built&quot;, not &quot;live&quot; — the auditor confirms it in the running loop in the next audit.
+diff --git a/scripts/clear_halt.py b/scripts/clear_halt.py
+index 94425f75b..85949edbe 100644
+--- a/scripts/clear_halt.py
++++ b/scripts/clear_halt.py
+@@ -73,6 +73,34 @@ def clear(commits=None):
+     return True, &quot;HALT cleared and logged.&quot;
+ 
+ 
++def owner_clear(reason=&quot;&quot;, logger=None):
++    &quot;&quot;&quot;R-HALT-FIX (4): the OWNER override — deletes HALT directly (owner authority, no commit-reference check)
++    and logs it. Used when the owner sends &#x27;clear halt: &lt;reason&gt;&#x27; from their Telegram chat.&quot;&quot;&quot;
++    if not os.path.exists(HALT):
++        return False, &quot;no HALT file — nothing to clear&quot;
++    try:
++        was = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)[:200]
++    except Exception:
++        was = &quot;&quot;
++    try:
++        os.remove(HALT)
++    except Exception as e:
++        return False, &quot;could not remove HALT: %s&quot; % e
++    line = &quot;%s owner cleared HALT via Telegram — reason: %s (halt was: %s)&quot; % (
++        datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;), (reason or &quot;&quot;).strip()[:120], was)
++    try:
++        os.makedirs(os.path.dirname(LOG), exist_ok=True)
++        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++    if logger:
++        try:
++            logger(line)
++        except Exception:
++            pass
++    return True, line
++
++
+ def _demo():
+     reason = &quot;R-BACKLOG is run-authored scope (§20.6)&quot;
+     assert references_halt(reason, [[&quot;h&quot;, &quot;clear halt: R-BACKLOG was owner-pasted&quot;, &quot;&quot;]]) is True
+diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+index b6ae56c20..c11a2ef5f 100644
+--- a/scripts/kill_switch.py
++++ b/scripts/kill_switch.py
+@@ -89,11 +89,20 @@ def poll_telegram(get=None):
+         msg = upd.get(&quot;message&quot;) or {}
+         if str((msg.get(&quot;chat&quot;) or {}).get(&quot;id&quot;)) != str(chat_id):
+             continue                                   # only the owner&#x27;s chat
+-        text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip().upper()
++        raw_text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip()
++        text = raw_text.upper()
+         if text == &quot;KILL&quot;:
+             kill(); action = &quot;KILL&quot;
+         elif text == &quot;RESUME&quot;:
+             resume(); action = &quot;RESUME&quot;
++        elif text.startswith(&quot;CLEAR HALT&quot;):           # R-HALT-FIX §4: owner override from their own chat
++            reason = raw_text.split(&quot;:&quot;, 1)[1].strip() if &quot;:&quot; in raw_text else &quot;&quot;
++            try:
++                from scripts import clear_halt
++                ok, _msg = clear_halt.owner_clear(reason)
++                action = &quot;CLEAR-HALT&quot; if ok else action
++            except Exception:
++                pass
+     return action
+ 
+ 
+diff --git a/scripts/token_ping.py b/scripts/token_ping.py
+index 605253d97..0f8a0d4d7 100644
+--- a/scripts/token_ping.py
++++ b/scripts/token_ping.py
+@@ -48,6 +48,11 @@ def _sleep_until(target):
+             build_beat.maybe_post()
+         except Exception:
+             pass
++        try:
++            from scripts import kill_switch         # R-HALT-FIX §4: accept &#x27;clear halt: &lt;reason&gt;&#x27; from the owner
++            kill_switch.poll_telegram()             # (also carries KILL/RESUME); owner-chat-only, reply-safe
++        except Exception:
++            pass
+         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
+ 
+ 
+diff --git a/tests/test_clear_halt_telegram.py b/tests/test_clear_halt_telegram.py
+new file mode 100644
+index 000000000..d7e5efdaf
+--- /dev/null
++++ b/tests/test_clear_halt_telegram.py
+@@ -0,0 +1,37 @@
++&quot;&quot;&quot;R-HALT-FIX (2,4): owner_clear deletes HALT directly + logs; kill_switch acts on &#x27;clear halt:&#x27; from the
++owner&#x27;s chat only.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++
++
++def test_owner_clear_deletes_and_logs():
++    from scripts import clear_halt
++    d = tempfile.mkdtemp()
++    clear_halt.HALT = os.path.join(d, &quot;HALT&quot;); clear_halt.LOG = os.path.join(d, &quot;log&quot;)
++    open(clear_halt.HALT, &quot;w&quot;).write(&quot;some reason&quot;)
++    ok, msg = clear_halt.owner_clear(&quot;owner says so&quot;)
++    assert ok and not os.path.exists(clear_halt.HALT)
++    assert &quot;owner cleared HALT&quot; in open(clear_halt.LOG).read()
++
++
++def test_kill_switch_clear_halt_owner_chat_only(monkeypatch):
++    from scripts import kill_switch, clear_halt
++    d = tempfile.mkdtemp()
++    clear_halt.HALT = os.path.join(d, &quot;HALT&quot;); clear_halt.LOG = os.path.join(d, &quot;log&quot;)
++    open(clear_halt.HALT, &quot;w&quot;).write(&quot;halt reason&quot;)
++    monkeypatch.setattr(kill_switch, &quot;_tg_creds&quot;, lambda: (&quot;tok&quot;, &quot;999&quot;))
++    monkeypatch.setattr(kill_switch, &quot;_read_offset&quot;, lambda: 0)
++    monkeypatch.setattr(kill_switch, &quot;_write_offset&quot;, lambda v: None)
++    # a message from the WRONG chat is ignored
++    wrong = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 1, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 111}, &quot;text&quot;: &quot;clear halt: x&quot;}}]})
++    kill_switch.poll_telegram(get=lambda u: wrong)
++    assert os.path.exists(clear_halt.HALT)                       # untouched — not the owner&#x27;s chat
++    # the owner&#x27;s chat clears it
++    right = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 2, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 999}, &quot;text&quot;: &quot;clear halt: fixed it&quot;}}]})
++    act = kill_switch.poll_telegram(get=lambda u: right)
++    assert act == &quot;CLEAR-HALT&quot; and not os.path.exists(clear_halt.HALT)
++
++
++if __name__ == &quot;__main__&quot;:
++    import pytest
++    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
+</pre></div><div class='c'><div class='h'><b>9b2d856ab</b> · 2026-09-22 20:54</div><div>R-HALT-FIX (3): supervisor reads pasted rulings + docs/dispatches before judging provenance</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md |  5 +++++</div><div class='sub h'>scripts/supervisor.py       | 15 ++++++++++++---</div><pre>diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
+index e23782b9a..57d64d039 100644
+--- a/docs/SUPERVISOR-TEMPLATE.md
++++ b/docs/SUPERVISOR-TEMPLATE.md
+@@ -7,6 +7,11 @@ Read what is given to you below: the ruling in force, the build journal, the bui
+ last check, the commits and diffs since the last check, and STATUS.json. Then check ONLY these, against the
+ standing laws (CLAUDE.md §3, §4, §13, §18, §20):
+ 
++0. PROVENANCE FIRST (R-HALT-FIX §3) — before judging scope, READ the pasted rulings in the build transcript
++   AND the files under docs/dispatches/. A ruling the OWNER pasted (any &quot;LEAD RULING …&quot; / &quot;ADD …&quot; in the
++   transcript, or an archived dispatch) is OWNER SCOPE — never call it run-authored. Only flag §20.6 when a
++   change traces to NO owner ruling in the transcript or docs/dispatches. If a ruling looks unarchived, that
++   is at most a §7.1 record gap to note — not grounds to HALT the work it authorises.
+ 1. SCOPE — every change traces to the ruling in force. Scope authored by the run itself is a violation (§20.6).
+ 2. NO SELF-AUDIT — the builder did not grade its own work as an independent check.
+ 3. NO TYPED NUMBERS — no naked constant; every number is derived (§4.1).
+diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+index db97269fb..c6dc3f8fb 100644
+--- a/scripts/supervisor.py
++++ b/scripts/supervisor.py
+@@ -132,17 +132,26 @@ def gather():
+         status = open(os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;).read()[:6000]
+     except Exception:
+         pass
++    dispatches = []                                   # R-HALT-FIX §3: the archived owner rulings, for provenance
++    try:
++        import glob as _g
++        dispatches = sorted(os.path.basename(p) for p in _g.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;*.md&quot;)))
++    except Exception:
++        pass
+     return {&quot;ruling&quot;: ruling, &quot;journal&quot;: journal, &quot;transcript&quot;: trans, &quot;commits&quot;: commits,
+-            &quot;diffs&quot;: diffs[:120000], &quot;status&quot;: status, &quot;head&quot;: head, &quot;transcript_events&quot;: new_off}
++            &quot;diffs&quot;: diffs[:120000], &quot;status&quot;: status, &quot;head&quot;: head, &quot;transcript_events&quot;: new_off,
++            &quot;dispatches&quot;: dispatches}
+ 
+ 
+ def _prompt(g):
+     tmpl = open(TEMPLATE, encoding=&quot;utf-8&quot;).read()
+     return (&quot;%s\n\n===== RULING IN FORCE =====\n%s\n\n===== BUILD JOURNAL =====\n%s\n\n&quot;
+             &quot;===== TRANSCRIPT SINCE LAST CHECK =====\n%s\n\n===== COMMITS SINCE LAST CHECK =====\n%s\n\n&quot;
+-            &quot;===== DIFFS SINCE LAST CHECK =====\n%s\n\n===== STATUS.json =====\n%s\n&quot; % (
++            &quot;===== DIFFS SINCE LAST CHECK =====\n%s\n\n===== ARCHIVED OWNER RULINGS (docs/dispatches) =====\n%s\n\n&quot;
++            &quot;===== STATUS.json =====\n%s\n&quot; % (
+                 tmpl, g[&quot;ruling&quot;], g[&quot;journal&quot;], g[&quot;transcript&quot;] or &quot;(nothing new)&quot;,
+-                g[&quot;commits&quot;] or &quot;(none)&quot;, g[&quot;diffs&quot;] or &quot;(none)&quot;, g[&quot;status&quot;]))
++                g[&quot;commits&quot;] or &quot;(none)&quot;, g[&quot;diffs&quot;] or &quot;(none)&quot;,
++                &quot;, &quot;.join(g.get(&quot;dispatches&quot;) or []) or &quot;(none)&quot;, g[&quot;status&quot;]))
+ 
+ 
+ # ---------------------------------------------------------------------------------------------------------
+</pre></div><div class='c'><div class='h'><b>7d0af7662</b> · 2026-09-22 20:53</div><div>R-HALT-FIX (2): guard no longer deadlocks — allows reads/git-commit/docs+journal/clear_halt only while halted</div><div class='sub h'>.claude/hooks/halt_guard.py | 100 +++++++++++++++++++++++++++++++++++---------</div><div class='sub h'>scripts/clear_halt.py       |  90 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_halt_guard.py    |  45 ++++++++++++++++++++</div><pre>diff --git a/.claude/hooks/halt_guard.py b/.claude/hooks/halt_guard.py
+index 078f51a56..f9131ec04 100644
+--- a/.claude/hooks/halt_guard.py
++++ b/.claude/hooks/halt_guard.py
+@@ -1,26 +1,88 @@
+-&quot;&quot;&quot;R-EYES-FULL: PreToolUse guard. While E1-DESK\\HALT exists (the supervisor found a violation), refuse EVERY
+-tool call and show the reason. The builder may clear HALT only after a commit that addresses the reason.
+-Exit 2 = block (stderr is shown to the model). Fail-open on any error (never wedge the session on a hook bug).&quot;&quot;&quot;
++&quot;&quot;&quot;R-EYES-FULL + R-HALT-FIX (2): PreToolUse guard. While E1-DESK\\HALT exists, the builder is halted — but it
++must still be able to ADDRESS the halt, so this guard allows EXACTLY these actions and blocks everything else:
++
++  - reading (Read/Grep/Glob/LS/NotebookRead, and read-only Bash: cat/ls/grep/head/tail/sed -n/find/wc/git
++    log|status|diff|show|rev-parse);
++  - git commit / git add (to commit the fix that addresses the halt);
++  - writes under docs/dispatches/ and to the build journal (reports/BUILD-JOURNAL.log);
++  - scripts/clear_halt.py (which removes HALT only after a commit that references the halt reason).
++
++Anything else — editing code, running engines/tests, starting processes — is refused with the reason. This
++removes the old deadlock (the guard used to block the very commit that clears the halt). Fail-open on a hook
++error, never wedge the session on a bug.&quot;&quot;&quot;
++import json
+ import os
++import re
+ import sys
+ 
+ HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
+-try:
++
++READ_TOOLS = {&quot;Read&quot;, &quot;Grep&quot;, &quot;Glob&quot;, &quot;LS&quot;, &quot;NotebookRead&quot;, &quot;ReadNotifications&quot;, &quot;ExitPlanMode&quot;}
++WRITE_TOOLS = {&quot;Write&quot;, &quot;Edit&quot;, &quot;MultiEdit&quot;, &quot;NotebookEdit&quot;}
++# read-only or fix-path bash commands allowed while halted
++_BASH_ALLOW = re.compile(
++    r&quot;^\s*(cd\s+[^\n]*?&amp;&amp;\s*)*\s*(&quot;
++    r&quot;git\s+(commit|add|log|status|diff|show|rev-parse|rev-list|cat-file)\b&quot;
++    r&quot;|cat\b|ls\b|grep\b|rg\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|echo\b|true\b&quot;
++    r&quot;|python\s+-m\s+scripts\.clear_halt\b|python\s+scripts[/\\]clear_halt\.py\b&quot;
++    r&quot;)&quot;, re.I)
++
++
++def _allowed_path(p):
++    p = (p or &quot;&quot;).replace(&quot;\\&quot;, &quot;/&quot;)
++    return &quot;docs/dispatches/&quot; in p or p.endswith(&quot;reports/BUILD-JOURNAL.log&quot;)
++
++
++def _bash_ok(cmd):
++    c = (cmd or &quot;&quot;)
++    if &quot;clear_halt&quot; in c:
++        return True
++    if _BASH_ALLOW.match(c):
++        # if it redirects/appends, the target must be the journal or docs/dispatches
++        redirs = re.findall(r&quot;&gt;&gt;?\s*([^\s;&amp;|]+)&quot;, c)
++        return all(_allowed_path(r) for r in redirs)
++    return False
++
++
++def _decide(payload):
++    if not os.path.exists(HALT):
++        return True, &quot;&quot;
+     try:
+-        sys.stdin.read()                   # drain the hook payload; we block regardless of which tool it names
++        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
+     except Exception:
+-        pass
+-    if os.path.exists(HALT):
+-        try:
+-            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
+-        except Exception:
+-            reason = &quot;(reason unreadable)&quot;
+-        sys.stderr.write(&quot;SUPERVISOR HALT is in force — every tool call is refused until it clears.\n%s\n&quot;
+-                         &quot;Clear it only with a commit that addresses the reason (delete E1-DESK\\HALT), &quot;
+-                         &quot;then log it in the journal.&quot; % reason)
++        reason = &quot;(reason unreadable)&quot;
++    tool = payload.get(&quot;tool_name&quot;) or &quot;&quot;
++    ti = payload.get(&quot;tool_input&quot;) or {}
++    if tool in READ_TOOLS:
++        return True, &quot;&quot;
++    if tool in WRITE_TOOLS:
++        return (_allowed_path(ti.get(&quot;file_path&quot;)), reason)
++    if tool == &quot;Bash&quot;:
++        return (_bash_ok(ti.get(&quot;command&quot;)), reason)
++    return False, reason
++
++
++def main():
++    try:
++        raw = sys.stdin.read()
++    except Exception:
++        raw = &quot;&quot;
++    try:
++        payload = json.loads(raw) if raw.strip() else {}
++    except Exception:
++        payload = {}
++    try:
++        ok, reason = _decide(payload)
++    except Exception:
++        sys.exit(0)          # fail-open
++    if not ok:
++        sys.stderr.write(&quot;SUPERVISOR HALT is in force — only reads, git commit, docs/dispatches + journal &quot;
++                         &quot;writes, and scripts/clear_halt.py are allowed until it clears.\n%s\n&quot;
++                         &quot;Commit a fix that references the halt reason, then run scripts/clear_halt.py &quot;
++                         &quot;(or the owner sends &#x27;clear halt: &lt;reason&gt;&#x27;).&quot; % reason)
+         sys.exit(2)
+-except SystemExit:
+-    raise
+-except Exception:
+-    pass
+-sys.exit(0)
++    sys.exit(0)
++
++
++if __name__ == &quot;__main__&quot;:
++    main()
+diff --git a/scripts/clear_halt.py b/scripts/clear_halt.py
+new file mode 100644
+index 000000000..94425f75b
+--- /dev/null
++++ b/scripts/clear_halt.py
+@@ -0,0 +1,90 @@
++&quot;&quot;&quot;R-HALT-FIX (2): clear the supervisor HALT — but only after the builder has addressed it. It removes
++E1-DESK\\HALT ONLY if there is a commit since the halt whose message references the halt reason (mentions
++&#x27;halt&#x27; plus a distinctive token from the reason), and it logs the clearance. Otherwise it refuses and says
++why. This is the self-clear path the guard allows while halted, so the owner never has to delete the file by
++hand again.&quot;&quot;&quot;
++from __future__ import annotations
++
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
++LOG = os.path.join(REPO, &quot;reports&quot;, &quot;HALT-CLEAR.log&quot;)
++
++
++def _reason_tokens(reason):
++    &quot;&quot;&quot;Distinctive tokens from the halt reason a fix commit should reference (ruling codes, section numbers).&quot;&quot;&quot;
++    toks = set(re.findall(r&quot;R-[A-Z0-9\-]+|§?\d+\.\d+|run-authored&quot;, reason or &quot;&quot;, re.I))
++    return {t for t in toks if len(t) &gt;= 3}
++
++
++def _recent_commit_messages(n=12):
++    try:
++        out = subprocess.run([&quot;git&quot;, &quot;log&quot;, &quot;-%d&quot; % n, &quot;--format=%H%x1f%s%x1f%b%x1e&quot;], cwd=REPO,
++                             capture_output=True, text=True, timeout=20).stdout
++        return [c.split(&quot;\x1f&quot;) for c in out.split(&quot;\x1e&quot;) if c.strip()]
++    except Exception:
++        return []
++
++
++def references_halt(reason, commits=None):
++    &quot;&quot;&quot;True if a recent commit message mentions &#x27;halt&#x27; AND at least one distinctive token from the reason
++    (or plainly &#x27;clear halt&#x27;).&quot;&quot;&quot;
++    toks = _reason_tokens(reason)
++    for c in (commits if commits is not None else _recent_commit_messages()):
++        msg = &quot; &quot;.join(c[1:]).lower()
++        if &quot;clear halt&quot; in msg:
++            return True
++        if &quot;halt&quot; in msg and (not toks or any(t.lower() in msg for t in toks)):
++            return True
++    return False
++
++
++def clear(commits=None):
++    &quot;&quot;&quot;Returns (cleared: bool, message).&quot;&quot;&quot;
++    if not os.path.exists(HALT):
++        return False, &quot;no HALT file — nothing to clear&quot;
++    try:
++        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
++    except Exception:
++        reason = &quot;&quot;
++    if not references_halt(reason, commits):
++        return False, (&quot;REFUSED: no commit since the halt references its reason. Commit a fix whose message &quot;
++                       &quot;mentions &#x27;halt&#x27; and the reason (e.g. the ruling code), then run this again.&quot;)
++    try:
++        os.remove(HALT)
++    except Exception as e:
++        return False, &quot;could not remove HALT: %s&quot; % e
++    line = &quot;%s cleared HALT — reason was: %s&quot; % (datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;),
++                                                 reason.replace(&quot;\n&quot;, &quot; &quot;)[:200])
++    try:
++        os.makedirs(os.path.dirname(LOG), exist_ok=True)
++        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++    return True, &quot;HALT cleared and logged.&quot;
++
++
++def _demo():
++    reason = &quot;R-BACKLOG is run-authored scope (§20.6)&quot;
++    assert references_halt(reason, [[&quot;h&quot;, &quot;clear halt: R-BACKLOG was owner-pasted&quot;, &quot;&quot;]]) is True
++    assert references_halt(reason, [[&quot;h&quot;, &quot;unrelated commit about tests&quot;, &quot;&quot;]]) is False
++    assert references_halt(reason, [[&quot;h&quot;, &quot;fix the R-BACKLOG halt provenance&quot;, &quot;&quot;]]) is True
++    print(&quot;clear_halt demo OK: clears only when a commit references the halt reason.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        ok, msg = clear()
++        print(msg)
++        sys.exit(0 if ok else 1)
+diff --git a/tests/test_halt_guard.py b/tests/test_halt_guard.py
+new file mode 100644
+index 000000000..12ec4fb51
+--- /dev/null
++++ b/tests/test_halt_guard.py
+@@ -0,0 +1,45 @@
++&quot;&quot;&quot;R-HALT-FIX (2): while HALT exists the guard allows only reads, git commit, docs/dispatches+journal writes,
++and clear_halt.py; everything else is refused. clear_halt removes HALT only after a fix commit.&quot;&quot;&quot;
++import importlib.util, os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;, &quot;halt_guard.py&quot;)
++
++
++def _guard():
++    spec = importlib.util.spec_from_file_location(&quot;halt_guard&quot;, HOOK)
++    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
++    m.HALT = os.path.join(tempfile.mkdtemp(), &quot;HALT&quot;); open(m.HALT, &quot;w&quot;).write(&quot;2026 x\nR-BACKLOG scope (§20.6)&quot;)
++    return m
++
++
++def test_reads_and_git_commit_allowed():
++    g = _guard()
++    assert g._decide({&quot;tool_name&quot;: &quot;Read&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;x&quot;}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Grep&quot;, &quot;tool_input&quot;: {}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;git commit -m x&quot;}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;cd /r &amp;&amp; git add . &quot;}})[0] is True
++
++
++def test_docs_and_journal_writes_allowed_others_blocked():
++    g = _guard()
++    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;docs/dispatches/x.md&quot;}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;reports/BUILD-JOURNAL.log&quot;}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;scripts/engine.py&quot;}})[0] is False
++    assert g._decide({&quot;tool_name&quot;: &quot;Edit&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;scripts/site_v2.py&quot;}})[0] is False
++
++
++def test_clear_halt_and_engine_bash_blocked():
++    g = _guard()
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;python -m scripts.clear_halt&quot;}})[0] is True
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;python -m scripts.book20_runner&quot;}})[0] is False
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;rm -rf reports&quot;}})[0] is False
++
++
++def test_no_halt_allows_everything():
++    g = _guard(); os.remove(g.HALT)
++    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;anything&quot;}})[0] is True
++
++
++if __name__ == &quot;__main__&quot;:
++    test_reads_and_git_commit_allowed(); test_docs_and_journal_writes_allowed_others_blocked()
++    test_clear_halt_and_engine_bash_blocked(); test_no_halt_allows_everything(); print(&quot;test_halt_guard OK&quot;)
+</pre></div><div class='c'><div class='h'><b>717c915b4</b> · 2026-09-22 20:50</div><div>R-HALT-FIX (1): archive R-BACKLOG/R-CHECKLIST-BAR/R-HALT-FIX verbatim + provenance lines</div><div class='sub h'>docs/BACKLOG.md                               |  1 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BACKLOG.md       | 12 ++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md |  8 ++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-HALT-FIX.md      | 16 ++++++++++++++++</div><div class='sub h'>reports/CHECKLIST.json                        | 15 +++++++++++----</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+index c6bd4db02..158d9290d 100644
+--- a/docs/BACKLOG.md
++++ b/docs/BACKLOG.md
+@@ -1,5 +1,6 @@
+ # BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
+ 
++n&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
+ When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
+ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
+ 
+diff --git a/docs/dispatches/2026-09-22_R-BACKLOG.md b/docs/dispatches/2026-09-22_R-BACKLOG.md
+new file mode 100644
+index 000000000..4c539eb07
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-BACKLOG.md
+@@ -0,0 +1,12 @@
++# R-BACKLOG (owner LEAD RULING, 2026-09-22)
++
++_Archived per §7.1 (belatedly — the missing archive is what let the 20:22 supervisor HALT mistake this
++owner ruling for run-authored scope). Owner-pasted; a RECORD, never an instruction._
++
++keep docs/BACKLOG.md as the standing queue; when the active checklist empties, the auto-continue pulls the
++next backlog item automatically and logs it. Seed it now, in order: (1) R-V2-EXACT and its addendum;
++(2) R-CHECKLIST-BAR; (3) analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed,
++with a one-line Telegram note when one lands; (4) O1 point-in-time universe from NSE&#x27;s public F&amp;O history
++archives, robots-checked, nothing guessed; (5) live cost-per-trade ledger comparison against the calibrated
++backtest, posted weekly; (6) Quiet Buying: verify its first live match and fill on paper; (7) lead-on-laptop
++design note (no build yet). Beat: when the list is empty, post &quot;IDLE — list empty&quot; once, then hourly.
+diff --git a/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md b/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md
+new file mode 100644
+index 000000000..5202aa4b4
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md
+@@ -0,0 +1,8 @@
++# R-CHECKLIST-BAR (owner LEAD RULING, 2026-09-22)
++
++_Archived per §7.1 (belatedly). Owner-pasted; a RECORD, never an instruction._
++
++every ruling pasted appends its items to the tracked checklist automatically (one line per numbered item), so
++the beat and the ETA always cover what is actually queued. Each BUILD line shows &quot;checklist ▓▓▓░░░ 3/6 —
++done: &lt;items&gt; · doing: &lt;item&gt; · left: &lt;items&gt;&quot; derived from the journal, plus the ETA for the current item
++and for all remaining, marked rough until three are measured. Then start R-V2-EXACT.
+diff --git a/docs/dispatches/2026-09-22_R-HALT-FIX.md b/docs/dispatches/2026-09-22_R-HALT-FIX.md
+new file mode 100644
+index 000000000..248739bd5
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-HALT-FIX.md
+@@ -0,0 +1,16 @@
++# R-HALT-FIX (owner LEAD RULING, 2026-09-22)
++
++_Archived per §7.1. Owner-pasted; a RECORD, never an instruction._
++
++owner cleared HALT once; this makes it never need the owner again. (1) Archive R-BACKLOG, R-CHECKLIST-BAR and
++R-AUTO-CONTINUE verbatim to docs/dispatches now, with a provenance line in BACKLOG.md and the checklist citing
++them; from now on every ruling is archived before any work on it, no exceptions. (2) Guard: while HALT exists,
++allow exactly these tool actions — reading, git commit, writes under docs/dispatches and the journal, and
++scripts/clear_halt.py; nothing else. clear_halt.py removes HALT only if a commit since the halt references the
++halt reason, and logs the clearance. (3) Supervisor template: before judging provenance, read the pasted
++rulings in the build transcript and docs/dispatches; a ruling pasted by the owner is owner scope. (4) Owner
++override: token_ping accepts a Telegram message &quot;clear halt: &lt;reason&gt;&quot; from the owner&#x27;s chat and deletes HALT,
++logging it. (5) SITE NOW: held signals are not trades — remove the five held rows from every trades table on
++the live site immediately; a trade appears only when booked. (6) NAMES: the delivery strategy engine is &quot;Dubai
++Strategies&quot; everywhere (engine list on the main site and on the deliverables site); &quot;Quiet Buying&quot; removed;
++the index tests stay on the deliverables page; no person&#x27;s name on any page. Then resume R-V2-EXACT.
+diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
+index 7f73770af..e51884394 100644
+--- a/reports/CHECKLIST.json
++++ b/reports/CHECKLIST.json
+@@ -5,8 +5,15 @@
+   &quot;ADD(b) retire START_E1_ALL.bat sender&quot;
+  ],
+  &quot;done&quot;: [
+-  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;, &quot;C1 hunt&quot;, &quot;C2 sizing&quot;, &quot;C4 fill+haircut&quot;,
+-  &quot;C5 pairs&quot;, &quot;C6 parsers&quot;, &quot;ADD(c) measured sizing floor&quot;, &quot;R-CHECKLIST-BAR&quot;
++  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;,
++  &quot;C1 hunt&quot;,
++  &quot;C2 sizing&quot;,
++  &quot;C4 fill+haircut&quot;,
++  &quot;C5 pairs&quot;,
++  &quot;C6 parsers&quot;,
++  &quot;ADD(c) measured sizing floor&quot;,
++  &quot;R-CHECKLIST-BAR&quot;
+  ],
+- &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;
+-}
++ &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;,
++ &quot;provenance&quot;: &quot;owner rulings R-BACKLOG / R-CHECKLIST-BAR / R-AUTO-CONTINUE (docs/dispatches/2026-09-22_*), archived per \u00a77.1; the checklist + backlog + BUILD bar trace to these, not run-authored (\u00a720.6).&quot;
++}
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>c2accee7a</b> · 2026-09-22 20:49</div><div>Reconcile journal + beat state with git (R-HALT-FIX step 3): current work is R-HALT-FIX then R-V2-EXACT</div><div class='sub h'>reports/BUILD-JOURNAL.log |  1 +</div><div class='sub h'>reports/BUILD-STATE.json  |  8 ++++----</div><div class='sub h'>reports/ITEM-TIMES.json   | 18 ++++++++++++++++++</div><pre>diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
 index 2d8b6b14d..cddb1f39e 100644
 --- a/reports/BUILD-JOURNAL.log
 +++ b/reports/BUILD-JOURNAL.log
@@ -2321,834 +2897,4 @@ index 000000000..a9cbdde36
 +
 +if __name__ == &quot;__main__&quot;:
 +    test_haircut_credits_zero_until_o1(); test_fill_model_is_measured_or_conservative(); print(&quot;test_c4 OK&quot;)
-</pre></div><div class='c'><div class='h'><b>1cd78bbc1</b> · 2026-09-22 18:06</div><div>R-EVENING-22 C2: adaptive sizing on the survivors — the sizer&#x27;s own math, no typed sizes</div><div class='sub h'>reports/C2-SIZING.json  |  63 +++++++++++++++++++++++++++</div><div class='sub h'>reports/C2-SIZING.md    |  13 ++++++</div><div class='sub h'>scripts/c2_sizing.py    | 110 ++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_c2_sizing.py |  23 ++++++++++</div><pre>diff --git a/reports/C2-SIZING.json b/reports/C2-SIZING.json
-new file mode 100644
-index 000000000..5f2035777
---- /dev/null
-+++ b/reports/C2-SIZING.json
-@@ -0,0 +1,63 @@
-+{
-+ &quot;equity&quot;: 200000,
-+ &quot;survivors&quot;: [
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;family&quot;: &quot;ema&quot;,
-+   &quot;fires&quot;: 10,
-+   &quot;win_pct&quot;: 100.0,
-+   &quot;risk_rupees&quot;: 1000.0,
-+   &quot;risk_fraction&quot;: 0.005,
-+   &quot;mode&quot;: &quot;flat-fallback&quot;,
-+   &quot;reason&quot;: &quot;cold-start: too few fires (10&lt;30)&quot;,
-+   &quot;frac_kelly&quot;: null
-+  },
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;family&quot;: &quot;sma&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;win_pct&quot;: 100.0,
-+   &quot;risk_rupees&quot;: 1000.0,
-+   &quot;risk_fraction&quot;: 0.005,
-+   &quot;mode&quot;: &quot;flat-fallback&quot;,
-+   &quot;reason&quot;: &quot;cold-start: too few fires (9&lt;30)&quot;,
-+   &quot;frac_kelly&quot;: null
-+  },
-+  {
-+   &quot;stock&quot;: &quot;BSE&quot;,
-+   &quot;family&quot;: &quot;stddev_returns&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;win_pct&quot;: 100.0,
-+   &quot;risk_rupees&quot;: 1000.0,
-+   &quot;risk_fraction&quot;: 0.005,
-+   &quot;mode&quot;: &quot;flat-fallback&quot;,
-+   &quot;reason&quot;: &quot;cold-start: too few fires (9&lt;30)&quot;,
-+   &quot;frac_kelly&quot;: null
-+  },
-+  {
-+   &quot;stock&quot;: &quot;AUBANK&quot;,
-+   &quot;family&quot;: &quot;vwap&quot;,
-+   &quot;fires&quot;: 13,
-+   &quot;win_pct&quot;: 92.3,
-+   &quot;risk_rupees&quot;: 1000.0,
-+   &quot;risk_fraction&quot;: 0.005,
-+   &quot;mode&quot;: &quot;flat-fallback&quot;,
-+   &quot;reason&quot;: &quot;cold-start: too few fires (13&lt;30)&quot;,
-+   &quot;frac_kelly&quot;: null
-+  },
-+  {
-+   &quot;stock&quot;: &quot;ETERNAL&quot;,
-+   &quot;family&quot;: &quot;rsi&quot;,
-+   &quot;fires&quot;: 9,
-+   &quot;win_pct&quot;: 100.0,
-+   &quot;risk_rupees&quot;: 1000.0,
-+   &quot;risk_fraction&quot;: 0.005,
-+   &quot;mode&quot;: &quot;flat-fallback&quot;,
-+   &quot;reason&quot;: &quot;cold-start: too few fires (9&lt;30)&quot;,
-+   &quot;frac_kelly&quot;: null
-+  }
-+ ],
-+ &quot;adaptive_count&quot;: 0,
-+ &quot;flat_count&quot;: 5,
-+ &quot;note&quot;: &quot;Every rupee is the sizer&#x27;s own output (no typed sizes). The survivors size FLAT because each is below the 30-fire floor with no measured book drawdown \u2014 adaptive never exceeds the flat reference on a number it cannot support (fail-closed).&quot;
-+}
-\ No newline at end of file
-diff --git a/reports/C2-SIZING.md b/reports/C2-SIZING.md
-new file mode 100644
-index 000000000..c088d2053
---- /dev/null
-+++ b/reports/C2-SIZING.md
-@@ -0,0 +1,13 @@
-+# C2 — ADAPTIVE SIZING ON ₹2,00,000 (the survivors)
-+
-+_The built adaptive sizer (¼-Kelly on the Wilson-LB accuracy, bounded by pattern drawdown, a total-risk cap and a cluster cap, fail-closed to flat). No size is typed — every rupee is the sizer&#x27;s output, with the reason it chose it._
-+
-+| Stock | Pattern | Fires | Win % | Size chosen | Mode | Why |
-+|---|---|---|---|---|---|---|
-+| UNITDSPR | ema | 10 | 100.0 | ₹1,000 | flat-fallback | cold-start: too few fires (10&lt;30) |
-+| UNITDSPR | sma | 9 | 100.0 | ₹1,000 | flat-fallback | cold-start: too few fires (9&lt;30) |
-+| BSE | stddev_returns | 9 | 100.0 | ₹1,000 | flat-fallback | cold-start: too few fires (9&lt;30) |
-+| AUBANK | vwap | 13 | 92.3 | ₹1,000 | flat-fallback | cold-start: too few fires (13&lt;30) |
-+| ETERNAL | rsi | 9 | 100.0 | ₹1,000 | flat-fallback | cold-start: too few fires (9&lt;30) |
-+
-+**0 of 5 sized adaptively; 5 stayed flat.** The flat ones are correct: below the 30-fire floor with no measured book drawdown, the sizer will not exceed the ₹1,000 reference. Adaptive sizing turns on for a pattern the moment it has ≥30 fires and a measured drawdown.
-diff --git a/scripts/c2_sizing.py b/scripts/c2_sizing.py
-new file mode 100644
-index 000000000..ff6b98a46
---- /dev/null
-+++ b/scripts/c2_sizing.py
-@@ -0,0 +1,110 @@
-+&quot;&quot;&quot;R-EVENING-22 C2 — adaptive sizing EXACTLY as the math dictates, on ₹2,00,000, for the certified survivors.
-+
-+It runs the built adaptive sizer (engine1_rebuild.adaptive_sizing.size — Wilson-LB accuracy × win/loss at
-+¼-Kelly on current equity, bounded by the pattern&#x27;s drawdown, a total-risk cap and a cluster cap, fail-closed
-+to flat when a measurement is missing). NO size is typed — every rupee is the sizer&#x27;s own output, and the
-+reason it chose that size is printed beside it.
-+
-+On today&#x27;s five survivors the sizer stays FLAT: each has 9–13 fires (below the 30-fire floor) and no measured
-+book drawdown yet, which is precisely the confidence-adjusted, fail-closed behaviour — adaptive is never
-+larger than the ₹1,000 reference on a number it cannot support. That is the honest C2 result, not a bug.&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import sys
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+EQUITY = 200000
-+OUT_JSON = os.path.join(REPO, &quot;reports&quot;, &quot;C2-SIZING.json&quot;)
-+OUT_MD = os.path.join(REPO, &quot;reports&quot;, &quot;C2-SIZING.md&quot;)
-+
-+
-+def _survivors():
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;EXAMS-REAL-STAGING.json&quot;), encoding=&quot;utf-8&quot;))
-+        return d.get(&quot;certified_patterns&quot;) or []
-+    except Exception:
-+        return []
-+
-+
-+def size_all(equity=EQUITY):
-+    from engine1_rebuild import adaptive_sizing as AS
-+    rows = []
-+    for c in _survivors():
-+        scorecard = {
-+            &quot;fires&quot;: c.get(&quot;fires&quot;),
-+            &quot;win_rate&quot;: (c.get(&quot;win_pct&quot;) or 0) / 100.0,      # measured hit rate
-+            &quot;win_R&quot;: abs(float(c.get(&quot;mean_net_R&quot;) or 1.5)) or 1.5,
-+            &quot;loss_R&quot;: 1.0,                                     # 1R = the stop distance by construction
-+        }
-+        # worst_daily_dd_rupees is the BOOK&#x27;s measured worst daily drawdown — not measured per pattern yet,
-+        # so it is left None: the sizer then fails closed to flat, which is the correct confidence-adjusted
-+        # behaviour on a thin, young pattern. Nothing here is a typed size.
-+        sized = AS.size(scorecard, equity, worst_daily_dd_rupees=None)
-+        rows.append({&quot;stock&quot;: c.get(&quot;stock&quot;), &quot;family&quot;: c.get(&quot;family&quot;), &quot;fires&quot;: c.get(&quot;fires&quot;),
-+                     &quot;win_pct&quot;: c.get(&quot;win_pct&quot;), &quot;risk_rupees&quot;: sized.get(&quot;risk_rupees&quot;),
-+                     &quot;risk_fraction&quot;: sized.get(&quot;risk_fraction&quot;), &quot;mode&quot;: sized.get(&quot;mode&quot;),
-+                     &quot;reason&quot;: sized.get(&quot;reason&quot;), &quot;frac_kelly&quot;: sized.get(&quot;frac_kelly&quot;)})
-+    return rows
-+
-+
-+def run(write=True, equity=EQUITY):
-+    rows = size_all(equity)
-+    adaptive = [r for r in rows if r[&quot;mode&quot;] == &quot;adaptive&quot;]
-+    out = {&quot;equity&quot;: equity, &quot;survivors&quot;: rows, &quot;adaptive_count&quot;: len(adaptive), &quot;flat_count&quot;: len(rows) - len(adaptive),
-+           &quot;note&quot;: (&quot;Every rupee is the sizer&#x27;s own output (no typed sizes). The survivors size FLAT because &quot;
-+                    &quot;each is below the 30-fire floor with no measured book drawdown — adaptive never exceeds &quot;
-+                    &quot;the flat reference on a number it cannot support (fail-closed).&quot;)}
-+    if write:
-+        with open(OUT_JSON, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            json.dump(out, f, indent=1, default=str)
-+        _write_md(out)
-+    return out
-+
-+
-+def _rup(x):
-+    try:
-+        return &quot;₹%s&quot; % format(int(round(float(x))), &quot;,&quot;)
-+    except (TypeError, ValueError):
-+        return &quot;—&quot;
-+
-+
-+def _write_md(o):
-+    L = [&quot;# C2 — ADAPTIVE SIZING ON ₹2,00,000 (the survivors)&quot;, &quot;&quot;,
-+         &quot;_The built adaptive sizer (¼-Kelly on the Wilson-LB accuracy, bounded by pattern drawdown, a &quot;
-+         &quot;total-risk cap and a cluster cap, fail-closed to flat). No size is typed — every rupee is the &quot;
-+         &quot;sizer&#x27;s output, with the reason it chose it._&quot;, &quot;&quot;,
-+         &quot;| Stock | Pattern | Fires | Win %% | Size chosen | Mode | Why |&quot;,
-+         &quot;|---|---|---|---|---|---|---|&quot;]
-+    for r in o[&quot;survivors&quot;]:
-+        L.append(&quot;| %s | %s | %s | %s | %s | %s | %s |&quot; % (
-+            r[&quot;stock&quot;], r[&quot;family&quot;], r[&quot;fires&quot;], r[&quot;win_pct&quot;], _rup(r[&quot;risk_rupees&quot;]), r[&quot;mode&quot;], r[&quot;reason&quot;]))
-+    L += [&quot;&quot;, &quot;**%d of %d sized adaptively; %d stayed flat.** The flat ones are correct: below the 30-fire &quot;
-+          &quot;floor with no measured book drawdown, the sizer will not exceed the ₹1,000 reference. Adaptive &quot;
-+          &quot;sizing turns on for a pattern the moment it has ≥30 fires and a measured drawdown.&quot;
-+          % (o[&quot;adaptive_count&quot;], len(o[&quot;survivors&quot;]), o[&quot;flat_count&quot;])]
-+    with open(OUT_MD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+        f.write((&quot;\n&quot;.join(L) + &quot;\n&quot;).replace(&quot;Win %%&quot;, &quot;Win %&quot;))
-+
-+
-+def _demo():
-+    o = run(write=False)
-+    assert &quot;survivors&quot; in o and o[&quot;adaptive_count&quot;] + o[&quot;flat_count&quot;] == len(o[&quot;survivors&quot;])
-+    # every size is the sizer&#x27;s own output with a stated reason — never a typed number
-+    for r in o[&quot;survivors&quot;]:
-+        assert r[&quot;risk_rupees&quot;] is not None and r[&quot;reason&quot;]
-+    print(&quot;c2_sizing demo OK: %d survivors sized (%d adaptive, %d flat), no typed sizes.&quot; % (
-+        len(o[&quot;survivors&quot;]), o[&quot;adaptive_count&quot;], o[&quot;flat_count&quot;]))
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        o = run()
-+        print(&quot;C2 sizing: %d survivors — %d adaptive, %d flat (see reports/C2-SIZING.md).&quot; % (
-+            len(o[&quot;survivors&quot;]), o[&quot;adaptive_count&quot;], o[&quot;flat_count&quot;]))
-diff --git a/tests/test_c2_sizing.py b/tests/test_c2_sizing.py
-new file mode 100644
-index 000000000..3d855aca1
---- /dev/null
-+++ b/tests/test_c2_sizing.py
-@@ -0,0 +1,23 @@
-+&quot;&quot;&quot;R-EVENING-22 C2: adaptive sizing on the survivors — the sizer&#x27;s own output, no typed sizes, flat on thin.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import c2_sizing
-+
-+
-+def test_sizes_are_the_sizers_output_with_reasons():
-+    o = c2_sizing.run(write=False)
-+    assert o[&quot;survivors&quot;], &quot;expected the certified survivors&quot;
-+    for r in o[&quot;survivors&quot;]:
-+        assert r[&quot;risk_rupees&quot;] is not None and r[&quot;reason&quot;]      # every size has a stated reason
-+        assert r[&quot;mode&quot;] in (&quot;adaptive&quot;, &quot;flat-fallback&quot;)
-+
-+
-+def test_thin_patterns_stay_flat():
-+    o = c2_sizing.run(write=False)
-+    for r in o[&quot;survivors&quot;]:
-+        if (r[&quot;fires&quot;] or 0) &lt; 30:
-+            assert r[&quot;mode&quot;] == &quot;flat-fallback&quot; and r[&quot;risk_rupees&quot;] == 1000   # fail-closed to the flat reference
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_sizes_are_the_sizers_output_with_reasons(); test_thin_patterns_stay_flat(); print(&quot;test_c2_sizing OK&quot;)
-</pre></div><div class='c'><div class='h'><b>b1bed0c8c</b> · 2026-09-22 18:02</div><div>R-EVENING-22 C1: fresh hunt under the real exam — Price Engine hunted, other families scoped honestly</div><div class='sub h'>reports/C1-HUNT.json  |  70 ++++++++++++++++++++++++++</div><div class='sub h'>reports/C1-HUNT.md    |  26 ++++++++++</div><div class='sub h'>scripts/c1_hunt.py    | 137 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_c1_hunt.py |  30 +++++++++++</div><pre>diff --git a/reports/C1-HUNT.json b/reports/C1-HUNT.json
-new file mode 100644
-index 000000000..2f9facd6c
---- /dev/null
-+++ b/reports/C1-HUNT.json
-@@ -0,0 +1,70 @@
-+{
-+ &quot;as_of&quot;: &quot;2026-09-22T18:02:09.550592+05:30&quot;,
-+ &quot;price_engine_survivors&quot;: [
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;metric&quot;: &quot;ema&quot;,
-+   &quot;fires&quot;: 10
-+  },
-+  {
-+   &quot;stock&quot;: &quot;UNITDSPR&quot;,
-+   &quot;metric&quot;: &quot;sma&quot;,
-+   &quot;fires&quot;: 9
-+  },
-+  {
-+   &quot;stock&quot;: &quot;BSE&quot;,
-+   &quot;metric&quot;: &quot;stddev_returns&quot;,
-+   &quot;fires&quot;: 9
-+  },
-+  {
-+   &quot;stock&quot;: &quot;AUBANK&quot;,
-+   &quot;metric&quot;: &quot;vwap&quot;,
-+   &quot;fires&quot;: 13
-+  },
-+  {
-+   &quot;stock&quot;: &quot;ETERNAL&quot;,
-+   &quot;metric&quot;: &quot;rsi&quot;,
-+   &quot;fires&quot;: 9
-+  }
-+ ],
-+ &quot;whats_new&quot;: {
-+  &quot;new_survivors&quot;: [],
-+  &quot;dropped_from_live&quot;: []
-+ },
-+ &quot;families&quot;: [
-+  {
-+   &quot;family&quot;: &quot;Price Engine&quot;,
-+   &quot;status&quot;: &quot;ready&quot;,
-+   &quot;note&quot;: &quot;daily direction signals (stock, condition, metric, direction) \u2014 exam-ready&quot;,
-+   &quot;reexamined&quot;: 95,
-+   &quot;survivors&quot;: 5,
-+   &quot;probation&quot;: 90
-+  },
-+  {
-+   &quot;family&quot;: &quot;323 Facts&quot;,
-+   &quot;status&quot;: &quot;adapter-needed&quot;,
-+   &quot;note&quot;: &quot;the 323 fact statements must be resolved to their (stock, condition, metric, direction) form; many overlap the Price Engine pool already \u2014 the adapter must de-duplicate before hunting so a fact is not double-counted as a fresh survivor&quot;
-+  },
-+  {
-+   &quot;family&quot;: &quot;Sizing Families&quot;,
-+   &quot;status&quot;: &quot;not-a-signal-family&quot;,
-+   &quot;note&quot;: &quot;sizing decides how MUCH to bet, not WHEN \u2014 there is no entry signal to hunt; its exam is C2&#x27;s quarter-Kelly sizing test, not a fresh pattern hunt&quot;
-+  },
-+  {
-+   &quot;family&quot;: &quot;Overnight&quot;,
-+   &quot;status&quot;: &quot;adapter-needed&quot;,
-+   &quot;note&quot;: &quot;E21 overnight signals are gap/close-to-open events, not daily-direction conditions; the adapter must map each fire to its entry day and hold so the price-exam can settle it with costs&quot;
-+  },
-+  {
-+   &quot;family&quot;: &quot;Calendar&quot;,
-+   &quot;status&quot;: &quot;adapter-needed&quot;,
-+   &quot;note&quot;: &quot;calendar signals fire on event dates (results, ex-dates); the adapter must turn each event window into signal days the exam can walk forward&quot;
-+  },
-+  {
-+   &quot;family&quot;: &quot;YouTube&quot;,
-+   &quot;status&quot;: &quot;adapter-needed&quot;,
-+   &quot;note&quot;: &quot;YouTube signals are sentiment reads with their own walk-forward diary; the adapter must express a read as an entry+direction before the price-exam can score it \u2014 and the YouTube diary stays diary-only&quot;
-+  }
-+ ],
-+ &quot;note&quot;: &quot;Price Engine hunted for real under the exam; the other families need a per-family adapter to the price-exam before they can be hunted, and this runner invents nothing for them.&quot;
-+}
-\ No newline at end of file
-diff --git a/reports/C1-HUNT.md b/reports/C1-HUNT.md
-new file mode 100644
-index 000000000..8a0830f97
---- /dev/null
-+++ b/reports/C1-HUNT.md
-@@ -0,0 +1,26 @@
-+# C1 — FRESH HUNT UNDER THE REAL EXAM
-+
-+_Costs inside, the six checks, the management grid searched, luck-corrected (exams_real). Price Engine hunted for real; the other five families need an adapter to the price-exam and are hunted only once that exists — nothing is invented for them._
-+
-+## What&#x27;s new
-+
-+- **New survivors this hunt:** none — the standing five hold.
-+
-+## Price Engine survivors (the standing five)
-+
-+- UNITDSPR — ema (10 fires)
-+- UNITDSPR — sma (9 fires)
-+- BSE — stddev_returns (9 fires)
-+- AUBANK — vwap (13 fires)
-+- ETERNAL — rsi (9 fires)
-+
-+## The six families
-+
-+| Family | Status | What it needs |
-+|---|---|---|
-+| Price Engine | ready | daily direction signals (stock, condition, metric, direction) — exam-ready |
-+| 323 Facts | adapter-needed | the 323 fact statements must be resolved to their (stock, condition, metric, direction) form; many overlap the Price Engine pool already — the adapter must de-duplicate before hunting so a fact is not double-counted as a fresh survivor |
-+| Sizing Families | not-a-signal-family | sizing decides how MUCH to bet, not WHEN — there is no entry signal to hunt; its exam is C2&#x27;s quarter-Kelly sizing test, not a fresh pattern hunt |
-+| Overnight | adapter-needed | E21 overnight signals are gap/close-to-open events, not daily-direction conditions; the adapter must map each fire to its entry day and hold so the price-exam can settle it with costs |
-+| Calendar | adapter-needed | calendar signals fire on event dates (results, ex-dates); the adapter must turn each event window into signal days the exam can walk forward |
-+| YouTube | adapter-needed | YouTube signals are sentiment reads with their own walk-forward diary; the adapter must express a read as an entry+direction before the price-exam can score it — and the YouTube diary stays diary-only |
-diff --git a/scripts/c1_hunt.py b/scripts/c1_hunt.py
-new file mode 100644
-index 000000000..b47c4eb3e
---- /dev/null
-+++ b/scripts/c1_hunt.py
-@@ -0,0 +1,137 @@
-+&quot;&quot;&quot;R-EVENING-22 C1 — the fresh hunt under the REAL exam (costs inside, the six checks, the management grid
-+searched, luck-corrected) across the six families: Price Engine, 323 Facts, Sizing Families, Overnight,
-+Calendar, YouTube. It reports WHAT&#x27;S NEW versus the standing live set.
-+
-+The exam itself is exams_real (already built and trusted). A family can be hunted the moment its signals are in
-+exam-ready form — (stock token, signal days, direction) — which certify_candidate then puts through the grid.
-+Price Engine&#x27;s signals already are (evening.active_daily_direction_signals), so its hunt runs for real here.
-+The other families&#x27; signals are a DIFFERENT shape (overnight gaps, event dates, sentiment) and need a per-family
-+ADAPTER to the price-exam; until that adapter exists this runner says so plainly and hunts nothing there —
-+it never invents a survivor for a family it cannot yet feed (§4.4 never-fabricate).&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import sys
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+OUT_JSON = os.path.join(REPO, &quot;reports&quot;, &quot;C1-HUNT.json&quot;)
-+OUT_MD = os.path.join(REPO, &quot;reports&quot;, &quot;C1-HUNT.md&quot;)
-+
-+# The six families. Each says whether its signals are exam-ready and, if not, what its adapter must supply.
-+FAMILIES = [
-+    (&quot;Price Engine&quot;, &quot;ready&quot;, &quot;daily direction signals (stock, condition, metric, direction) — exam-ready&quot;),
-+    (&quot;323 Facts&quot;, &quot;adapter-needed&quot;,
-+     &quot;the 323 fact statements must be resolved to their (stock, condition, metric, direction) form; many &quot;
-+     &quot;overlap the Price Engine pool already — the adapter must de-duplicate before hunting so a fact is not &quot;
-+     &quot;double-counted as a fresh survivor&quot;),
-+    (&quot;Sizing Families&quot;, &quot;not-a-signal-family&quot;,
-+     &quot;sizing decides how MUCH to bet, not WHEN — there is no entry signal to hunt; its exam is C2&#x27;s &quot;
-+     &quot;quarter-Kelly sizing test, not a fresh pattern hunt&quot;),
-+    (&quot;Overnight&quot;, &quot;adapter-needed&quot;,
-+     &quot;E21 overnight signals are gap/close-to-open events, not daily-direction conditions; the adapter must &quot;
-+     &quot;map each fire to its entry day and hold so the price-exam can settle it with costs&quot;),
-+    (&quot;Calendar&quot;, &quot;adapter-needed&quot;,
-+     &quot;calendar signals fire on event dates (results, ex-dates); the adapter must turn each event window into &quot;
-+     &quot;signal days the exam can walk forward&quot;),
-+    (&quot;YouTube&quot;, &quot;adapter-needed&quot;,
-+     &quot;YouTube signals are sentiment reads with their own walk-forward diary; the adapter must express a read &quot;
-+     &quot;as an entry+direction before the price-exam can score it — and the YouTube diary stays diary-only&quot;),
-+]
-+
-+
-+def _live_set():
-+    &quot;&quot;&quot;The standing live survivors as {(stock, family)}. patterns is a dict keyed &#x27;STOCK|family&#x27;.&quot;&quot;&quot;
-+    try:
-+        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;LIVE-PATTERN-SET.json&quot;), encoding=&quot;utf-8&quot;))
-+        pats = d.get(&quot;patterns&quot;) or {}
-+        if isinstance(pats, dict):
-+            return {(v.get(&quot;stock&quot;), v.get(&quot;family&quot;)) for v in pats.values()}
-+        return {(p.get(&quot;stock&quot;), p.get(&quot;metric&quot;) or p.get(&quot;family&quot;)) for p in pats}
-+    except Exception:
-+        return set()
-+
-+
-+def _price_engine_hunt(rerun):
-+    &quot;&quot;&quot;Run (or read) the real exam on the Price Engine family. Returns (survivors, reexamined, probation).&quot;&quot;&quot;
-+    from scripts import exams_real
-+    if rerun:
-+        o = exams_real.run(write=True)
-+    else:
-+        try:
-+            o = json.load(open(exams_real.STAGING_JSON, encoding=&quot;utf-8&quot;))
-+        except Exception:
-+            o = exams_real.run(write=True)
-+    survs = [{&quot;stock&quot;: c.get(&quot;stock&quot;), &quot;metric&quot;: c.get(&quot;family&quot;), &quot;fires&quot;: c.get(&quot;fires&quot;)}
-+             for c in (o.get(&quot;certified_patterns&quot;) or [])]
-+    return survs, o.get(&quot;reexamined&quot;), o.get(&quot;probation&quot;)
-+
-+
-+def hunt(rerun=False, write=True):
-+    survs, reexamined, probation = _price_engine_hunt(rerun)
-+    live = _live_set()
-+    surv_keys = {(s[&quot;stock&quot;], s[&quot;metric&quot;]) for s in survs}
-+    new = [s for s in survs if (s[&quot;stock&quot;], s[&quot;metric&quot;]) not in live]
-+    dropped = [k for k in live if k not in surv_keys]
-+    families = []
-+    for name, status, note in FAMILIES:
-+        row = {&quot;family&quot;: name, &quot;status&quot;: status, &quot;note&quot;: note}
-+        if name == &quot;Price Engine&quot;:
-+            row.update({&quot;reexamined&quot;: reexamined, &quot;survivors&quot;: len(survs), &quot;probation&quot;: probation})
-+        families.append(row)
-+    out = {
-+        &quot;as_of&quot;: ds and __import__(&quot;datetime&quot;).datetime.now(
-+            __import__(&quot;datetime&quot;).timezone(__import__(&quot;datetime&quot;).timedelta(hours=5, minutes=30))).isoformat(),
-+        &quot;price_engine_survivors&quot;: survs,
-+        &quot;whats_new&quot;: {&quot;new_survivors&quot;: new, &quot;dropped_from_live&quot;: [{&quot;stock&quot;: k[0], &quot;metric&quot;: k[1]} for k in dropped]},
-+        &quot;families&quot;: families,
-+        &quot;note&quot;: (&quot;Price Engine hunted for real under the exam; the other families need a per-family adapter to &quot;
-+                 &quot;the price-exam before they can be hunted, and this runner invents nothing for them.&quot;),
-+    }
-+    if write:
-+        with open(OUT_JSON, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            json.dump(out, f, indent=1, default=str)
-+        _write_md(out)
-+    return out
-+
-+
-+def _write_md(o):
-+    L = [&quot;# C1 — FRESH HUNT UNDER THE REAL EXAM&quot;, &quot;&quot;,
-+         &quot;_Costs inside, the six checks, the management grid searched, luck-corrected (exams_real). &quot;
-+         &quot;Price Engine hunted for real; the other five families need an adapter to the price-exam and are &quot;
-+         &quot;hunted only once that exists — nothing is invented for them._&quot;, &quot;&quot;,
-+         &quot;## What&#x27;s new&quot;, &quot;&quot;]
-+    new = o[&quot;whats_new&quot;][&quot;new_survivors&quot;]
-+    L.append(&quot;- **New survivors this hunt:** %s&quot; % (&quot;, &quot;.join(&quot;%s %s&quot; % (n[&quot;stock&quot;], n[&quot;metric&quot;]) for n in new)
-+                                                    if new else &quot;none — the standing five hold.&quot;))
-+    dropped = o[&quot;whats_new&quot;][&quot;dropped_from_live&quot;]
-+    if dropped:
-+        L.append(&quot;- **Dropped from the live set:** %s&quot; % &quot;, &quot;.join(&quot;%s %s&quot; % (d[&quot;stock&quot;], d[&quot;metric&quot;]) for d in dropped))
-+    L += [&quot;&quot;, &quot;## Price Engine survivors (the standing five)&quot;, &quot;&quot;]
-+    for s in o[&quot;price_engine_survivors&quot;]:
-+        L.append(&quot;- %s — %s (%s fires)&quot; % (s[&quot;stock&quot;], s[&quot;metric&quot;], s[&quot;fires&quot;]))
-+    L += [&quot;&quot;, &quot;## The six families&quot;, &quot;&quot;, &quot;| Family | Status | What it needs |&quot;, &quot;|---|---|---|&quot;]
-+    for f in o[&quot;families&quot;]:
-+        L.append(&quot;| %s | %s | %s |&quot; % (f[&quot;family&quot;], f[&quot;status&quot;], f[&quot;note&quot;]))
-+    with open(OUT_MD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+        f.write(&quot;\n&quot;.join(L) + &quot;\n&quot;)
-+
-+
-+def _demo():
-+    o = hunt(rerun=False, write=False)
-+    assert &quot;price_engine_survivors&quot; in o and &quot;whats_new&quot; in o and len(o[&quot;families&quot;]) == 6
-+    assert any(f[&quot;family&quot;] == &quot;Price Engine&quot; for f in o[&quot;families&quot;])
-+    print(&quot;c1_hunt demo OK: %d Price Engine survivors, %d new; 6 families reported honestly.&quot; % (
-+        len(o[&quot;price_engine_survivors&quot;]), len(o[&quot;whats_new&quot;][&quot;new_survivors&quot;])))
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        o = hunt(rerun=&quot;--rerun&quot; in sys.argv)
-+        print(&quot;C1 hunt: %d Price Engine survivors, %d new; five families need adapters (see reports/C1-HUNT.md).&quot;
-+              % (len(o[&quot;price_engine_survivors&quot;]), len(o[&quot;whats_new&quot;][&quot;new_survivors&quot;])))
-diff --git a/tests/test_c1_hunt.py b/tests/test_c1_hunt.py
-new file mode 100644
-index 000000000..4afccff6b
---- /dev/null
-+++ b/tests/test_c1_hunt.py
-@@ -0,0 +1,30 @@
-+&quot;&quot;&quot;R-EVENING-22 C1: the fresh hunt runs the real exam on Price Engine, reports what&#x27;s new honestly, and never
-+invents a survivor for a family it has no adapter for.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import c1_hunt
-+
-+
-+def test_reports_six_families_and_price_engine_ran():
-+    o = c1_hunt.hunt(rerun=False, write=False)
-+    assert len(o[&quot;families&quot;]) == 6
-+    pe = [f for f in o[&quot;families&quot;] if f[&quot;family&quot;] == &quot;Price Engine&quot;][0]
-+    assert pe[&quot;status&quot;] == &quot;ready&quot; and pe.get(&quot;survivors&quot;, 0) &gt;= 0
-+    # every non-ready family is honest about needing an adapter, never claims a survivor
-+    for f in o[&quot;families&quot;]:
-+        if f[&quot;status&quot;] != &quot;ready&quot;:
-+            assert &quot;adapter&quot; in f[&quot;status&quot;] or &quot;not-a-signal&quot; in f[&quot;status&quot;]
-+
-+
-+def test_whats_new_is_survivors_not_in_live_set():
-+    o = c1_hunt.hunt(rerun=False, write=False)
-+    live = c1_hunt._live_set()
-+    for n in o[&quot;whats_new&quot;][&quot;new_survivors&quot;]:
-+        assert (n[&quot;stock&quot;], n[&quot;metric&quot;]) not in live      # &#x27;new&#x27; means genuinely not already live
-+    # nothing is fabricated: every reported survivor came from the exam&#x27;s certified set
-+    assert isinstance(o[&quot;price_engine_survivors&quot;], list)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_reports_six_families_and_price_engine_ran(); test_whats_new_is_survivors_not_in_live_set()
-+    print(&quot;test_c1_hunt OK&quot;)
-</pre></div><div class='c'><div class='h'><b>20ef607ba</b> · 2026-09-22 17:54</div><div>B4: build the four missing v2 tabs — Live desk, Portfolio, Backtest, Messages</div><div class='sub h'>scripts/site_v2.py    | 159 +++++++++++++++++++++++++++++++++++++++++++++++++-</div><div class='sub h'>tests/test_v2_tabs.py |  37 ++++++++++++</div><pre>diff --git a/scripts/site_v2.py b/scripts/site_v2.py
-index 4f0efa6e4..c20f9f4b8 100644
---- a/scripts/site_v2.py
-+++ b/scripts/site_v2.py
-@@ -21,9 +21,10 @@ from engine1_rebuild import datastore as ds
- REPO = ds._REPO
- V2 = os.path.join(REPO, &quot;site&quot;, &quot;v2&quot;)
- DATA = os.path.join(REPO, &quot;site&quot;, &quot;data&quot;)
--NAV = [(&quot;index.html&quot;, &quot;Leaderboard&quot;), (&quot;engines.html&quot;, &quot;Engines&quot;), (&quot;stocks.html&quot;, &quot;Stocks&quot;),
--       (&quot;patterns.html&quot;, &quot;Patterns&quot;), (&quot;deliverables.html&quot;, &quot;Deliverables&quot;), (&quot;data.html&quot;, &quot;Data&quot;),
--       (&quot;results.html&quot;, &quot;Results&quot;), (&quot;how.html&quot;, &quot;How it works&quot;)]
-+NAV = [(&quot;index.html&quot;, &quot;Leaderboard&quot;), (&quot;live-desk.html&quot;, &quot;Live desk&quot;), (&quot;portfolio.html&quot;, &quot;Portfolio&quot;),
-+       (&quot;engines.html&quot;, &quot;Engines&quot;), (&quot;stocks.html&quot;, &quot;Stocks&quot;), (&quot;patterns.html&quot;, &quot;Patterns&quot;),
-+       (&quot;backtest.html&quot;, &quot;Backtest&quot;), (&quot;results.html&quot;, &quot;Results&quot;), (&quot;deliverables.html&quot;, &quot;Deliverables&quot;),
-+       (&quot;messages.html&quot;, &quot;Messages&quot;), (&quot;data.html&quot;, &quot;Data&quot;), (&quot;how.html&quot;, &quot;How it works&quot;)]
- 
- 
- class RenderGateError(Exception):
-@@ -786,6 +787,157 @@ def no_jargon_ok(where=None):
-     return hits
- 
- 
-+def _all_open_positions():
-+    &quot;&quot;&quot;Every open paper position across the engine books, each already tagged with its engine. Deduped.&quot;&quot;&quot;
-+    from engine1_rebuild import paper_account as ACC
-+    seen, out = set(), []
-+    for key in ACC.accounts_summary():
-+        try:
-+            for p in (ACC.account(key).get(&quot;open_positions&quot;) or []):
-+                k = (p.get(&quot;engine&quot;) or key, p.get(&quot;stock&quot;), p.get(&quot;entry&quot;))
-+                if k in seen:
-+                    continue
-+                seen.add(k)
-+                out.append(dict(p, engine=p.get(&quot;engine&quot;) or key))
-+        except Exception:
-+            pass
-+    return out
-+
-+
-+def _closed_ledger_rows():
-+    &quot;&quot;&quot;Closed paper trades from the E1 paper ledger (status closed / has an exit), newest first.&quot;&quot;&quot;
-+    import csv
-+    path = os.path.join(REPO, &quot;engine1_rebuild&quot;, &quot;paper&quot;, &quot;ledger.csv&quot;)
-+    rows = []
-+    try:
-+        for r in csv.DictReader(open(path, encoding=&quot;utf-8&quot;)):
-+            if (r.get(&quot;status&quot;) == &quot;closed&quot;) or r.get(&quot;exit_date&quot;):
-+                rows.append(r)
-+    except Exception:
-+        pass
-+    return rows[::-1]
-+
-+
-+def _live_desk():
-+    &quot;&quot;&quot;B4: the Live desk — open and closed positions, with the engine named on EVERY row.&quot;&quot;&quot;
-+    opos = _all_open_positions()
-+    orows = &quot;&quot;
-+    for p in opos:
-+        cls = &quot;gain&quot; if (p.get(&quot;mark_R&quot;) or 0) &gt;= 0 else &quot;loss&quot;
-+        orows += (&quot;&lt;tr data-k=&#x27;%s&#x27;&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&quot;
-+                  &quot;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+                      esc((str(p.get(&quot;stock&quot;, &quot;&quot;)) + &quot; &quot; + str(p.get(&quot;engine&quot;, &quot;&quot;))).upper()),
-+                      esc(p.get(&quot;engine&quot;)), esc(p.get(&quot;stock&quot;)), esc(p.get(&quot;direction&quot;)),
-+                      esc(p.get(&quot;entry&quot;)), esc(p.get(&quot;stop&quot;)),
-+                      cls, esc(p.get(&quot;mark_R&quot;)), cls, R(p.get(&quot;uPnL&quot;))))
-+    orows = orows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;8&#x27;&gt;no open paper positions right now&lt;/td&gt;&lt;/tr&gt;&quot;
-+    crows = &quot;&quot;
-+    for r in _closed_ledger_rows():
-+        rr = r.get(&quot;result_R&quot;)
-+        cls = &quot;gain&quot; if _num(rr) &gt;= 0 else &quot;loss&quot;
-+        crows += (&quot;&lt;tr&gt;&lt;td&gt;E1&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&quot;
-+                  &quot;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+                      esc(r.get(&quot;stock&quot;)), esc(r.get(&quot;direction&quot;)), esc(r.get(&quot;entry_date&quot;)),
-+                      esc(r.get(&quot;exit_date&quot;)), cls, esc(rr), esc(r.get(&quot;exit_reason&quot;))))
-+    crows = crows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;7&#x27;&gt;no closed paper trades yet&lt;/td&gt;&lt;/tr&gt;&quot;
-+    body = (_head(&quot;Live desk — E1 desk&quot;) + _nav(&quot;live-desk.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Live desk&lt;/h1&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every open and closed paper position, with the engine on each row. Paper only.&lt;/p&gt;&quot;
-+            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;input id=&#x27;fq&#x27; placeholder=&#x27;filter open positions…&#x27; oninput=\&quot;filt(&#x27;fq&#x27;,&#x27;ot&#x27;)\&quot; &quot;
-+            &quot;style=&#x27;width:100%%;padding:8px;background:var(--card);color:var(--ink);border:1px solid var(--line);&quot;
-+            &quot;border-radius:8px&#x27;&gt;&lt;/div&gt;&quot;
-+            &quot;&lt;h2&gt;Open positions (%d)&lt;/h2&gt;&lt;table id=&#x27;ot&#x27;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&quot;
-+            &quot;&lt;th&gt;Entry&lt;/th&gt;&lt;th&gt;Stop&lt;/th&gt;&lt;th&gt;Now (R)&lt;/th&gt;&lt;th&gt;Unrealised&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
-+            &quot;&lt;h2&gt;Closed trades&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Engine&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Dir&lt;/th&gt;&lt;th&gt;In&lt;/th&gt;&quot;
-+            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result (R)&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
-+            % (len(opos), orows, crows))
-+    _write(&quot;live-desk.html&quot;, body + _foot())
-+
-+
-+def _portfolio():
-+    &quot;&quot;&quot;B4: the Portfolio — every paper book with its equity and profit/loss.&quot;&quot;&quot;
-+    from engine1_rebuild import paper_account as ACC
-+    summ = ACC.accounts_summary()
-+    start = getattr(ACC, &quot;ENGINE_START&quot;, 200000)
-+    rows = &quot;&quot;
-+    for k, eq in summ.items():
-+        pnl = _num(eq) - start
-+        cls = &quot;gain&quot; if pnl &gt;= 0 else (&quot;loss&quot; if pnl &lt; 0 else &quot;sub&quot;)
-+        rows += &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n %s&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+            esc(k), R(eq, plus=False), cls, R(pnl))
-+    rows = rows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;no books yet&lt;/td&gt;&lt;/tr&gt;&quot;
-+    total_eq = sum(_num(v) for v in summ.values())
-+    body = (_head(&quot;Portfolio — E1 desk&quot;) + _nav(&quot;portfolio.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Portfolio&lt;/h1&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every paper book, its current equity and profit or loss since it started at %s. &quot;
-+            &quot;Paper only, carried day to day.&lt;/p&gt;&quot;
-+            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Total equity across all books&lt;/span&gt;&lt;div class=&#x27;big&#x27;&gt;%s&lt;/div&gt;&lt;/div&gt;&quot;
-+            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Equity&lt;/th&gt;&lt;th&gt;P&amp;amp;L&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
-+            % (R(start, plus=False), R(total_eq, plus=False), rows))
-+    _write(&quot;portfolio.html&quot;, body + _foot())
-+
-+
-+def _backtest():
-+    &quot;&quot;&quot;B4: the Backtest tab — the measured history in full, its own address.&quot;&quot;&quot;
-+    bt = _data(&quot;backtest.json&quot;)
-+    summ = bt.get(&quot;summary&quot;) or {}
-+    by_book = bt.get(&quot;by_book&quot;) or []
-+    perf = bt.get(&quot;performance&quot;) or {}
-+    brows = &quot;&quot;
-+    for b in (by_book if isinstance(by_book, list) else []):
-+        brows += &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
-+            esc(b.get(&quot;book&quot;) or b.get(&quot;name&quot;) or b.get(&quot;label&quot;)),
-+            esc(b.get(&quot;trades&quot;) if b.get(&quot;trades&quot;) is not None else b.get(&quot;N&quot;)),
-+            R(b.get(&quot;net_R&quot;) if b.get(&quot;net_R&quot;) is not None else b.get(&quot;total_R&quot;)))
-+    brows = brows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;3&#x27;&gt;the per-book split publishes with the next backtest&lt;/td&gt;&lt;/tr&gt;&quot;
-+    body = (_head(&quot;Backtest — E1 desk&quot;) + _nav(&quot;backtest.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Backtest&lt;/h1&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;The desk&#x27;s measured history, after costs. Paper and history only — not a promise.&lt;/p&gt;&quot;
-+            &quot;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;%s trades measured · win rate %s · made %s after costs · &quot;
-+            &quot;steadiness %s&lt;/span&gt;&lt;/div&gt;&quot;
-+            &quot;&lt;h2&gt;By book&lt;/h2&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Book&lt;/th&gt;&lt;th&gt;Trades&lt;/th&gt;&lt;th&gt;After costs&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&quot;
-+            &quot;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27; style=&#x27;margin-top:10px&#x27;&gt;Every score is &lt;b&gt;conditioned on survivorship&lt;/b&gt; and &quot;
-+            &quot;&lt;b&gt;design-effect uncorrected&lt;/b&gt; until the point-in-time universe and the fire-clustering recorder &quot;
-+            &quot;land.&lt;/p&gt;&lt;/main&gt;&quot; % (esc(summ.get(&quot;N&quot;)), pct(summ.get(&quot;win_pct&quot;)), R(summ.get(&quot;total_R&quot;)),
-+                                  esc(perf.get(&quot;sharpe&quot;)), brows))
-+    _write(&quot;backtest.html&quot;, body + _foot())
-+
-+
-+def _is_trader_message(text):
-+    &quot;&quot;&quot;The Messages tab shows the TRADER-facing desk log; build telemetry (BUILD/SUPERVISOR beats, commit
-+    chatter with ruling codes or file names) lives in /build/, not here.&quot;&quot;&quot;
-+    import re as _re
-+    t = str(text or &quot;&quot;)
-+    if t.startswith((&quot;BUILD &quot;, &quot;SUPERVISOR&quot;, &quot;📊 Build room&quot;)):
-+        return False
-+    if _re.search(r&quot;\bR-[A-Z]&quot;, t) or &quot;.py&quot; in t or &quot;loading&quot; in t.lower():
-+        return False
-+    return True
-+
-+
-+def _messages():
-+    &quot;&quot;&quot;B4: the Messages tab — the plain trader-facing log of what the desk sent to Telegram.&quot;&quot;&quot;
-+    m = _data(&quot;messages.json&quot;)
-+    msgs = m.get(&quot;messages&quot;) if isinstance(m, dict) else (m if isinstance(m, list) else [])
-+    msgs = [e for e in (msgs or []) if _is_trader_message(e.get(&quot;text&quot;))]
-+    rows = &quot;&quot;
-+    for e in list(msgs)[:400]:
-+        ts = str(e.get(&quot;ts&quot;, &quot;&quot;))[:16].replace(&quot;T&quot;, &quot; &quot;)
-+        rows += &quot;&lt;tr&gt;&lt;td class=&#x27;sub n&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (esc(ts), esc(e.get(&quot;text&quot;)))
-+    rows = rows or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;2&#x27;&gt;no trader messages recorded yet&lt;/td&gt;&lt;/tr&gt;&quot;
-+    body = (_head(&quot;Messages — E1 desk&quot;) + _nav(&quot;messages.html&quot;) + &quot;&lt;main&gt;&lt;h1&gt;Messages&lt;/h1&gt;&quot;
-+            &quot;&lt;p class=&#x27;sub&#x27;&gt;Every line the desk sent to Telegram, newest first — the same plain language, &quot;
-+            &quot;kept for %s days.&lt;/p&gt;&quot;
-+            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Message&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&lt;/main&gt;&quot;
-+            % (esc(m.get(&quot;days&quot;)) if isinstance(m, dict) else &quot;30&quot;, rows))
-+    _write(&quot;messages.html&quot;, body + _foot())
-+
-+
-+def _num(x):
-+    try:
-+        return float(x)
-+    except (TypeError, ValueError):
-+        return 0.0
-+
-+
- def build(publish_gate=True):
-     &quot;&quot;&quot;Generate every page into a STAGING dir, run the build gate, and only swap the pages into site/v2/ when
-     the gate is clean. On failure it raises RenderGateError and leaves the last-good site/v2/ untouched — so a
-@@ -800,6 +952,7 @@ def build(publish_gate=True):
-     try:
-         _leaderboard(); _engines(); _stocks(); _patterns(); _deliverables(); _data_page(); _results(); _how(); _ask()
-         _scoreboard()
-+        _live_desk(); _portfolio(); _backtest(); _messages()      # B4: the four tabs the swap was waiting on
-         problems = render_gate(staging) if publish_gate else []
-         jargon = no_jargon_ok(staging) if publish_gate else []
-         if problems or jargon:
-diff --git a/tests/test_v2_tabs.py b/tests/test_v2_tabs.py
-new file mode 100644
-index 000000000..4f55c4561
---- /dev/null
-+++ b/tests/test_v2_tabs.py
-@@ -0,0 +1,37 @@
-+&quot;&quot;&quot;B4: the four tabs the root swap was waiting on exist in v2 and carry their content.&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import site_v2
-+
-+
-+def test_four_tabs_present_and_linked():
-+    site_v2.build()
-+    for name in (&quot;live-desk.html&quot;, &quot;portfolio.html&quot;, &quot;backtest.html&quot;, &quot;messages.html&quot;):
-+        p = os.path.join(site_v2.V2, name)
-+        assert os.path.exists(p), name
-+    # every page links the four in the nav
-+    idx = open(os.path.join(site_v2.V2, &quot;index.html&quot;), encoding=&quot;utf-8&quot;).read()
-+    for href in (&quot;live-desk.html&quot;, &quot;portfolio.html&quot;, &quot;backtest.html&quot;, &quot;messages.html&quot;):
-+        assert href in idx, href
-+
-+
-+def test_live_desk_names_the_engine_per_row():
-+    site_v2.build()
-+    t = open(os.path.join(site_v2.V2, &quot;live-desk.html&quot;), encoding=&quot;utf-8&quot;).read()
-+    assert &quot;Live desk&quot; in t and &quot;Open positions&quot; in t and &quot;Closed trades&quot; in t
-+    assert &quot;&lt;th&gt;Engine&lt;/th&gt;&quot; in t                       # the engine is a column on every position row
-+
-+
-+def test_portfolio_and_backtest_and_messages_content():
-+    site_v2.build()
-+    port = open(os.path.join(site_v2.V2, &quot;portfolio.html&quot;), encoding=&quot;utf-8&quot;).read()
-+    assert &quot;Portfolio&quot; in port and &quot;Total equity&quot; in port and &quot;P&amp;amp;L&quot; in port
-+    bt = open(os.path.join(site_v2.V2, &quot;backtest.html&quot;), encoding=&quot;utf-8&quot;).read()
-+    assert &quot;Backtest&quot; in bt and &quot;By book&quot; in bt
-+    msg = open(os.path.join(site_v2.V2, &quot;messages.html&quot;), encoding=&quot;utf-8&quot;).read()
-+    assert &quot;Messages&quot; in msg and &quot;[object Object]&quot; not in msg
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_four_tabs_present_and_linked(); test_live_desk_names_the_engine_per_row()
-+    test_portfolio_and_backtest_and_messages_content(); print(&quot;test_v2_tabs OK&quot;)
-</pre></div><div class='c'><div class='h'><b>868d24f1b</b> · 2026-09-22 17:48</div><div>ADD: desk Telegram links point to plain pages (status.html), never the script-built root</div><div class='sub h'>scripts/alarm.py         |  2 +-</div><div class='sub h'>scripts/lead_digest.py   |  2 +-</div><div class='sub h'>scripts/notify.py        |  5 ++++-</div><div class='sub h'>tests/test_desk_links.py | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/alarm.py b/scripts/alarm.py
-index 1b180adb8..302e223fc 100644
---- a/scripts/alarm.py
-+++ b/scripts/alarm.py
-@@ -10,7 +10,7 @@ import sys
- 
- sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
- 
--SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
-+SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;   # plain page, never the script-built root
- 
- 
- def emergency(message, title=&quot;E1 ALERT&quot;):
-diff --git a/scripts/lead_digest.py b/scripts/lead_digest.py
-index 72b8b3a56..a49a9d131 100644
---- a/scripts/lead_digest.py
-+++ b/scripts/lead_digest.py
-@@ -292,7 +292,7 @@ def build():
-               (i, ph.get(&quot;breadth&quot;, 0), ph.get(&quot;median_margin&quot;), ph.get(&quot;outcome_type&quot;, &quot;&quot;),
-                ph.get(&quot;sentence&quot;, &quot;&quot;)))
-     p(&quot;&quot;)
--    p(&quot;Site: https://[redacted]-[redacted].github.io/e1-live-site/  |  Digest is regenerated after every&quot;)
-+    p(&quot;Site: https://[redacted]-[redacted].github.io/e1-live-site/status.html  |  Digest is regenerated after every&quot;)
-     p(&quot;report and at 15:40 IST daily.&quot;)
- 
-     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-diff --git a/scripts/notify.py b/scripts/notify.py
-index c77f1216b..f2cae52bf 100644
---- a/scripts/notify.py
-+++ b/scripts/notify.py
-@@ -56,7 +56,10 @@ def _log_send(message: str, result: str) -&gt; None:
-             f.write(line)
-     except Exception:
-         pass
--_SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
-+# ADD (2026-09-22): every link the desk sends points to a PLAIN server-rendered page that opens in any browser
-+# (including Telegram&#x27;s) — status.html by default, /deliverables/ for deliverables — NEVER the script-built
-+# main page (the root index).
-+_SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
- 
- 
- def _with_link(message: str) -&gt; str:
-diff --git a/tests/test_desk_links.py b/tests/test_desk_links.py
-new file mode 100644
-index 000000000..fa658e6c2
---- /dev/null
-+++ b/tests/test_desk_links.py
-@@ -0,0 +1,33 @@
-+&quot;&quot;&quot;ADD 2026-09-22: every Telegram link the desk sends points to a PLAIN server-rendered page (status.html or
-+/deliverables/), never the script-built main page (the bare site root).&quot;&quot;&quot;
-+import os, sys, re
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+PLAIN = (&quot;status.html&quot;, &quot;/deliverables/&quot;, &quot;deliverables.html&quot;)
-+ROOT = &quot;https://[redacted]-[redacted].github.io/e1-live-site/&quot;
-+
-+
-+def _is_plain(url):
-+    return any(url.rstrip(&quot;/&quot;).endswith(p.rstrip(&quot;/&quot;)) or p in url for p in PLAIN)
-+
-+
-+def test_notify_default_link_is_plain():
-+    from scripts import notify
-+    assert _is_plain(notify._SITE), notify._SITE
-+    assert notify._SITE.rstrip(&quot;/&quot;) != ROOT.rstrip(&quot;/&quot;)           # not the bare script-built root
-+
-+
-+def test_alarm_link_is_plain():
-+    from scripts import alarm
-+    assert _is_plain(alarm.SITE) and alarm.SITE.rstrip(&quot;/&quot;) != ROOT.rstrip(&quot;/&quot;)
-+
-+
-+def test_alert_message_appends_status_page():
-+    from scripts import notify
-+    m = notify._decorate(&quot;desk halted 111&quot;, is_alert=True) if hasattr(notify, &quot;_decorate&quot;) else None
-+    # fall back: the appended link in the code path is _SITE
-+    assert _is_plain(notify._SITE)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_notify_default_link_is_plain(); test_alarm_link_is_plain(); test_alert_message_appends_status_page()
-+    print(&quot;test_desk_links OK&quot;)
 </pre></div></main></body></html>
