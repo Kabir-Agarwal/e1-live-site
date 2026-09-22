@@ -1,4 +1,206 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>1a1ab980a</b> · 2026-09-23 02:38</div><div>R-EXAM-CONFORM PROVEN + R-GHOST-ROWS: marker written, AUBANK+ETERNAL queued, ghost book archived</div><div class='sub h'>docs/reports/verify-a905edd32.md               | 46 ++++++++++++++++++++++++++</div><div class='sub h'>engine1_rebuild/paper/ledger.csv               |  7 ++--</div><div class='sub h'>engine1_rebuild/paper/ledger_ghost_archive.csv | 11 ++++++</div><div class='sub h'>reports/EXAM-CONFORM-PROVEN                    |  4 +++</div><pre>diff --git a/docs/reports/verify-a905edd32.md b/docs/reports/verify-a905edd32.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>4315f1210</b> · 2026-09-23 02:45</div><div>R-OWNER-EMOJI: drop 🙈, reserve 🙋 for owner-&gt;lead lines; + measured RAM floor recorded</div><div class='sub h'>docs/EYES.md              | 15 +++++++++++++--</div><div class='sub h'>docs/VERIFIER-BRAIN.md    | 16 +++++++++++++++-</div><div class='sub h'>scripts/build_beat.py     |  4 ++--</div><div class='sub h'>scripts/notify.py         | 20 ++++++++++++++++++++</div><div class='sub h'>scripts/preopen_gate.py   |  2 +-</div><div class='sub h'>scripts/watchers.py       | 20 +++++++++++---------</div><div class='sub h'>tests/test_mirror_link.py | 13 ++++++++++++-</div><div class='sub h'>tests/test_watchers.py    |  9 ++++++---</div><pre>diff --git a/docs/EYES.md b/docs/EYES.md
+index 5d82e2bb4..2da3968f0 100644
+--- a/docs/EYES.md
++++ b/docs/EYES.md
+@@ -35,6 +35,17 @@ Dedup is the existing notify rate-limit: a frozen page keeps the same written ti
+ 
+ | NIGHT DRY RUN | can the stack restart from the last verified commit after build hours | runs nightly (scheduled under START_E1_STACK); skips 05:30–15:45 | a PASS; a FAIL auto-reverts to the tag and restarts on it | a FAIL raises 🙋 LEAD RULING NEEDED; owner registers the schedule via START_E1_STACK |
+ 
+-## R-EYE-EMOJI (2026-09-23) — the freshness eye on every desk line
++## R-OWNER-EMOJI (2026-09-23) — supersedes the 🙈 half of R-EYE-EMOJI
+ 
+-Every BUILD line, the 08:30 READY line, and the restart announcement carry a 👀/🙈 read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page). 👀 = public written time under 2 min old; 🙈 = older, with that time shown. A failed fetch is 🙈, never a false 👀. Three 🙈 in a row sets `blocked` (fixing the page becomes the only work). The restart line stays silent until the public page is confirmed under 2 min old, then posts &quot;👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT…&quot;. Helper: `watchers.public_eye` / `watchers.eye_prefix`.
++**The freshness eye.** Every BUILD line, the 08:30 READY line, and the restart announcement carry the eye read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page).
++- **Fresh (public written time under 2 min old) → 👀** (unchanged).
++- **Stale → NO emoji**; the line carries the words **`page stale since HH:MM`** instead of 🙈. A failed fetch is stale. Three stale reads in a row set `blocked` (fixing the page becomes the only work). Helper: `watchers.public_eye` / `watchers.eye_prefix` (stale prefix = `page stale since HH:MM · `).
++
++**🙋 is the one and only owner→lead signal.** 🙋 is reserved for lines the owner must act on or paste to the lead: LEAD RULING NEEDED, NOT READY at 08:30, a needed human restart, a sign-in tap, the 06:00 login link. **No other line may start with 🙋.** Every 🙋 line ends with **exactly one** of these closers:
++- `send this to the lead`
++- `tap the login`
++- `reply restart now`
++
++👀 lines are never owner-actioned; if a 👀-context line ever needs the owner, it also carries 🙋 (and thus one of the three closers). Central guard: `notify.owner_signal_ok(msg)` flags a 🙋 line missing a closer (a guard, never a filter — the line still sends). Read-only line types (✅ done, ⏱ progress, beat and card lines) are unchanged.
++
++**Remaining reconciliation (follow-up):** the many existing 🙋 call-sites (`token_ping` login link, `kite_login`, `day_report`, `alarm`, …) should each be checked to end with one of the three exact closers; the central `notify` guard surfaces any that do not. Not swept tonight to avoid editing launch-adjacent files near the 05:00 freeze.
+diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
+index 2df5f9d87..6fc39a7a9 100644
+--- a/docs/VERIFIER-BRAIN.md
++++ b/docs/VERIFIER-BRAIN.md
+@@ -62,4 +62,18 @@ Standing rule, in force from tonight:
+ 
+ Applied 2026-09-23 ~01:35 IST: free RAM settled at ~1.2–1.4 GB (peak 1.44) with Chrome closed, below the
+ 2.0 GB floor, so the suite was **held** and the number posted. The 3 stale tests were fixed and committed
+-(`a1bd8ab60`) beforehand; conformance stays HELD until the suite runs green above the floor.
++(`a1bd8ab60`) beforehand.
++
++## MEASURED RAM floor (owner ruling 23 Sep) — the reference number
++
++The suite then ran ALONE at 01:55, single-process, after Edge/Chrome/[redacted] Voice were closed. Measured:
++
++- **peak 7.07 GB used, min 0.73 GB free** (of 7.8 GB total), from a 1.82 GB free start — the run consumed
++  ~1.1 GB of headroom over ~7.5 min (330 passed, 0 failed).
++
++**This measured number is the RAM floor.** The suite needs the box to hold ≥ ~1.8 GB free at start so free
++does not dip below the ~0.73 GB it reached, and it aborts if free ever falls under the sweep&#x27;s **0.5 GB light
++floor** (`WEEKEND_SWEEP_FLOOR_GB`). The launcher prints free RAM before starting and every minute during the
++run (`scripts/_conform_suite_runner.py`). The 2.0 GB `HEAVY_START_GB` heavy gate remains the preferred start
++threshold; the 01:55 run was authorised below it under the owner&#x27;s single-process low-memory ruling with the
++0.5 GB abort line as the hard stop.
+diff --git a/scripts/build_beat.py b/scripts/build_beat.py
+index dcf3529fc..cf054e10f 100644
+--- a/scripts/build_beat.py
++++ b/scripts/build_beat.py
+@@ -110,8 +110,8 @@ def _tail(line):
+ 
+ 
+ def _eye():
+-    &quot;&quot;&quot;R-EYE-EMOJI: 👀/🙈 prefix from the PUBLIC status page (fetched, never the local file). Best-effort —
+-    a failure returns &#x27;&#x27; rather than a false 👀.&quot;&quot;&quot;
++    &quot;&quot;&quot;R-OWNER-EMOJI: 👀 when fresh, else &#x27;page stale since HH:MM · &#x27; (no emoji) — from the PUBLIC status page
++    (fetched, never the local file). Best-effort — a failure returns &#x27;&#x27; rather than a false 👀.&quot;&quot;&quot;
+     try:
+         from scripts import watchers
+         px, _e = watchers.eye_prefix()
+diff --git a/scripts/notify.py b/scripts/notify.py
+index 59878dd3e..46a5691b8 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -66,6 +66,24 @@ _SITE = &quot;https://[redacted]-[redacted].github.io/e1-live-site/status.html&quot;
+ MIRROR_LINK = &quot;https://[redacted]-[redacted].github.io/e1-live-site/build/index.html&quot;
+ 
+ 
++# R-OWNER-EMOJI (owner ruling 23 Sep): 🙋 is the ONE and ONLY signal the owner must copy and send to the lead.
++# It is reserved for lines needing a human act (LEAD RULING NEEDED, NOT READY at 08:30, a needed human restart,
++# a sign-in tap, the 06:00 login link). Every 🙋 line ends with EXACTLY ONE of these closers; 👀 lines are never
++# owner-actioned (if one ever needs the owner it also carries 🙋). No other line may start with 🙋.
++OWNER_SIGNAL = &quot;\U0001f64b&quot;                                          # 🙋
++OWNER_CLOSERS = (&quot;send this to the lead&quot;, &quot;tap the login&quot;, &quot;reply restart now&quot;)
++
++
++def owner_signal_ok(message) -&gt; bool:
++    &quot;&quot;&quot;R-OWNER-EMOJI guard: True unless the line violates the policy — a line that LEADS with 🙋 must end with
++    exactly one of OWNER_CLOSERS. Returns True for every non-🙋-leading line. A guard (flags a malformed
++    owner-signal line), never a filter — notify still sends, so a needs-you alert is never suppressed.&quot;&quot;&quot;
++    m = str(message).lstrip()
++    if not m.startswith(OWNER_SIGNAL):
++        return True
++    return any(str(message).rstrip().endswith(c) for c in OWNER_CLOSERS)
++
++
+ def _with_link(message: str) -&gt; str:
+     &quot;&quot;&quot;R-EYES-COMPLETE §7: EVERY Telegram line ends with the mirror link (the build room — one link that shows
+     Now/Journal/Commits/Tests/Supervisor/Messages/Reports/Screenshots/Queue/Eyes). A line that already carries
+@@ -273,6 +291,8 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+     elif _drop:
+         _log_send(message, &quot;STORM-MUTED&quot;)
+         return False
++    if not owner_signal_ok(message):          # R-OWNER-EMOJI: flag a 🙋 line missing a required closer (never blocks)
++        _log_send(message, &quot;OWNER-EMOJI-VIOLATION: a 🙋 line must end with one of %s&quot; % (OWNER_CLOSERS,))
+     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
+     try:
+         from scripts import msg_log            # R-EYES-COMPLETE §2: the mirror&#x27;s incoming/outgoing log
+diff --git a/scripts/preopen_gate.py b/scripts/preopen_gate.py
+index 766f08abf..bc032fc6b 100644
+--- a/scripts/preopen_gate.py
++++ b/scripts/preopen_gate.py
+@@ -199,7 +199,7 @@ def post(notifier=None):
+             msg = vline                                  # the room is not actually up — do not claim READY
+     except Exception:
+         pass
+-    try:                                                 # R-EYE-EMOJI: 👀/🙈 from the PUBLIC page (fetched)
++    try:                                     # R-OWNER-EMOJI: 👀 fresh, else &#x27;page stale since HH:MM&#x27; (no emoji)
+         from scripts import watchers
+         px, _e = watchers.eye_prefix()
+         msg = px + msg
+diff --git a/scripts/watchers.py b/scripts/watchers.py
+index 6003fbbb6..94688a1d7 100644
+--- a/scripts/watchers.py
++++ b/scripts/watchers.py
+@@ -101,15 +101,16 @@ def stream_silence(now=None, status=None, post_fn=None):
+     return out
+ 
+ 
+-EYE_FRESH_S = 120                                   # R-EYE-EMOJI: public page under 2 min old = 👀, else 🙈
+-EYE_STREAK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.eye_streak&quot;)   # gitignored: consecutive 🙈 count
++EYE_FRESH_S = 120                                   # public page under 2 min old = 👀 (R-OWNER-EMOJI: fresh only)
++EYE_STREAK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.eye_streak&quot;)   # gitignored: consecutive stale count
+ 
+ 
+ def public_eye(now=None, fetch_fn=None):
+-    &quot;&quot;&quot;R-EYE-EMOJI: fetch the PUBLIC status page (never the local file) and return the freshness eye.
+-    Returns {emoji, hhmm, fresh, streak, blocked}: 👀 when the public written time is under 2 min old, else
+-    🙈 with that time. A failed fetch is 🙈 (fail toward the owner&#x27;s view, never a false 👀). `blocked` is True
+-    once 🙈 has held 3 lines in a row — the caller then makes fixing the page the only work.&quot;&quot;&quot;
++    &quot;&quot;&quot;R-OWNER-EMOJI (supersedes the 🙈 half of R-EYE-EMOJI): fetch the PUBLIC status page and return the
++    freshness eye. Returns {emoji, hhmm, fresh, streak, blocked}. Fresh (under 2 min) → 👀. Stale → NO emoji;
++    the caller writes the words &#x27;page stale since HH:MM&#x27; instead. A failed fetch is stale (fail toward the
++    owner&#x27;s view, never a false 👀). `blocked` is True once stale has held 3 lines in a row — the caller then
++    makes fixing the page the only work. A 🙋 is posted only if a human act is required (never from here).&quot;&quot;&quot;
+     now = now or _ist_now()
+     fetch_fn = fetch_fn or (lambda: _fetch_json(STATUS_JSON_URL))
+     hhmm, fresh = &quot;?&quot;, False
+@@ -127,14 +128,15 @@ def public_eye(now=None, fetch_fn=None):
+         open(EYE_STREAK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(str(streak))
+     except Exception:
+         streak = 0 if fresh else 1
+-    return {&quot;emoji&quot;: &quot;👀&quot; if fresh else &quot;🙈&quot;, &quot;hhmm&quot;: hhmm, &quot;fresh&quot;: fresh,
++    return {&quot;emoji&quot;: &quot;👀&quot; if fresh else &quot;&quot;, &quot;hhmm&quot;: hhmm, &quot;fresh&quot;: fresh,      # no 🙈 when stale
+             &quot;streak&quot;: streak, &quot;blocked&quot;: (not fresh) and streak &gt;= 3}
+ 
+ 
+ def eye_prefix(now=None, fetch_fn=None):
+-    &quot;&quot;&quot;The short prefix for a BUILD / READY line: &#x27;👀 &#x27; when fresh, else &#x27;🙈 status HH:MM · &#x27;.&quot;&quot;&quot;
++    &quot;&quot;&quot;The short prefix for a BUILD / READY line: &#x27;👀 &#x27; when fresh, else &#x27;page stale since HH:MM · &#x27; (no emoji,
++    R-OWNER-EMOJI).&quot;&quot;&quot;
+     e = public_eye(now, fetch_fn)
+-    return (&quot;👀 &quot; if e[&quot;fresh&quot;] else &quot;🙈 status %s · &quot; % e[&quot;hhmm&quot;]), e
++    return (&quot;👀 &quot; if e[&quot;fresh&quot;] else &quot;page stale since %s · &quot; % e[&quot;hhmm&quot;]), e
+ 
+ 
+ def _notify(msg):
+diff --git a/tests/test_mirror_link.py b/tests/test_mirror_link.py
+index 9af7ef2bb..c80f5cbcc 100644
+--- a/tests/test_mirror_link.py
++++ b/tests/test_mirror_link.py
+@@ -16,5 +16,16 @@ def test_line_with_status_link_not_doubled():
+     assert out.count(&quot;github.io/e1-live-site&quot;) == 1       # not doubled
+ 
+ 
++def test_owner_signal_closers():
++    # R-OWNER-EMOJI: a 🙋 line must end with exactly one of the three closers; non-🙋 lines are always fine.
++    assert notify.owner_signal_ok(&quot;🙋 LEAD RULING NEEDED — foo. send this to the lead&quot;)
++    assert notify.owner_signal_ok(&quot;🙋 the login page is open. tap the login&quot;)
++    assert notify.owner_signal_ok(&quot;🙋 the stack needs a restart. reply restart now&quot;)
++    assert not notify.owner_signal_ok(&quot;🙋 something happened, please look.&quot;)   # 🙋 without a closer = violation
++    assert notify.owner_signal_ok(&quot;👀 EYES LIVE — status 01:22&quot;)              # non-🙋 lines never owner-actioned
++    assert notify.owner_signal_ok(&quot;BUILD 01:24 — checklist 8/11&quot;)
++
++
+ if __name__ == &quot;__main__&quot;:
+-    test_plain_line_gets_mirror_link(); test_line_with_status_link_not_doubled(); print(&quot;test_mirror_link OK&quot;)
++    test_plain_line_gets_mirror_link(); test_line_with_status_link_not_doubled()
++    test_owner_signal_closers(); print(&quot;test_mirror_link OK&quot;)
+diff --git a/tests/test_watchers.py b/tests/test_watchers.py
+index 434395dd5..e957bf0cc 100644
+--- a/tests/test_watchers.py
++++ b/tests/test_watchers.py
+@@ -40,9 +40,12 @@ def test_public_eye_fresh_vs_stale(tmp_path):
+     stale_iso = (now - _dt.timedelta(minutes=10)).isoformat()
+     for i in range(1, 4):
+         s = w.public_eye(now, fetch_fn=lambda: {&quot;generated&quot;: stale_iso})
+-        assert s[&quot;emoji&quot;] == &quot;🙈&quot; and not s[&quot;fresh&quot;] and s[&quot;streak&quot;] == i
++        assert s[&quot;emoji&quot;] == &quot;&quot; and not s[&quot;fresh&quot;] and s[&quot;streak&quot;] == i    # R-OWNER-EMOJI: no 🙈 when stale
+     assert s[&quot;blocked&quot;] is True                       # 3 in a row -&gt; fixing the page is the only work
+-    # a failed fetch is 🙈, never a false 👀
+-    assert w.public_eye(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError()))[&quot;emoji&quot;] == &quot;🙈&quot;
++    # a failed fetch is stale (no emoji), never a false 👀
++    assert w.public_eye(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError()))[&quot;emoji&quot;] == &quot;&quot;
+     px, _e = w.eye_prefix(now, fetch_fn=lambda: {&quot;generated&quot;: (now - _dt.timedelta(seconds=10)).isoformat()})
+     assert px == &quot;👀 &quot;
++    # R-OWNER-EMOJI: the stale prefix carries the words &#x27;page stale since HH:MM&#x27;, no emoji
++    spx, se = w.eye_prefix(now, fetch_fn=lambda: {&quot;generated&quot;: stale_iso})
++    assert spx == &quot;page stale since %s · &quot; % se[&quot;hhmm&quot;] and &quot;🙈&quot; not in spx
+</pre></div><div class='c'><div class='h'><b>1a1ab980a</b> · 2026-09-23 02:38</div><div>R-EXAM-CONFORM PROVEN + R-GHOST-ROWS: marker written, AUBANK+ETERNAL queued, ghost book archived</div><div class='sub h'>docs/reports/verify-a905edd32.md               | 46 ++++++++++++++++++++++++++</div><div class='sub h'>engine1_rebuild/paper/ledger.csv               |  7 ++--</div><div class='sub h'>engine1_rebuild/paper/ledger_ghost_archive.csv | 11 ++++++</div><div class='sub h'>reports/EXAM-CONFORM-PROVEN                    |  4 +++</div><pre>diff --git a/docs/reports/verify-a905edd32.md b/docs/reports/verify-a905edd32.md
 new file mode 100644
 index 000000000..2b6debf88
 --- /dev/null
