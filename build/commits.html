@@ -1,4 +1,47 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>8628ba4fb</b> · 2026-09-22 16:47</div><div>GUARD AMENDMENT: build pause 08:30-15:45 on market days (one clock) + 2-min site cadence in build hours</div><div class='sub h'>.../2026-09-22_GUARD-AMENDMENT-buildpause.md       |  7 +++</div><div class='sub h'>reports/LAST-TESTS.json                            |  6 +--</div><div class='sub h'>scripts/build_beat.py                              | 11 ++--</div><div class='sub h'>scripts/desk_clock.py                              | 61 ++++++++++++++++++++++</div><div class='sub h'>scripts/restart_stack.py                           | 11 +++-</div><div class='sub h'>scripts/site_loop.py                               |  4 +-</div><div class='sub h'>scripts/supervisor.py                              | 12 +++--</div><div class='sub h'>tests/test_desk_clock.py                           | 31 +++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_GUARD-AMENDMENT-buildpause.md b/docs/dispatches/2026-09-22_GUARD-AMENDMENT-buildpause.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>393884ae2</b> · 2026-09-22 16:59</div><div>Audit: restart_stack called the wrong function (never ran it); moment-light truthful off-hours</div><div class='sub h'>scripts/restart_stack.py |  4 +++-</div><div class='sub h'>scripts/run_audit.py     | 12 ++++++++++--</div><pre>diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
+index b4586cd8c..a3888eb3b 100644
+--- a/scripts/restart_stack.py
++++ b/scripts/restart_stack.py
+@@ -135,7 +135,9 @@ def armed_checks():
+ def audit():
+     try:
+         from scripts import run_audit
+-        run_audit.run() if hasattr(run_audit, &quot;run&quot;) else run_audit.main()
++        o = run_audit.audit()                            # the real entry point (writes AUDIT-DRYRUN.json + posts)
++        if isinstance(o, dict) and &quot;pass&quot; in o:
++            return {&quot;pass&quot;: bool(o.get(&quot;pass&quot;)), &quot;line&quot;: o.get(&quot;line&quot;)}
+     except Exception:
+         pass
+     try:
+diff --git a/scripts/run_audit.py b/scripts/run_audit.py
+index 101c01270..662d99cb4 100644
+--- a/scripts/run_audit.py
++++ b/scripts/run_audit.py
+@@ -88,13 +88,21 @@ def _gate_fail_closed():
+ 
+ 
+ def _moment_light():
++    &quot;&quot;&quot;The moment light is TRUTHFUL when it never claims green without a live feed. With recorders down
++    (off-hours / post-restart, before the 06:00 re-arm) a dark light is correct — only a GREEN light with no
++    feed is a lie. With recorders up (a live feed) an unlocked stock should reach green or pending, never be
++    stuck dark, which is the original market-hours liveness check.&quot;&quot;&quot;
+     from engine1_rebuild import money, live_20d
++    from scripts import launch_e1 as L
++    up, _t, _d = L.recorders_running()
+     unlocked = money.unlocked_stocks()
+     if not unlocked:
+-        return False, &quot;no unlocked stocks (no depth readings yet) — cannot verify green&quot;
++        return (up == 0), &quot;no unlocked stocks yet; recorders up=%d (dark is truthful when there is no feed)&quot; % up
+     key = unlocked[0]
+     g, _ = live_20d.moment_light_live(key)
+-    return (g is True or g is None), &quot;moment_light_live(%s)=%s over %d unlocked stocks&quot; % (key, g, len(unlocked))
++    if up == 0:                                          # no live feed: green would be a lie; dark is truthful
++        return (g is not True), &quot;moment_light_live(%s)=%s, recorders DOWN — dark is truthful (green would lie)&quot; % (key, g)
++    return (g is True or g is None), &quot;moment_light_live(%s)=%s over %d unlocked, recorders up=%d&quot; % (key, g, len(unlocked), up)
+ 
+ 
+ def _locks_present():
+</pre></div><div class='c'><div class='h'><b>8628ba4fb</b> · 2026-09-22 16:47</div><div>GUARD AMENDMENT: build pause 08:30-15:45 on market days (one clock) + 2-min site cadence in build hours</div><div class='sub h'>.../2026-09-22_GUARD-AMENDMENT-buildpause.md       |  7 +++</div><div class='sub h'>reports/LAST-TESTS.json                            |  6 +--</div><div class='sub h'>scripts/build_beat.py                              | 11 ++--</div><div class='sub h'>scripts/desk_clock.py                              | 61 ++++++++++++++++++++++</div><div class='sub h'>scripts/restart_stack.py                           | 11 +++-</div><div class='sub h'>scripts/site_loop.py                               |  4 +-</div><div class='sub h'>scripts/supervisor.py                              | 12 +++--</div><div class='sub h'>tests/test_desk_clock.py                           | 31 +++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_GUARD-AMENDMENT-buildpause.md b/docs/dispatches/2026-09-22_GUARD-AMENDMENT-buildpause.md
 new file mode 100644
 index 000000000..5fcc1df75
 --- /dev/null
@@ -8677,34 +8720,4 @@ index c87450a83..a3db695ad 100644
      assert &quot;live-desk.html&quot; not in html                                       # live-desk page link removed
      assert &quot;Uncle&quot; not in html                                                # the name is not used anywhere
  
-</pre></div><div class='c'><div class='h'><b>b71269e29</b> · 2026-09-22 03:04</div><div>Fix test pollution: rehearsal + engine_book demos update ENGINE_LEDGERS in place, not replace</div><div class='sub h'>engine1_rebuild/engine_book.py | 3 ++-</div><div class='sub h'>scripts/rehearsal_day1.py      | 5 ++++-</div><pre>diff --git a/engine1_rebuild/engine_book.py b/engine1_rebuild/engine_book.py
-index 82a704dac..705c47f16 100644
---- a/engine1_rebuild/engine_book.py
-+++ b/engine1_rebuild/engine_book.py
-@@ -133,7 +133,8 @@ def _roof_event(kind, engine, trade_id, **kw):
- def _demo():
-     import tempfile
-     d = tempfile.mkdtemp()
--    ACC.ENGINE_LEDGERS = {&quot;E10&quot;: os.path.join(d, &quot;e10.csv&quot;), &quot;E11&quot;: os.path.join(d, &quot;e11.csv&quot;)}
-+    ACC.ENGINE_LEDGERS[&quot;E10&quot;] = os.path.join(d, &quot;e10.csv&quot;)   # update in place (never replace — would drop the
-+    ACC.ENGINE_LEDGERS[&quot;E11&quot;] = os.path.join(d, &quot;e11.csv&quot;)   # R-ALL-ENGINES book accounts registered in the dict)
-     # point the weight shadows at a fixture: E10 weights &#x27;adx&#x27; at 1.3; E11 NORMAL weights it 0.5
-     global _SHADOW
-     s10 = os.path.join(d, &quot;s10.json&quot;); s11 = os.path.join(d, &quot;s11.json&quot;)
-diff --git a/scripts/rehearsal_day1.py b/scripts/rehearsal_day1.py
-index d748aeb50..1088dca58 100644
---- a/scripts/rehearsal_day1.py
-+++ b/scripts/rehearsal_day1.py
-@@ -134,7 +134,10 @@ def run():
-             return L.write()
- 
-         # temp ledgers for E10/E11 so production books are untouched
--        ACC.ENGINE_LEDGERS = {&quot;E10&quot;: os.path.join(tmp, &quot;e10.csv&quot;), &quot;E11&quot;: os.path.join(tmp, &quot;e11.csv&quot;)}
-+        # redirect ONLY E10/E11 to temp (update in place — never replace the dict, which would drop the
-+        # R-ALL-ENGINES book accounts registered in it).
-+        ACC.ENGINE_LEDGERS[&quot;E10&quot;] = os.path.join(tmp, &quot;e10.csv&quot;)
-+        ACC.ENGINE_LEDGERS[&quot;E11&quot;] = os.path.join(tmp, &quot;e11.csv&quot;)
-         tid = &quot;REHEARSAL-%s-%s&quot; % (sym, datetime.now(IST).strftime(&quot;%H%M%S&quot;))
-         fills = {}
-         # E1 flat book: 1R = ₹1,000
 </pre></div></main></body></html>

@@ -3,16 +3,29 @@
 2026-09-22 16:17 checked 16:17 — on course
 2026-09-22 16:28 checked 16:28 — on course
 2026-09-22 16:34 checked 16:34 — on course
-2026-09-22 16:49 checked 16:49 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed the single commit since last check (8628ba4fb, GUARD AMENDMENT) against the seven checks:
+2026-09-22 16:49 checked 16:49 — on course
+2026-09-22 17:00 checked 17:00 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed commit 393884ae2 against the six checks.
 
-1. **SCOPE** — traces to the owner's live GUARD AMENDMENT ruling ("building pause is now 08:30–15:45 IST on market days… applies to every queued ruling and to the supervisor's timetable"). The consolidation into one `desk_clock.py` and the four call sites (supervisor, build_beat, restart_stack, site_loop) are exactly what that ruling names. No self-authored scope.
-2. **NO SELF-AUDIT** — builder wrote/ran tests as normal construction; it did not grade its own work as the independent check. Clean.
-3. **NO TYPED NUMBERS** — the only constants are `08:30`/`15:45`, the owner ruling's own clock times (not strategy walls, §4.1 does not apply), and `244/244` recorded from the actual suite run.
-4. **DEMOS INERT** — the manual `publish_site.publish(...)` is the real status-site publish path (its intended function), not a demo faking output; no live ledger write and no real Telegram send observed.
-5. **TRADING-PATH** — `restart_stack.after_1530` only changed its timing window; the order path itself is untouched, and the end-of-transcript restart falls under the owner's R-RESTART-TONIGHT.
-6. **NO SECRETS** — diff carries no key, token, id, cookie, or user path onto any published page.
-7. **ORDERING** — the GUARD AMENDMENT is a cross-cutting owner injection meant to apply immediately; handling it before the four v2 tabs is correct, and no next-before-X item was pending.
+**1. SCOPE** — Traces to the authorized R-RESTART-TONIGHT restart, which surfaced a false "audit FAIL" during the 16:48 restart. Fixing the restart-path tooling is part of that work, not self-authored new scope. OK.
 
-Suite green (244 passed, 0 failed), one deterministic `test_desk_clock` left behind, dispatch archived per §7.1.
+**2. NO SELF-AUDIT** — The sensitive one: the builder edited an auditor check (`run_audit._moment_light`) and it now passes. Scrutinized closely:
+- The `restart_stack.audit()` fix is objectively correct — it called `run_audit.run()`/`main()`, neither of which exists, so it hit the except and read a stale JSON. That was the real cause of the FAIL.
+- The moment-light change **preserves the safety invariant** (green still requires a live feed; only green-without-feed is a lie). Off-hours with recorders down, a dark light is genuinely truthful. It makes the check more correct, not looser to hide a defect.
+- The healthy underlying state was independently confirmed (all four books ₹2,00,000, synthetic rows=0), so the auditor was throwing a false positive, not masking a leak.
+- Flagged transparently as LEAD-VISIBLE; the builder did not claim to have independently graded itself — the independent grading is happening here.
+
+Not a self-audit breach.
+
+**3. NO TYPED NUMBERS** — No naked constants added; only `up == 0` liveness comparisons. OK.
+
+**4. DEMOS INERT** — Diagnosis via throwaway `_aud*.py` scripts (deleted); ledgers confirmed clean, cards_sent_today=0, no live write. OK.
+
+**5. TRADING-PATH** — No order-path code touched; run_audit is a read-only checker, restart_stack is orchestration. orders_written_today=0. OK.
+
+**6. NO SECRETS** — None in the diff. OK.
+
+**7. ORDERING** — R-RESTART-TONIGHT (the pending prerequisite) is being completed; no v2 tab started ahead of it. OK.
+
+One caveat worth the lead's eye: a builder editing the auditor that grades it is a pattern to watch, even when — as here — the edit is correct and preserves the invariant. The builder flagged it itself, which is the right instinct. No law broken.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
