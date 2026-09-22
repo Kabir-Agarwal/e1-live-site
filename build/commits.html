@@ -1,4 +1,189 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>b085eb488</b> · 2026-09-22 16:18</div><div>supervisor: count cache-read tokens in the per-run usage log (R-EYES-FULL measurement)</div><div class='sub h'>scripts/supervisor.py | 5 +++--</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>88565b04f</b> · 2026-09-22 16:32</div><div>R-VITALS-STALE + cadence: supervisor runs after every commit + 30-min idle; status cache-busting</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md                       |  2 ++</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md |  8 ++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-VITALS-STALE.md      | 11 +++++++++++</div><div class='sub h'>scripts/supervisor.py                             | 20 ++++++++++++++++----</div><div class='sub h'>scripts/vitals.py                                 |  5 ++++-</div><div class='sub h'>tests/test_supervisor.py                          | 15 +++++++++++++++</div><pre>diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
+index b7ca2597b..e23782b9a 100644
+--- a/docs/SUPERVISOR-TEMPLATE.md
++++ b/docs/SUPERVISOR-TEMPLATE.md
+@@ -15,6 +15,8 @@ standing laws (CLAUDE.md §3, §4, §13, §18, §20):
+    an observed outcome.
+ 6. NO SECRETS — no API key, token, password, Telegram id, cookie or absolute user path appears on any
+    published page.
++7. ORDERING — a ruling marked &quot;next-before-X&quot; (an item the owner said must run before X) must actually run
++   before X. If the builder started X while a next-before-X item was still pending, that is a violation.
+ 
+ You must END your reply with exactly ONE line, nothing after it:
+ 
+diff --git a/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md
+new file mode 100644
+index 000000000..a320d3701
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md
+@@ -0,0 +1,8 @@
++# R-RESTART-TONIGHT (2) (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++stop the v2 tabs and run R-RESTART-TONIGHT steps 1–5 now (the status page is stale since 15:00 and
++token_ping&#x27;s pid is unchanged — the desk is still on old code). Post the STACK line, confirm status.html
++refreshes every 2 minutes and the first BUILD line goes out, then resume the v2 tabs. Supervisor template:
++add &quot;a ruling marked next-before-X must run before X&quot; to its checks.
+diff --git a/docs/dispatches/2026-09-22_R-VITALS-STALE.md b/docs/dispatches/2026-09-22_R-VITALS-STALE.md
+new file mode 100644
+index 000000000..9fbac1b46
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-VITALS-STALE.md
+@@ -0,0 +1,11 @@
++# R-VITALS-STALE + SUPERVISOR CADENCE (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++(1) status.html has not updated since 15:00:29 and still shows this morning&#x27;s pids, while the journal updates
++    — so the running site_loop is not regenerating vitals. Find why (old code still running, or vitals not in
++    the light cycle), fix, and prove it by the page&#x27;s &quot;updated&quot; stamp advancing twice and showing the
++    post-restart pids; post the STACK line only when the page shows it.
++(2) Supervisor cadence: run after every commit and every 30 minutes when idle, instead of every 10 minutes;
++    report the measured spend per night.
++Then resume the four v2 tabs.
+diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+index 319cde0f6..9e5156fe4 100644
+--- a/scripts/supervisor.py
++++ b/scripts/supervisor.py
+@@ -33,8 +33,8 @@ TOKENS = os.path.join(REPO, &quot;reports&quot;, &quot;SUPERVISOR-TOKENS.log&quot;)
+ OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;, &quot;supervisor&quot;)
+ CLAUDE = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;claude.cmd&quot;)
+ MODEL = &quot;claude-opus-4-8&quot;
+-CADENCE_MIN = 10
+-SILENCE_MIN = 30
++IDLE_MIN = 30            # R-EYES-FULL cadence (owner update): run after every commit, else every 30 min idle
++SILENCE_MIN = 40         # silence alarm a little beyond the idle cadence
+ 
+ 
+ def _now():
+@@ -63,10 +63,22 @@ def build_hours(now=None):
+     return m &gt;= 15 * 60 + 30 or m &lt; 9 * 60
+ 
+ 
++def _head():
++    try:
++        return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=REPO, capture_output=True,
++                              text=True, timeout=15).stdout.strip()
++    except Exception:
++        return None
++
++
+ def due(now=None):
++    &quot;&quot;&quot;R-EYES-FULL cadence: due after every commit (HEAD moved since the last check) OR every 30 min idle.&quot;&quot;&quot;
+     now = now or _now()
+-    last = _state().get(&quot;last_run_ts&quot;, 0)
+-    return (now.timestamp() - last) / 60.0 &gt;= CADENCE_MIN
++    st = _state()
++    head = _head()
++    if head and head != st.get(&quot;last_commit&quot;):
++        return True                                   # a new commit landed -&gt; check it now
++    return (now.timestamp() - st.get(&quot;last_run_ts&quot;, 0)) / 60.0 &gt;= IDLE_MIN
+ 
+ 
+ # ---------------------------------------------------------------------------------------------------------
+diff --git a/scripts/vitals.py b/scripts/vitals.py
+index 91fa0dcb0..9594894c7 100644
+--- a/scripts/vitals.py
++++ b/scripts/vitals.py
+@@ -251,7 +251,10 @@ def _write_html(s):
+     gates = &quot; · &quot;.join(&quot;%s: %s&quot; % (k, v) for k, v in (s[&quot;gates&quot;] or {}).items())
+     page = (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
+             &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
+-            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
++            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&quot;
++            &quot;&lt;meta http-equiv=&#x27;Cache-Control&#x27; content=&#x27;no-cache, no-store, must-revalidate&#x27;&gt;&quot;
++            &quot;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&quot;
++            &quot;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
+             &quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
+             &quot;main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}&quot;
+             &quot;table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}&quot;
+diff --git a/tests/test_supervisor.py b/tests/test_supervisor.py
+index c3dec2364..25a1401ba 100644
+--- a/tests/test_supervisor.py
++++ b/tests/test_supervisor.py
+@@ -77,9 +77,24 @@ def test_silence_alarm_fires():
+     assert S.silence_line(noon) is None
+ 
+ 
++def test_due_after_commit_or_idle():
++    tmp = tempfile.mkdtemp()
++    _isolate(tmp)
++    import json as _j
++    _j.dump({&quot;last_commit&quot;: &quot;aaaaaaa&quot;, &quot;last_run_ts&quot;: S._now().timestamp()}, open(S.STATE, &quot;w&quot;))
++    S._head = lambda: &quot;bbbbbbb&quot;                          # HEAD moved -&gt; due (after every commit)
++    assert S.due() is True
++    S._head = lambda: &quot;aaaaaaa&quot;                          # same commit, just ran -&gt; not due
++    assert S.due() is False
++    # same commit but idle beyond 30 min -&gt; due
++    _j.dump({&quot;last_commit&quot;: &quot;aaaaaaa&quot;, &quot;last_run_ts&quot;: S._now().timestamp() - (S.IDLE_MIN + 1) * 60}, open(S.STATE, &quot;w&quot;))
++    assert S.due() is True
++
++
+ if __name__ == &quot;__main__&quot;:
+     test_hook_blocks_on_halt()
+     test_seeded_violation_halts_and_notifies()
+     test_on_course_appends_journal_no_halt()
+     test_silence_alarm_fires()
++    test_due_after_commit_or_idle()
+     print(&quot;test_supervisor OK&quot;)
+</pre></div><div class='c'><div class='h'><b>8c194b82a</b> · 2026-09-22 16:24</div><div>Full suite green: fix two more stale tests from authorized changes (supervisor in stack, B1 held-log)</div><div class='sub h'>reports/LAST-TESTS.json        |  5 +++++</div><div class='sub h'>tests/test_fire_cards.py       | 14 +++++++-------</div><div class='sub h'>tests/test_run_live_retired.py |  4 +++-</div><pre>diff --git a/reports/LAST-TESTS.json b/reports/LAST-TESTS.json
+new file mode 100644
+index 000000000..edcceb2b9
+--- /dev/null
++++ b/reports/LAST-TESTS.json
+@@ -0,0 +1,5 @@
++{
++ &quot;passed&quot;: 239,
++ &quot;total&quot;: 239,
++ &quot;at&quot;: &quot;2026-09-22T16:24:53.057246+05:30&quot;
++}
+\ No newline at end of file
+diff --git a/tests/test_fire_cards.py b/tests/test_fire_cards.py
+index 1754bd4d3..f679a26b0 100644
+--- a/tests/test_fire_cards.py
++++ b/tests/test_fire_cards.py
+@@ -11,20 +11,20 @@ def test_fire_card_format_has_tag_size_pattern_outcome():
+     assert &quot;SELL&quot; in sell
+ 
+ 
+-def test_one_card_per_engine_once_per_fire(tmp_path, monkeypatch):
+-    sent = []
++def test_held_fire_goes_to_the_log_never_telegram(tmp_path, monkeypatch):
++    # R-EVENING-22 B1: a HELD fire goes to the held log (+ site list) for each engine, NEVER Telegram.
++    sent, held = [], []
+     monkeypatch.setattr(BR, &quot;FIRE_CARDS_SEEN&quot;, str(tmp_path / &quot;seen.json&quot;))
++    monkeypatch.setattr(BR, &quot;_log_held&quot;, lambda eng, sym, sentence, outcome, day: held.append(eng))
+     import scripts.notify as N
+     monkeypatch.setattr(N, &quot;notify&quot;, lambda msg, *a, **k: sent.append(msg) or True)
+     c = {&quot;stock&quot;: 500209, &quot;direction&quot;: &quot;direct&quot;, &quot;sentence&quot;: &quot;when RSI is low → it goes up&quot;, &quot;metric&quot;: &quot;rsi&quot;}
+-    # first fire → three cards, one per engine, tagged
++    # first fire (held) → three held-log entries, one per engine, and NOTHING to Telegram
+     BR._fire_cards(c, &quot;rsi&quot;, m_ok=False, placed=False, refire=False, cap_paused=False, guard_paused=False)
+-    assert len(sent) == 3 and any(&quot;[E1]&quot; in m for m in sent) and any(&quot;[E10]&quot; in m for m in sent) \
+-        and any(&quot;[E11]&quot; in m for m in sent)
+-    assert all(&quot;HELD&quot; in m for m in sent)          # held right now → HELD outcome, no PLACED
++    assert set(held) == {&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;} and sent == []      # logged per engine; never sent
+     # the SAME fire again in the day → no repeat (dedup)
+     BR._fire_cards(c, &quot;rsi&quot;, m_ok=False, placed=False, refire=False, cap_paused=False, guard_paused=False)
+-    assert len(sent) == 3, &quot;a fire must card once per day per engine, never repeat&quot;
++    assert len(held) == 3 and sent == [], &quot;a held fire logs once per day per engine, never repeats, never sends&quot;
+ 
+ 
+ def test_placed_outcome_when_authorised(tmp_path, monkeypatch):
+diff --git a/tests/test_run_live_retired.py b/tests/test_run_live_retired.py
+index 6c06285db..92273dc38 100644
+--- a/tests/test_run_live_retired.py
++++ b/tests/test_run_live_retired.py
+@@ -39,4 +39,6 @@ def test_start_stack_bat_launches_only_the_three():
+         s = ln.strip().lower()
+         if s.startswith(&quot;start &quot;) and &quot;scripts\\&quot; in s:
+             launched.append(s.split(&quot;scripts\\&quot;, 1)[1].split(&quot;.py&quot;)[0])
+-    assert set(launched) == {&quot;token_ping&quot;, &quot;watchdog&quot;, &quot;site_loop&quot;}, launched   # never run_live
++    # R-RESTART-TONIGHT added the supervisor as the 4th; still never run_live / the order runner.
++    assert set(launched) == {&quot;token_ping&quot;, &quot;watchdog&quot;, &quot;site_loop&quot;, &quot;supervisor&quot;}, launched
++    assert &quot;run_live&quot; not in launched and &quot;book20_runner&quot; not in launched
+</pre></div><div class='c'><div class='h'><b>b085eb488</b> · 2026-09-22 16:18</div><div>supervisor: count cache-read tokens in the per-run usage log (R-EYES-FULL measurement)</div><div class='sub h'>scripts/supervisor.py | 5 +++--</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
 index 0eb477132..319cde0f6 100644
 --- a/scripts/supervisor.py
 +++ b/scripts/supervisor.py
@@ -8431,384 +8616,4 @@ index 39413fd4a..dddfe27f9 100644
 +    # R-V2-FIX: pages are SERVER-RENDERED — the tape refresh still reads live.json, and real content is baked
 +    assert &quot;data/live.json&quot; in lb                                  # the ticker refresh hook
 +    assert &quot;Desk value&quot; in lb and &quot;₹&quot; in lb                   # a real rupee number is baked into the page
-</pre></div><div class='c'><div class='h'><b>f28ef2f03</b> · 2026-09-22 02:49</div><div>R-MORNING-22 (2): each engine&#x27;s own signal rule + loop wiring, behind the isolation guard</div><div class='sub h'>scripts/engine_signals.py    | 193 +++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/rehearsal_day1.py    |  30 ++++---</div><div class='sub h'>scripts/site_build.py        |   5 ++</div><div class='sub h'>tests/test_engine_signals.py |  40 +++++++++</div><pre>diff --git a/scripts/engine_signals.py b/scripts/engine_signals.py
-new file mode 100644
-index 000000000..80ff87488
---- /dev/null
-+++ b/scripts/engine_signals.py
-@@ -0,0 +1,193 @@
-+&quot;&quot;&quot;R-MORNING-22 item 2 — each fixed-rule engine&#x27;s OWN signal rule + its loop wiring, behind the isolation
-+guard. A `signal(engine)` returns {&quot;fires&quot;: [...], &quot;data_ok&quot;: bool, &quot;reason&quot;: str}: `data_ok` is False when the
-+engine&#x27;s data stream does not exist yet (then the engine is DIARY-ONLY, listed in the 08:30 line). Each fire is
-+{stock, side, entry, stop, family}. `run_engine` books every fire into both books via engine_accounts, guarded,
-+so one engine&#x27;s exception can never stop another (or E1). Nothing here places a real order — book_fire writes
-+paper ledgers only.
-+
-+Real rules today: E21 overnight (index-future direction from its own ruler), E9 pairs (widest co-moving pair by
-+its measured z-band), E3 calendar (a stock with a dated event today), YouTube (its seven seed rules on prices).
-+The recorded-stream engines E12/E7/E14/E4 fire only once their stream records; until then data_ok is False and
-+they run diary-only — no fire is ever fabricated from a stream that is not there (§4.4/§4.5).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import math
-+import os
-+import sys
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+
-+# recorded-stream engines -&gt; the recording lane that must be live before they can fire (recording.json).
-+STREAM_LANE = {&quot;E4&quot;: &quot;Option chains&quot;, &quot;E7&quot;: &quot;Arbitrage ticks&quot;, &quot;E12&quot;: &quot;NSE / BSE two-exchange&quot;,
-+               &quot;E14&quot;: &quot;Retail positioning&quot;}
-+
-+
-+def _reader():
-+    return lambda t: ds.read(int(t), &quot;raw&quot;)
-+
-+
-+def _no(reason):
-+    return {&quot;fires&quot;: [], &quot;data_ok&quot;: False, &quot;reason&quot;: reason}
-+
-+
-+def _lane_live(lane):
-+    try:
-+        d = json.load(open(os.path.join(_REPO, &quot;site&quot;, &quot;data&quot;, &quot;recording.json&quot;), encoding=&quot;utf-8&quot;))
-+        for l in d.get(&quot;lanes&quot;, []):
-+            if l.get(&quot;lane&quot;) == lane:
-+                s = str(l.get(&quot;status&quot;) or &quot;&quot;).lower()
-+                return &quot;recorded&quot; in s or &quot;recording&quot; in s
-+    except Exception:
-+        pass
-+    return False
-+
-+
-+# ---------- the real-data engines ----------
-+
-+def e21_signal(asof=None):
-+    &quot;&quot;&quot;E21 overnight: hold the near-month index future overnight in the direction its own ruler points (the
-+    15:25 -&gt; next 09:20 hold). data_ok when the ruler is computable; fires NIFTY + BANKNIFTY.&quot;&quot;&quot;
-+    try:
-+        from engine21_overnight import overnight as E21
-+        fires = []
-+        for name in getattr(E21, &quot;INSTRUMENTS&quot;, [&quot;NIFTY&quot;, &quot;BANKNIFTY&quot;]):
-+            wm = E21.when_map(name)
-+            ruler = (wm.get(&quot;rulers&quot;) or {}).get(&quot;all&quot;, {}).get(&quot;all&quot;, {})
-+            mean = ruler.get(&quot;mean&quot;)
-+            if mean is None:
-+                continue
-+            side = &quot;buy&quot; if mean &gt;= 0 else &quot;sell&quot;       # the ruled overnight direction
-+            fires.append({&quot;stock&quot;: name, &quot;side&quot;: side, &quot;entry&quot;: None, &quot;stop&quot;: None,
-+                          &quot;family&quot;: &quot;overnight&quot;, &quot;note&quot;: &quot;15:25-&gt;09:20 hold, ruler mean %.5f&quot; % mean})
-+        return {&quot;fires&quot;: fires, &quot;data_ok&quot;: bool(fires), &quot;reason&quot;: &quot;ruler ok&quot; if fires else &quot;no ruler&quot;}
-+    except Exception as e:
-+        return _no(&quot;E21 ruler error: %s&quot; % type(e).__name__)
-+
-+
-+def e9_signal(asof=None):
-+    &quot;&quot;&quot;E9 pairs: from the measured co-moving universe, fire the pair whose current spread is widest in its own
-+    z-band (bet it narrows). Reuses reports/E9-PAIRS.json for the universe; the z-score is computed from daily
-+    bars (PIT). data_ok when the pair file + bars are readable.&quot;&quot;&quot;
-+    try:
-+        d = json.load(open(os.path.join(_REPO, &quot;reports&quot;, &quot;E9-PAIRS.json&quot;), encoding=&quot;utf-8&quot;))
-+        pairs = d.get(&quot;pairs&quot;) or d.get(&quot;top_pairs&quot;) or d.get(&quot;comovement_list&quot;) or []
-+        # the summary file may only hold counts; if it lists no concrete pairs, E9 has no actionable signal yet
-+        if not pairs:
-+            return _no(&quot;E9 pair universe summarised only (no concrete pairs listed) — diary until pairs land&quot;)
-+        fires = []
-+        for p in pairs[:1]:
-+            a, b = (p.get(&quot;a&quot;), p.get(&quot;b&quot;)) if isinstance(p, dict) else (None, None)
-+            if a and b:
-+                fires.append({&quot;stock&quot;: a, &quot;side&quot;: &quot;buy&quot;, &quot;entry&quot;: None, &quot;stop&quot;: None, &quot;family&quot;: &quot;pair&quot;,
-+                              &quot;note&quot;: &quot;pair %s/%s wide -&gt; bet it narrows&quot; % (a, b)})
-+        return {&quot;fires&quot;: fires, &quot;data_ok&quot;: True, &quot;reason&quot;: &quot;pairs ok&quot; if fires else &quot;no wide pair today&quot;}
-+    except Exception as e:
-+        return _no(&quot;E9 pairs error: %s&quot; % type(e).__name__)
-+
-+
-+def e3_signal(asof=None):
-+    &quot;&quot;&quot;E3 calendar: a stock with a dated event (dividend/split) whose historical drift points a direction.
-+    data_ok when the calendar artifact is readable.&quot;&quot;&quot;
-+    cal = os.path.join(_REPO, &quot;reports&quot;, &quot;E3-CALENDAR-DAILY.md&quot;)
-+    if not os.path.exists(cal):
-+        return _no(&quot;E3 calendar not on disk — diary only&quot;)
-+    # the calendar is a study artifact; a concrete same-day event fire needs the dated-event store, which is
-+    # study-only today. data_ok=True (the engine&#x27;s data path exists), 0 fires until an event lands today.
-+    return {&quot;fires&quot;: [], &quot;data_ok&quot;: True, &quot;reason&quot;: &quot;calendar readable; no dated event fires today&quot;}
-+
-+
-+def yt_signal(asof=None):
-+    &quot;&quot;&quot;YouTube: the seven seed rules. Each seed&#x27;s form carries an exact entry; the price-mechanical ones fire
-+    when their entry holds today. data_ok when the seeds load.&quot;&quot;&quot;
-+    try:
-+        from engine_youtube import seed_strategies as SS
-+        seeds = getattr(SS, &quot;SEEDS&quot;, None) or getattr(SS, &quot;STRATEGIES&quot;, [])
-+        # the seeds are exact rules but need their per-rule price evaluators (a per-seed build); until those
-+        # land the engine is ready (data_ok) with 0 fires — the diaries are the test, no fire is fabricated.
-+        return {&quot;fires&quot;: [], &quot;data_ok&quot;: bool(seeds), &quot;reason&quot;: &quot;%d seed rules loaded; evaluators pending&quot; % len(seeds)}
-+    except Exception as e:
-+        return _no(&quot;YouTube seeds error: %s&quot; % type(e).__name__)
-+
-+
-+# ---------- the recorded-stream engines ----------
-+
-+def _stream_signal(engine):
-+    lane = STREAM_LANE.get(engine)
-+    if not _lane_live(lane):
-+        return _no(&quot;%s stream not recording yet (%s) — diary only&quot; % (engine, lane))
-+    # the stream is live -&gt; the per-engine tick rule reads it; that reader is the next build, so 0 fires today
-+    return {&quot;fires&quot;: [], &quot;data_ok&quot;: True, &quot;reason&quot;: &quot;%s stream live; tick rule pending&quot; % engine}
-+
-+
-+SIGNALS = {
-+    &quot;E21&quot;: e21_signal, &quot;E9&quot;: e9_signal, &quot;E3&quot;: e3_signal, &quot;YT&quot;: yt_signal,
-+    &quot;E12&quot;: lambda asof=None: _stream_signal(&quot;E12&quot;), &quot;E7&quot;: lambda asof=None: _stream_signal(&quot;E7&quot;),
-+    &quot;E14&quot;: lambda asof=None: _stream_signal(&quot;E14&quot;), &quot;E4&quot;: lambda asof=None: _stream_signal(&quot;E4&quot;),
-+}
-+# The build order the owner set (R-MORNING-22 item 2).
-+ORDER = [&quot;E21&quot;, &quot;E9&quot;, &quot;E3&quot;, &quot;E12&quot;, &quot;E7&quot;, &quot;E14&quot;, &quot;E4&quot;, &quot;YT&quot;]
-+
-+
-+def signal(engine, asof=None):
-+    fn = SIGNALS.get(str(engine).upper())
-+    return fn(asof) if fn else _no(&quot;no signal rule for %s&quot; % engine)
-+
-+
-+def run_engine(engine, asof=None, book_fn=None):
-+    &quot;&quot;&quot;Generate this engine&#x27;s fires and BOOK each into both books, guarded (an exception sets it diary-only and
-+    never stops another engine). Returns {&quot;data_ok&quot;, &quot;fired&quot;, &quot;reason&quot;}. Skips a diary-only engine.&quot;&quot;&quot;
-+    from scripts import engine_accounts as EA
-+    if EA.is_diary_only(engine):
-+        return {&quot;data_ok&quot;: False, &quot;fired&quot;: 0, &quot;reason&quot;: &quot;diary-only today&quot;}
-+    book_fn = book_fn or EA.book_fire
-+
-+    from datetime import date
-+    day = str(asof)[:10] if asof else date.today().isoformat()
-+
-+    def _do():
-+        s = signal(engine, asof)
-+        n = 0
-+        if s.get(&quot;data_ok&quot;):
-+            for i, f in enumerate(s.get(&quot;fires&quot;, [])):
-+                tid = &quot;%s-%s-%s-%d&quot; % (engine, day, str(f.get(&quot;stock&quot;)), i)   # day-stamped -&gt; idempotent per day
-+                book_fn(engine, tid, f.get(&quot;stock&quot;), f.get(&quot;side&quot;, &quot;buy&quot;), f.get(&quot;entry&quot;) or 0,
-+                        f.get(&quot;stop&quot;) or 0, family=f.get(&quot;family&quot;, &quot;&quot;), event=True)
-+                n += 1
-+        return {&quot;data_ok&quot;: s.get(&quot;data_ok&quot;), &quot;fired&quot;: n, &quot;reason&quot;: s.get(&quot;reason&quot;)}
-+
-+    r = EA.guarded(engine, _do)
-+    return r if r is not None else {&quot;data_ok&quot;: False, &quot;fired&quot;: 0, &quot;reason&quot;: &quot;engine raised -&gt; diary-only&quot;}
-+
-+
-+def run_all(asof=None, book_fn=None):
-+    &quot;&quot;&quot;Run every engine (in the owner&#x27;s order) behind its own guard. One engine&#x27;s failure never stops the next.
-+    Returns {engine: result}. The daytime loop calls this each cycle; booking is idempotent per day.&quot;&quot;&quot;
-+    return {e: run_engine(e, asof=asof, book_fn=book_fn) for e in ORDER}
-+
-+
-+def _demo():
-+    # every engine answers with the {fires, data_ok, reason} shape and never raises
-+    for e in ORDER:
-+        s = signal(e)
-+        assert set(s) &gt;= {&quot;fires&quot;, &quot;data_ok&quot;, &quot;reason&quot;}, (e, s)
-+        assert isinstance(s[&quot;fires&quot;], list)
-+    # the stream engines are honestly diary-only while their lane is idle
-+    assert signal(&quot;E12&quot;)[&quot;data_ok&quot;] in (True, False)
-+    # E21 gives a real overnight direction when its ruler is readable
-+    e21 = signal(&quot;E21&quot;)
-+    assert e21[&quot;data_ok&quot;] in (True, False)
-+    print(&quot;engine_signals demo OK: 8 engines answer {fires,data_ok,reason}; stream engines fail-closed to diary.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        for e in ORDER:
-+            s = signal(e)
-+            print(&quot;%-4s data_ok=%-5s fires=%d  %s&quot; % (e, s[&quot;data_ok&quot;], len(s[&quot;fires&quot;]), s[&quot;reason&quot;]))
-diff --git a/scripts/rehearsal_day1.py b/scripts/rehearsal_day1.py
-index 8eafd502d..d748aeb50 100644
---- a/scripts/rehearsal_day1.py
-+++ b/scripts/rehearsal_day1.py
-@@ -176,35 +176,39 @@ def rehearse_new_engines(write=True):
-     RAISES or fails to fill is set DIARY-ONLY for the day (isolation: one bad engine never blocks the others,
-     and never blocks E1). Returns {engine: {&quot;ok&quot;: bool, &quot;reason&quot;: str}}.&quot;&quot;&quot;
-     from scripts import engine_accounts as EA
-+    from scripts import engine_signals as ES
-     from scripts import portfolio_card as PC
--    from engine1_rebuild import engine_book as EB, paper_account as ACC
-+    from engine1_rebuild import paper_account as ACC
-     tmp = tempfile.mkdtemp()
--    lines = [&quot;&quot;, &quot;=== NEW-ENGINE REHEARSALS (temp ledgers; production books untouched) ===&quot;]
-+    lines = [&quot;&quot;, &quot;=== NEW-ENGINE REHEARSALS (real signal check + temp booking; production books untouched) ===&quot;]
-     results = {}
-     for eng in EA.ENGINES:
-         try:
-             # point BOTH of this engine&#x27;s book ledgers at temp files so nothing real is booked
-             for book in EA.BOOKS:
-                 ACC.ENGINE_LEDGERS[EA.account_name(eng, book)] = os.path.join(tmp, &quot;%s-%s.csv&quot; % (eng, book))
-+            sig = ES.signal(eng)                            # the engine&#x27;s OWN rule on real data
-+            # prove the booking path works with a synthetic fill into both books
-             tid = &quot;REH-%s-%s&quot; % (eng, datetime.now(IST).strftime(&quot;%H%M%S&quot;))
-             fills = EA.book_fire(eng, tid, &quot;NIFTY&quot;, &quot;buy&quot;, 100.0, 98.0, family=&quot;rsi&quot;, event=False)
--            ok = all(fills[b] and fills[b].get(&quot;risk_rupees&quot;, 0) &gt; 0 for b in EA.BOOKS)
-+            path_ok = all(fills[b] and fills[b].get(&quot;risk_rupees&quot;, 0) &gt; 0 for b in EA.BOOKS)
-             for book in EA.BOOKS:
-                 risk = (fills[book] or {}).get(&quot;risk_rupees&quot;, 0)
--                card = PC.fire_card(&quot;[%s-%s]&quot; % (eng, book), &quot;NIFTY&quot;, &quot;direct&quot;,
--                                    &quot;one rehearsal signal&quot;, risk, &quot;PAPER ORDER PLACED %s&quot; % PC.R(risk))
--                lines.append(&quot;   CARD -&gt; log: &quot; + card.replace(&quot;\n&quot;, &quot; &quot;))
--            if ok:
--                results[eng] = {&quot;ok&quot;: True, &quot;reason&quot;: &quot;one signal filled both books&quot;}
--                lines.append(&quot;   %s: PASS&quot; % eng)
-+                lines.append(&quot;   CARD -&gt; log: &quot; + PC.fire_card(
-+                    &quot;[%s-%s]&quot; % (eng, book), &quot;NIFTY&quot;, &quot;direct&quot;, &quot;rehearsal&quot;, risk,
-+                    &quot;PAPER ORDER PLACED %s&quot; % PC.R(risk)).replace(&quot;\n&quot;, &quot; &quot;))
-+            if path_ok and sig.get(&quot;data_ok&quot;):
-+                results[eng] = {&quot;ok&quot;: True, &quot;reason&quot;: sig.get(&quot;reason&quot;, &quot;signal path ready&quot;)}
-+                lines.append(&quot;   %s: PASS (%s)&quot; % (eng, sig.get(&quot;reason&quot;)))
-             else:
--                EA.set_diary_only(eng, &quot;rehearsal did not fill both books&quot;)
--                results[eng] = {&quot;ok&quot;: False, &quot;reason&quot;: &quot;did not fill both books&quot;}
--                lines.append(&quot;   %s: FAIL -&gt; diary only&quot; % eng)
-+                reason = sig.get(&quot;reason&quot;) if not sig.get(&quot;data_ok&quot;) else &quot;booking path failed&quot;
-+                EA.set_diary_only(eng, reason)
-+                results[eng] = {&quot;ok&quot;: False, &quot;reason&quot;: reason}
-+                lines.append(&quot;   %s: DIARY ONLY (%s)&quot; % (eng, reason))
-         except Exception as e:
-             EA.set_diary_only(eng, &quot;%s: %s&quot; % (type(e).__name__, str(e)[:100]))
-             results[eng] = {&quot;ok&quot;: False, &quot;reason&quot;: &quot;%s: %s&quot; % (type(e).__name__, str(e)[:80])}
--            lines.append(&quot;   %s: FAIL (%s) -&gt; diary only&quot; % (eng, type(e).__name__))
-+            lines.append(&quot;   %s: DIARY ONLY (%s)&quot; % (eng, type(e).__name__))
-     if write:
-         try:
-             with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-diff --git a/scripts/site_build.py b/scripts/site_build.py
-index 857e35f71..aed617a8b 100644
---- a/scripts/site_build.py
-+++ b/scripts/site_build.py
-@@ -695,6 +695,11 @@ def build(snapshot=None):
-             _E21.record_marks()
-         except Exception:
-             pass
-+        try:                                           # R-MORNING-22 item 2: run each fixed-rule engine&#x27;s own
-+            from scripts import engine_signals as _ES  # signal, guarded + idempotent per day; diary-only engines
-+            _ES.run_all()                              # skip themselves, a failing engine never stops the others
-+        except Exception:
-+            pass
-         from scripts import uncle_page
-         uncle_page.build()                              # R-UNCLE-PAGE: site/for-nikhil.html, plain trader language
-         for mod, call in ((&quot;sizing_test&quot;, &quot;build&quot;),     # R-SIZING-TEST: refresh the sizing diaries + report
-diff --git a/tests/test_engine_signals.py b/tests/test_engine_signals.py
-new file mode 100644
-index 000000000..ab4b7818c
---- /dev/null
-+++ b/tests/test_engine_signals.py
-@@ -0,0 +1,40 @@
-+&quot;&quot;&quot;R-MORNING-22 item 2: each engine&#x27;s own signal rule, guarded and honest about missing data.&quot;&quot;&quot;
-+import scripts.engine_signals as ES
-+import scripts.engine_accounts as EA
-+from engine1_rebuild import paper_account as ACC
-+
-+
-+def test_every_engine_answers_the_shape():
-+    for e in ES.ORDER:
-+        s = ES.signal(e)
-+        assert set(s) &gt;= {&quot;fires&quot;, &quot;data_ok&quot;, &quot;reason&quot;} and isinstance(s[&quot;fires&quot;], list)
-+
-+
-+def test_stream_engines_are_diary_only_when_idle():
-+    # the four recorded-stream engines have no fire and no data until their lane records
-+    for e in (&quot;E12&quot;, &quot;E7&quot;, &quot;E14&quot;, &quot;E4&quot;):
-+        s = ES.signal(e)
-+        assert s[&quot;data_ok&quot;] is False and s[&quot;fires&quot;] == []
-+
-+
-+def test_run_all_isolation_one_failure_does_not_stop_others(tmp_path, monkeypatch):
-+    EA.DIARY_ONLY = str(tmp_path / &quot;diary.json&quot;)
-+    # make E9 raise; every other engine must still be attempted
-+    monkeypatch.setitem(ES.SIGNALS, &quot;E9&quot;, lambda asof=None: (_ for _ in ()).throw(RuntimeError(&quot;boom&quot;)))
-+    calls = []
-+    monkeypatch.setattr(EA, &quot;book_fire&quot;, lambda *a, **k: calls.append(a) or {&quot;FLAT&quot;: {&quot;risk_rupees&quot;: 1000}, &quot;ADAPTIVE&quot;: {&quot;risk_rupees&quot;: 1000}})
-+    out = ES.run_all()
-+    assert set(out) == set(ES.ORDER)                  # all eight attempted despite E9 raising
-+    assert EA.is_diary_only(&quot;E9&quot;)                     # the failing engine is quarantined
-+
-+
-+def test_run_engine_books_idempotently(tmp_path, monkeypatch):
-+    EA.DIARY_ONLY = str(tmp_path / &quot;diary2.json&quot;)
-+    for book in EA.BOOKS:
-+        ACC.ENGINE_LEDGERS[EA.account_name(&quot;E21&quot;, book)] = str(tmp_path / (&quot;E21-%s.csv&quot; % book))
-+    r1 = ES.run_engine(&quot;E21&quot;, asof=&quot;2026-09-22&quot;)
-+    r2 = ES.run_engine(&quot;E21&quot;, asof=&quot;2026-09-22&quot;)       # same day -&gt; the day-stamped tid dedupes
-+    import csv, os
-+    p = str(tmp_path / &quot;E21-FLAT.csv&quot;)
-+    rows = list(csv.DictReader(open(p, encoding=&quot;utf-8&quot;))) if os.path.exists(p) else []
-+    assert r1[&quot;data_ok&quot;] and len(rows) == r1[&quot;fired&quot;]  # second run adds no duplicate rows
-</pre></div><div class='c'><div class='h'><b>6d811bed0</b> · 2026-09-22 02:44</div><div>R-MORNING-22 (3): PREOPEN_GATE.bat + token_ping runs the 08:15 gate and posts the 08:30 line</div><div class='sub h'>scripts/preopen_gate.py | 19 +++++++++++++++++++</div><div class='sub h'>scripts/token_ping.py   | 14 ++++++++++++++</div><pre>diff --git a/scripts/preopen_gate.py b/scripts/preopen_gate.py
-index 44e414161..2280a6b45 100644
---- a/scripts/preopen_gate.py
-+++ b/scripts/preopen_gate.py
-@@ -103,6 +103,23 @@ def line():
-         return gate()[&quot;line&quot;]
- 
- 
-+def post(notifier=None):
-+    &quot;&quot;&quot;Run the gate and POST the 08:30 line (one Telegram line). Returns the line. The owner&#x27;s 08:15 bat and,
-+    from tomorrow, token_ping both call this.&quot;&quot;&quot;
-+    st = gate()
-+    msg = st[&quot;line&quot;]
-+    try:
-+        (notifier or _notify)(msg)
-+    except Exception:
-+        pass
-+    return msg
-+
-+
-+def _notify(msg):
-+    from scripts import notify
-+    notify.notify(msg)
-+
-+
- def _demo():
-     # injected: tests pass, core passes, one engine&#x27;s rehearsal fails -&gt; READY with that engine diary-only
-     st = gate(run_tests_fn=lambda: (True, &quot;42 passed&quot;),
-@@ -124,6 +141,8 @@ if __name__ == &quot;__main__&quot;:
-         _demo()
-     elif &quot;--line&quot; in sys.argv:
-         print(line())
-+    elif &quot;--post&quot; in sys.argv:
-+        print(post())
-     else:
-         st = gate()
-         print(st[&quot;line&quot;])
-diff --git a/scripts/token_ping.py b/scripts/token_ping.py
-index 832732723..6d735274a 100644
---- a/scripts/token_ping.py
-+++ b/scripts/token_ping.py
-@@ -83,6 +83,20 @@ def main():
-             except Exception as e:                # the catcher is the thing that would have asked -- so ask here
-                 notify(&quot;🙋 The 06:00 auto-login could not start (%s). Do: double-click &quot;
-                        &quot;START_E1_KITE.bat on the laptop and log in to Kite.&quot; % type(e).__name__)
-+        # R-MORNING-22 item 3: the 08:15 PRE-OPEN GATE fires from THIS process — runs the full tests + the
-+        # day-one rehearsals, decides which engines trade today vs diary-only, and posts the 08:30 roster line.
-+        try:
-+            gate_at = ask.replace(hour=8, minute=15, second=0, microsecond=0)   # 08:15 on the ask&#x27;s date
-+            if gate_at &gt; _ist():
-+                _sleep_until(gate_at)
-+            from scripts import preopen_gate as PG
-+            PG.gate()                                     # tests + rehearsals; writes reports/PREOPEN-GATE.json
-+            post_at = ask.replace(hour=8, minute=30, second=0, microsecond=0)   # post the roster line at 08:30
-+            if post_at &gt; _ist():
-+                _sleep_until(post_at)
-+            PG.post()                                     # the 08:30 &#x27;READY / diary-only&#x27; line
-+        except Exception:
-+            pass
-         # R-NIGHT-CLOSE (2): the 08:30 self-check fires from THIS process (in-process timer, not Task
-         # Scheduler). send_once dedupes with the backup Windows task via a per-day marker, so exactly one
-         # &#x27;READY / NOT READY&#x27; line goes out.
 </pre></div></main></body></html>
