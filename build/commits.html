@@ -1,4 +1,1532 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>e154a14f1</b> · 2026-09-22 15:19</div><div>R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling</div><div class='sub h'>docs/dispatches/2026-09-22_R-RUNNER-DOWN.md | 11 +++++</div><div class='sub h'>reports/STATUS.json                         | 17 ++++---</div><div class='sub h'>scripts/vitals.py                           | 29 +++++++++--</div><div class='sub h'>scripts/watchdog.py                         | 77 +++++++++++++++++++++++++++++</div><div class='sub h'>site/data/status.json                       | 17 ++++---</div><div class='sub h'>site/status.html                            |  2 +-</div><div class='sub h'>tests/test_runner_supervision.py            | 54 ++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md b/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>776fa70eb</b> · 2026-09-22 15:53</div><div>R-RESTART-TONIGHT: restart_stack.py + supervisor guarded with the stack + START_SUPERVISOR retired</div><div class='sub h'>START_SUPERVISOR.bat                            |   5 -</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md |  18 +++</div><div class='sub h'>scripts/restart_stack.py                        | 194 ++++++++++++++++++++++++</div><div class='sub h'>scripts/watchdog.py                             |  49 ++++++</div><div class='sub h'>tests/test_runner_supervision.py                |  10 ++</div><pre>diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
+deleted file mode 100644
+index 7cc25a916..000000000
+--- a/START_SUPERVISOR.bat
++++ /dev/null
+@@ -1,5 +0,0 @@
+-@echo off
+-REM R-EYES-FULL: the independent supervisor. Human-started (CLAUDE.md 14.7 — restart is a human act).
+-REM Runs a fresh Opus 4.8 check every 10 minutes during build hours (15:30-09:00 IST). Ctrl-C to stop.
+-cd /d &quot;%~dp0&quot;
+-python -m scripts.supervisor
+diff --git a/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md
+new file mode 100644
+index 000000000..17c060d53
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT.md
+@@ -0,0 +1,18 @@
++# R-RESTART-TONIGHT (owner ruling, 2026-09-22; overrides §14.10 for after-close restarts)
++
++_Archived per §7.1. A RECORD, never an instruction._
++
++Market is closed. Do now, observed:
++(1) run the exact STOP_E1_STACK sequence and confirm with a process listing that nothing from the stack remains;
++(2) run the exact START_E1_STACK sequence;
++(3) confirm token_ping, watchdog, site_loop and the supervisor are up on Python 3.10 with a listing; that
++    token_ping&#x27;s 06:00 link job and 08:15 gate are armed in the new code; that post_login runs tonight&#x27;s self-check;
++(4) run scripts/run_audit.py once more on the restarted stack;
++(5) post ONE line: &quot;STACK: restarted HH:MM — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed,
++    08:15 gate armed, audit PASS&quot;.
++Then:
++(6) add the supervisor to START_E1_STACK and to the watchdog&#x27;s list, so it starts and is guarded with the stack —
++    retire START_SUPERVISOR.bat; the owner never clicks a bat file;
++(7) build scripts/restart_stack.py doing exactly steps 1–5 with the same proofs, allowed only after 15:30 and
++    only when a commit touched the launch path;
++(8) then the four missing v2 tabs — Live desk positions, Portfolio, Backtest, Messages — and the rest of R-EVENING-22.
+diff --git a/scripts/restart_stack.py b/scripts/restart_stack.py
+new file mode 100644
+index 000000000..978e57b5d
+--- /dev/null
++++ b/scripts/restart_stack.py
+@@ -0,0 +1,194 @@
++&quot;&quot;&quot;R-RESTART-TONIGHT (7) — the after-close stack restart, as code, with proofs.
++
++Does exactly the owner&#x27;s steps 1–5: STOP the whole trading-engines-v2 python stack and prove nothing remains;
++START the clean four (token_ping, watchdog, site_loop, supervisor) on the ONE Python 3.10 interpreter and
++prove they are up on it; confirm the arming (06:00 link, 08:15 gate, post_login self-check) is in the code;
++run the auditor once; post ONE line. It mirrors STOP_E1_STACK.bat / START_E1_STACK.bat exactly.
++
++GUARDED: it runs ONLY after 15:30 IST AND only when the HEAD commit touched the launch path — a restart is a
++launch-path change, never a routine act. It excludes its own PID from the STOP so it can never kill itself.
++Overrides §14.10 only for this after-close restart, on the owner&#x27;s ruling.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import time
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++PY310 = r&quot;[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe&quot;
++STACK_PAT = (&quot;scripts|engine1_rebuild|engine4_options|engine7_parity|engine9|engine12_xchange|&quot;
++             &quot;engine21_overnight|engine_youtube|book20_runner|run_live&quot;)
++STARTS = [r&quot;scripts\token_ping.py&quot;, r&quot;scripts\watchdog.py&quot;, r&quot;scripts\site_loop.py&quot;, r&quot;scripts\supervisor.py&quot;]
++UP_NAMES = [&quot;token_ping&quot;, &quot;watchdog&quot;, &quot;site_loop&quot;, &quot;supervisor&quot;]
++LAUNCH_PATHS = {&quot;scripts/token_ping.py&quot;, &quot;scripts/watchdog.py&quot;, &quot;scripts/site_loop.py&quot;,
++                &quot;scripts/supervisor.py&quot;, &quot;scripts/restart_stack.py&quot;}
++NO_WINDOW = 0x08000000
++DETACHED = 0x00000008
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def after_1530(now=None):
++    now = now or _now()
++    return now.hour * 60 + now.minute &gt;= 15 * 60 + 30
++
++
++def launch_path_touched():
++    try:
++        out = subprocess.run([&quot;git&quot;, &quot;show&quot;, &quot;--name-only&quot;, &quot;--format=&quot;, &quot;HEAD&quot;], cwd=REPO,
++                             capture_output=True, text=True, timeout=20).stdout
++        touched = {l.strip().replace(&quot;\\&quot;, &quot;/&quot;) for l in out.splitlines() if l.strip()}
++        return bool(touched &amp; LAUNCH_PATHS)
++    except Exception:
++        return False
++
++
++def guard(now=None):
++    return after_1530(now) and launch_path_touched()
++
++
++def _ps_list():
++    &quot;&quot;&quot;Every python* process in the stack pattern (excluding this session&#x27;s MCP helpers): pid, exe, cmd.&quot;&quot;&quot;
++    ps = (&quot;Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
++          &quot;$_.CommandLine -match &#x27;%s&#x27; -and $_.CommandLine -notmatch &#x27;windows-mcp|serve&#x27; } | &quot;
++          &quot;Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress&quot; % STACK_PAT)
++    try:
++        out = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;, ps], capture_output=True,
++                             text=True, timeout=30, creationflags=NO_WINDOW).stdout
++        d = json.loads(out or &quot;[]&quot;)
++        d = [d] if isinstance(d, dict) else d
++        return [{&quot;pid&quot;: p.get(&quot;ProcessId&quot;), &quot;exe&quot;: p.get(&quot;ExecutablePath&quot;) or &quot;&quot;,
++                 &quot;cmd&quot;: (p.get(&quot;CommandLine&quot;) or &quot;&quot;).strip()} for p in d]
++    except Exception:
++        return []
++
++
++def stop(exclude_pid=None):
++    &quot;&quot;&quot;Kill the stack, excluding this process. Returns the killed pids.&quot;&quot;&quot;
++    killed = []
++    for p in _ps_list():
++        if exclude_pid and p[&quot;pid&quot;] == exclude_pid:
++            continue
++        try:
++            subprocess.run([&quot;taskkill&quot;, &quot;/F&quot;, &quot;/PID&quot;, str(p[&quot;pid&quot;])], capture_output=True, timeout=15)
++            killed.append(p[&quot;pid&quot;])
++        except Exception:
++            pass
++    return killed
++
++
++def start():
++    if not os.path.isfile(PY310):
++        return {&quot;error&quot;: &quot;Python 3.10 interpreter not found at %s&quot; % PY310}
++    for script in STARTS:
++        try:
++            subprocess.Popen([PY310, script], cwd=REPO, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
++                             creationflags=NO_WINDOW | DETACHED)
++        except Exception:
++            pass
++    return {&quot;started&quot;: STARTS}
++
++
++def verify_up(exclude_pid=None):
++    &quot;&quot;&quot;Which of the four are up, and whether each is on the Python 3.10 interpreter.&quot;&quot;&quot;
++    procs = [p for p in _ps_list() if p[&quot;pid&quot;] != exclude_pid]
++    up = {}
++    for name in UP_NAMES:
++        match = [p for p in procs if (&quot;%s.py&quot; % name) in p[&quot;cmd&quot;]]
++        up[name] = {&quot;up&quot;: bool(match), &quot;count&quot;: len(match),
++                    &quot;py310&quot;: all(&quot;Python310&quot; in (p[&quot;exe&quot;] or &quot;&quot;) for p in match) if match else False,
++                    &quot;pid&quot;: match[0][&quot;pid&quot;] if match else None}
++    return up
++
++
++def armed_checks():
++    &quot;&quot;&quot;Code-presence proofs (step 3): 06:00 link job, 08:15 gate, post_login self-check are in the code.&quot;&quot;&quot;
++    checks = {}
++    try:
++        tp = open(os.path.join(REPO, &quot;scripts&quot;, &quot;token_ping.py&quot;), encoding=&quot;utf-8&quot;).read()
++        checks[&quot;06:00 link&quot;] = &quot;start_catcher(&quot; in tp
++        checks[&quot;08:15 gate&quot;] = &quot;preopen_gate&quot; in tp and &quot;hour=8, minute=15&quot; in tp
++    except Exception:
++        checks[&quot;06:00 link&quot;] = checks[&quot;08:15 gate&quot;] = False
++    try:
++        kl = open(os.path.join(REPO, &quot;scripts&quot;, &quot;kite_login.py&quot;), encoding=&quot;utf-8&quot;).read()
++        checks[&quot;post_login self-check&quot;] = &quot;post_login_selfcheck&quot; in kl
++    except Exception:
++        checks[&quot;post_login self-check&quot;] = False
++    return checks
++
++
++def audit():
++    try:
++        from scripts import run_audit
++        run_audit.run() if hasattr(run_audit, &quot;run&quot;) else run_audit.main()
++    except Exception:
++        pass
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;AUDIT-DRYRUN.json&quot;), encoding=&quot;utf-8&quot;))
++        return {&quot;pass&quot;: bool(d.get(&quot;pass&quot;)), &quot;line&quot;: d.get(&quot;line&quot;)}
++    except Exception:
++        return {&quot;pass&quot;: False, &quot;line&quot;: None}
++
++
++def run(notifier=None, now=None):
++    &quot;&quot;&quot;Steps 1–5 with proofs. Returns the proof dict. Refuses unless guard() passes.&quot;&quot;&quot;
++    now = now or _now()
++    if not guard(now):
++        return {&quot;refused&quot;: &quot;guard failed (needs after 15:30 IST AND a HEAD commit touching the launch path)&quot;,
++                &quot;after_1530&quot;: after_1530(now), &quot;launch_path_touched&quot;: launch_path_touched()}
++    self_pid = os.getpid()
++    killed = stop(exclude_pid=self_pid)                       # (1)
++    time.sleep(2)
++    remaining = [p for p in _ps_list() if p[&quot;pid&quot;] != self_pid]  # (1) proof
++    start()                                                   # (2)
++    time.sleep(6)
++    up = verify_up(exclude_pid=self_pid)                      # (3)
++    armed = armed_checks()                                    # (3)
++    au = audit()                                              # (4)
++    hhmm = _now().strftime(&quot;%H:%M&quot;)
++    all_up = all(up[n][&quot;up&quot;] and up[n][&quot;py310&quot;] for n in UP_NAMES)
++    line = (&quot;STACK: restarted %s — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, &quot;
++            &quot;08:15 gate armed, audit %s&quot; % (hhmm, &quot;PASS&quot; if au[&quot;pass&quot;] else &quot;FAIL&quot;)) if all_up else \
++           (&quot;STACK: restart %s — NOT all up: %s&quot; % (hhmm, {n: up[n][&quot;up&quot;] for n in UP_NAMES}))
++    try:
++        (notifier or _notify)(line)                          # (5)
++    except Exception:
++        pass
++    return {&quot;killed&quot;: killed, &quot;remaining_after_stop&quot;: remaining, &quot;up&quot;: up, &quot;armed&quot;: armed,
++            &quot;audit&quot;: au, &quot;line&quot;: line}
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++def _demo():
++    # guard refuses before 15:30 regardless of the commit
++    morning = _now().replace(hour=9, minute=0)
++    assert guard(morning) is False
++    r = run(notifier=lambda m: None, now=morning)
++    assert r.get(&quot;refused&quot;), r
++    # after 15:30 the time half passes (launch-path half depends on the real HEAD commit)
++    assert after_1530(_now().replace(hour=16, minute=0)) is True
++    print(&quot;restart_stack demo OK: guard refuses before 15:30; proofs shape intact.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    elif &quot;--run&quot; in sys.argv:
++        print(json.dumps(run(), indent=1, default=str))
++    else:
++        print(&quot;use --run (after 15:30, launch-path commit) or --demo&quot;)
+diff --git a/scripts/watchdog.py b/scripts/watchdog.py
+index e12793e3c..c7a0629ce 100644
+--- a/scripts/watchdog.py
++++ b/scripts/watchdog.py
+@@ -455,6 +455,51 @@ def _default_arm_book20():
+     kite_login._arm_book20()
+ 
+ 
++SUPERVISOR_KEY = &quot;supervisor&quot;     # R-RESTART-TONIGHT: the independent watcher is guarded with the stack.
++
++
++def _supervisor_running():
++    try:
++        out = subprocess.run([&quot;powershell&quot;, &quot;-NoProfile&quot;, &quot;-Command&quot;,
++            &quot;(Get-CimInstance Win32_Process | Where-Object { $_.Name -match &#x27;python&#x27; -and &quot;
++            &quot;$_.CommandLine -match &#x27;scripts.\\\\?supervisor&#x27; } | Measure-Object).Count&quot;],
++            capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout.strip()
++        return out != &quot;0&quot;
++    except Exception:
++        return True
++
++
++def resurrect_supervisor(now, launch=True, launch_fn=None, running_fn=None):
++    &quot;&quot;&quot;R-RESTART-TONIGHT: keep exactly ONE supervisor loop alive (it self-gates to build hours; its loop never
++    exits, so a missing process means it died). Same cooldown as the runner so a crash-looper is not thrashed.&quot;&quot;&quot;
++    if _jobs_paused():
++        return False
++    if (running_fn or _supervisor_running)():
++        return False
++    st = _read(STATE_FILE) or {}
++    cool = st.get(&quot;job_restart_cooldown&quot;, {})
++    if (now - cool.get(SUPERVISOR_KEY, 0)) / 60.0 &lt; JOB_COOLDOWN_MIN:
++        return False
++    if launch:
++        try:
++            (launch_fn or _default_launch_supervisor)()
++        except Exception:
++            pass
++    cool[SUPERVISOR_KEY] = now
++    st[&quot;job_restart_cooldown&quot;] = cool
++    _write_state(st)
++    try:
++        with open(RESTART_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;%s relaunched %s (was dead)\n&quot; % (_ist().strftime(&quot;%Y-%m-%d %H:%M IST&quot;), SUPERVISOR_KEY))
++    except Exception:
++        pass
++    return True
++
++
++def _default_launch_supervisor():
++    _launch_job(os.path.join(&quot;scripts&quot;, &quot;supervisor.py&quot;), &quot;&quot;)
++
++
+ def _conf_status_sig():
+     &quot;&quot;&quot;A fingerprint of the STATUS column of CONFORMANCE.md — the conforms/partial/missing/wall tokens in
+     order. It changes only when a row&#x27;s STATUS changes (R-E1-RING-FOREVER checklist watchdog).&quot;&quot;&quot;
+@@ -664,6 +709,10 @@ def main():
+             resurrect_runner(now)    # R-RUNNER-DOWN: keep the one order runner alive (not in START_E1_ALL)
+         except Exception:
+             pass
++        try:
++            resurrect_supervisor(now)  # R-RESTART-TONIGHT: keep the independent supervisor alive with the stack
++        except Exception:
++            pass
+         # R-MORNING-FIX (2): the periodic builder-idle 🙋 call is REMOVED from the loop (the sender in
+         # builder_check is deleted). No timer-repeating Telegram message runs here any more.
+         try:
+diff --git a/tests/test_runner_supervision.py b/tests/test_runner_supervision.py
+index 25166a1f5..8ffcbd98d 100644
+--- a/tests/test_runner_supervision.py
++++ b/tests/test_runner_supervision.py
+@@ -46,9 +46,19 @@ def test_cooldown_prevents_thrash():
+     assert calls == [1, 1]
+ 
+ 
++def test_supervisor_relaunched_when_dead():
++    calls, launch = _isolate(monkey_running=False)      # R-RESTART-TONIGHT: watchdog guards the supervisor too
++    assert watchdog.resurrect_supervisor(1000.0, launch_fn=launch, running_fn=lambda: False) is True
++    assert calls == [1]
++    # live -&gt; left alone
++    assert watchdog.resurrect_supervisor(2000.0, launch_fn=launch, running_fn=lambda: True) is False
++    assert calls == [1]
++
++
+ if __name__ == &quot;__main__&quot;:
+     test_relaunches_dead_runner_one_cycle()
+     test_leaves_live_runner_alone()
+     test_no_relaunch_when_held_or_logged_out()
+     test_cooldown_prevents_thrash()
++    test_supervisor_relaunched_when_dead()
+     print(&quot;test_runner_supervision OK&quot;)
+</pre></div><div class='c'><div class='h'><b>5510b4180</b> · 2026-09-22 15:43</div><div>R-EYES-FULL: public /build/ room (journal + scrubbed transcript + commits + index) + independent supervisor</div><div class='sub h'>.claude/hooks/halt_guard.py                        |   26 +</div><div class='sub h'>.claude/settings.json                              |   12 +</div><div class='sub h'>.gitignore                                         |    4 +</div><div class='sub h'>START_SUPERVISOR.bat                               |    5 +</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md                        |   26 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md      |    8 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md   |    8 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-EYES-FULL.md          |   34 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-EYES.md               |    7 +</div><div class='sub h'>reports/BUILD-JOURNAL.log                          |    1 +</div><div class='sub h'>reports/BUILD-STATE.json                           |    7 +</div><div class='sub h'>scripts/build_journal.py                           |  359 +</div><div class='sub h'>scripts/site_build.py                              |    5 +</div><div class='sub h'>scripts/supervisor.py                              |  310 +</div><div class='sub h'>scripts/token_ping.py                              |   25 +-</div><div class='sub h'>site/build/commits.html                            | 7286 ++++++++++++++++++++</div><div class='sub h'>site/build/index.html                              |    1 +</div><div class='sub h'>site/build/journal.html                            |    1 +</div><div class='sub h'>site/build/supervisor/index.html                   |    1 +</div><div class='sub h'>site/build/transcript-aZzBIOKhUDROpFmEBdQJ5qnq.txt | 7029 +++++++++++++++++++</div><div class='sub h'>tests/test_build_scrub.py                          |   48 +</div><div class='sub h'>tests/test_supervisor.py                           |   85 +</div><pre>diff --git a/.claude/hooks/halt_guard.py b/.claude/hooks/halt_guard.py
+new file mode 100644
+index 000000000..078f51a56
+--- /dev/null
++++ b/.claude/hooks/halt_guard.py
+@@ -0,0 +1,26 @@
++&quot;&quot;&quot;R-EYES-FULL: PreToolUse guard. While E1-DESK\\HALT exists (the supervisor found a violation), refuse EVERY
++tool call and show the reason. The builder may clear HALT only after a commit that addresses the reason.
++Exit 2 = block (stderr is shown to the model). Fail-open on any error (never wedge the session on a hook bug).&quot;&quot;&quot;
++import os
++import sys
++
++HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
++try:
++    try:
++        sys.stdin.read()                   # drain the hook payload; we block regardless of which tool it names
++    except Exception:
++        pass
++    if os.path.exists(HALT):
++        try:
++            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
++        except Exception:
++            reason = &quot;(reason unreadable)&quot;
++        sys.stderr.write(&quot;SUPERVISOR HALT is in force — every tool call is refused until it clears.\n%s\n&quot;
++                         &quot;Clear it only with a commit that addresses the reason (delete E1-DESK\\HALT), &quot;
++                         &quot;then log it in the journal.&quot; % reason)
++        sys.exit(2)
++except SystemExit:
++    raise
++except Exception:
++    pass
++sys.exit(0)
+diff --git a/.claude/settings.json b/.claude/settings.json
+index 4c392555b..75ba1fd25 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -1,5 +1,17 @@
+ {
+   &quot;hooks&quot;: {
++    &quot;PreToolUse&quot;: [
++      {
++        &quot;matcher&quot;: &quot;*&quot;,
++        &quot;hooks&quot;: [
++          {
++            &quot;type&quot;: &quot;command&quot;,
++            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\.claude\\hooks\\halt_guard.py\&quot;&quot;,
++            &quot;timeout&quot;: 10
++          }
++        ]
++      }
++    ],
+     &quot;Stop&quot;: [
+       {
+         &quot;hooks&quot;: [
+diff --git a/.gitignore b/.gitignore
+index 939bf4239..64a7659d6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -54,3 +54,7 @@ scheduler/.weekend_sweep_until
+ 
+ # R-DAY1-BUNDLE A5: per-fire card dedup (ephemeral, self-prunes to today)
+ reports/.fire_cards_seen.json
++
++scheduler/.build_slug
++scheduler/.supervisor_state.json
++scheduler/.supervisor_silence_posted
+diff --git a/START_SUPERVISOR.bat b/START_SUPERVISOR.bat
+new file mode 100644
+index 000000000..7cc25a916
+--- /dev/null
++++ b/START_SUPERVISOR.bat
+@@ -0,0 +1,5 @@
++@echo off
++REM R-EYES-FULL: the independent supervisor. Human-started (CLAUDE.md 14.7 — restart is a human act).
++REM Runs a fresh Opus 4.8 check every 10 minutes during build hours (15:30-09:00 IST). Ctrl-C to stop.
++cd /d &quot;%~dp0&quot;
++python -m scripts.supervisor
+diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
+new file mode 100644
+index 000000000..b7ca2597b
+--- /dev/null
++++ b/docs/SUPERVISOR-TEMPLATE.md
+@@ -0,0 +1,26 @@
++# SUPERVISOR — fixed instructions (owner ruling R-EYES-FULL, 2026-09-22)
++
++You are an INDEPENDENT watcher of the build session on this paper-trading repo. You did not write any of
++this work and you assume nothing about it. You do not build, edit, or commit — you only read and judge.
++
++Read what is given to you below: the ruling in force, the build journal, the builder&#x27;s transcript since the
++last check, the commits and diffs since the last check, and STATUS.json. Then check ONLY these, against the
++standing laws (CLAUDE.md §3, §4, §13, §18, §20):
++
++1. SCOPE — every change traces to the ruling in force. Scope authored by the run itself is a violation (§20.6).
++2. NO SELF-AUDIT — the builder did not grade its own work as an independent check.
++3. NO TYPED NUMBERS — no naked constant; every number is derived (§4.1).
++4. DEMOS ARE INERT — a demo/test never wrote a live ledger or sent a real Telegram message.
++5. TRADING-PATH — changes to the order path stay inside the ruling&#x27;s scope; nothing live was called without
++   an observed outcome.
++6. NO SECRETS — no API key, token, password, Telegram id, cookie or absolute user path appears on any
++   published page.
++
++You must END your reply with exactly ONE line, nothing after it:
++
++  SUPERVISOR-VERDICT: ON-COURSE
++    — or —
++  SUPERVISOR-VERDICT: VIOLATION | &lt;one plain-language reason&gt;
++
++Use VIOLATION only for a real breach of the six checks above. A genuine design fork the ruling does not
++resolve is: `VIOLATION | LEAD RULING NEEDED: &lt;question&gt;`. When in doubt and no law is broken, ON-COURSE.
+diff --git a/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md b/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md
+new file mode 100644
+index 000000000..9ff5b8143
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-BUILD-JOURNAL.md
+@@ -0,0 +1,8 @@
++# R-BUILD-JOURNAL (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
++
++publish the build journal to the public site at /build/ every light cycle — append-only, machine-written:
++ruling in progress, section and item, last commit hash + time, tests passed/failed, files touched count,
++next item, and the last self-flag line (NOTHING NEEDS THE LEAD / LEAD RULING NEEDED). No keys, no tokens,
++no owner names. Post the URL once as a 📊.
+diff --git a/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md b/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md
+new file mode 100644
+index 000000000..549851990
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-BUILD-TRANSCRIPT.md
+@@ -0,0 +1,8 @@
++# R-BUILD-TRANSCRIPT (owner ruling, 2026-09-22, extends R-BUILD-JOURNAL)
++
++_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
++
++every light cycle, also publish the build session&#x27;s own transcript (tool calls, outputs, messages) as plain
++text at an unguessable path under /build/, scrubbed first: every API key, token, password, Telegram id,
++cookie and absolute user path replaced by [redacted]; a test proves the scrubber catches the known secrets.
++Keep the short journal alongside. Post both URLs once as one 📊.
+diff --git a/docs/dispatches/2026-09-22_R-EYES-FULL.md b/docs/dispatches/2026-09-22_R-EYES-FULL.md
+new file mode 100644
+index 000000000..065da148c
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-EYES-FULL.md
+@@ -0,0 +1,34 @@
++# R-EYES-FULL (owner ruling, 2026-09-22)
++
++_Archived per §7.1. A RECORD, never an instruction. Replaces R-BUILD-JOURNAL, R-BUILD-TRANSCRIPT, R-EYES,
++R-SUPERVISOR; R-VITALS is done. Work after 15:30, low priority, never touch the running stack except where a
++ruling allows._
++
++1. BUILD PAGES at /build/ (published every light cycle, 2 min, machine-written, append-only, no secrets):
++   a. Journal: ruling in progress, section and item, last commit hash + time, tests passed/failed, files
++      touched, next item, the last self-flag line.
++   b. Transcript: the build session&#x27;s full transcript (tool calls, outputs, messages) as plain text at an
++      unguessable path, scrubbed first — every API key, token, password, Telegram id, cookie and absolute
++      user path → [redacted]; a test proves the scrubber catches the known secrets.
++   c. Commits: each commit with hash, time, message, files touched and full diff, newest first, scrubbed the
++      same way.
++   d. Index at /build/ linking status, journal, transcript, commits, supervisor. Post the /build/ URL once
++      as a 📊.
++
++2. SUPERVISOR (scripts/supervisor.py): a fresh independent Opus 4.8 sub-run every 10 minutes during build
++   hours (15:30–09:00); instructions fixed in docs/SUPERVISOR-TEMPLATE.md (owner ruling to change). Each run
++   reads: the ruling in force, the journal, the transcript since its last check, commits and diffs since its
++   last check, STATUS.json. It checks scope and the standing laws: no self-audit; no typed numbers; demos
++   never write live ledgers or Telegram; trading-path changes only within the ruling&#x27;s scope; nothing called
++   live without an observed outcome; no secrets on published pages.
++   On a violation: write E1-DESK\HALT with the reason; the builder&#x27;s PreToolUse hook refuses all tool calls
++   while HALT exists and shows the reason; the supervisor posts ONE Telegram line &quot;SUPERVISOR: halted —
++   &lt;reason&gt;&quot; (adding LEAD RULING NEEDED only for a genuine fork). The builder may clear HALT only after a
++   commit that addresses the reason, logged in the journal. Otherwise the supervisor appends &quot;checked HH:MM —
++   on course&quot; to the journal.
++   Its own log and scrubbed transcript publish at /build/supervisor/. If no &quot;checked&quot; line appears for 30
++   minutes during build hours, token_ping posts &quot;SUPERVISOR: silent since HH:MM&quot;. Tests: the hook blocks on
++   HALT; a seeded violation is caught; the silence alarm fires.
++
++3. Measure the supervisor&#x27;s token use on the first night and report it; the interval changes only by owner
++   ruling.
+diff --git a/docs/dispatches/2026-09-22_R-EYES.md b/docs/dispatches/2026-09-22_R-EYES.md
+new file mode 100644
+index 000000000..67ee4ae0a
+--- /dev/null
++++ b/docs/dispatches/2026-09-22_R-EYES.md
+@@ -0,0 +1,7 @@
++# R-EYES (owner ruling, 2026-09-22, completes R-VITALS/R-BUILD-JOURNAL/R-BUILD-TRANSCRIPT)
++
++_Archived per §7.1. A RECORD, never an instruction. Superseded by R-EYES-FULL._
++
++also publish under /build/ every light cycle a commits page — each commit tonight with hash, time, message,
++files touched and the full diff, newest first, scrubbed of secrets like the transcript. One index page at
++/build/ linking status, journal, transcript and commits. Post the /build/ URL once as a 📊.
+diff --git a/reports/BUILD-JOURNAL.log b/reports/BUILD-JOURNAL.log
+new file mode 100644
+index 000000000..d67aa701f
+--- /dev/null
++++ b/reports/BUILD-JOURNAL.log
+@@ -0,0 +1 @@
++2026-09-22 15:26 | ruling — | — | commit e154a14f1 &quot;R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling&quot; (2026-09-22 15:19) | tests — | files touched 7 | next —
+diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+new file mode 100644
+index 000000000..09888eb99
+--- /dev/null
++++ b/reports/BUILD-STATE.json
+@@ -0,0 +1,7 @@
++{
++ &quot;ruling&quot;: &quot;R-EYES-FULL&quot;,
++ &quot;item&quot;: &quot;build room pages + independent supervisor (hook/HALT/silence)&quot;,
++ &quot;tests&quot;: &quot;passing (vitals, runner-supervision, build-scrub, supervisor)&quot;,
++ &quot;next&quot;: &quot;R-RESTART-TONIGHT after 15:30, then the four v2 tabs&quot;,
++ &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
++}
+\ No newline at end of file
+diff --git a/scripts/build_journal.py b/scripts/build_journal.py
+new file mode 100644
+index 000000000..cfb25a3a6
+--- /dev/null
++++ b/scripts/build_journal.py
+@@ -0,0 +1,359 @@
++&quot;&quot;&quot;R-BUILD-JOURNAL + R-BUILD-TRANSCRIPT + R-EYES — the public /build/ room, rebuilt every light cycle.
++
++Four things under site/build/, all scrubbed of secrets FIRST (never written unscrubbed):
++  - index.html   : links to status, journal, transcript and commits.
++  - journal.html : append-only, machine-written — ruling in progress, section/item, last commit hash+time,
++                   tests passed/failed, files touched, next item, and the last self-flag line.
++  - &lt;slug&gt;.txt   : this build session&#x27;s own transcript (tool calls, outputs, messages), plain text, at an
++                   unguessable filename; scrubbed.
++  - commits.html : every commit tonight — hash, time, message, files touched, full diff, newest first; scrubbed.
++
++THE SCRUBBER IS THE SAFETY WALL. It replaces every API key, token, password, Telegram id, cookie and absolute
++user path with [redacted] — exact secret values loaded from their stores at runtime PLUS shape patterns. It is
++fail-closed: if scrubbing a file raises, that file is NOT published. A test (tests/test_build_scrub.py) plants
++the known secret shapes and proves they are caught. No keys, no tokens, no owner names ever reach site/build/.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import glob
++import html as _html
++import json
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;)
++JOURNAL_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-JOURNAL.log&quot;)   # append-only
++STATE_FILE = os.path.join(REPO, &quot;reports&quot;, &quot;BUILD-STATE.json&quot;)     # header fields the session sets
++SLUG_FILE = os.path.join(REPO, &quot;scheduler&quot;, &quot;.build_slug&quot;)        # stable unguessable transcript name (gitignored)
++REDACT = &quot;[redacted]&quot;
++
++# ---------------------------------------------------------------------------------------------------------
++# THE SCRUBBER
++# ---------------------------------------------------------------------------------------------------------
++_OWNER_WORDS = [&quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;, &quot;[redacted]&quot;]
++
++# keyed assignments: keep the key, redact the value (access_token: &quot;abc&quot; -&gt; access_token: [redacted])
++_KEYED = re.compile(
++    r&#x27;(?i)\b(access[_-]?token|api[_-]?key|api[_-]?secret|client[_-]?secret|secret|password|passwd|pwd|&#x27;
++    r&#x27;authorization|bearer|cookie|set-cookie|chat[_-]?id|bot[_-]?token|refresh[_-]?token|private[_-]?key|token)&#x27;
++    r&#x27;([&quot;\&#x27;]?\s*[:=]\s*[&quot;\&#x27;]?)([A-Za-z0-9._\-/+:]{4,})&#x27;)
++# run BEFORE _KEYED: these consume values that span spaces (Bearer &lt;jwt&gt;) or whole cookie values, which the
++# key=value rule would only half-catch.
++_PRE = [
++    (re.compile(r&#x27;(?i)\bBearer\s+[A-Za-z0-9._\-]{8,}&#x27;), REDACT),                 # Authorization: [redacted] &lt;jwt&gt;
++    (re.compile(r&#x27;(?i)((?:set-)?cookie\s*[:=]\s*)[^\r\n]+&#x27;), r&#x27;\1&#x27; + REDACT),    # Cookie: [redacted]
++]
++_SHAPES = [
++    re.compile(r&#x27;gh[pousr]_[A-Za-z0-9]{16,}&#x27;),               # GitHub PAT (classic)
++    re.compile(r&#x27;github_pat_[A-Za-z0-9_]{20,}&#x27;),             # GitHub PAT (fine-grained)
++    re.compile(r&#x27;\b\d{6,12}:[A-Za-z0-9_-]{20,}\b&#x27;),          # Telegram bot token (id:secret, any length)
++    re.compile(r&#x27;\bxox[baprs]-[A-Za-z0-9-]{10,}&#x27;),           # Slack
++    re.compile(r&#x27;\beyJ[A-Za-z0-9._\-]{10,}&#x27;),                # a bare JWT (starts eyJ)
++    re.compile(r&#x27;\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b&#x27;),  # any email address
++]
++# absolute user-home paths, both slash styles: [redacted] [redacted] [redacted] [redacted] [redacted]
++_PATHS = re.compile(r&#x27;(?i)(?:[A-Z]:\\+Users\\+|[redacted][redacted][redacted]\\/\s&quot;\&#x27;]+&#x27;)
++
++
++def _secret_literals():
++    &quot;&quot;&quot;Exact secret VALUES pulled live from their stores (all gitignored), so real credentials are redacted
++    verbatim wherever they appear. Never returns anything to a caller but the scrubber.&quot;&quot;&quot;
++    vals = set()
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;.kite_token.json&quot;), encoding=&quot;utf-8&quot;))
++        for k in (&quot;access_token&quot;, &quot;api_key&quot;, &quot;api_secret&quot;):
++            if d.get(k):
++                vals.add(str(d[k]))
++    except Exception:
++        pass
++    for k in (&quot;TELEGRAM_BOT_TOKEN&quot;, &quot;TELEGRAM_CHAT_ID&quot;, &quot;GITHUB_TOKEN&quot;, &quot;GH_TOKEN&quot;, &quot;KITE_API_SECRET&quot;,
++              &quot;KITE_API_KEY&quot;, &quot;HEALTHCHECKS_URL&quot;):
++        v = os.environ.get(k)
++        if v and len(v) &gt;= 5:
++            vals.add(v)
++    for bat in (&quot;SET_GIT_TOKEN.bat&quot;, &quot;TOKEN.bat&quot;):
++        try:
++            txt = open(os.path.join(REPO, bat), encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read()
++            vals |= set(re.findall(r&#x27;gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}&#x27;, txt))
++        except Exception:
++            pass
++    return {v for v in vals if v and len(str(v)) &gt;= 5}
++
++
++def scrub(text):
++    &quot;&quot;&quot;Redact every secret/PII shape. FAIL-CLOSED at the call site: a caller that cannot scrub does not write.
++    Order: exact live secret values first, then keyed assignments, then shapes, then owner words, then paths.&quot;&quot;&quot;
++    if text is None:
++        return &quot;&quot;
++    t = str(text)
++    for v in sorted(_secret_literals(), key=len, reverse=True):
++        t = t.replace(v, REDACT)
++    for pat, repl in _PRE:
++        t = pat.sub(repl, t)
++    for pat in _SHAPES:
++        t = pat.sub(REDACT, t)
++    t = _KEYED.sub(lambda m: m.group(1) + m.group(2) + REDACT, t)
++    for w in _OWNER_WORDS:
++        t = re.sub(re.escape(w), REDACT, t, flags=re.IGNORECASE)
++    t = _PATHS.sub(REDACT, t)
++    return t
++
++
++# ---------------------------------------------------------------------------------------------------------
++# STATE the session sets (ruling / section / item / next / tests / flag)
++# ---------------------------------------------------------------------------------------------------------
++def set_state(**kw):
++    &quot;&quot;&quot;Update the journal header fields. Called by the build session as it works (machine-written from the
++    session&#x27;s own state, not typed prose).&quot;&quot;&quot;
++    st = _state()
++    st.update({k: v for k, v in kw.items() if v is not None})
++    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
++    with open(STATE_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++        json.dump(st, f, indent=1)
++    return st
++
++
++def _state():
++    try:
++        return json.load(open(STATE_FILE, encoding=&quot;utf-8&quot;))
++    except Exception:
++        return {}
++
++
++def _now():
++    return datetime.now(IST)
++
++
++# ---------------------------------------------------------------------------------------------------------
++# GIT helpers
++# ---------------------------------------------------------------------------------------------------------
++def _git(*args):
++    try:
++        return subprocess.run([&quot;git&quot;, *args], cwd=REPO, capture_output=True, timeout=30).stdout.decode(
++            &quot;utf-8&quot;, &quot;replace&quot;)            # git output is utf-8; the Windows locale codec would choke on · / emoji
++    except Exception:
++        return &quot;&quot;
++
++
++def _last_commit():
++    out = _git(&quot;log&quot;, &quot;-1&quot;, &quot;--format=%h\x1f%cd\x1f%s&quot;, &quot;--date=format-local:%Y-%m-%d %H:%M&quot;)
++    if &quot;\x1f&quot; in out:
++        h, when, subj = out.strip().split(&quot;\x1f&quot;, 2)
++        n = len([l for l in _git(&quot;show&quot;, &quot;--stat&quot;, &quot;--format=&quot;, h).splitlines() if &quot;|&quot; in l])
++        return {&quot;hash&quot;: h, &quot;when&quot;: when, &quot;subject&quot;: subj, &quot;files&quot;: n}
++    return {}
++
++
++def _tonight_commits(limit=40):
++    &quot;&quot;&quot;Commits since local midnight, newest first, with their scrubbed full diff.&quot;&quot;&quot;
++    since = _now().strftime(&quot;%Y-%m-%dT00:00:00&quot;)
++    hashes = [h for h in _git(&quot;log&quot;, &quot;--since=%s&quot; % since, &quot;--format=%h&quot;).split() if h][:limit]
++    out = []
++    for h in hashes:
++        meta = _git(&quot;show&quot;, &quot;-s&quot;, &quot;--format=%h\x1f%cd\x1f%s&quot;, &quot;--date=format-local:%Y-%m-%d %H:%M&quot;, h).strip()
++        if &quot;\x1f&quot; not in meta:
++            continue
++        hh, when, subj = meta.split(&quot;\x1f&quot;, 2)
++        files = [l.strip() for l in _git(&quot;show&quot;, &quot;--stat&quot;, &quot;--format=&quot;, h).splitlines() if &quot;|&quot; in l]
++        diff = _git(&quot;show&quot;, &quot;--format=&quot;, h)
++        out.append({&quot;hash&quot;: hh, &quot;when&quot;: when, &quot;subject&quot;: subj, &quot;files&quot;: files, &quot;diff&quot;: diff})
++    return out
++
++
++# ---------------------------------------------------------------------------------------------------------
++# TRANSCRIPT — this session&#x27;s own .jsonl, flattened + scrubbed
++# ---------------------------------------------------------------------------------------------------------
++def _transcript_path():
++    proj = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;.claude&quot;, &quot;projects&quot;,
++                        &quot;C--Users-[redacted]-Desktop-trading-engines-v2&quot;)
++    files = sorted(glob.glob(os.path.join(proj, &quot;*.jsonl&quot;)), key=os.path.getmtime, reverse=True)
++    return files[0] if files else None
++
++
++def _slug():
++    try:
++        s = open(SLUG_FILE, encoding=&quot;utf-8&quot;).read().strip()
++        if s:
++            return s
++    except Exception:
++        pass
++    import secrets
++    s = &quot;transcript-&quot; + secrets.token_urlsafe(18)
++    try:
++        os.makedirs(os.path.dirname(SLUG_FILE), exist_ok=True)
++        open(SLUG_FILE, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(s)
++    except Exception:
++        pass
++    return s
++
++
++def _flatten_event(ev):
++    &quot;&quot;&quot;One .jsonl event -&gt; a few readable plain-text lines (role, text, tool calls, tool results).&quot;&quot;&quot;
++    role = ev.get(&quot;type&quot;) or ev.get(&quot;role&quot;) or &quot;&quot;
++    msg = ev.get(&quot;message&quot;) if isinstance(ev.get(&quot;message&quot;), dict) else ev
++    content = msg.get(&quot;content&quot;) if isinstance(msg, dict) else None
++    lines = []
++    if isinstance(content, str):
++        lines.append(&quot;%s: %s&quot; % (role, content))
++    elif isinstance(content, list):
++        for b in content:
++            if not isinstance(b, dict):
++                continue
++            bt = b.get(&quot;type&quot;)
++            if bt == &quot;text&quot;:
++                lines.append(&quot;%s: %s&quot; % (role, b.get(&quot;text&quot;, &quot;&quot;)))
++            elif bt == &quot;tool_use&quot;:
++                lines.append(&quot;tool_use %s %s&quot; % (b.get(&quot;name&quot;, &quot;&quot;), json.dumps(b.get(&quot;input&quot;, {}))[:2000]))
++            elif bt == &quot;tool_result&quot;:
++                c = b.get(&quot;content&quot;)
++                c = c if isinstance(c, str) else json.dumps(c)[:4000]
++                lines.append(&quot;tool_result: %s&quot; % c)
++    return [l for l in lines if l.strip()]
++
++
++def transcript_text(max_events=4000):
++    p = _transcript_path()
++    if not p:
++        return None
++    out = []
++    try:
++        for line in open(p, encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read().splitlines()[-max_events:]:
++            line = line.strip()
++            if not line:
++                continue
++            try:
++                out += _flatten_event(json.loads(line))
++            except Exception:
++                continue
++    except Exception:
++        return None
++    return &quot;\n&quot;.join(out)
++
++
++# ---------------------------------------------------------------------------------------------------------
++# PAGE BUILDERS
++# ---------------------------------------------------------------------------------------------------------
++_CSS = (&quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
++        &quot;main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}&quot;
++        &quot;pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;&quot;
++        &quot;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}&quot;
++        &quot;.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}&quot;
++        &quot;table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}&quot;)
++
++
++def _page(title, body, refresh=True):
++    return (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
++            &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
++            + (&quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&quot; if refresh else &quot;&quot;)
++            + &quot;&lt;title&gt;%s&lt;/title&gt;&lt;style&gt;%s&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;%s&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;&quot;
++            % (_html.escape(title), _CSS, body))
++
++
++def _journal_body():
++    st = _state()
++    c = _last_commit()
++    line = (&quot;%s | ruling %s | %s | commit %s \&quot;%s\&quot; (%s) | tests %s | files touched %s | next %s&quot; % (
++        _now().strftime(&quot;%Y-%m-%d %H:%M&quot;), st.get(&quot;ruling&quot;, &quot;—&quot;), st.get(&quot;item&quot;, &quot;—&quot;),
++        c.get(&quot;hash&quot;, &quot;—&quot;), c.get(&quot;subject&quot;, &quot;—&quot;), c.get(&quot;when&quot;, &quot;—&quot;),
++        st.get(&quot;tests&quot;, &quot;—&quot;), c.get(&quot;files&quot;, &quot;—&quot;), st.get(&quot;next&quot;, &quot;—&quot;)))
++    _append_journal(line, c.get(&quot;hash&quot;))
++    tail = []
++    try:
++        tail = open(JOURNAL_LOG, encoding=&quot;utf-8&quot;).read().splitlines()[-200:]
++    except Exception:
++        pass
++    flag = st.get(&quot;flag&quot;, &quot;NOTHING NEEDS THE LEAD&quot;)
++    body = (&quot;&lt;h1&gt;Build journal&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Append-only, machine-written every 2 minutes. &quot;
++            &quot;No keys, no tokens, no names. &lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: &lt;b&gt;%s&lt;/b&gt;&lt;/p&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot;
++            % (_html.escape(flag), _html.escape(&quot;\n&quot;.join(tail))))
++    return _page(&quot;Build journal&quot;, body)
++
++
++def _append_journal(line, commit_hash):
++    &quot;&quot;&quot;Append a line only when the latest commit changed (keeps it append-only without 2-min spam).&quot;&quot;&quot;
++    try:
++        prev = open(JOURNAL_LOG, encoding=&quot;utf-8&quot;).read().splitlines()
++    except Exception:
++        prev = []
++    last_hash = None
++    if prev:
++        m = re.search(r&quot;commit (\w+)&quot;, prev[-1])
++        last_hash = m.group(1) if m else None
++    if commit_hash and commit_hash != last_hash:
++        os.makedirs(os.path.dirname(JOURNAL_LOG), exist_ok=True)
++        with open(JOURNAL_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(scrub(line) + &quot;\n&quot;)
++
++
++def _commits_body():
++    cards = []
++    for c in _tonight_commits():
++        files = &quot;&quot;.join(&quot;&lt;div class=&#x27;sub h&#x27;&gt;%s&lt;/div&gt;&quot; % _html.escape(f) for f in c[&quot;files&quot;])
++        cards.append(&quot;&lt;div class=&#x27;c&#x27;&gt;&lt;div class=&#x27;h&#x27;&gt;&lt;b&gt;%s&lt;/b&gt; · %s&lt;/div&gt;&lt;div&gt;%s&lt;/div&gt;%s&quot;
++                     &quot;&lt;pre&gt;%s&lt;/pre&gt;&lt;/div&gt;&quot; % (_html.escape(c[&quot;hash&quot;]), _html.escape(c[&quot;when&quot;]),
++                     _html.escape(c[&quot;subject&quot;]), files, _html.escape(scrub(c[&quot;diff&quot;])[:60000])))
++    body = (&quot;&lt;h1&gt;Commits tonight&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Newest first, full diff, scrubbed of secrets. &quot;
++            &quot;&lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot; + (&quot;&quot;.join(cards) or &quot;&lt;p class=&#x27;sub&#x27;&gt;none yet.&lt;/p&gt;&quot;))
++    return _page(&quot;Commits tonight&quot;, body)
++
++
++def _index_body(slug, have_transcript):
++    st = _state()
++    tlink = (&quot;&lt;li&gt;&lt;a href=&#x27;%s.txt&#x27;&gt;Transcript&lt;/a&gt; — this session&#x27;s tool calls and messages, scrubbed&lt;/li&gt;&quot; % slug
++             if have_transcript else &quot;&lt;li class=&#x27;sub&#x27;&gt;Transcript — unavailable this cycle&lt;/li&gt;&quot;)
++    return _page(&quot;Build room&quot;,
++        &quot;&lt;h1&gt;Build room&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;What the desk is building tonight, refreshed every 2 minutes. &quot;
++        &quot;Everything here is scrubbed of keys, tokens and names.&lt;/p&gt;&quot;
++        &quot;&lt;p&gt;Ruling in progress: &lt;b&gt;%s&lt;/b&gt; · %s&lt;/p&gt;&lt;ul&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;../status.html&#x27;&gt;Status&lt;/a&gt; — is the desk up right now&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;journal.html&#x27;&gt;Journal&lt;/a&gt; — append-only build log&lt;/li&gt;&quot;
++        &quot;%s&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;commits.html&#x27;&gt;Commits&lt;/a&gt; — tonight&#x27;s commits with full diffs&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&lt;/ul&gt;&quot;
++        &quot;&lt;p class=&#x27;sub&#x27;&gt;Last self-flag: %s&lt;/p&gt;&quot;
++        % (_html.escape(st.get(&quot;ruling&quot;, &quot;—&quot;)), _html.escape(st.get(&quot;item&quot;, &quot;&quot;)), tlink,
++           _html.escape(st.get(&quot;flag&quot;, &quot;NOTHING NEEDS THE LEAD&quot;))))
++
++
++def build(write=True):
++    &quot;&quot;&quot;Rebuild the whole /build/ room. Each file is scrubbed before it is written; a file that cannot be
++    scrubbed is skipped (fail-closed), never published unscrubbed.&quot;&quot;&quot;
++    slug = _slug()
++    txt = transcript_text()
++    have_transcript = False
++    pages = {&quot;journal.html&quot;: _journal_body(), &quot;commits.html&quot;: _commits_body()}
++    if txt is not None:
++        try:
++            scrubbed = scrub(txt)                       # if this raises, we do NOT write the transcript
++            pages[slug + &quot;.txt&quot;] = scrubbed
++            have_transcript = True
++        except Exception:
++            have_transcript = False
++    pages[&quot;index.html&quot;] = _index_body(slug, have_transcript)
++    if write:
++        os.makedirs(OUT, exist_ok=True)
++        for name, content in pages.items():
++            with open(os.path.join(OUT, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(content)
++        sup = os.path.join(OUT, &quot;supervisor&quot;, &quot;index.html&quot;)   # placeholder until supervisor.py writes its own
++        if not os.path.exists(sup):
++            os.makedirs(os.path.dirname(sup), exist_ok=True)
++            with open(sup, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(_page(&quot;Supervisor&quot;, &quot;&lt;h1&gt;Supervisor&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;The independent watcher runs &quot;
++                              &quot;every 10 minutes during build hours. Its checks appear here. &quot;
++                              &quot;&lt;a href=&#x27;../index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot;))
++    return {&quot;slug&quot;: slug, &quot;have_transcript&quot;: have_transcript, &quot;files&quot;: sorted(pages)}
++
++
++if __name__ == &quot;__main__&quot;:
++    r = build()
++    print(&quot;build room: %s (transcript=%s)&quot; % (&quot;, &quot;.join(r[&quot;files&quot;]), r[&quot;have_transcript&quot;]))
+diff --git a/scripts/site_build.py b/scripts/site_build.py
+index d44593741..51131a1bd 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -618,6 +618,11 @@ def build_live():
+         vitals.build()
+     except Exception:
+         pass
++    try:
++        from scripts import build_journal                # R-BUILD-JOURNAL/TRANSCRIPT/EYES: the /build/ room
++        build_journal.build()
++    except Exception:
++        pass
+     return SITE
+ 
+ 
+diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+new file mode 100644
+index 000000000..f840dce9c
+--- /dev/null
++++ b/scripts/supervisor.py
+@@ -0,0 +1,310 @@
++&quot;&quot;&quot;R-EYES-FULL (2) — the independent supervisor. Every 10 minutes during build hours (15:30–09:00 IST) a
++FRESH Opus 4.8 sub-run reads the ruling in force, the journal, the builder&#x27;s transcript + commits since its
++last check, and STATUS.json, and checks scope + the standing laws against docs/SUPERVISOR-TEMPLATE.md.
++
++- ON-COURSE  -&gt; append &quot;checked HH:MM — on course&quot; to the build journal.
++- VIOLATION  -&gt; write E1-DESK\HALT with the reason (the builder&#x27;s PreToolUse hook then refuses every tool
++                call until a commit addresses it), and post ONE Telegram line.
++
++Its own log and a SCRUBBED transcript publish at site/build/supervisor/. Token use per run is recorded. The
++sub-run is injectable (invoke_fn) so tests never spend a real Opus run. This module never builds or commits.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++from scripts import build_journal as BJ
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++E1DESK = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
++HALT = os.path.join(E1DESK, &quot;HALT&quot;)
++TEMPLATE = os.path.join(REPO, &quot;docs&quot;, &quot;SUPERVISOR-TEMPLATE.md&quot;)
++STATE = os.path.join(REPO, &quot;scheduler&quot;, &quot;.supervisor_state.json&quot;)     # gitignored: last check ts / commit / offset
++LOG = os.path.join(REPO, &quot;reports&quot;, &quot;SUPERVISOR.log&quot;)
++TOKENS = os.path.join(REPO, &quot;reports&quot;, &quot;SUPERVISOR-TOKENS.log&quot;)
++OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;, &quot;supervisor&quot;)
++CLAUDE = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;claude.cmd&quot;)
++MODEL = &quot;claude-opus-4-8&quot;
++CADENCE_MIN = 10
++SILENCE_MIN = 30
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _state():
++    try:
++        return json.load(open(STATE, encoding=&quot;utf-8&quot;))
++    except Exception:
++        return {}
++
++
++def _save_state(st):
++    try:
++        os.makedirs(os.path.dirname(STATE), exist_ok=True)
++        json.dump(st, open(STATE, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++    except Exception:
++        pass
++
++
++def build_hours(now=None):
++    &quot;&quot;&quot;15:30–09:00 IST — the overnight build window (wraps midnight).&quot;&quot;&quot;
++    now = now or _now()
++    m = now.hour * 60 + now.minute
++    return m &gt;= 15 * 60 + 30 or m &lt; 9 * 60
++
++
++def due(now=None):
++    now = now or _now()
++    last = _state().get(&quot;last_run_ts&quot;, 0)
++    return (now.timestamp() - last) / 60.0 &gt;= CADENCE_MIN
++
++
++# ---------------------------------------------------------------------------------------------------------
++# GATHER what the sub-run reads
++# ---------------------------------------------------------------------------------------------------------
++def _git(*a):
++    try:
++        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, timeout=30).stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++    except Exception:
++        return &quot;&quot;
++
++
++def gather():
++    st = _state()
++    ruling = BJ._state().get(&quot;ruling&quot;, &quot;—&quot;)
++    journal = &quot;&quot;
++    try:
++        journal = &quot;\n&quot;.join(open(BJ.JOURNAL_LOG, encoding=&quot;utf-8&quot;).read().splitlines()[-60:])
++    except Exception:
++        pass
++    # transcript since last check (by event offset into the newest .jsonl)
++    tp = BJ._transcript_path()
++    last_off = st.get(&quot;transcript_events&quot;, 0)
++    trans, new_off = &quot;&quot;, last_off
++    if tp:
++        try:
++            lines = open(tp, encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read().splitlines()
++            new_off = len(lines)
++            out = []
++            for ln in lines[last_off:]:
++                try:
++                    out += BJ._flatten_event(json.loads(ln))
++                except Exception:
++                    pass
++            trans = &quot;\n&quot;.join(out)[-40000:]
++        except Exception:
++            pass
++    # commits since last check
++    since = st.get(&quot;last_commit&quot;)
++    rng = (&quot;%s..HEAD&quot; % since) if since else &quot;-5&quot;
++    commits = _git(&quot;log&quot;, rng, &quot;--format=%h %cd %s&quot;, &quot;--date=format-local:%H:%M&quot;) if since else _git(&quot;log&quot;, &quot;-5&quot;, &quot;--format=%h %cd %s&quot;, &quot;--date=format-local:%H:%M&quot;)
++    diffs = _git(&quot;log&quot;, rng, &quot;-p&quot;) if since else _git(&quot;show&quot;, &quot;--format=&quot;, &quot;HEAD&quot;)
++    head = _git(&quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;).strip()
++    status = &quot;&quot;
++    try:
++        status = open(os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;).read()[:6000]
++    except Exception:
++        pass
++    return {&quot;ruling&quot;: ruling, &quot;journal&quot;: journal, &quot;transcript&quot;: trans, &quot;commits&quot;: commits,
++            &quot;diffs&quot;: diffs[:120000], &quot;status&quot;: status, &quot;head&quot;: head, &quot;transcript_events&quot;: new_off}
++
++
++def _prompt(g):
++    tmpl = open(TEMPLATE, encoding=&quot;utf-8&quot;).read()
++    return (&quot;%s\n\n===== RULING IN FORCE =====\n%s\n\n===== BUILD JOURNAL =====\n%s\n\n&quot;
++            &quot;===== TRANSCRIPT SINCE LAST CHECK =====\n%s\n\n===== COMMITS SINCE LAST CHECK =====\n%s\n\n&quot;
++            &quot;===== DIFFS SINCE LAST CHECK =====\n%s\n\n===== STATUS.json =====\n%s\n&quot; % (
++                tmpl, g[&quot;ruling&quot;], g[&quot;journal&quot;], g[&quot;transcript&quot;] or &quot;(nothing new)&quot;,
++                g[&quot;commits&quot;] or &quot;(none)&quot;, g[&quot;diffs&quot;] or &quot;(none)&quot;, g[&quot;status&quot;]))
++
++
++# ---------------------------------------------------------------------------------------------------------
++# INVOKE a fresh Opus run (injectable)
++# ---------------------------------------------------------------------------------------------------------
++def _invoke_claude(prompt):
++    &quot;&quot;&quot;Launch ONE fresh headless Opus run. Returns (text, usage_dict). Never raises.&quot;&quot;&quot;
++    if not os.path.isfile(CLAUDE):
++        return &quot;&quot;, {&quot;error&quot;: &quot;claude CLI not found&quot;}
++    try:
++        r = subprocess.run([CLAUDE, &quot;--model&quot;, MODEL, &quot;--output-format&quot;, &quot;stream-json&quot;, &quot;--verbose&quot;, &quot;-p&quot;],
++                           input=prompt.encode(&quot;utf-8&quot;), capture_output=True, timeout=600, cwd=REPO)
++        out = r.stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++    except Exception as e:
++        return &quot;&quot;, {&quot;error&quot;: type(e).__name__}
++    text, usage = [], {}
++    for line in out.splitlines():
++        try:
++            ev = json.loads(line)
++        except Exception:
++            continue
++        if ev.get(&quot;type&quot;) == &quot;assistant&quot;:
++            for b in (ev.get(&quot;message&quot;, {}) or {}).get(&quot;content&quot;, []):
++                if isinstance(b, dict) and b.get(&quot;type&quot;) == &quot;text&quot;:
++                    text.append(b[&quot;text&quot;])
++        if ev.get(&quot;type&quot;) == &quot;result&quot;:
++            u = ev.get(&quot;usage&quot;) or {}
++            usage = {&quot;input&quot;: u.get(&quot;input_tokens&quot;), &quot;output&quot;: u.get(&quot;output_tokens&quot;),
++                     &quot;cost_usd&quot;: ev.get(&quot;total_cost_usd&quot;)}
++    return &quot;\n&quot;.join(text), usage
++
++
++def _verdict(text):
++    m = re.search(r&quot;SUPERVISOR-VERDICT:\s*(ON-COURSE|VIOLATION)\s*(?:\|\s*(.*))?&quot;, text or &quot;&quot;, re.I)
++    if not m:
++        return None, &quot;no verdict line in the sub-run&#x27;s reply&quot;
++    if m.group(1).upper() == &quot;ON-COURSE&quot;:
++        return &quot;ON-COURSE&quot;, None
++    return &quot;VIOLATION&quot;, (m.group(2) or &quot;unspecified&quot;).strip()
++
++
++# ---------------------------------------------------------------------------------------------------------
++# ACT on the verdict
++# ---------------------------------------------------------------------------------------------------------
++def write_halt(reason):
++    try:
++        os.makedirs(E1DESK, exist_ok=True)
++        with open(HALT, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;%s\n%s\n&quot; % (_now().strftime(&quot;%Y-%m-%d %H:%M IST&quot;), reason))
++        return True
++    except Exception:
++        return False
++
++
++def _append_journal(line):
++    try:
++        os.makedirs(os.path.dirname(BJ.JOURNAL_LOG), exist_ok=True)
++        with open(BJ.JOURNAL_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(BJ.scrub(line) + &quot;\n&quot;)
++    except Exception:
++        pass
++
++
++def _log(line):
++    try:
++        os.makedirs(os.path.dirname(LOG), exist_ok=True)
++        with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(BJ.scrub(&quot;%s %s&quot; % (_now().strftime(&quot;%Y-%m-%d %H:%M&quot;), line)) + &quot;\n&quot;)
++    except Exception:
++        pass
++
++
++def run_once(invoke_fn=None, notifier=None):
++    &quot;&quot;&quot;One supervisor pass. Returns (verdict, reason). Does not build or commit.&quot;&quot;&quot;
++    g = gather()
++    text, usage = (invoke_fn or _invoke_claude)(_prompt(g))
++    verdict, reason = _verdict(text)
++    st = _state()
++    st[&quot;last_run_ts&quot;] = _now().timestamp()
++    st[&quot;last_commit&quot;] = g[&quot;head&quot;] or st.get(&quot;last_commit&quot;)
++    st[&quot;transcript_events&quot;] = g[&quot;transcript_events&quot;]
++    _save_state(st)
++    if usage:
++        try:
++            with open(TOKENS, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++                f.write(&quot;%s in=%s out=%s cost=%s\n&quot; % (_now().strftime(&quot;%Y-%m-%d %H:%M&quot;),
++                        usage.get(&quot;input&quot;), usage.get(&quot;output&quot;), usage.get(&quot;cost_usd&quot;)))
++        except Exception:
++            pass
++    if verdict == &quot;VIOLATION&quot;:
++        write_halt(reason)
++        line = &quot;SUPERVISOR: halted — %s&quot; % reason
++        _log(line)
++        try:
++            (notifier or _notify)(line)
++        except Exception:
++            pass
++    else:
++        stamp = &quot;checked %s — on course&quot; % _now().strftime(&quot;%H:%M&quot;)
++        _append_journal(stamp)
++        _log(stamp if verdict else &quot;check inconclusive (%s) — treated as on course, not halting&quot; % reason)
++    _publish(text, verdict, reason)
++    return verdict, reason
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++def _publish(text, verdict, reason):
++    &quot;&quot;&quot;The supervisor&#x27;s own page + scrubbed transcript at site/build/supervisor/.&quot;&quot;&quot;
++    try:
++        os.makedirs(OUT, exist_ok=True)
++        tail = []
++        try:
++            tail = open(LOG, encoding=&quot;utf-8&quot;).read().splitlines()[-120:]
++        except Exception:
++            pass
++        state = (&quot;HALTED — %s&quot; % reason) if verdict == &quot;VIOLATION&quot; else &quot;on course&quot;
++        body = (&quot;&lt;h1&gt;Supervisor&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Independent watcher, fresh run every 10 minutes in build &quot;
++                &quot;hours. &lt;a href=&#x27;../index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Now: &lt;b&gt;%s&lt;/b&gt;&lt;/p&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot;
++                &quot;&lt;h3&gt;Last check (scrubbed)&lt;/h3&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot;
++                % (BJ.scrub(state), BJ.scrub(&quot;\n&quot;.join(tail)), BJ.scrub((text or &quot;&quot;)[-20000:])))
++        with open(os.path.join(OUT, &quot;index.html&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(BJ._page(&quot;Supervisor&quot;, body))
++    except Exception:
++        pass
++
++
++# ---------------------------------------------------------------------------------------------------------
++# SILENCE ALARM (called by token_ping)
++# ---------------------------------------------------------------------------------------------------------
++def silence_line(now=None):
++    &quot;&quot;&quot;A one-line alarm if no &#x27;checked …&#x27; line has appeared for SILENCE_MIN during build hours, else None.
++    Said once per silent stretch (keyed on the stretch start).&quot;&quot;&quot;
++    now = now or _now()
++    if not build_hours(now):
++        return None
++    last = _last_checked_ts()
++    if last is None:
++        return None
++    if (now.timestamp() - last) / 60.0 &lt; SILENCE_MIN:
++        return None
++    hhmm = datetime.fromtimestamp(last, IST).strftime(&quot;%H:%M&quot;)
++    return &quot;SUPERVISOR: silent since %s&quot; % hhmm
++
++
++def _last_checked_ts():
++    &quot;&quot;&quot;Timestamp of the last &#x27;checked HH:MM — on course&#x27; line in the journal, today, or None.&quot;&quot;&quot;
++    try:
++        lines = [l for l in open(BJ.JOURNAL_LOG, encoding=&quot;utf-8&quot;).read().splitlines() if &quot;checked &quot; in l and &quot;on course&quot; in l]
++    except Exception:
++        return None
++    if not lines:
++        return None
++    m = re.search(r&quot;checked (\d{2}):(\d{2})&quot;, lines[-1])
++    if not m:
++        return None
++    n = _now()
++    dt = n.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0)
++    if dt &gt; n:
++        dt -= timedelta(days=1)                       # a checked time in the &quot;future&quot; is from before midnight
++    return dt.timestamp()
++
++
++def main():
++    import time
++    while True:
++        try:
++            if build_hours() and due():
++                run_once()
++        except Exception:
++            pass
++        time.sleep(60)
++
++
++if __name__ == &quot;__main__&quot;:
++    if &quot;--once&quot; in sys.argv:
++        print(run_once())
++    else:
++        main()
+diff --git a/scripts/token_ping.py b/scripts/token_ping.py
+index 173ddfb82..5ba52360c 100644
+--- a/scripts/token_ping.py
++++ b/scripts/token_ping.py
+@@ -42,7 +42,30 @@ def _sleep_until(target):
+         secs = (target - _ist()).total_seconds()
+         if secs &lt;= 0:
+             return
+-        time.sleep(min(secs, 1800))
++        _supervisor_silence_tick()                # R-EYES-FULL: post the supervisor-silence alarm from here
++        time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
++
++
++_SILENCE_MARK = os.path.join(REPO, &quot;scheduler&quot;, &quot;.supervisor_silence_posted&quot;)
++
++
++def _supervisor_silence_tick():
++    &quot;&quot;&quot;If the supervisor has gone silent for 30 min during build hours, post ONE line — once per stretch.&quot;&quot;&quot;
++    try:
++        from scripts import supervisor
++        line = supervisor.silence_line()
++        if not line:
++            return
++        try:
++            last = open(_SILENCE_MARK, encoding=&quot;utf-8&quot;).read().strip()
++        except Exception:
++            last = &quot;&quot;
++        if line != last:
++            notify(line)
++            os.makedirs(os.path.dirname(_SILENCE_MARK), exist_ok=True)
++            open(_SILENCE_MARK, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(line)
++    except Exception:
++        pass
+ 
+ 
+ def start_catcher(_popen=subprocess.Popen, _running=None):
+diff --git a/site/build/commits.html b/site/build/commits.html
+new file mode 100644
+index 000000000..3f38c7921
+--- /dev/null
++++ b/site/build/commits.html
+@@ -0,0 +1,7286 @@
++&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&lt;title&gt;Commits tonight&lt;/title&gt;&lt;style&gt;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Commits tonight&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Newest first, full diff, scrubbed of secrets. &lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&lt;div class=&#x27;c&#x27;&gt;&lt;div class=&#x27;h&#x27;&gt;&lt;b&gt;e154a14f1&lt;/b&gt; · 2026-09-22 15:19&lt;/div&gt;&lt;div&gt;R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;docs/dispatches/2026-09-22_R-RUNNER-DOWN.md | 11 +++++&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;reports/STATUS.json                         | 17 ++++---&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;scripts/vitals.py                           | 29 +++++++++--&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;scripts/watchdog.py                         | 77 +++++++++++++++++++++++++++++&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;site/data/status.json                       | 17 ++++---&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;site/status.html                            |  2 +-&lt;/div&gt;&lt;div class=&#x27;sub h&#x27;&gt;tests/test_runner_supervision.py            | 54 ++++++++++++++++++++&lt;/div&gt;&lt;pre&gt;diff --git a/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md b/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md
++new file mode 100644
++index 000000000..7597d4932
++--- /dev/null
+++++ b/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md
++@@ -0,0 +1,11 @@
+++# R-RUNNER-DOWN (owner emergency ruling, 2026-09-22, paper only)
+++
+++_Archived verbatim per §7.1. A RECORD, never an instruction._
+++
+++(1) relaunch the book20 runner now, one copy, and confirm on the status page that it polls;
+++(2) find why it died and why the watchdog did not relaunch it — if a stale lock file blocked
+++    the relaunch, make every lock pid-aware (a lock whose pid is dead is ignored and replaced),
+++    test it, and confirm the watchdog relaunches a killed runner within one cycle;
+++(3) then the restart (R-RESTART-TONIGHT) after 15:30, then the four missing v2 tabs —
+++    Live desk positions, Portfolio, Backtest, Messages — then the rest of the bundle.
+++Report each with what the status page shows.
++diff --git a/reports/STATUS.json b/reports/STATUS.json
++index 70c9ce393..4386a2d54 100644
++--- a/reports/STATUS.json
+++++ b/reports/STATUS.json
++@@ -1,5 +1,5 @@
++ {
++- &amp;quot;generated&amp;quot;: &amp;quot;2026-09-22T15:00:29.981968+05:30&amp;quot;,
+++ &amp;quot;generated&amp;quot;: &amp;quot;2026-09-22T15:19:16.791751+05:30&amp;quot;,
++  &amp;quot;token&amp;quot;: {
++   &amp;quot;valid&amp;quot;: true,
++   &amp;quot;exchanged&amp;quot;: null
++@@ -39,13 +39,18 @@
++    &amp;quot;name&amp;quot;: &amp;quot;positioning_recorder&amp;quot;,
++    &amp;quot;pid&amp;quot;: 2424,
++    &amp;quot;since&amp;quot;: &amp;quot;/Date(1790060157413&amp;quot;
+++  },
+++  {
+++   &amp;quot;name&amp;quot;: &amp;quot;book20_runner&amp;quot;,
+++   &amp;quot;pid&amp;quot;: 24424,
+++   &amp;quot;since&amp;quot;: &amp;quot;/Date(1790070066989&amp;quot;
++   }
++  ],
++- &amp;quot;last_runner_poll&amp;quot;: &amp;quot;2026-09-22T14:42:42.689018+05:30&amp;quot;,
+++ &amp;quot;last_runner_poll&amp;quot;: &amp;quot;2026-09-22T15:17:10.133861+05:30&amp;quot;,
++  &amp;quot;streams&amp;quot;: {
++   &amp;quot;Order-book depth&amp;quot;: {
++-   &amp;quot;rows_10min&amp;quot;: 2100,
++-   &amp;quot;last&amp;quot;: &amp;quot;2026-09-22T15:00:12.924174+05:30&amp;quot;
+++   &amp;quot;rows_10min&amp;quot;: 1890,
+++   &amp;quot;last&amp;quot;: &amp;quot;2026-09-22T15:18:20.925341+05:30&amp;quot;
++   },
++   &amp;quot;Option chains&amp;quot;: {
++    &amp;quot;rows_10min&amp;quot;: null,
++@@ -74,6 +79,6 @@
++   &amp;quot;line&amp;quot;: &amp;quot;AUDIT: PASS \u2014 5/5 checks, trading path sound (724d8139a)&amp;quot;,
++   &amp;quot;commit&amp;quot;: &amp;quot;724d8139a&amp;quot;
++  },
++- &amp;quot;plain&amp;quot;: &amp;quot;logged in \u00b7 7 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;,
++- &amp;quot;ready_line&amp;quot;: &amp;quot;NOT READY \u2014 logged in \u00b7 7 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;
+++ &amp;quot;plain&amp;quot;: &amp;quot;logged in \u00b7 8 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;,
+++ &amp;quot;ready_line&amp;quot;: &amp;quot;READY \u2014 4 recorders + runner up, 216 stocks ready, orders allowed.&amp;quot;
++ }
++\ No newline at end of file
++diff --git a/scripts/vitals.py b/scripts/vitals.py
++index fcf331c18..8d49d3f38 100644
++--- a/scripts/vitals.py
+++++ b/scripts/vitals.py
++@@ -101,6 +101,30 @@ def _last_line_ts(path):
++         return None
++ 
++ 
+++def _last_runner_poll():
+++    &amp;quot;&amp;quot;&amp;quot;The newer of: the BOOK20 readout mtime, and the shared heartbeat mtime when the runner wrote it last
+++    (state == &amp;#x27;book20&amp;#x27;). The heartbeat ticks every poll; the readout does not always, so the heartbeat is the
+++    truer &amp;#x27;last poll&amp;#x27; signal.&amp;quot;&amp;quot;&amp;quot;
+++    try:
+++        from engine1_rebuild import scan
+++        hb = scan.HEARTBEAT
+++    except Exception:
+++        hb = None
+++    best = None
+++    for p, gate_state in ((os.path.join(REPO, &amp;quot;reports&amp;quot;, &amp;quot;BOOK20-READOUT.json&amp;quot;), None), (hb, &amp;quot;book20&amp;quot;)):
+++        if not p:
+++            continue
+++        try:
+++            if gate_state:
+++                if json.load(open(p, encoding=&amp;quot;utf-8&amp;quot;)).get(&amp;quot;state&amp;quot;) != gate_state:
+++                    continue
+++            t = datetime.fromtimestamp(os.path.getmtime(p), IST)
+++            best = t if best is None or t &amp;gt; best else best
+++        except Exception:
+++            pass
+++    return best.isoformat() if best else None
+++
+++
++ def _readout():
++     try:
++         return json.load(open(os.path.join(REPO, &amp;quot;reports&amp;quot;, &amp;quot;BOOK20-READOUT.json&amp;quot;), encoding=&amp;quot;utf-8&amp;quot;))
++@@ -163,10 +187,7 @@ def _audit():
++ def build(write=True):
++     ro = _readout()
++     written, cards = _orders_and_cards_today()
++-    try:
++-        runner_poll = datetime.fromtimestamp(os.path.getmtime(os.path.join(REPO, &amp;quot;reports&amp;quot;, &amp;quot;BOOK20-READOUT.json&amp;quot;)), IST).isoformat()
++-    except Exception:
++-        runner_poll = None
+++    runner_poll = _last_runner_poll()
++     green = _moment_green_count()
++     status = {
++         &amp;quot;generated&amp;quot;: _now().isoformat(), &amp;quot;token&amp;quot;: [redacted](), &amp;quot;processes&amp;quot;: _processes(),
++diff --git a/scripts/watchdog.py b/scripts/watchdog.py
++index 5316e2ddb..e12793e3c 100644
++--- a/scripts/watchdog.py
+++++ b/scripts/watchdog.py
++@@ -382,6 +382,79 @@ def resurrect_jobs(now, launch=True, notify_fn=None):
++     return restarted
++ 
++ 
+++RUNNER_KEY = &amp;quot;book20_runner&amp;quot;      # R-RUNNER-DOWN: the order runner is launched at login (not in START_E1_ALL),
+++#                                   so resurrect_jobs never watched it. This supervises it directly.
+++
+++
+++def _runner_running():
+++    &amp;quot;&amp;quot;&amp;quot;True if any python*/pythonw* process is looping the 20-day book runner. Fail-safe True on error
+++    (never spawn a duplicate).&amp;quot;&amp;quot;&amp;quot;
+++    try:
+++        out = subprocess.run([&amp;quot;powershell&amp;quot;, &amp;quot;-NoProfile&amp;quot;, &amp;quot;-Command&amp;quot;,
+++            &amp;quot;(Get-CimInstance Win32_Process | Where-Object { $_.Name -match &amp;#x27;python&amp;#x27; -and &amp;quot;
+++            &amp;quot;$_.CommandLine -match &amp;#x27;book20_runner&amp;#x27; } | Measure-Object).Count&amp;quot;],
+++            capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout.strip()
+++        return out != &amp;quot;0&amp;quot;
+++    except Exception:
+++        return True
+++
+++
+++def _token_valid():
+++    try:
+++        from data_acquisition import kite
+++        kite.load_token()
+++        return True
+++    except Exception:
+++        return False
+++
+++
+++def _held():
+++    try:
+++        from engine1_rebuild import gate
+++        return gate.held()
+++    except Exception:
+++        return False
+++
+++
+++def resurrect_runner(now, launch=True, notify_fn=None, launch_fn=None, running_fn=None):
+++    &amp;quot;&amp;quot;&amp;quot;R-RUNNER-DOWN (2): keep exactly ONE 20-day book runner alive. If it is dead — and there IS a login
+++    token and the hold is off — relaunch it via the canonical login path within one watchdog cycle. Reuses
+++    the same per-job cooldown so a genuinely crash-looping runner is not thrashed. Returns True if it
+++    relaunched this pass. No-op while jobs are paused, while held, or with no token (nothing to poll).&amp;quot;&amp;quot;&amp;quot;
+++    if _jobs_paused():
+++        return False
+++    if _held() or not _token_valid():
+++        return False                                  # by design there is no runner while held / logged out
+++    if (running_fn or _runner_running)():
+++        return False                                  # already up (its own lock keeps it single-instance)
+++    st = _read(STATE_FILE) or {}
+++    cool = st.get(&amp;quot;job_restart_cooldown&amp;quot;, {})
+++    if (now - cool.get(RUNNER_KEY, 0)) / 60.0 &amp;lt; JOB_COOLDOWN_MIN:
+++        return False                                  # relaunched very recently — give it a cycle to come up
+++    if launch:
+++        try:
+++            (launch_fn or _default_arm_book20)()
+++        except Exception:
+++            pass
+++    cool[RUNNER_KEY] = now
+++    st[&amp;quot;job_restart_cooldown&amp;quot;] = cool
+++    pend = st.get(&amp;quot;pending_restart_report&amp;quot;) or []
+++    st[&amp;quot;pending_restart_report&amp;quot;] = list(pend) + [RUNNER_KEY]
+++    st[&amp;quot;pending_restart_ts&amp;quot;] = now
+++    _write_state(st)
+++    try:
+++        with open(RESTART_LOG, &amp;quot;a&amp;quot;, encoding=&amp;quot;utf-8&amp;quot;) as f:
+++            f.write(&amp;quot;%s relaunched %s (was dead)\n&amp;quot; % (_ist().strftime(&amp;quot;%Y-%m-%d %H:%M IST&amp;quot;), RUNNER_KEY))
+++    except Exception:
+++        pass
+++    return True
+++
+++
+++def _default_arm_book20():
+++    from scripts import kite_login
+++    kite_login._arm_book20()
+++
+++
++ def _conf_status_sig():
++     &amp;quot;&amp;quot;&amp;quot;A fingerprint of the STATUS column of CONFORMANCE.md — the conforms/partial/missing/wall tokens in
++     order. It changes only when a row&amp;#x27;s STATUS changes (R-E1-RING-FOREVER checklist watchdog).&amp;quot;&amp;quot;&amp;quot;
++@@ -587,6 +660,10 @@ def main():
++             resurrect_jobs(now)      # R-E1-RESURRECT: restart any dead START_E1_ALL job
++         except Exception:
++             pass
+++        try:
+++            resurrect_runner(now)    # R-RUNNER-DOWN: keep the one order runner alive (not in START_E1_ALL)
+++        except Exception:
+++            pass
++         # R-MORNING-FIX (2): the periodic builder-idle 🙋 call is REMOVED from the loop (the sender in
++         # builder_check is deleted). No timer-repeating Telegram message runs here any more.
++         try:
++diff --git a/site/data/status.json b/site/data/status.json
++index 70c9ce393..4386a2d54 100644
++--- a/site/data/status.json
+++++ b/site/data/status.json
++@@ -1,5 +1,5 @@
++ {
++- &amp;quot;generated&amp;quot;: &amp;quot;2026-09-22T15:00:29.981968+05:30&amp;quot;,
+++ &amp;quot;generated&amp;quot;: &amp;quot;2026-09-22T15:19:16.791751+05:30&amp;quot;,
++  &amp;quot;token&amp;quot;: {
++   &amp;quot;valid&amp;quot;: true,
++   &amp;quot;exchanged&amp;quot;: null
++@@ -39,13 +39,18 @@
++    &amp;quot;name&amp;quot;: &amp;quot;positioning_recorder&amp;quot;,
++    &amp;quot;pid&amp;quot;: 2424,
++    &amp;quot;since&amp;quot;: &amp;quot;/Date(1790060157413&amp;quot;
+++  },
+++  {
+++   &amp;quot;name&amp;quot;: &amp;quot;book20_runner&amp;quot;,
+++   &amp;quot;pid&amp;quot;: 24424,
+++   &amp;quot;since&amp;quot;: &amp;quot;/Date(1790070066989&amp;quot;
++   }
++  ],
++- &amp;quot;last_runner_poll&amp;quot;: &amp;quot;2026-09-22T14:42:42.689018+05:30&amp;quot;,
+++ &amp;quot;last_runner_poll&amp;quot;: &amp;quot;2026-09-22T15:17:10.133861+05:30&amp;quot;,
++  &amp;quot;streams&amp;quot;: {
++   &amp;quot;Order-book depth&amp;quot;: {
++-   &amp;quot;rows_10min&amp;quot;: 2100,
++-   &amp;quot;last&amp;quot;: &amp;quot;2026-09-22T15:00:12.924174+05:30&amp;quot;
+++   &amp;quot;rows_10min&amp;quot;: 1890,
+++   &amp;quot;last&amp;quot;: &amp;quot;2026-09-22T15:18:20.925341+05:30&amp;quot;
++   },
++   &amp;quot;Option chains&amp;quot;: {
++    &amp;quot;rows_10min&amp;quot;: null,
++@@ -74,6 +79,6 @@
++   &amp;quot;line&amp;quot;: &amp;quot;AUDIT: PASS \u2014 5/5 checks, trading path sound (724d8139a)&amp;quot;,
++   &amp;quot;commit&amp;quot;: &amp;quot;724d8139a&amp;quot;
++  },
++- &amp;quot;plain&amp;quot;: &amp;quot;logged in \u00b7 7 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;,
++- &amp;quot;ready_line&amp;quot;: &amp;quot;NOT READY \u2014 logged in \u00b7 7 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;
+++ &amp;quot;plain&amp;quot;: &amp;quot;logged in \u00b7 8 desk processes up \u00b7 216 stocks ready \u00b7 orders allowed \u00b7 0 placed today \u00b7 audit passed&amp;quot;,
+++ &amp;quot;ready_line&amp;quot;: &amp;quot;READY \u2014 4 recorders + runner up, 216 stocks ready, orders allowed.&amp;quot;
++ }
++\ No newline at end of file
++diff --git a/site/status.html b/site/status.html
++index 86f1abf17..ff6582ac2 100644
++--- a/site/status.html
+++++ b/site/status.html
++@@ -1 +1 @@
++-&amp;lt;!doctype html&amp;gt;&amp;lt;html lang=&amp;#x27;en&amp;#x27;&amp;gt;&amp;lt;head&amp;gt;&amp;lt;meta charset=&amp;#x27;utf-8&amp;#x27;&amp;gt;&amp;lt;meta name=&amp;#x27;viewport&amp;#x27; content=&amp;#x27;width=device-width,initial-scale=1&amp;#x27;&amp;gt;&amp;lt;meta http-equiv=&amp;#x27;refresh&amp;#x27; content=&amp;#x27;120&amp;#x27;&amp;gt;&amp;lt;title&amp;gt;Desk status&amp;lt;/title&amp;gt;&amp;lt;style&amp;gt;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&amp;lt;/style&amp;gt;&amp;lt;/head&amp;gt;&amp;lt;body&amp;gt;&amp;lt;main&amp;gt;&amp;lt;h1&amp;gt;Desk status&amp;lt;/h1&amp;gt;&amp;lt;p class=&amp;#x27;big&amp;#x27;&amp;gt;logged in · 7 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit passed&amp;lt;/p&amp;gt;&amp;lt;p class=&amp;#x27;sub&amp;#x27;&amp;gt;NOT READY — logged in · 7 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit passed · updated 2026-09-22T15:00:29.981968+05:30 · refreshes every 2 minutes&amp;lt;/p&amp;gt;&amp;lt;h3&amp;gt;Processes&amp;lt;/h3&amp;gt;&amp;lt;table&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;th&amp;gt;Process&amp;lt;/th&amp;gt;&amp;lt;th&amp;gt;PID&amp;lt;/th&amp;gt;&amp;lt;th&amp;gt;Since&amp;lt;/th&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;token_ping&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;30296&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790056173328&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;watchdog&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;25204&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790056173342&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;site_loop&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;19568&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790056173381&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;chain_recorder&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;20808&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790060157354&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;xchange_recorder&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;16524&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790060157395&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;e13_depth&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;17600&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790060157404&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;positioning_recorder&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;2424&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;/Date(1790060157413&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;/table&amp;gt;&amp;lt;h3&amp;gt;Streams (rows in the last 10 min)&amp;lt;/h3&amp;gt;&amp;lt;table&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;th&amp;gt;Stream&amp;lt;/th&amp;gt;&amp;lt;th&amp;gt;Rows&amp;lt;/th&amp;gt;&amp;lt;th&amp;gt;Last&amp;lt;/th&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;Order-book depth&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;2100&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;2026-09-22T15:00:12.924174+05:30&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;Option chains&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;—&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;2026-09-22&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;NSE/BSE two-exchange&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;—&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;2026-09-22&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;tr&amp;gt;&amp;lt;td&amp;gt;Retail positioning&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;n&amp;#x27;&amp;gt;—&amp;lt;/td&amp;gt;&amp;lt;td class=&amp;#x27;sub&amp;#x27;&amp;gt;—&amp;lt;/td&amp;gt;&amp;lt;/tr&amp;gt;&amp;lt;/table&amp;gt;&amp;lt;h3&amp;gt;Gates&amp;lt;/h3&amp;gt;&amp;lt;p class=&amp;#x27;sub&amp;#x27;&amp;gt;hold: off · orders_allowed: True · kill_switch: orders allowed&amp;lt;/p&amp;gt;&amp;lt;h3&amp;gt;Orders today&amp;lt;/h3&amp;gt;&amp;lt;p class=&amp;#x27;sub&amp;#x27;&amp;gt;placed 0 · cards sent 0 · orders now allowed&amp;lt;/p&amp;gt;&amp;lt;h3&amp;gt;Last audit&amp;lt;/h3&amp;gt;&amp;lt;p class=&amp;#x27;sub&amp;#x27;&amp;gt;AUDIT: PASS — 5/5 checks, trading path sound (724d8139a)&amp;lt;/p&amp;gt;&amp;lt;/main&amp;gt;&amp;lt;/body&amp;gt;&amp;lt;/html&amp;gt;
++\ No newline at end of file
+++&amp;lt;!doctype html&amp;gt;&amp;lt;html lang=&amp;#x27;en&amp;#x27;&amp;gt;&amp;lt;head&amp;gt;&amp;lt;meta charset=&amp;#x27;utf-8&amp;#x27;&amp;gt;&amp;lt;meta name=&amp;#x27;viewport&amp;#x27; content=&amp;#x27;width=device-width,initial-scale=1&amp;#x27;&amp;gt;&amp;lt;meta http-equiv=&amp;#x27;refresh&amp;#x27; content=&amp;#x27;120&amp;#x27;&amp;gt;&amp;lt;title&amp;gt;Desk status&amp;lt;/title&amp;gt;&amp;lt;style&amp;gt;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}td,th{border-bottom:1px solid #23262d;padding:6px 9px;text-align:left}.sub{color:#9a9a93}.n{font-family:ui-monospace,monospace}.big{font-size:17px;margin:8px 0}&amp;lt;/style&amp;gt;&amp;lt;/head&amp;gt;&amp;lt;body&amp;gt;&amp;lt;main&amp;gt;&amp;lt;h1&amp;gt;Desk status&amp;lt;/h1&amp;gt;&amp;lt;p class=&amp;#x27;big&amp;#x27;&amp;gt;logged in · 8 desk processes up · 216 stocks ready · orders allowed · 0 placed today · audit passed&amp;lt;/p&amp;gt;&amp;lt;p class=&amp;#x27;sub&amp;#x27;&amp;gt;READY — 4 recorders + runner up, 216 stocks ready, orders allowe</pre></div><div class='c'><div class='h'><b>e154a14f1</b> · 2026-09-22 15:19</div><div>R-RUNNER-DOWN: watchdog now supervises the order runner + status shows it polling</div><div class='sub h'>docs/dispatches/2026-09-22_R-RUNNER-DOWN.md | 11 +++++</div><div class='sub h'>reports/STATUS.json                         | 17 ++++---</div><div class='sub h'>scripts/vitals.py                           | 29 +++++++++--</div><div class='sub h'>scripts/watchdog.py                         | 77 +++++++++++++++++++++++++++++</div><div class='sub h'>site/data/status.json                       | 17 ++++---</div><div class='sub h'>site/status.html                            |  2 +-</div><div class='sub h'>tests/test_runner_supervision.py            | 54 ++++++++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md b/docs/dispatches/2026-09-22_R-RUNNER-DOWN.md
 new file mode 100644
 index 000000000..7597d4932
 --- /dev/null
@@ -6900,387 +8428,4 @@ index b8ffc84ae..24490d80b 100644
  .updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
 -&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1067&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1065&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1064&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1059&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1058&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.1%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1053&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1049&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1043&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1023&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;60.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;998&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;992&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.6%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;990&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;975&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.4%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;972&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;955&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;14.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;59.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;931&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;When&lt;/th&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Signal&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;DABUR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;DABUR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;HINDUNILVR&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;HINDUNILVR, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;JSWENERGY&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;JSWENERGY, daily: when RSI is between 40 and 60 and volatility (ATR) is in its low 20–40% at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;BDL&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;BDL, daily: when RSI is between 30 and 50 and money-flow (MFI) is between 20 and 40 at the same time → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Filled 2026-09-21&lt;/td&gt;&lt;td&gt;SHREECEM&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;SHREECEM, daily: when VWAP is in its lowest 20% → it tends to go UP over the next 20 days.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;The certified book re-run as if it had to cross a real order book — measured spread, market impact and fees on every trade.&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Fill assumption&lt;/th&gt;&lt;th&gt;Made&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;At the mid (before cost)&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;+15.4 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;At the real spread&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-87.5 R&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;With the calibrated cost&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;-89.9 R&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0 0&#x27;&gt;Even at the real measured spread the edge does not survive: most of the cost is the fixed exchange-and-tax charge on every trade.&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane&#x27; data-g=&#x27;eng&#x27;&gt;&lt;ol class=&#x27;sub&#x27;&gt;&lt;li&gt;Search each stock&#x27;s own history for a behaviour that repeats.&lt;/li&gt;&lt;li&gt;Prove it on test years, then on sealed months never seen while building.&lt;/li&gt;&lt;li&gt;Keep it only if its move clears the real cost of trading.&lt;/li&gt;&lt;li&gt;Trade it on paper, scored daily after real costs.&lt;/li&gt;&lt;/ol&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T01:55:50.490505+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 \ No newline at end of file
-+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=</pre></div><div class='c'><div class='h'><b>c819dd304</b> · 2026-09-22 02:06</div><div>R-ALL-ENGINES-TOMORROW (1): wire 8 fixed-rule engines, two books each, with isolation + auto-export</div><div class='sub h'>engine1_rebuild/paper_account.py |  13 ++-</div><div class='sub h'>scripts/engine_accounts.py       | 216 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/rehearsal_day1.py        |  46 +++++++++</div><div class='sub h'>tests/test_engine_accounts.py    |  48 +++++++++</div><pre>diff --git a/engine1_rebuild/paper_account.py b/engine1_rebuild/paper_account.py
-index 46e6f5512..bc3050d5e 100644
---- a/engine1_rebuild/paper_account.py
-+++ b/engine1_rebuild/paper_account.py
-@@ -42,6 +42,17 @@ ADAPTIVE_LEDGER = os.path.join(_REPO, &quot;reports&quot;, &quot;BOOK20-ADAPTIVE-LEDGER.csv&quot;)
- ENGINE_LEDGERS = {&quot;E10&quot;: os.path.join(_REPO, &quot;reports&quot;, &quot;E10-BOOK-LEDGER.csv&quot;),
-                   &quot;E11&quot;: os.path.join(_REPO, &quot;reports&quot;, &quot;E11-BOOK-LEDGER.csv&quot;)}
- 
-+# R-ALL-ENGINES-TOMORROW: every fixed-rule engine gets its OWN persistent ₹2,00,000 account, run as TWO books
-+# — FLAT (₹1,000 per trade) and ADAPTIVE (sizing follows the book&#x27;s own record, cold-start flat). Each book is
-+# its own account/ledger, tagged [E21-FLAT] etc.; the roof copies them the same way it copies E10/E11.
-+NEW_ENGINES = [&quot;E21&quot;, &quot;E9&quot;, &quot;E3&quot;, &quot;YT&quot;, &quot;E7&quot;, &quot;E12&quot;, &quot;E14&quot;, &quot;E4&quot;]
-+NEW_ENGINE_ACCOUNTS = []
-+for _e in NEW_ENGINES:
-+    for _b in (&quot;FLAT&quot;, &quot;ADAPTIVE&quot;):
-+        _name = &quot;%s-%s&quot; % (_e, _b)
-+        NEW_ENGINE_ACCOUNTS.append(_name)
-+        ENGINE_LEDGERS[_name] = os.path.join(_REPO, &quot;reports&quot;, &quot;books&quot;, &quot;%s-LEDGER.csv&quot; % _name)
-+
- 
- def desk_start():
-     return ENGINE_START * len(LIVE_ENGINES)
-@@ -117,7 +128,7 @@ def accounts_summary():
-     &quot;&quot;&quot;Every account&#x27;s current equity, for the cards and pages: the live ENGINES (E1, E10, E11 — R-DAY1-
-     BUNDLE A4), engine 1&#x27;s two sizing books (E1-FLAT, E1-ADAPTIVE), and the desk (the roof&#x27;s copies over
-     ₹2,00,000 × engines). Every ₹ reconciles to that account&#x27;s own ledger.&quot;&quot;&quot;
--    names = list(dict.fromkeys(LIVE_ENGINES + LIVE_ACCOUNTS))
-+    names = list(dict.fromkeys(LIVE_ENGINES + LIVE_ACCOUNTS + NEW_ENGINE_ACCOUNTS))
-     out = {a: account(a)[&quot;equity&quot;] for a in names}
-     out[&quot;desk&quot;] = account(&quot;desk&quot;)[&quot;equity&quot;]
-     return out
-diff --git a/scripts/engine_accounts.py b/scripts/engine_accounts.py
-new file mode 100644
-index 000000000..1d4066d39
---- /dev/null
-+++ b/scripts/engine_accounts.py
-@@ -0,0 +1,216 @@
-+&quot;&quot;&quot;R-ALL-ENGINES-TOMORROW — wire a persistent paper account for every fixed-rule engine, as TWO books each.
-+
-+Each engine (E21 overnight, E9 pairs, E3 calendar, YT YouTube, E7 cash-futures, E12 two-exchange, E14 retail,
-+E4 options) gets its own ₹2,00,000 account run as a FLAT book (₹1,000 per trade) and an ADAPTIVE book (sizing
-+follows the book&#x27;s own record; cold-start = flat, never larger on a number it lacks). Same locks, fills, costs
-+and exits as E1 — this layer reuses engine1_rebuild.engine_book (the E10/E11 template) and paper_account, so a
-+fire books identically and the roof copies it. Each book is its own account/ledger, tagged [E21-FLAT] etc.
-+
-+ISOLATION (addendum): every engine&#x27;s signal+order work runs inside `guarded(...)`. An exception in one engine
-+is logged, that engine is set DIARY-ONLY for the day, and the caller keeps going for every other engine — a
-+failing engine can never stop E1. AUTO-EXPORT (addendum): `export_day` zips every stream&#x27;s files for a day into
-+E1-DESK\\exports\\YYYY-MM-DD.zip, keeps every day, never deletes recorded data, and warns once if free disk
-+drops below ~ten days of recording.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import glob
-+import json
-+import os
-+import sys
-+import zipfile
-+from datetime import date
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import engine_book as EB
-+from engine1_rebuild import paper_account as ACC
-+
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+ENGINES = list(ACC.NEW_ENGINES)                    # the eight fixed-rule engines
-+BOOKS = (&quot;FLAT&quot;, &quot;ADAPTIVE&quot;)
-+DIARY_ONLY = os.path.join(_REPO, &quot;reports&quot;, &quot;engine_diary_only.json&quot;)   # engines set diary-only for the day
-+DESK = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
-+EXPORTS = os.path.join(DESK, &quot;exports&quot;)
-+DISK_WARN_FLAG = os.path.join(_REPO, &quot;reports&quot;, &quot;.disk_warned&quot;)
-+
-+
-+def account_name(engine, book):
-+    return &quot;%s-%s&quot; % (str(engine).upper(), str(book).upper())
-+
-+
-+def book_fire(engine, trade_id, stock, side, entry, stop, family=&quot;&quot;, *, ts=&quot;&quot;, event=True):
-+    &quot;&quot;&quot;Book one fire into BOTH of an engine&#x27;s books (FLAT at ₹1,000, ADAPTIVE at its shadow weight — cold-start
-+    flat). Idempotent per (book, trade_id). Returns {book: result}. This is the only entry point an engine&#x27;s
-+    rule calls; the daytime loop supplies real fires (E21/E9/E3/YT on prices, E7/E12/E14/E4 on the stream).&quot;&quot;&quot;
-+    out = {}
-+    for book in BOOKS:
-+        out[book] = EB.record_entry(account_name(engine, book), trade_id, stock, side, entry, stop,
-+                                    family=family, ts=ts, event=event)
-+    return out
-+
-+
-+def close_fire(engine, trade_id, result_R, cause=&quot;&quot;, *, ts=&quot;&quot;, event=True):
-+    &quot;&quot;&quot;Close a fire in both of an engine&#x27;s books. Returns {book: row}.&quot;&quot;&quot;
-+    return {book: EB.record_exit(account_name(engine, book), trade_id, result_R, cause=cause, ts=ts, event=event)
-+            for book in BOOKS}
-+
-+
-+# ---------- isolation guard ----------
-+
-+def _diary_only():
-+    try:
-+        return set(json.load(open(DIARY_ONLY, encoding=&quot;utf-8&quot;)).get(&quot;engines&quot;, []))
-+    except Exception:
-+        return set()
-+
-+
-+def set_diary_only(engine, reason=&quot;&quot;):
-+    d = _diary_only()
-+    d.add(str(engine).upper())
-+    try:
-+        rec = {&quot;engines&quot;: sorted(d), &quot;reasons&quot;: {}}
-+        try:
-+            rec[&quot;reasons&quot;] = json.load(open(DIARY_ONLY, encoding=&quot;utf-8&quot;)).get(&quot;reasons&quot;, {})
-+        except Exception:
-+            pass
-+        rec[&quot;reasons&quot;][str(engine).upper()] = reason
-+        json.dump(rec, open(DIARY_ONLY, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+
-+
-+def is_diary_only(engine):
-+    return str(engine).upper() in _diary_only()
-+
-+
-+def guarded(engine, fn, *args, **kwargs):
-+    &quot;&quot;&quot;Run one engine&#x27;s work in isolation. If it raises, log it, set that engine DIARY-ONLY for the day, and
-+    return None — the caller keeps going for every other engine. A failing engine can never stop E1.&quot;&quot;&quot;
-+    try:
-+        return fn(*args, **kwargs)
-+    except Exception as e:
-+        set_diary_only(engine, &quot;%s: %s&quot; % (type(e).__name__, str(e)[:120]))
-+        _log(&quot;engine %s failed and was set diary-only: %s&quot; % (engine, type(e).__name__))
-+        return None
-+
-+
-+def _log(msg):
-+    try:
-+        p = os.path.join(_REPO, &quot;reports&quot;, &quot;engine_isolation.log&quot;)
-+        with open(p, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            from datetime import datetime, timezone, timedelta
-+            ts = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).isoformat()
-+            f.write(&quot;%s %s\n&quot; % (ts, msg))
-+    except Exception:
-+        pass
-+
-+
-+# ---------- auto-export + disk warning ----------
-+
-+def _stream_files(day):
-+    &quot;&quot;&quot;Every recorded stream file dated `day` under the deriv store (depth, spreads, session starts, and the
-+    day&#x27;s own dirs). Read-only; we only ever ADD to a zip, never delete a source.&quot;&quot;&quot;
-+    store = os.path.join(DESK, &quot;stores&quot;, &quot;e1_deriv_store&quot;)
-+    files = []
-+    for pat in (&quot;depth5/%s/*&quot; % day, &quot;depth5/%s.*&quot; % day, &quot;*/%s/*&quot; % day):
-+        files += glob.glob(os.path.join(store, pat))
-+    # the day&#x27;s manifests/spreads that carry the date in their rows are copied whole (small, append-only)
-+    for nm in (&quot;depth5/SPREADS.csv&quot;, &quot;depth5/MANIFEST.csv&quot;, &quot;depth5/SESSION-STARTS.csv&quot;):
-+        p = os.path.join(store, nm)
-+        if os.path.exists(p):
-+            files.append(p)
-+    return sorted({f for f in files if os.path.isfile(f)})
-+
-+
-+def export_day(day=None):
-+    &quot;&quot;&quot;Zip every stream&#x27;s files for `day` into E1-DESK/exports/&lt;day&gt;.zip. Adds to the zip; NEVER deletes a
-+    recorded source. Returns the zip path (or None if nothing to export). Idempotent: rewrites the day&#x27;s zip.&quot;&quot;&quot;
-+    day = day or date.today().isoformat()
-+    files = _stream_files(day)
-+    if not files:
-+        return None
-+    os.makedirs(EXPORTS, exist_ok=True)
-+    out = os.path.join(EXPORTS, &quot;%s.zip&quot; % day)
-+    store = os.path.join(DESK, &quot;stores&quot;, &quot;e1_deriv_store&quot;)
-+    with zipfile.ZipFile(out, &quot;w&quot;, zipfile.ZIP_DEFLATED) as z:
-+        for f in files:
-+            try:
-+                z.write(f, os.path.relpath(f, store))
-+            except Exception:
-+                pass
-+    check_disk()
-+    return out
-+
-+
-+def _ten_day_bytes():
-+    &quot;&quot;&quot;~ten days of recording = 10 × the most recent day&#x27;s recorded size (measured, not assumed). Falls back
-+    to a small floor if nothing is recorded yet.&quot;&quot;&quot;
-+    store = os.path.join(DESK, &quot;stores&quot;, &quot;e1_deriv_store&quot;, &quot;depth5&quot;)
-+    days = sorted(d for d in glob.glob(os.path.join(store, &quot;*&quot;)) if os.path.isdir(d))
-+    if not days:
-+        return 100 * 1024 * 1024
-+    last = days[-1]
-+    size = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(last) for f in fs)
-+    return max(size, 1) * 10
-+
-+
-+def check_disk(notifier=None):
-+    &quot;&quot;&quot;One Telegram warning if free disk drops below ~ten days of recording. Warned-once via a flag.&quot;&quot;&quot;
-+    try:
-+        import shutil
-+        free = shutil.disk_usage(DESK).free
-+    except Exception:
-+        return None
-+    need = _ten_day_bytes()
-+    if free &gt;= need:
-+        try:
-+            if os.path.exists(DISK_WARN_FLAG):
-+                os.remove(DISK_WARN_FLAG)      # recovered → re-arm the warning
-+        except Exception:
-+            pass
-+        return {&quot;free&quot;: free, &quot;need&quot;: need, &quot;warned&quot;: False}
-+    if os.path.exists(DISK_WARN_FLAG):
-+        return {&quot;free&quot;: free, &quot;need&quot;: need, &quot;warned&quot;: True}    # already warned
-+    open(DISK_WARN_FLAG, &quot;w&quot;).close()
-+    msg = (&quot;Free disk is low: %.1f GB left, under ~ten days of recording (%.1f GB). Recorded data is never &quot;
-+           &quot;deleted — please free some space.&quot; % (free / 1e9, need / 1e9))
-+    (notifier or _notify)(msg)
-+    return {&quot;free&quot;: free, &quot;need&quot;: need, &quot;warned&quot;: True}
-+
-+
-+def _notify(msg):
-+    try:
-+        from scripts import notify
-+        notify.notify(msg)
-+    except Exception:
-+        pass
-+
-+
-+def _demo():
-+    import tempfile
-+    global DIARY_ONLY
-+    saved = DIARY_ONLY
-+    DIARY_ONLY = os.path.join(tempfile.gettempdir(), &quot;diaryonly_%d.json&quot; % os.getpid())
-+    try:
-+        assert len(ENGINES) == 8 and set(BOOKS) == {&quot;FLAT&quot;, &quot;ADAPTIVE&quot;}
-+        assert account_name(&quot;E21&quot;, &quot;flat&quot;) == &quot;E21-FLAT&quot;
-+        # ISOLATION: a failing engine is set diary-only and returns None; a good one still runs
-+        assert guarded(&quot;E9&quot;, lambda: 1 / 0) is None and is_diary_only(&quot;E9&quot;)
-+        assert guarded(&quot;E21&quot;, lambda: &quot;ok&quot;) == &quot;ok&quot; and not is_diary_only(&quot;E21&quot;)
-+        # the disk check with an injected notifier: plenty of space -&gt; no warning
-+        note = []
-+        r = check_disk(notifier=lambda m: note.append(m))
-+        assert r is None or r.get(&quot;warned&quot;) in (True, False)
-+        print(&quot;engine_accounts demo OK: 8 engines x 2 books, isolation guard (E9 fails alone, E21 fine), &quot;
-+              &quot;disk check runs.&quot;)
-+    finally:
-+        DIARY_ONLY = saved
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    elif &quot;--export&quot; in sys.argv:
-+        print(&quot;exported:&quot;, export_day())
-+    else:
-+        print(&quot;engines:&quot;, ENGINES, &quot;| accounts:&quot;, ACC.NEW_ENGINE_ACCOUNTS)
-diff --git a/scripts/rehearsal_day1.py b/scripts/rehearsal_day1.py
-index a5dd30811..8eafd502d 100644
---- a/scripts/rehearsal_day1.py
-+++ b/scripts/rehearsal_day1.py
-@@ -170,7 +170,53 @@ def run():
-     return L.write()
- 
- 
-+def rehearse_new_engines(write=True):
-+    &quot;&quot;&quot;R-ALL-ENGINES-TOMORROW item 2: one rehearsal per fixed-rule engine — a synthetic signal fills BOTH books
-+    (FLAT + ADAPTIVE) on TEMP ledgers and a card is written per book to the log. An engine whose rehearsal
-+    RAISES or fails to fill is set DIARY-ONLY for the day (isolation: one bad engine never blocks the others,
-+    and never blocks E1). Returns {engine: {&quot;ok&quot;: bool, &quot;reason&quot;: str}}.&quot;&quot;&quot;
-+    from scripts import engine_accounts as EA
-+    from scripts import portfolio_card as PC
-+    from engine1_rebuild import engine_book as EB, paper_account as ACC
-+    tmp = tempfile.mkdtemp()
-+    lines = [&quot;&quot;, &quot;=== NEW-ENGINE REHEARSALS (temp ledgers; production books untouched) ===&quot;]
-+    results = {}
-+    for eng in EA.ENGINES:
-+        try:
-+            # point BOTH of this engine&#x27;s book ledgers at temp files so nothing real is booked
-+            for book in EA.BOOKS:
-+                ACC.ENGINE_LEDGERS[EA.account_name(eng, book)] = os.path.join(tmp, &quot;%s-%s.csv&quot; % (eng, book))
-+            tid = &quot;REH-%s-%s&quot; % (eng, datetime.now(IST).strftime(&quot;%H%M%S&quot;))
-+            fills = EA.book_fire(eng, tid, &quot;NIFTY&quot;, &quot;buy&quot;, 100.0, 98.0, family=&quot;rsi&quot;, event=False)
-+            ok = all(fills[b] and fills[b].get(&quot;risk_rupees&quot;, 0) &gt; 0 for b in EA.BOOKS)
-+            for book in EA.BOOKS:
-+                risk = (fills[book] or {}).get(&quot;risk_rupees&quot;, 0)
-+                card = PC.fire_card(&quot;[%s-%s]&quot; % (eng, book), &quot;NIFTY&quot;, &quot;direct&quot;,
-+                                    &quot;one rehearsal signal&quot;, risk, &quot;PAPER ORDER PLACED %s&quot; % PC.R(risk))
-+                lines.append(&quot;   CARD -&gt; log: &quot; + card.replace(&quot;\n&quot;, &quot; &quot;))
-+            if ok:
-+                results[eng] = {&quot;ok&quot;: True, &quot;reason&quot;: &quot;one signal filled both books&quot;}
-+                lines.append(&quot;   %s: PASS&quot; % eng)
-+            else:
-+                EA.set_diary_only(eng, &quot;rehearsal did not fill both books&quot;)
-+                results[eng] = {&quot;ok&quot;: False, &quot;reason&quot;: &quot;did not fill both books&quot;}
-+                lines.append(&quot;   %s: FAIL -&gt; diary only&quot; % eng)
-+        except Exception as e:
-+            EA.set_diary_only(eng, &quot;%s: %s&quot; % (type(e).__name__, str(e)[:100]))
-+            results[eng] = {&quot;ok&quot;: False, &quot;reason&quot;: &quot;%s: %s&quot; % (type(e).__name__, str(e)[:80])}
-+            lines.append(&quot;   %s: FAIL (%s) -&gt; diary only&quot; % (eng, type(e).__name__))
-+    if write:
-+        try:
-+            with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+                f.write(&quot;\n&quot;.join(lines) + &quot;\n&quot;)
-+        except Exception:
-+            pass
-+    return results
-+
-+
- if __name__ == &quot;__main__&quot;:
-     ok = run()
-+    reh = rehearse_new_engines()
-     print(&quot;REHEARSAL&quot;, &quot;PASS&quot; if ok else &quot;FAIL&quot;, &quot;-&gt; reports/REHEARSAL-DAY1.log&quot;)
-+    print(&quot;new engines:&quot;, {e: r[&quot;ok&quot;] for e, r in reh.items()})
-     sys.exit(0 if ok else 1)
-diff --git a/tests/test_engine_accounts.py b/tests/test_engine_accounts.py
-new file mode 100644
-index 000000000..eb7df529d
---- /dev/null
-+++ b/tests/test_engine_accounts.py
-@@ -0,0 +1,48 @@
-+&quot;&quot;&quot;R-ALL-ENGINES-TOMORROW: 8 engines x 2 books wired, the isolation guard, and per-engine rehearsals.&quot;&quot;&quot;
-+import scripts.engine_accounts as EA
-+from engine1_rebuild import paper_account as ACC
-+
-+
-+def test_sixteen_accounts_at_two_lakh():
-+    assert len(ACC.NEW_ENGINE_ACCOUNTS) == 16
-+    for name in ACC.NEW_ENGINE_ACCOUNTS:
-+        a = ACC.account(name)
-+        assert a[&quot;start_equity&quot;] == ACC.ENGINE_START == 200000.0
-+
-+
-+def test_book_fire_fills_both_books(tmp_path):
-+    for book in EA.BOOKS:
-+        ACC.ENGINE_LEDGERS[EA.account_name(&quot;E9&quot;, book)] = str(tmp_path / (&quot;E9-%s.csv&quot; % book))
-+    out = EA.book_fire(&quot;E9&quot;, &quot;t-iso-1&quot;, &quot;NIFTY&quot;, &quot;buy&quot;, 100.0, 98.0, family=&quot;rsi&quot;, event=False)
-+    assert out[&quot;FLAT&quot;][&quot;risk_rupees&quot;] == 1000.0            # flat = ₹1,000 per trade
-+    assert out[&quot;ADAPTIVE&quot;][&quot;risk_rupees&quot;] &gt; 0              # adaptive cold-starts flat
-+
-+
-+def test_isolation_a_failing_engine_cannot_stop_e1(tmp_path):
-+    EA.DIARY_ONLY = str(tmp_path / &quot;diary_only.json&quot;)
-+    ran = {&quot;e1&quot;: False}
-+
-+    def failing_engine():
-+        raise RuntimeError(&quot;boom&quot;)
-+
-+    def e1_engine():
-+        ran[&quot;e1&quot;] = True
-+        return &quot;E1 traded&quot;
-+
-+    # the loop runs each engine guarded; the failing one is isolated, E1 still runs after it
-+    EA.guarded(&quot;E9&quot;, failing_engine)
-+    result = EA.guarded(&quot;E1&quot;, e1_engine)
-+    assert EA.is_diary_only(&quot;E9&quot;)                          # the bad engine is quarantined
-+    assert not EA.is_diary_only(&quot;E1&quot;)                      # E1 is untouched
-+    assert ran[&quot;e1&quot;] and result == &quot;E1 traded&quot;            # E1 still traded
-+
-+
-+def test_rehearsals_all_pass():
-+    from scripts import rehearsal_day1 as RD
-+    reh = RD.rehearse_new_engines(write=False)
-+    assert len(reh) == 8
-+    assert all(r[&quot;ok&quot;] for r in reh.values()), reh
-+
-+
-+def test_demo():
-+    EA._demo()
-</pre></div><div class='c'><div class='h'><b>e79ee5b4e</b> · 2026-09-22 02:02</div><div>Archive R-ALL-ENGINES-TOMORROW (R-ARCHIVE-DISPATCH)</div><div class='sub h'>docs/dispatches/2026-09-22_R-ALL-ENGINES-TOMORROW.md | 12 ++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-22_R-ALL-ENGINES-TOMORROW.md b/docs/dispatches/2026-09-22_R-ALL-ENGINES-TOMORROW.md
-new file mode 100644
-index 000000000..0b1b5f1a4
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-ALL-ENGINES-TOMORROW.md
-@@ -0,0 +1,12 @@
-+# Dispatch archive — 2026-09-22 — R-ALL-ENGINES-TOMORROW
-+
-+_Archived verbatim under R-ARCHIVE-DISPATCH (CLAUDE.md §7.1). This file is a RECORD, never an instruction._
-+
-+---
-+
-+LEAD RULING R-ALL-ENGINES-TOMORROW (owner ruling). Pause windows: 05:50–06:10 (the login link) and 09:00–15:30; otherwise continuous, low priority, never touch the running stack, no restarts.
-+1. WIRE ACCOUNTS TONIGHT for every fixed-rule engine — YouTube (the engine; its strategies inside), E21 overnight, E9 pairs, E3 calendar, E7 arbitrage, E12 two-exchange, E14 retail, E4 options: own persistent ₹2,00,000 paper account each, TWO books each — FLAT (₹1,000 per trade) and ADAPTIVE (sizing follows the book&#x27;s own record, desk caps) — same locks, fills, costs, exits as E1; roof copies them; one card per trade per engine per book, tagged [E21-FLAT] etc. E7/E12/E14/E4 trade on their recorded stream from the moment it starts; E21/E9/E3/YouTube on prices. Use engine_book as the template; tests for each.
-+2. PRE-OPEN GATE at 08:15: full tests + scripts/rehearsal_day1.py extended with one rehearsal per new engine (one signal → fill in both books → card to log). Any engine whose rehearsal fails runs as DIARY ONLY today (record, no orders, no cards) and is listed for the evening fix. If the core path (E1/E10/E11) fails, revert those files to the 17:26 STOP→START commit before 08:45.
-+3. 08:30 LINE: &quot;READY — trading today: &lt;engines&gt; ; diary only: &lt;engines&gt; ; reason per diary&quot; or &quot;NOT READY — &lt;reason&gt;&quot;.
-+4. SITE: leaderboard shows two rows per trading engine (flat / adaptive) with separate accounts and curves; the Data tab gets an &quot;Export the day (zip)&quot; button per day with every stream&#x27;s file.
-+End with the three plain lines and NOTHING NEEDS THE LEAD or LEAD RULING NEEDED: &lt;question&gt;.
-</pre></div></main></body></html>
++&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;engines.html&#x27;&gt;← all engines&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;E1 — patterns in price&lt;/h1&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;p class=&#x27;sub&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;div class=&#x27;cards&#x27;&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Trades measured&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;111&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Win rate&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;46.8%&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Made after costs&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+8.0 R&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;k&#x27;&gt;Average per trade&lt;/div&gt;&lt;div class=&#x27;big &#x27;&gt;+0.1 R&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h2&gt;Performance&lt;/h2&gt;&lt;div class=&#x27;panel&#x27;&gt;&lt;span class=&#x27;sub&#x27;&gt;Steadiness 0.62 · downside steadiness 0.95 · yearly growth 5.0% · worst drop ₹-16,748 · average hold 4.2 days&lt;/span&gt;&lt;/div&gt;&lt;h2&gt;The engine&lt;/h2&gt;&lt;div class=&#x27;tabs&#x27;&gt;&lt;button class=&#x27;on&#x27; data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,0)&#x27;&gt;Patterns&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,1)&#x27;&gt;Live signals&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,2)&#x27;&gt;Costs&lt;/button&gt;&lt;button data-tb=&#x27;eng&#x27; onclick=&#x27;tab(&quot;eng&quot;,3)&#x27;&gt;How it trades&lt;/button&gt;&lt;/div&gt;&lt;div class=&#x27;tabpane on&#x27; data-g=&#x27;eng&#x27;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Pattern&lt;/th&gt;&lt;th&gt;Stocks&lt;/th&gt;&lt;th&gt;Held out&lt;/th&gt;&lt;th&gt;Times seen&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.2%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1156&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.9%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1128&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.5%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1108&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.0%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1099&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;15.8%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1086&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;17.7%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1075&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;62.3%&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;1071&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;210&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;61.3%&lt;/td&gt;&lt;td class=</pre></div></main></body></html>
