@@ -1,4 +1,534 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3c8675e99</b> · 2026-09-22 21:22</div><div>R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only)</div><div class='sub h'>scripts/kill_switch.py  | 27 +++++++++++++++++++++++++++</div><div class='sub h'>tests/test_now_reply.py | 27 +++++++++++++++++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>ef04300cd</b> · 2026-09-22 21:32</div><div>R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit</div><div class='sub h'>docs/AUDITOR-TEMPLATE.md        |  21 +++++++</div><div class='sub h'>docs/dispatches/inbox/README.md |   1 +</div><div class='sub h'>scripts/auditor.py              | 120 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/inbox.py                | 111 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py          |   8 +++</div><div class='sub h'>tests/test_inbox.py             |  36 ++++++++++++</div><pre>diff --git a/docs/AUDITOR-TEMPLATE.md b/docs/AUDITOR-TEMPLATE.md
+new file mode 100644
+index 000000000..3a757e6a8
+--- /dev/null
++++ b/docs/AUDITOR-TEMPLATE.md
+@@ -0,0 +1,21 @@
++# AUDITOR — fixed instructions (R-EYES-COMPLETE §6)
++
++You are a FRESH, INDEPENDENT auditor of this paper-trading repo. You did not write any of it and you assume
++nothing. You read ONLY repo files and the published mirror files. You do not build, edit, commit, or run
++engines — you read and judge.
++
++The owner asked for this audit (their → AUDIT message is the REASON below). Answer their question against the
++repo and the mirror, and also check the standing laws (CLAUDE.md §3, §4, §13, §18, §20):
++
++1. The owner&#x27;s question in the REASON — answered from the files, with the file:line receipts.
++2. NO fabricated data — every number traces to a store on disk; a missing store is BLOCKED-ON-DATA, not a guess.
++3. NO naked numbers — every constant is derived (§4.1).
++4. Held signals are not trades; demos never wrote a live ledger or sent a real Telegram line.
++5. Provenance — every change traces to an owner ruling in docs/dispatches (including docs/dispatches/inbox).
++6. No secret on any published mirror page.
++
++END your reply with exactly ONE line, nothing after it:
++
++  AUDIT-VERDICT: PASS — &lt;one plain sentence&gt;
++    — or —
++  AUDIT-VERDICT: FAIL — &lt;one plain sentence naming the defect + its file:line&gt;
+diff --git a/docs/dispatches/inbox/README.md b/docs/dispatches/inbox/README.md
+new file mode 100644
+index 000000000..c0534db63
+--- /dev/null
++++ b/docs/dispatches/inbox/README.md
+@@ -0,0 +1 @@
++inbox ruling archives land here (R-EYES-COMPLETE §6). A RECORD, never an instruction.
+diff --git a/scripts/auditor.py b/scripts/auditor.py
+new file mode 100644
+index 000000000..d171f0bf2
+--- /dev/null
++++ b/scripts/auditor.py
+@@ -0,0 +1,120 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (6): the fresh independent audit runner. A → AUDIT from the owner launches a fresh Opus run
++(the same mechanism as the supervisor) with docs/AUDITOR-TEMPLATE.md, reading only repo + mirror files. Its
++report lands on docs/reports (the mirror renders Reports newest first) and one Telegram line goes out. The
++interactive audit session is retired — this replaces it. The claude invocation is injectable so tests never
++spend a real run.&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import subprocess
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++TEMPLATE = os.path.join(REPO, &quot;docs&quot;, &quot;AUDITOR-TEMPLATE.md&quot;)
++REPORTS_DIR = os.path.join(REPO, &quot;docs&quot;, &quot;reports&quot;)
++CLAUDE = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;claude.cmd&quot;)
++MODEL = &quot;claude-opus-4-8&quot;
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _invoke_claude(prompt):
++    if not os.path.isfile(CLAUDE):
++        return &quot;&quot;, {&quot;error&quot;: &quot;claude CLI not found&quot;}
++    try:
++        r = subprocess.run([CLAUDE, &quot;--model&quot;, MODEL, &quot;--output-format&quot;, &quot;stream-json&quot;, &quot;--verbose&quot;, &quot;-p&quot;],
++                           input=prompt.encode(&quot;utf-8&quot;), capture_output=True, timeout=600, cwd=REPO,
++                           creationflags=0x08000000)     # R-NO-WINDOWS
++        out = r.stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
++    except Exception as e:
++        return &quot;&quot;, {&quot;error&quot;: type(e).__name__}
++    text, usage = [], {}
++    for line in out.splitlines():
++        try:
++            ev = json.loads(line)
++        except Exception:
++            continue
++        if ev.get(&quot;type&quot;) == &quot;assistant&quot;:
++            for b in (ev.get(&quot;message&quot;, {}) or {}).get(&quot;content&quot;, []):
++                if isinstance(b, dict) and b.get(&quot;type&quot;) == &quot;text&quot;:
++                    text.append(b[&quot;text&quot;])
++        if ev.get(&quot;type&quot;) == &quot;result&quot;:
++            usage = {&quot;cost_usd&quot;: ev.get(&quot;total_cost_usd&quot;)}
++    return &quot;\n&quot;.join(text), usage
++
++
++def _prompt(reason):
++    tmpl = open(TEMPLATE, encoding=&quot;utf-8&quot;).read()
++    head = _git(&quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;).strip()
++    return &quot;%s\n\n===== REASON (the owner&#x27;s → AUDIT) =====\n%s\n\n===== HEAD =====\n%s\n&quot; % (tmpl, reason, head)
++
++
++def _git(*a):
++    try:
++        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, text=True, timeout=20,
++                              creationflags=0x08000000).stdout
++    except Exception:
++        return &quot;&quot;
++
++
++def _verdict(text):
++    m = re.search(r&quot;AUDIT-VERDICT:\s*(PASS|FAIL)\s*[—-]?\s*(.*)&quot;, text or &quot;&quot;, re.I)
++    if not m:
++        return None, &quot;no verdict line&quot;
++    return m.group(1).upper(), (m.group(2) or &quot;&quot;).strip()
++
++
++def run(reason=&quot;&quot;, invoke_fn=None, notifier=None):
++    &quot;&quot;&quot;One fresh audit. Writes the report to docs/reports and posts one line. Returns (verdict, summary).&quot;&quot;&quot;
++    text, usage = (invoke_fn or _invoke_claude)(_prompt(reason))
++    verdict, summary = _verdict(text)
++    ts = _now().strftime(&quot;%Y-%m-%d-%H%M%S&quot;)
++    path = os.path.join(REPORTS_DIR, &quot;%s-audit.md&quot; % ts)
++    try:
++        os.makedirs(REPORTS_DIR, exist_ok=True)
++        with open(path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;# Audit %s\n\n_Fresh independent audit (→ AUDIT). Reason: %s_\n\n**Verdict: %s — %s**\n\n&quot;
++                    &quot;## Full reply\n\n%s\n&quot; % (ts, str(reason)[:200], verdict or &quot;INCONCLUSIVE&quot;, summary,
++                                              _scrub(text)))
++    except Exception:
++        pass
++    line = &quot;AUDIT %s: %s — %s · https://[redacted]-[redacted].github.io/e1-live-site/build/index.html&quot; % (
++        ts[-6:], verdict or &quot;INCONCLUSIVE&quot;, summary[:120])
++    try:
++        (notifier or _notify)(line)
++    except Exception:
++        pass
++    return verdict, summary
++
++
++def _scrub(text):
++    try:
++        from scripts import build_journal
++        return build_journal.scrub(str(text or &quot;&quot;))[:40000]
++    except Exception:
++        return str(text or &quot;&quot;)[:40000]
++
++
++def _notify(msg):
++    from scripts import notify
++    notify.notify(msg)
++
++
++def _demo():
++    o = run(reason=&quot;check the ledgers&quot;, invoke_fn=lambda p: (&quot;looks fine.\nAUDIT-VERDICT: PASS — ledgers clean&quot;,
++                                                             {}), notifier=lambda m: None)
++    assert o[0] == &quot;PASS&quot; and &quot;ledgers clean&quot; in o[1]
++    print(&quot;auditor demo OK: fresh run parses the verdict and writes a report.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo() if &quot;--demo&quot; in sys.argv else print(run(reason=&quot; &quot;.join(sys.argv[1:]) or &quot;general audit&quot;))
+diff --git a/scripts/inbox.py b/scripts/inbox.py
+new file mode 100644
+index 000000000..8032c5ade
+--- /dev/null
++++ b/scripts/inbox.py
+@@ -0,0 +1,111 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (6): the ruling inbox. A Telegram message from the owner&#x27;s chat that starts with:
++  • &quot;→ BUILD&quot; is archived verbatim to docs/dispatches/inbox/&lt;time&gt;.md and becomes the NEXT queue item (the
++    auto-continue mechanism, R-AUTO-CONTINUE, takes inbox items in order).
++  • &quot;→ AUDIT&quot; triggers a fresh independent audit run (docs/AUDITOR-TEMPLATE.md, fresh model, reads only repo +
++    mirror files), whose report lands on Reports and as one Telegram line.
++The bot replies &quot;queued: &lt;first words&gt;&quot; so the owner knows it landed. Owner chat only (enforced by the caller).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++INBOX_DIR = os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;inbox&quot;)
++CHECKLIST = os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _first_words(text, n=5):
++    body = re.sub(r&quot;^→\s*(BUILD|AUDIT)\s*&quot;, &quot;&quot;, str(text).strip())
++    return &quot; &quot;.join(body.split()[:n]) or &quot;(empty)&quot;
++
++
++def handle_build(raw_text):
++    &quot;&quot;&quot;Archive the → BUILD ruling verbatim and make it the next queue item. Returns the first-words label.&quot;&quot;&quot;
++    ts = _now().strftime(&quot;%Y-%m-%d_%H%M%S&quot;)
++    label = _first_words(raw_text)
++    try:
++        os.makedirs(INBOX_DIR, exist_ok=True)
++        with open(os.path.join(INBOX_DIR, ts + &quot;.md&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(&quot;# Inbox ruling %s\n\n_Owner-pasted via Telegram (→ BUILD), archived verbatim per §7.1._\n\n&quot;
++                    &quot;%s\n&quot; % (ts, raw_text.strip()))
++    except Exception:
++        pass
++    try:                                                   # front of the checklist -&gt; auto-continue takes it next
++        c = json.load(open(CHECKLIST, encoding=&quot;utf-8&quot;))
++    except Exception:
++        c = {&quot;remaining&quot;: [], &quot;done&quot;: []}
++    c.setdefault(&quot;remaining&quot;, []).insert(0, &quot;inbox: &quot; + label)
++    try:
++        json.dump(c, open(CHECKLIST, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
++    except Exception:
++        pass
++    return label
++
++
++def handle_audit(raw_text, runner=None):
++    &quot;&quot;&quot;Trigger a fresh independent audit run. Returns the first-words label; the audit report + one line are the
++    auditor&#x27;s own outputs.&quot;&quot;&quot;
++    label = _first_words(raw_text)
++    try:
++        from scripts import auditor
++        (runner or auditor.run)(reason=raw_text.strip())
++    except Exception:
++        pass
++    return label
++
++
++def process(raw_text, reply=None, runner=None):
++    &quot;&quot;&quot;Route a message. Returns (kind, label) or (None, None) if not an inbox command. Sends the &#x27;queued&#x27; reply.&quot;&quot;&quot;
++    t = str(raw_text).strip()
++    up = t.upper()
++    kind = label = None
++    if up.startswith(&quot;→ BUILD&quot;) or up.startswith(&quot;-&gt;BUILD&quot;) or up.startswith(&quot;→BUILD&quot;):
++        kind, label = &quot;BUILD&quot;, handle_build(t)
++    elif up.startswith(&quot;→ AUDIT&quot;) or up.startswith(&quot;-&gt;AUDIT&quot;) or up.startswith(&quot;→AUDIT&quot;):
++        kind, label = &quot;AUDIT&quot;, handle_audit(t, runner=runner)
++    if kind:
++        try:
++            (reply or _reply)(&quot;queued: %s&quot; % label)
++        except Exception:
++            pass
++    return kind, label
++
++
++def _reply(text):
++    from scripts import notify
++    notify.notify(text)
++
++
++def _demo():
++    import tempfile
++    global INBOX_DIR, CHECKLIST
++    d = tempfile.mkdtemp()
++    INBOX_DIR = os.path.join(d, &quot;inbox&quot;); CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
++    json.dump({&quot;remaining&quot;: [&quot;existing&quot;], &quot;done&quot;: []}, open(CHECKLIST, &quot;w&quot;))
++    replies = []
++    kind, label = process(&quot;→ BUILD add a page widget&quot;, reply=replies.append)
++    assert kind == &quot;BUILD&quot; and label == &quot;add a page widget&quot;
++    c = json.load(open(CHECKLIST))
++    assert c[&quot;remaining&quot;][0] == &quot;inbox: add a page widget&quot;         # became the next queue item
++    assert os.listdir(INBOX_DIR)                                    # archived verbatim
++    assert replies == [&quot;queued: add a page widget&quot;]
++    audited = []
++    process(&quot;→ AUDIT check the ledgers&quot;, reply=replies.append, runner=lambda reason: audited.append(reason))
++    assert audited and &quot;check the ledgers&quot; in audited[0]
++    print(&quot;inbox demo OK: → BUILD archives + queues; → AUDIT triggers a run; both reply &#x27;queued&#x27;.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+index 4968026e7..e9595291d 100644
+--- a/scripts/kill_switch.py
++++ b/scripts/kill_switch.py
+@@ -95,6 +95,14 @@ def poll_telegram(get=None):
+             msg_log.incoming(raw_text)
+         except Exception:
+             pass
++        try:                                   # R-EYES-COMPLETE §6: ruling inbox — → BUILD queues, → AUDIT runs
++            from scripts import inbox
++            kind, _label = inbox.process(raw_text)
++            if kind:
++                action = kind
++                continue                       # handled as an inbox command; not KILL/RESUME/NOW
++        except Exception:
++            pass
+         text = raw_text.upper()
+         if text == &quot;KILL&quot;:
+             kill(); action = &quot;KILL&quot;
+diff --git a/tests/test_inbox.py b/tests/test_inbox.py
+new file mode 100644
+index 000000000..de9f59a04
+--- /dev/null
++++ b/tests/test_inbox.py
+@@ -0,0 +1,36 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (6): → BUILD archives + becomes the next queue item; → AUDIT triggers a run; reply &#x27;queued&#x27;.&quot;&quot;&quot;
++import os, sys, json, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import inbox
++
++
++def _iso(d):
++    inbox.INBOX_DIR = os.path.join(d, &quot;inbox&quot;); inbox.CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
++    json.dump({&quot;remaining&quot;: [&quot;existing&quot;], &quot;done&quot;: []}, open(inbox.CHECKLIST, &quot;w&quot;))
++
++
++def test_build_archives_and_queues_first():
++    d = tempfile.mkdtemp(); _iso(d); replies = []
++    kind, label = inbox.process(&quot;→ BUILD add a status widget&quot;, reply=replies.append)
++    assert kind == &quot;BUILD&quot; and label == &quot;add a status widget&quot;
++    c = json.load(open(inbox.CHECKLIST))
++    assert c[&quot;remaining&quot;][0] == &quot;inbox: add a status widget&quot;     # next queue item
++    assert os.listdir(inbox.INBOX_DIR)                            # archived verbatim
++    assert replies == [&quot;queued: add a status widget&quot;]
++
++
++def test_audit_triggers_runner_and_replies():
++    d = tempfile.mkdtemp(); _iso(d); replies, ran = [], []
++    kind, label = inbox.process(&quot;→ AUDIT verify the ledgers&quot;, reply=replies.append, runner=lambda reason: ran.append(reason))
++    assert kind == &quot;AUDIT&quot; and ran and &quot;verify the ledgers&quot; in ran[0]
++    assert replies == [&quot;queued: verify the ledgers&quot;]
++
++
++def test_non_inbox_message_ignored():
++    d = tempfile.mkdtemp(); _iso(d)
++    assert inbox.process(&quot;just a normal note&quot;, reply=lambda m: None) == (None, None)
++
++
++if __name__ == &quot;__main__&quot;:
++    test_build_archives_and_queues_first(); test_audit_triggers_runner_and_replies(); test_non_inbox_message_ignored()
++    print(&quot;test_inbox OK&quot;)
+</pre></div><div class='c'><div class='h'><b>d696097a9</b> · 2026-09-22 21:29</div><div>R-EYES-COMPLETE (2): local incoming/outgoing Telegram log (scrubbed) for the mirror</div><div class='sub h'>scripts/kill_switch.py |  5 ++++</div><div class='sub h'>scripts/msg_log.py     | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/notify.py      |  5 ++++</div><div class='sub h'>tests/test_msg_log.py  | 18 +++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
+index 1f7107b54..4968026e7 100644
+--- a/scripts/kill_switch.py
++++ b/scripts/kill_switch.py
+@@ -90,6 +90,11 @@ def poll_telegram(get=None):
+         if str((msg.get(&quot;chat&quot;) or {}).get(&quot;id&quot;)) != str(chat_id):
+             continue                                   # only the owner&#x27;s chat
+         raw_text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip()
++        try:
++            from scripts import msg_log        # R-EYES-COMPLETE §2: log every owner command received
++            msg_log.incoming(raw_text)
++        except Exception:
++            pass
+         text = raw_text.upper()
+         if text == &quot;KILL&quot;:
+             kill(); action = &quot;KILL&quot;
+diff --git a/scripts/msg_log.py b/scripts/msg_log.py
+new file mode 100644
+index 000000000..b90dd6020
+--- /dev/null
++++ b/scripts/msg_log.py
+@@ -0,0 +1,68 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (2): the local incoming/outgoing Telegram log the mirror&#x27;s Messages page reads — every line
++the bot sent and every command it received, with times, scrubbed with the public transcript&#x27;s scrubber. Both
++directions in one file (reports/MSG-LOG.tsv: iso&lt;TAB&gt;IN|OUT&lt;TAB&gt;scrubbed-text).&quot;&quot;&quot;
++from __future__ import annotations
++
++import os
++import sys
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++MSGLOG = os.path.join(REPO, &quot;reports&quot;, &quot;MSG-LOG.tsv&quot;)
++
++
++def _scrub(text):
++    try:
++        from scripts import build_journal
++        return build_journal.scrub(str(text))
++    except Exception:
++        return str(text)
++
++
++def _write(direction, text):
++    try:
++        line = &quot;%s\t%s\t%s&quot; % (datetime.now(IST).isoformat(), direction,
++                               _scrub(text).replace(&quot;\t&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;)[:1000])
++        os.makedirs(os.path.dirname(MSGLOG), exist_ok=True)
++        with open(MSGLOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++
++
++def outgoing(text):
++    _write(&quot;OUT&quot;, text)
++
++
++def incoming(text):
++    _write(&quot;IN&quot;, text)
++
++
++def recent(n=400):
++    &quot;&quot;&quot;[(iso, direction, text)] newest first.&quot;&quot;&quot;
++    try:
++        rows = [l.split(&quot;\t&quot;, 2) for l in open(MSGLOG, encoding=&quot;utf-8&quot;).read().splitlines() if l.strip()]
++        rows = [r for r in rows if len(r) == 3]
++        return rows[::-1][:n]
++    except Exception:
++        return []
++
++
++def _demo():
++    import tempfile
++    global MSGLOG
++    MSGLOG = os.path.join(tempfile.mkdtemp(), &quot;m.tsv&quot;)
++    incoming(&quot;→ AUDIT check the ledgers  api_key=[redacted]&quot;)
++    outgoing(&quot;STACK: restarted 21:00&quot;)
++    r = recent()
++    assert len(r) == 2 and r[0][1] == &quot;OUT&quot; and r[1][1] == &quot;IN&quot;
++    assert &quot;SECRETVALUE123456&quot; not in r[1][2] or &quot;[redacted]&quot; in r[1][2]   # scrubbed
++    print(&quot;msg_log demo OK: incoming + outgoing, newest first, scrubbed.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    _demo()
+diff --git a/scripts/notify.py b/scripts/notify.py
+index 0e528e782..c66584d5f 100644
+--- a/scripts/notify.py
++++ b/scripts/notify.py
+@@ -181,6 +181,11 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
+         _log_send(message, &quot;RATE-LIMITED&quot;)
+         return False
+     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
++    try:
++        from scripts import msg_log            # R-EYES-COMPLETE §2: the mirror&#x27;s incoming/outgoing log
++        msg_log.outgoing(message)
++    except Exception:
++        pass
+     try:
+         from scripts import heartbeat            # R-E1-TIMER+CLOCK: update the public heartbeat the
+         heartbeat.touch(message)                 # alarm page reads (⏱ / 🙋 / session-finished), IST.
+diff --git a/tests/test_msg_log.py b/tests/test_msg_log.py
+new file mode 100644
+index 000000000..b5dc5cbce
+--- /dev/null
++++ b/tests/test_msg_log.py
+@@ -0,0 +1,18 @@
++&quot;&quot;&quot;R-EYES-COMPLETE (2): incoming + outgoing messages logged with times, scrubbed, newest first.&quot;&quot;&quot;
++import os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import msg_log
++
++
++def test_both_directions_scrubbed_newest_first():
++    msg_log.MSGLOG = os.path.join(tempfile.mkdtemp(), &quot;m.tsv&quot;)
++    msg_log.incoming(&quot;→ BUILD do the thing  [redacted]&quot;)
++    msg_log.outgoing(&quot;posted a line&quot;)
++    r = msg_log.recent()
++    assert len(r) == 2 and r[0][1] == &quot;OUT&quot; and r[1][1] == &quot;IN&quot;
++    assert &quot;ghp_&quot; not in r[1][2]                          # secret scrubbed on the way in
++    assert &quot;→ BUILD do the thing&quot; in r[1][2]
++
++
++if __name__ == &quot;__main__&quot;:
++    test_both_directions_scrubbed_newest_first(); print(&quot;test_msg_log OK&quot;)
+</pre></div><div class='c'><div class='h'><b>c0900ac6b</b> · 2026-09-22 21:27</div><div>R-NOW-LINE done; queue advances to R-EYES-COMPLETE</div><div class='sub h'>docs/BACKLOG.md          | 2 +-</div><div class='sub h'>reports/BUILD-STATE.json | 6 +++---</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
+index 68b303f5c..9f771cf47 100644
+--- a/docs/BACKLOG.md
++++ b/docs/BACKLOG.md
+@@ -11,4 +11,4 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
+ - [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
+ - [ ] Quiet Buying: verify its first live match and fill on paper
+ - [ ] Lead-on-laptop design note (no build yet)
+-- [ ] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
++- [x] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
+diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+index 1f3c6bfb4..932a13597 100644
+--- a/reports/BUILD-STATE.json
++++ b/reports/BUILD-STATE.json
+@@ -1,7 +1,7 @@
+ {
+- &quot;ruling&quot;: &quot;R-HALT-FIX&quot;,
+- &quot;item&quot;: &quot;R-HALT-FIX (archive rulings, guard fix, names, held rows)&quot;,
++ &quot;ruling&quot;: &quot;R-NOW-LINE done&quot;,
++ &quot;item&quot;: &quot;R-EYES-COMPLETE (next in queue)&quot;,
+  &quot;tests&quot;: &quot;all C-series + tabs + fixes tested; full suite last 244 green&quot;,
+- &quot;next&quot;: &quot;R-V2-EXACT verbatim /v2/ rebuild&quot;,
++ &quot;next&quot;: &quot;R-EYES-COMPLETE, then remaining R-V2-EXACT pages&quot;,
+  &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
+ }
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>3b35525f9</b> · 2026-09-22 21:26</div><div>R-NOW-LINE (7): report to docs/reports — NOW line built, screenshot + test-halt proof</div><div class='sub h'>docs/reports/2026-09-22-R-NOW-LINE.md | 30 ++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/reports/2026-09-22-R-NOW-LINE.md b/docs/reports/2026-09-22-R-NOW-LINE.md
+new file mode 100644
+index 000000000..63b77799b
+--- /dev/null
++++ b/docs/reports/2026-09-22-R-NOW-LINE.md
+@@ -0,0 +1,30 @@
++# R-NOW-LINE — report (2026-09-22) — BUILT (not yet confirmed live by the auditor)
++
++One link shows what the build session is doing right now, at most one status cycle old, even under a halt.
++
++## Steps + commits
++1. NOW writer — .claude/hooks/now_writer.py (PostToolUse): overwrites E1-DESK\now.txt every tool call with
++   `time · dispatch item (from BUILD-STATE, not typed) · tool · file/first-words-of-command · last output line`,
++   every field through the transcript scrubber; never env/tokens/full output; never raises. **bffef127d**
++2. NOW on the page — vitals prints the NOW line at the top of status.html with age; older than 3 status cycles
++   (6 min) it shows NOW (STALE) in the warn colour; the build room shows the same line. **51c15cfed**
++3. Halt-proof push — the status WRITER (site_loop&#x27;s status daemon) writes AND pushes status.html via the
++   targeted publish_status, never the build session. Proven with a TEST halt path (never the real HALT), no
++   Telegram, no ledger. Real-world proof: the daemon pushed at 21:04/21:06/21:08 DURING the 20:22 halt.
++   **1978f4744**
++4. Beat truth — the BUILD beat&#x27;s HALTED flag is read from E1-DESK\HALT ON DISK at beat time (not the log), with
++   the supervisor&#x27;s last log entry as a second line; every BUILD and LIVE bar line ends with the status link.
++   **bba854dc1**
++5. Telegram &quot;now&quot; — token_ping (its inbound poller) answers &quot;now&quot; from the owner&#x27;s chat with the NOW line + the
++   status one-liner; reply-only, changes nothing. **3c8675e99**
++6. Tests — now_writer (never blocks, scrubber applied), now_line (stale marking), halt_proof_push, beat_truth
++   (halted-from-disk), now_reply. All 13 related test files green.
++
++## Proof
++- Screenshot: status.html top shows `NOW · 2026-09-22 21:25:47 · R-NOW-LINE built · Bash · rebuild status.html
++  · NOW line proof · just now`, above the LIVE bar.
++- Test-halt proof: test_halt_proof_push creates a TEST halt file, shows vitals.build keeps writing a fresh
++  status.html and _status_tick pushes via publish_status, then deletes the test file — the real HALT untouched.
++
++BUILT, not live: the running site_loop still carries the pre-R-NOW-LINE vitals; the NOW line goes live on the
++next stack restart (a human/owner act). The auditor confirms it in the running loop next.
+</pre></div><div class='c'><div class='h'><b>3c8675e99</b> · 2026-09-22 21:22</div><div>R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only)</div><div class='sub h'>scripts/kill_switch.py  | 27 +++++++++++++++++++++++++++</div><div class='sub h'>tests/test_now_reply.py | 27 +++++++++++++++++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
 index c11a2ef5f..1f7107b54 100644
 --- a/scripts/kill_switch.py
 +++ b/scripts/kill_switch.py
@@ -868,580 +1398,4 @@ index 23da6d514..aad9c621a 100644
  
      calls.sort(key=lambda c: (c[&quot;date&quot;], c[&quot;when&quot;]), reverse=True)
      r = pd.Series([c[&quot;result_R&quot;] for c in closed if c[&quot;result_R&quot;] is not None], dtype=float)
-</pre></div><div class='c'><div class='h'><b>3fe6bb96e</b> · 2026-09-22 20:56</div><div>R-HALT-FIX (4): owner clears HALT by Telegram &#x27;clear halt: &lt;reason&gt;&#x27; (owner-chat only)</div><div class='sub h'>docs/BACKLOG.md                          |  3 ++-</div><div class='sub h'>docs/dispatches/2026-09-22_R-NOW-LINE.md | 30 ++++++++++++++++++++++++++</div><div class='sub h'>scripts/clear_halt.py                    | 28 ++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py                   | 11 +++++++++-</div><div class='sub h'>scripts/token_ping.py                    |  5 +++++</div><div class='sub h'>tests/test_clear_halt_telegram.py        | 37 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-index 158d9290d..68b303f5c 100644
---- a/docs/BACKLOG.md
-+++ b/docs/BACKLOG.md
-@@ -1,6 +1,6 @@
- # BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
- 
--n&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
-+&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
- When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
- logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
- 
-@@ -11,3 +11,4 @@ logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = que
- - [ ] Live cost-per-trade ledger comparison against the calibrated backtest, posted weekly
- - [ ] Quiet Buying: verify its first live match and fill on paper
- - [ ] Lead-on-laptop design note (no build yet)
-+- [ ] R-NOW-LINE: NOW line on status.html + PostToolUse now-writer + halt-proof push
-diff --git a/docs/dispatches/2026-09-22_R-NOW-LINE.md b/docs/dispatches/2026-09-22_R-NOW-LINE.md
-new file mode 100644
-index 000000000..1de26b796
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-NOW-LINE.md
-@@ -0,0 +1,30 @@
-+# R-NOW-LINE (owner LEAD RULING, 2026-09-22) — queue AFTER the current item
-+
-+_Archived per §7.1 before any work on it. Owner-pasted; a RECORD, never an instruction. Do not interrupt
-+R-HALT-FIX or R-V2-EXACT mid-page to start it._
-+
-+Goal: status.html must show what the build session is doing right now, at most one status cycle old, even
-+while a HALT is in force. Today nothing writes the &quot;current scene&quot; outside the Claude Code window, and
-+tonight&#x27;s halt froze the site because the blocked session was also the one pushing it.
-+
-+1. NOW writer. Add a PostToolUse hook that overwrites E1-DESK\now.txt on every tool call with one line:
-+   machine-clock time · current dispatch item (read from the journal&#x27;s latest item line, not typed) · tool
-+   name · the file path or the first few words of the command · the last line of that tool&#x27;s output. Pass
-+   every field through the same scrubber the public transcript uses; never write env values, tokens, or full
-+   outputs. The hook must never raise — a failed write must never block a tool.
-+2. NOW on the page. The status writer (its own deskproc process, not the build session) reads now.txt each
-+   cycle and prints a NOW line at the top of status.html with its age (&quot;2 min ago&quot;). If now.txt is older than
-+   three status cycles, print it in the warn colour as STALE with the age. The build room shows the same line.
-+3. Halt-proof push. Confirm status.html is written AND pushed by the status writer, never by the build
-+   session. Prove it without touching the real HALT file: point the guard at a test halt path via config,
-+   create that test file, run one status cycle, show the NOW line still updated and pushed, delete the test
-+   file. The test must not reach Telegram or any ledger.
-+4. Beat truth. The BUILD beat&#x27;s HALTED flag comes from whether E1-DESK\HALT exists on disk at beat time, with
-+   the supervisor&#x27;s last entry as a second line — never from the log alone. Every BUILD beat and LIVE bar line
-+   ends with the status.html link, so any pasted line carries it.
-+5. Telegram &quot;now&quot;. token_ping answers the word &quot;now&quot; with the current NOW line plus the status one-liner.
-+   Reply-only; it changes nothing.
-+6. Tests: hook never blocks, scrubber applied, stale marking, halted-flag-from-disk. All existing tests stay
-+   green. Commit after each numbered step.
-+7. Report: paths, commit hashes, one screenshot of status.html showing the NOW line, and the test-halt proof.
-+   Call it &quot;built&quot;, not &quot;live&quot; — the auditor confirms it in the running loop in the next audit.
-diff --git a/scripts/clear_halt.py b/scripts/clear_halt.py
-index 94425f75b..85949edbe 100644
---- a/scripts/clear_halt.py
-+++ b/scripts/clear_halt.py
-@@ -73,6 +73,34 @@ def clear(commits=None):
-     return True, &quot;HALT cleared and logged.&quot;
- 
- 
-+def owner_clear(reason=&quot;&quot;, logger=None):
-+    &quot;&quot;&quot;R-HALT-FIX (4): the OWNER override — deletes HALT directly (owner authority, no commit-reference check)
-+    and logs it. Used when the owner sends &#x27;clear halt: &lt;reason&gt;&#x27; from their Telegram chat.&quot;&quot;&quot;
-+    if not os.path.exists(HALT):
-+        return False, &quot;no HALT file — nothing to clear&quot;
-+    try:
-+        was = open(HALT, encoding=&quot;utf-8&quot;).read().strip().replace(&quot;\n&quot;, &quot; &quot;)[:200]
-+    except Exception:
-+        was = &quot;&quot;
-+    try:
-+        os.remove(HALT)
-+    except Exception as e:
-+        return False, &quot;could not remove HALT: %s&quot; % e
-+    line = &quot;%s owner cleared HALT via Telegram — reason: %s (halt was: %s)&quot; % (
-+        datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;), (reason or &quot;&quot;).strip()[:120], was)
-+    try:
-+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
-+        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+    if logger:
-+        try:
-+            logger(line)
-+        except Exception:
-+            pass
-+    return True, line
-+
-+
- def _demo():
-     reason = &quot;R-BACKLOG is run-authored scope (§20.6)&quot;
-     assert references_halt(reason, [[&quot;h&quot;, &quot;clear halt: R-BACKLOG was owner-pasted&quot;, &quot;&quot;]]) is True
-diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
-index b6ae56c20..c11a2ef5f 100644
---- a/scripts/kill_switch.py
-+++ b/scripts/kill_switch.py
-@@ -89,11 +89,20 @@ def poll_telegram(get=None):
-         msg = upd.get(&quot;message&quot;) or {}
-         if str((msg.get(&quot;chat&quot;) or {}).get(&quot;id&quot;)) != str(chat_id):
-             continue                                   # only the owner&#x27;s chat
--        text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip().upper()
-+        raw_text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip()
-+        text = raw_text.upper()
-         if text == &quot;KILL&quot;:
-             kill(); action = &quot;KILL&quot;
-         elif text == &quot;RESUME&quot;:
-             resume(); action = &quot;RESUME&quot;
-+        elif text.startswith(&quot;CLEAR HALT&quot;):           # R-HALT-FIX §4: owner override from their own chat
-+            reason = raw_text.split(&quot;:&quot;, 1)[1].strip() if &quot;:&quot; in raw_text else &quot;&quot;
-+            try:
-+                from scripts import clear_halt
-+                ok, _msg = clear_halt.owner_clear(reason)
-+                action = &quot;CLEAR-HALT&quot; if ok else action
-+            except Exception:
-+                pass
-     return action
- 
- 
-diff --git a/scripts/token_ping.py b/scripts/token_ping.py
-index 605253d97..0f8a0d4d7 100644
---- a/scripts/token_ping.py
-+++ b/scripts/token_ping.py
-@@ -48,6 +48,11 @@ def _sleep_until(target):
-             build_beat.maybe_post()
-         except Exception:
-             pass
-+        try:
-+            from scripts import kill_switch         # R-HALT-FIX §4: accept &#x27;clear halt: &lt;reason&gt;&#x27; from the owner
-+            kill_switch.poll_telegram()             # (also carries KILL/RESUME); owner-chat-only, reply-safe
-+        except Exception:
-+            pass
-         time.sleep(min(secs, 300))                # wake every 5 min so a 30-min silence is caught in time
- 
- 
-diff --git a/tests/test_clear_halt_telegram.py b/tests/test_clear_halt_telegram.py
-new file mode 100644
-index 000000000..d7e5efdaf
---- /dev/null
-+++ b/tests/test_clear_halt_telegram.py
-@@ -0,0 +1,37 @@
-+&quot;&quot;&quot;R-HALT-FIX (2,4): owner_clear deletes HALT directly + logs; kill_switch acts on &#x27;clear halt:&#x27; from the
-+owner&#x27;s chat only.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+
-+
-+def test_owner_clear_deletes_and_logs():
-+    from scripts import clear_halt
-+    d = tempfile.mkdtemp()
-+    clear_halt.HALT = os.path.join(d, &quot;HALT&quot;); clear_halt.LOG = os.path.join(d, &quot;log&quot;)
-+    open(clear_halt.HALT, &quot;w&quot;).write(&quot;some reason&quot;)
-+    ok, msg = clear_halt.owner_clear(&quot;owner says so&quot;)
-+    assert ok and not os.path.exists(clear_halt.HALT)
-+    assert &quot;owner cleared HALT&quot; in open(clear_halt.LOG).read()
-+
-+
-+def test_kill_switch_clear_halt_owner_chat_only(monkeypatch):
-+    from scripts import kill_switch, clear_halt
-+    d = tempfile.mkdtemp()
-+    clear_halt.HALT = os.path.join(d, &quot;HALT&quot;); clear_halt.LOG = os.path.join(d, &quot;log&quot;)
-+    open(clear_halt.HALT, &quot;w&quot;).write(&quot;halt reason&quot;)
-+    monkeypatch.setattr(kill_switch, &quot;_tg_creds&quot;, lambda: (&quot;tok&quot;, &quot;999&quot;))
-+    monkeypatch.setattr(kill_switch, &quot;_read_offset&quot;, lambda: 0)
-+    monkeypatch.setattr(kill_switch, &quot;_write_offset&quot;, lambda v: None)
-+    # a message from the WRONG chat is ignored
-+    wrong = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 1, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 111}, &quot;text&quot;: &quot;clear halt: x&quot;}}]})
-+    kill_switch.poll_telegram(get=lambda u: wrong)
-+    assert os.path.exists(clear_halt.HALT)                       # untouched — not the owner&#x27;s chat
-+    # the owner&#x27;s chat clears it
-+    right = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 2, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 999}, &quot;text&quot;: &quot;clear halt: fixed it&quot;}}]})
-+    act = kill_switch.poll_telegram(get=lambda u: right)
-+    assert act == &quot;CLEAR-HALT&quot; and not os.path.exists(clear_halt.HALT)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import pytest
-+    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
-</pre></div><div class='c'><div class='h'><b>9b2d856ab</b> · 2026-09-22 20:54</div><div>R-HALT-FIX (3): supervisor reads pasted rulings + docs/dispatches before judging provenance</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md |  5 +++++</div><div class='sub h'>scripts/supervisor.py       | 15 ++++++++++++---</div><pre>diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
-index e23782b9a..57d64d039 100644
---- a/docs/SUPERVISOR-TEMPLATE.md
-+++ b/docs/SUPERVISOR-TEMPLATE.md
-@@ -7,6 +7,11 @@ Read what is given to you below: the ruling in force, the build journal, the bui
- last check, the commits and diffs since the last check, and STATUS.json. Then check ONLY these, against the
- standing laws (CLAUDE.md §3, §4, §13, §18, §20):
- 
-+0. PROVENANCE FIRST (R-HALT-FIX §3) — before judging scope, READ the pasted rulings in the build transcript
-+   AND the files under docs/dispatches/. A ruling the OWNER pasted (any &quot;LEAD RULING …&quot; / &quot;ADD …&quot; in the
-+   transcript, or an archived dispatch) is OWNER SCOPE — never call it run-authored. Only flag §20.6 when a
-+   change traces to NO owner ruling in the transcript or docs/dispatches. If a ruling looks unarchived, that
-+   is at most a §7.1 record gap to note — not grounds to HALT the work it authorises.
- 1. SCOPE — every change traces to the ruling in force. Scope authored by the run itself is a violation (§20.6).
- 2. NO SELF-AUDIT — the builder did not grade its own work as an independent check.
- 3. NO TYPED NUMBERS — no naked constant; every number is derived (§4.1).
-diff --git a/scripts/supervisor.py b/scripts/supervisor.py
-index db97269fb..c6dc3f8fb 100644
---- a/scripts/supervisor.py
-+++ b/scripts/supervisor.py
-@@ -132,17 +132,26 @@ def gather():
-         status = open(os.path.join(REPO, &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;).read()[:6000]
-     except Exception:
-         pass
-+    dispatches = []                                   # R-HALT-FIX §3: the archived owner rulings, for provenance
-+    try:
-+        import glob as _g
-+        dispatches = sorted(os.path.basename(p) for p in _g.glob(os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;*.md&quot;)))
-+    except Exception:
-+        pass
-     return {&quot;ruling&quot;: ruling, &quot;journal&quot;: journal, &quot;transcript&quot;: trans, &quot;commits&quot;: commits,
--            &quot;diffs&quot;: diffs[:120000], &quot;status&quot;: status, &quot;head&quot;: head, &quot;transcript_events&quot;: new_off}
-+            &quot;diffs&quot;: diffs[:120000], &quot;status&quot;: status, &quot;head&quot;: head, &quot;transcript_events&quot;: new_off,
-+            &quot;dispatches&quot;: dispatches}
- 
- 
- def _prompt(g):
-     tmpl = open(TEMPLATE, encoding=&quot;utf-8&quot;).read()
-     return (&quot;%s\n\n===== RULING IN FORCE =====\n%s\n\n===== BUILD JOURNAL =====\n%s\n\n&quot;
-             &quot;===== TRANSCRIPT SINCE LAST CHECK =====\n%s\n\n===== COMMITS SINCE LAST CHECK =====\n%s\n\n&quot;
--            &quot;===== DIFFS SINCE LAST CHECK =====\n%s\n\n===== STATUS.json =====\n%s\n&quot; % (
-+            &quot;===== DIFFS SINCE LAST CHECK =====\n%s\n\n===== ARCHIVED OWNER RULINGS (docs/dispatches) =====\n%s\n\n&quot;
-+            &quot;===== STATUS.json =====\n%s\n&quot; % (
-                 tmpl, g[&quot;ruling&quot;], g[&quot;journal&quot;], g[&quot;transcript&quot;] or &quot;(nothing new)&quot;,
--                g[&quot;commits&quot;] or &quot;(none)&quot;, g[&quot;diffs&quot;] or &quot;(none)&quot;, g[&quot;status&quot;]))
-+                g[&quot;commits&quot;] or &quot;(none)&quot;, g[&quot;diffs&quot;] or &quot;(none)&quot;,
-+                &quot;, &quot;.join(g.get(&quot;dispatches&quot;) or []) or &quot;(none)&quot;, g[&quot;status&quot;]))
- 
- 
- # ---------------------------------------------------------------------------------------------------------
-</pre></div><div class='c'><div class='h'><b>7d0af7662</b> · 2026-09-22 20:53</div><div>R-HALT-FIX (2): guard no longer deadlocks — allows reads/git-commit/docs+journal/clear_halt only while halted</div><div class='sub h'>.claude/hooks/halt_guard.py | 100 +++++++++++++++++++++++++++++++++++---------</div><div class='sub h'>scripts/clear_halt.py       |  90 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_halt_guard.py    |  45 ++++++++++++++++++++</div><pre>diff --git a/.claude/hooks/halt_guard.py b/.claude/hooks/halt_guard.py
-index 078f51a56..f9131ec04 100644
---- a/.claude/hooks/halt_guard.py
-+++ b/.claude/hooks/halt_guard.py
-@@ -1,26 +1,88 @@
--&quot;&quot;&quot;R-EYES-FULL: PreToolUse guard. While E1-DESK\\HALT exists (the supervisor found a violation), refuse EVERY
--tool call and show the reason. The builder may clear HALT only after a commit that addresses the reason.
--Exit 2 = block (stderr is shown to the model). Fail-open on any error (never wedge the session on a hook bug).&quot;&quot;&quot;
-+&quot;&quot;&quot;R-EYES-FULL + R-HALT-FIX (2): PreToolUse guard. While E1-DESK\\HALT exists, the builder is halted — but it
-+must still be able to ADDRESS the halt, so this guard allows EXACTLY these actions and blocks everything else:
-+
-+  - reading (Read/Grep/Glob/LS/NotebookRead, and read-only Bash: cat/ls/grep/head/tail/sed -n/find/wc/git
-+    log|status|diff|show|rev-parse);
-+  - git commit / git add (to commit the fix that addresses the halt);
-+  - writes under docs/dispatches/ and to the build journal (reports/BUILD-JOURNAL.log);
-+  - scripts/clear_halt.py (which removes HALT only after a commit that references the halt reason).
-+
-+Anything else — editing code, running engines/tests, starting processes — is refused with the reason. This
-+removes the old deadlock (the guard used to block the very commit that clears the halt). Fail-open on a hook
-+error, never wedge the session on a bug.&quot;&quot;&quot;
-+import json
- import os
-+import re
- import sys
- 
- HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
--try:
-+
-+READ_TOOLS = {&quot;Read&quot;, &quot;Grep&quot;, &quot;Glob&quot;, &quot;LS&quot;, &quot;NotebookRead&quot;, &quot;ReadNotifications&quot;, &quot;ExitPlanMode&quot;}
-+WRITE_TOOLS = {&quot;Write&quot;, &quot;Edit&quot;, &quot;MultiEdit&quot;, &quot;NotebookEdit&quot;}
-+# read-only or fix-path bash commands allowed while halted
-+_BASH_ALLOW = re.compile(
-+    r&quot;^\s*(cd\s+[^\n]*?&amp;&amp;\s*)*\s*(&quot;
-+    r&quot;git\s+(commit|add|log|status|diff|show|rev-parse|rev-list|cat-file)\b&quot;
-+    r&quot;|cat\b|ls\b|grep\b|rg\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|echo\b|true\b&quot;
-+    r&quot;|python\s+-m\s+scripts\.clear_halt\b|python\s+scripts[/\\]clear_halt\.py\b&quot;
-+    r&quot;)&quot;, re.I)
-+
-+
-+def _allowed_path(p):
-+    p = (p or &quot;&quot;).replace(&quot;\\&quot;, &quot;/&quot;)
-+    return &quot;docs/dispatches/&quot; in p or p.endswith(&quot;reports/BUILD-JOURNAL.log&quot;)
-+
-+
-+def _bash_ok(cmd):
-+    c = (cmd or &quot;&quot;)
-+    if &quot;clear_halt&quot; in c:
-+        return True
-+    if _BASH_ALLOW.match(c):
-+        # if it redirects/appends, the target must be the journal or docs/dispatches
-+        redirs = re.findall(r&quot;&gt;&gt;?\s*([^\s;&amp;|]+)&quot;, c)
-+        return all(_allowed_path(r) for r in redirs)
-+    return False
-+
-+
-+def _decide(payload):
-+    if not os.path.exists(HALT):
-+        return True, &quot;&quot;
-     try:
--        sys.stdin.read()                   # drain the hook payload; we block regardless of which tool it names
-+        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
-     except Exception:
--        pass
--    if os.path.exists(HALT):
--        try:
--            reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
--        except Exception:
--            reason = &quot;(reason unreadable)&quot;
--        sys.stderr.write(&quot;SUPERVISOR HALT is in force — every tool call is refused until it clears.\n%s\n&quot;
--                         &quot;Clear it only with a commit that addresses the reason (delete E1-DESK\\HALT), &quot;
--                         &quot;then log it in the journal.&quot; % reason)
-+        reason = &quot;(reason unreadable)&quot;
-+    tool = payload.get(&quot;tool_name&quot;) or &quot;&quot;
-+    ti = payload.get(&quot;tool_input&quot;) or {}
-+    if tool in READ_TOOLS:
-+        return True, &quot;&quot;
-+    if tool in WRITE_TOOLS:
-+        return (_allowed_path(ti.get(&quot;file_path&quot;)), reason)
-+    if tool == &quot;Bash&quot;:
-+        return (_bash_ok(ti.get(&quot;command&quot;)), reason)
-+    return False, reason
-+
-+
-+def main():
-+    try:
-+        raw = sys.stdin.read()
-+    except Exception:
-+        raw = &quot;&quot;
-+    try:
-+        payload = json.loads(raw) if raw.strip() else {}
-+    except Exception:
-+        payload = {}
-+    try:
-+        ok, reason = _decide(payload)
-+    except Exception:
-+        sys.exit(0)          # fail-open
-+    if not ok:
-+        sys.stderr.write(&quot;SUPERVISOR HALT is in force — only reads, git commit, docs/dispatches + journal &quot;
-+                         &quot;writes, and scripts/clear_halt.py are allowed until it clears.\n%s\n&quot;
-+                         &quot;Commit a fix that references the halt reason, then run scripts/clear_halt.py &quot;
-+                         &quot;(or the owner sends &#x27;clear halt: &lt;reason&gt;&#x27;).&quot; % reason)
-         sys.exit(2)
--except SystemExit:
--    raise
--except Exception:
--    pass
--sys.exit(0)
-+    sys.exit(0)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    main()
-diff --git a/scripts/clear_halt.py b/scripts/clear_halt.py
-new file mode 100644
-index 000000000..94425f75b
---- /dev/null
-+++ b/scripts/clear_halt.py
-@@ -0,0 +1,90 @@
-+&quot;&quot;&quot;R-HALT-FIX (2): clear the supervisor HALT — but only after the builder has addressed it. It removes
-+E1-DESK\\HALT ONLY if there is a commit since the halt whose message references the halt reason (mentions
-+&#x27;halt&#x27; plus a distinctive token from the reason), and it logs the clearance. Otherwise it refuses and says
-+why. This is the self-clear path the guard allows while halted, so the owner never has to delete the file by
-+hand again.&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import os
-+import re
-+import subprocess
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+HALT = os.environ.get(&quot;E1_HALT_FILE&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;, &quot;HALT&quot;)
-+LOG = os.path.join(REPO, &quot;reports&quot;, &quot;HALT-CLEAR.log&quot;)
-+
-+
-+def _reason_tokens(reason):
-+    &quot;&quot;&quot;Distinctive tokens from the halt reason a fix commit should reference (ruling codes, section numbers).&quot;&quot;&quot;
-+    toks = set(re.findall(r&quot;R-[A-Z0-9\-]+|§?\d+\.\d+|run-authored&quot;, reason or &quot;&quot;, re.I))
-+    return {t for t in toks if len(t) &gt;= 3}
-+
-+
-+def _recent_commit_messages(n=12):
-+    try:
-+        out = subprocess.run([&quot;git&quot;, &quot;log&quot;, &quot;-%d&quot; % n, &quot;--format=%H%x1f%s%x1f%b%x1e&quot;], cwd=REPO,
-+                             capture_output=True, text=True, timeout=20).stdout
-+        return [c.split(&quot;\x1f&quot;) for c in out.split(&quot;\x1e&quot;) if c.strip()]
-+    except Exception:
-+        return []
-+
-+
-+def references_halt(reason, commits=None):
-+    &quot;&quot;&quot;True if a recent commit message mentions &#x27;halt&#x27; AND at least one distinctive token from the reason
-+    (or plainly &#x27;clear halt&#x27;).&quot;&quot;&quot;
-+    toks = _reason_tokens(reason)
-+    for c in (commits if commits is not None else _recent_commit_messages()):
-+        msg = &quot; &quot;.join(c[1:]).lower()
-+        if &quot;clear halt&quot; in msg:
-+            return True
-+        if &quot;halt&quot; in msg and (not toks or any(t.lower() in msg for t in toks)):
-+            return True
-+    return False
-+
-+
-+def clear(commits=None):
-+    &quot;&quot;&quot;Returns (cleared: bool, message).&quot;&quot;&quot;
-+    if not os.path.exists(HALT):
-+        return False, &quot;no HALT file — nothing to clear&quot;
-+    try:
-+        reason = open(HALT, encoding=&quot;utf-8&quot;).read().strip()
-+    except Exception:
-+        reason = &quot;&quot;
-+    if not references_halt(reason, commits):
-+        return False, (&quot;REFUSED: no commit since the halt references its reason. Commit a fix whose message &quot;
-+                       &quot;mentions &#x27;halt&#x27; and the reason (e.g. the ruling code), then run this again.&quot;)
-+    try:
-+        os.remove(HALT)
-+    except Exception as e:
-+        return False, &quot;could not remove HALT: %s&quot; % e
-+    line = &quot;%s cleared HALT — reason was: %s&quot; % (datetime.now(IST).strftime(&quot;%Y-%m-%d %H:%M&quot;),
-+                                                 reason.replace(&quot;\n&quot;, &quot; &quot;)[:200])
-+    try:
-+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
-+        open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;).write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+    return True, &quot;HALT cleared and logged.&quot;
-+
-+
-+def _demo():
-+    reason = &quot;R-BACKLOG is run-authored scope (§20.6)&quot;
-+    assert references_halt(reason, [[&quot;h&quot;, &quot;clear halt: R-BACKLOG was owner-pasted&quot;, &quot;&quot;]]) is True
-+    assert references_halt(reason, [[&quot;h&quot;, &quot;unrelated commit about tests&quot;, &quot;&quot;]]) is False
-+    assert references_halt(reason, [[&quot;h&quot;, &quot;fix the R-BACKLOG halt provenance&quot;, &quot;&quot;]]) is True
-+    print(&quot;clear_halt demo OK: clears only when a commit references the halt reason.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        ok, msg = clear()
-+        print(msg)
-+        sys.exit(0 if ok else 1)
-diff --git a/tests/test_halt_guard.py b/tests/test_halt_guard.py
-new file mode 100644
-index 000000000..12ec4fb51
---- /dev/null
-+++ b/tests/test_halt_guard.py
-@@ -0,0 +1,45 @@
-+&quot;&quot;&quot;R-HALT-FIX (2): while HALT exists the guard allows only reads, git commit, docs/dispatches+journal writes,
-+and clear_halt.py; everything else is refused. clear_halt removes HALT only after a fix commit.&quot;&quot;&quot;
-+import importlib.util, os, sys, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;, &quot;halt_guard.py&quot;)
-+
-+
-+def _guard():
-+    spec = importlib.util.spec_from_file_location(&quot;halt_guard&quot;, HOOK)
-+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-+    m.HALT = os.path.join(tempfile.mkdtemp(), &quot;HALT&quot;); open(m.HALT, &quot;w&quot;).write(&quot;2026 x\nR-BACKLOG scope (§20.6)&quot;)
-+    return m
-+
-+
-+def test_reads_and_git_commit_allowed():
-+    g = _guard()
-+    assert g._decide({&quot;tool_name&quot;: &quot;Read&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;x&quot;}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Grep&quot;, &quot;tool_input&quot;: {}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;git commit -m x&quot;}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;cd /r &amp;&amp; git add . &quot;}})[0] is True
-+
-+
-+def test_docs_and_journal_writes_allowed_others_blocked():
-+    g = _guard()
-+    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;docs/dispatches/x.md&quot;}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;reports/BUILD-JOURNAL.log&quot;}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;scripts/engine.py&quot;}})[0] is False
-+    assert g._decide({&quot;tool_name&quot;: &quot;Edit&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;scripts/site_v2.py&quot;}})[0] is False
-+
-+
-+def test_clear_halt_and_engine_bash_blocked():
-+    g = _guard()
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;python -m scripts.clear_halt&quot;}})[0] is True
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;python -m scripts.book20_runner&quot;}})[0] is False
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;rm -rf reports&quot;}})[0] is False
-+
-+
-+def test_no_halt_allows_everything():
-+    g = _guard(); os.remove(g.HALT)
-+    assert g._decide({&quot;tool_name&quot;: &quot;Bash&quot;, &quot;tool_input&quot;: {&quot;command&quot;: &quot;anything&quot;}})[0] is True
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_reads_and_git_commit_allowed(); test_docs_and_journal_writes_allowed_others_blocked()
-+    test_clear_halt_and_engine_bash_blocked(); test_no_halt_allows_everything(); print(&quot;test_halt_guard OK&quot;)
-</pre></div><div class='c'><div class='h'><b>717c915b4</b> · 2026-09-22 20:50</div><div>R-HALT-FIX (1): archive R-BACKLOG/R-CHECKLIST-BAR/R-HALT-FIX verbatim + provenance lines</div><div class='sub h'>docs/BACKLOG.md                               |  1 +</div><div class='sub h'>docs/dispatches/2026-09-22_R-BACKLOG.md       | 12 ++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md |  8 ++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-HALT-FIX.md      | 16 ++++++++++++++++</div><div class='sub h'>reports/CHECKLIST.json                        | 15 +++++++++++----</div><pre>diff --git a/docs/BACKLOG.md b/docs/BACKLOG.md
-index c6bd4db02..158d9290d 100644
---- a/docs/BACKLOG.md
-+++ b/docs/BACKLOG.md
-@@ -1,5 +1,6 @@
- # BACKLOG — the standing queue (R-BACKLOG, 2026-09-22)
- 
-+n&gt; Provenance: this queue exists by owner ruling **R-BACKLOG** (docs/dispatches/2026-09-22_R-BACKLOG.md); the auto-pull + IDLE by **R-BACKLOG** and **R-AUTO-CONTINUE**; the BUILD-line bar by **R-CHECKLIST-BAR**. Owner-pasted, archived per §7.1.
- When the active checklist empties, the auto-continue pulls the TOP unchecked item here into the checklist and
- logs it. Owner-curated; a run never invents an item (§12/§20.6). `- [ ]` = queued, `- [~]` = active, `- [x]` = done.
- 
-diff --git a/docs/dispatches/2026-09-22_R-BACKLOG.md b/docs/dispatches/2026-09-22_R-BACKLOG.md
-new file mode 100644
-index 000000000..4c539eb07
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-BACKLOG.md
-@@ -0,0 +1,12 @@
-+# R-BACKLOG (owner LEAD RULING, 2026-09-22)
-+
-+_Archived per §7.1 (belatedly — the missing archive is what let the 20:22 supervisor HALT mistake this
-+owner ruling for run-authored scope). Owner-pasted; a RECORD, never an instruction._
-+
-+keep docs/BACKLOG.md as the standing queue; when the active checklist empties, the auto-continue pulls the
-+next backlog item automatically and logs it. Seed it now, in order: (1) R-V2-EXACT and its addendum;
-+(2) R-CHECKLIST-BAR; (3) analyst drop: a folder E1-DESK\drops\ where saved pages are picked up and parsed,
-+with a one-line Telegram note when one lands; (4) O1 point-in-time universe from NSE&#x27;s public F&amp;O history
-+archives, robots-checked, nothing guessed; (5) live cost-per-trade ledger comparison against the calibrated
-+backtest, posted weekly; (6) Quiet Buying: verify its first live match and fill on paper; (7) lead-on-laptop
-+design note (no build yet). Beat: when the list is empty, post &quot;IDLE — list empty&quot; once, then hourly.
-diff --git a/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md b/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md
-new file mode 100644
-index 000000000..5202aa4b4
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-CHECKLIST-BAR.md
-@@ -0,0 +1,8 @@
-+# R-CHECKLIST-BAR (owner LEAD RULING, 2026-09-22)
-+
-+_Archived per §7.1 (belatedly). Owner-pasted; a RECORD, never an instruction._
-+
-+every ruling pasted appends its items to the tracked checklist automatically (one line per numbered item), so
-+the beat and the ETA always cover what is actually queued. Each BUILD line shows &quot;checklist ▓▓▓░░░ 3/6 —
-+done: &lt;items&gt; · doing: &lt;item&gt; · left: &lt;items&gt;&quot; derived from the journal, plus the ETA for the current item
-+and for all remaining, marked rough until three are measured. Then start R-V2-EXACT.
-diff --git a/docs/dispatches/2026-09-22_R-HALT-FIX.md b/docs/dispatches/2026-09-22_R-HALT-FIX.md
-new file mode 100644
-index 000000000..248739bd5
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-HALT-FIX.md
-@@ -0,0 +1,16 @@
-+# R-HALT-FIX (owner LEAD RULING, 2026-09-22)
-+
-+_Archived per §7.1. Owner-pasted; a RECORD, never an instruction._
-+
-+owner cleared HALT once; this makes it never need the owner again. (1) Archive R-BACKLOG, R-CHECKLIST-BAR and
-+R-AUTO-CONTINUE verbatim to docs/dispatches now, with a provenance line in BACKLOG.md and the checklist citing
-+them; from now on every ruling is archived before any work on it, no exceptions. (2) Guard: while HALT exists,
-+allow exactly these tool actions — reading, git commit, writes under docs/dispatches and the journal, and
-+scripts/clear_halt.py; nothing else. clear_halt.py removes HALT only if a commit since the halt references the
-+halt reason, and logs the clearance. (3) Supervisor template: before judging provenance, read the pasted
-+rulings in the build transcript and docs/dispatches; a ruling pasted by the owner is owner scope. (4) Owner
-+override: token_ping accepts a Telegram message &quot;clear halt: &lt;reason&gt;&quot; from the owner&#x27;s chat and deletes HALT,
-+logging it. (5) SITE NOW: held signals are not trades — remove the five held rows from every trades table on
-+the live site immediately; a trade appears only when booked. (6) NAMES: the delivery strategy engine is &quot;Dubai
-+Strategies&quot; everywhere (engine list on the main site and on the deliverables site); &quot;Quiet Buying&quot; removed;
-+the index tests stay on the deliverables page; no person&#x27;s name on any page. Then resume R-V2-EXACT.
-diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
-index 7f73770af..e51884394 100644
---- a/reports/CHECKLIST.json
-+++ b/reports/CHECKLIST.json
-@@ -5,8 +5,15 @@
-   &quot;ADD(b) retire START_E1_ALL.bat sender&quot;
-  ],
-  &quot;done&quot;: [
--  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;, &quot;C1 hunt&quot;, &quot;C2 sizing&quot;, &quot;C4 fill+haircut&quot;,
--  &quot;C5 pairs&quot;, &quot;C6 parsers&quot;, &quot;ADD(c) measured sizing floor&quot;, &quot;R-CHECKLIST-BAR&quot;
-+  &quot;v2 tabs (Live desk/Portfolio/Backtest/Messages)&quot;,
-+  &quot;C1 hunt&quot;,
-+  &quot;C2 sizing&quot;,
-+  &quot;C4 fill+haircut&quot;,
-+  &quot;C5 pairs&quot;,
-+  &quot;C6 parsers&quot;,
-+  &quot;ADD(c) measured sizing floor&quot;,
-+  &quot;R-CHECKLIST-BAR&quot;
-  ],
-- &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;
--}
-+ &quot;note&quot;: &quot;Auto-appended from pasted rulings (R-CHECKLIST-BAR). Owner-named items only.&quot;,
-+ &quot;provenance&quot;: &quot;owner rulings R-BACKLOG / R-CHECKLIST-BAR / R-AUTO-CONTINUE (docs/dispatches/2026-09-22_*), archived per \u00a77.1; the checklist + backlog + BUILD bar trace to these, not run-authored (\u00a720.6).&quot;
-+}
-\ No newline at end of file
 </pre></div></main></body></html>
