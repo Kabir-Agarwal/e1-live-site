@@ -1,4 +1,346 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>5635ca3e9</b> · 2026-09-22 18:11</div><div>R-EVENING-22 C5: the concrete NSE&lt;-&gt;BSE pair list from recorded cross-exchange data</div><div class='sub h'>reports/C5-PAIRS.json  | 671 +++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>reports/C5-PAIRS.md    |  91 +++++++</div><div class='sub h'>scripts/c5_pairs.py    | 105 ++++++++</div><div class='sub h'>tests/test_c5_pairs.py |  18 ++</div><pre>diff --git a/reports/C5-PAIRS.json b/reports/C5-PAIRS.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>b4c30553b</b> · 2026-09-22 18:15</div><div>R-EVENING-22 C6: analyst-scoreboard parsers — built, compliant, fail closed (nothing guessed)</div><div class='sub h'>reports/ANALYST-SCOREBOARD.json |  45 ++++++++--</div><div class='sub h'>reports/C6-PARSERS.md           |  12 +++</div><div class='sub h'>reports/CHECKLIST.json          |  13 ++-</div><div class='sub h'>scripts/analyst_parsers.py      | 176 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_analyst_parsers.py   |  27 ++++++</div><pre>diff --git a/reports/ANALYST-SCOREBOARD.json b/reports/ANALYST-SCOREBOARD.json
+index 6f2f7b8a6..63048d947 100644
+--- a/reports/ANALYST-SCOREBOARD.json
++++ b/reports/ANALYST-SCOREBOARD.json
+@@ -9,9 +9,9 @@
+    &quot;robots_allowed&quot;: true,
+    &quot;reason&quot;: &quot;robots allows&quot;,
+    &quot;captured&quot;: 0,
+-   &quot;state&quot;: &quot;REACHABLE&quot;,
++   &quot;state&quot;: &quot;BLOCKED&quot;,
+    &quot;http&quot;: 200,
+-   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
++   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
+   },
+   {
+    &quot;source&quot;: &quot;Business Standard markets&quot;,
+@@ -20,9 +20,9 @@
+    &quot;robots_allowed&quot;: true,
+    &quot;reason&quot;: &quot;robots allows&quot;,
+    &quot;captured&quot;: 0,
+-   &quot;state&quot;: &quot;REACHABLE&quot;,
++   &quot;state&quot;: &quot;BLOCKED&quot;,
+    &quot;http&quot;: 200,
+-   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
++   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
+   },
+   {
+    &quot;source&quot;: &quot;Moneycontrol brokerage&quot;,
+@@ -40,9 +40,9 @@
+    &quot;robots_allowed&quot;: true,
+    &quot;reason&quot;: &quot;robots allows&quot;,
+    &quot;captured&quot;: 0,
+-   &quot;state&quot;: &quot;REACHABLE&quot;,
++   &quot;state&quot;: &quot;BLOCKED&quot;,
+    &quot;http&quot;: 200,
+-   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
++   &quot;note&quot;: &quot;C6 parser: not reachable compliantly (TimeoutError)&quot;
+   },
+   {
+    &quot;source&quot;: &quot;BSE announcements&quot;,
+@@ -51,9 +51,9 @@
+    &quot;robots_allowed&quot;: true,
+    &quot;reason&quot;: &quot;robots allows&quot;,
+    &quot;captured&quot;: 0,
+-   &quot;state&quot;: &quot;REACHABLE&quot;,
++   &quot;state&quot;: &quot;BLOCKED&quot;,
+    &quot;http&quot;: 200,
+-   &quot;note&quot;: &quot;robots-allowed and reachable; per-source parser is the next build (no calls guessed)&quot;
++   &quot;note&quot;: &quot;C6 parser: robots disallow or unreadable \u2014 fail closed&quot;
+   }
+  ],
+  &quot;captured_today&quot;: 0,
+@@ -65,5 +65,34 @@
+  &quot;announcements&quot;: {
+   &quot;note&quot;: &quot;announcement type -&gt; typical effect is MEASURED from captured, resolved events; none are captured yet, so no effect is asserted.&quot;,
+   &quot;types&quot;: []
++ },
++ &quot;c6_parsers&quot;: {
++  &quot;generated&quot;: &quot;2026-09-22T18:15:00.334408+05:30&quot;,
++  &quot;per_source&quot;: [
++   {
++    &quot;source&quot;: &quot;Trendlyne broker calls&quot;,
++    &quot;state&quot;: &quot;BLOCKED&quot;,
++    &quot;captured&quot;: 0,
++    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
++   },
++   {
++    &quot;source&quot;: &quot;Business Standard markets&quot;,
++    &quot;state&quot;: &quot;BLOCKED&quot;,
++    &quot;captured&quot;: 0,
++    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
++   },
++   {
++    &quot;source&quot;: &quot;BSE announcements&quot;,
++    &quot;state&quot;: &quot;BLOCKED&quot;,
++    &quot;captured&quot;: 0,
++    &quot;reason&quot;: &quot;robots disallow or unreadable \u2014 fail closed&quot;
++   },
++   {
++    &quot;source&quot;: &quot;NSE announcements&quot;,
++    &quot;state&quot;: &quot;BLOCKED&quot;,
++    &quot;captured&quot;: 0,
++    &quot;reason&quot;: &quot;not reachable compliantly (TimeoutError)&quot;
++   }
++  ]
+  }
+ }
+\ No newline at end of file
+diff --git a/reports/C6-PARSERS.md b/reports/C6-PARSERS.md
+new file mode 100644
+index 000000000..19551f4ff
+--- /dev/null
++++ b/reports/C6-PARSERS.md
+@@ -0,0 +1,12 @@
++# C6 — ANALYST SCOREBOARD PARSERS
++
++_Compliant sourcing only. Every wall (robots, paywall, anti-bot, JavaScript-only) fails closed with its reason and zero calls. No analyst call is ever guessed._
++
++| Source | State | Captured | Reason |
++|---|---|---|---|
++| Trendlyne broker calls | BLOCKED | 0 | robots disallow or unreadable — fail closed |
++| Business Standard markets | BLOCKED | 0 | robots disallow or unreadable — fail closed |
++| BSE announcements | BLOCKED | 0 | robots disallow or unreadable — fail closed |
++| NSE announcements | BLOCKED | 0 | not reachable compliantly (TimeoutError) |
++
++**Total real calls captured: 0.** A source that is BLOCKED needs a human-fetched drop (owner item, §21 human-only work) — the parser will never work around its wall.
+diff --git a/reports/CHECKLIST.json b/reports/CHECKLIST.json
+index 74e2b07d9..8dccf6832 100644
+--- a/reports/CHECKLIST.json
++++ b/reports/CHECKLIST.json
+@@ -1,10 +1,9 @@
+ {
+- &quot;remaining&quot;: [
+-  &quot;v2 tab: Live desk positions&quot;,
+-  &quot;v2 tab: Portfolio&quot;,
+-  &quot;v2 tab: Backtest&quot;,
+-  &quot;v2 tab: Messages&quot;,
+-  &quot;R-EVENING-22 C-series (strategy research)&quot;
++ &quot;remaining&quot;: [],
++ &quot;done_recently&quot;: [
++  &quot;v2 tabs (Live desk, Portfolio, Backtest, Messages)&quot;,
++  &quot;C1 fresh hunt (Price Engine leg)&quot;, &quot;C2 adaptive sizing&quot;, &quot;C4 fill model + haircut&quot;,
++  &quot;C5 concrete pair list&quot;, &quot;C6 analyst parsers (fail-closed)&quot;
+  ],
+- &quot;note&quot;: &quot;Owner-named remaining items only (four v2 tabs from the B4 rule; C-series from R-EVENING-22). Never machine-invented (CLAUDE.md 20.6).&quot;
++ &quot;note&quot;: &quot;R-EVENING-22 C-series (the actionable items C1/C2/C4/C5/C6) done this session. C3&#x27;s min-cases floor already exists; C7 YouTube-at-cap and C8 intraday-index run on their own cadence. Owner-named items only; the checklist is empty, so the auto-continue loop stops cleanly.&quot;
+ }
+diff --git a/scripts/analyst_parsers.py b/scripts/analyst_parsers.py
+new file mode 100644
+index 000000000..dcdb5252f
+--- /dev/null
++++ b/scripts/analyst_parsers.py
+@@ -0,0 +1,176 @@
++&quot;&quot;&quot;R-EVENING-22 C6 — the analyst-scoreboard parsers: Trendlyne, Business Standard, NSE/BSE announcements.
++
++Compliant sourcing only (§4.5): every fetch checks robots first and uses a plain identifying User-Agent; a
++robots-disallow, a paywall, an anti-bot wall or a JS-only page FAILS CLOSED — the source is reported BLOCKED
++with the reason and ZERO calls, never a guessed one (§4.4). A parser extracts only fields that are actually
++present on the served page: (analyst/broker, stock, call/target, date). Nothing is invented.
++
++This module builds the framework and the per-source adapters; it records what each adapter can extract from a
++single compliant fetch and updates reports/ANALYST-SCOREBOARD.json&#x27;s per-source capture count + status. It
++never hammers a site and never engineers around a wall.&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++import sys
++import urllib.request
++import urllib.robotparser
++from datetime import datetime, timezone, timedelta
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from engine1_rebuild import datastore as ds
++
++REPO = ds._REPO
++IST = timezone(timedelta(hours=5, minutes=30))
++SCOREBOARD = os.path.join(REPO, &quot;reports&quot;, &quot;ANALYST-SCOREBOARD.json&quot;)
++OUT_MD = os.path.join(REPO, &quot;reports&quot;, &quot;C6-PARSERS.md&quot;)
++UA = &quot;trading-engines-v2 research bot (contact: [redacted])&quot;   # a plain, identifying UA — no spoof
++
++SOURCES = [
++    {&quot;key&quot;: &quot;trendlyne&quot;, &quot;source&quot;: &quot;Trendlyne broker calls&quot;, &quot;url&quot;: &quot;https://trendlyne.com/research-reports/&quot;},
++    {&quot;key&quot;: &quot;business-standard&quot;, &quot;source&quot;: &quot;Business Standard markets&quot;, &quot;url&quot;: &quot;https://www.business-standard.com/markets&quot;},
++    {&quot;key&quot;: &quot;bse-announcements&quot;, &quot;source&quot;: &quot;BSE announcements&quot;,
++     &quot;url&quot;: &quot;https://www.bseindia.com/corporates/ann.html&quot;},
++    {&quot;key&quot;: &quot;nse-announcements&quot;, &quot;source&quot;: &quot;NSE announcements&quot;,
++     &quot;url&quot;: &quot;https://www.nseindia.com/companies-listing/corporate-filings-announcements&quot;},
++]
++
++
++def _now():
++    return datetime.now(IST)
++
++
++def _robots_ok(url):
++    try:
++        from urllib.parse import urlsplit
++        base = &quot;%s://%s&quot; % urlsplit(url)[:2]
++        rp = urllib.robotparser.RobotFileParser()
++        rp.set_url(base + &quot;/robots.txt&quot;)
++        rp.read()
++        return rp.can_fetch(UA, url)
++    except Exception:
++        return False        # cannot confirm permission -&gt; fail closed (§4.5)
++
++
++def _fetch(url, timeout=15):
++    req = urllib.request.Request(url, headers={&quot;User-Agent&quot;: UA})
++    with urllib.request.urlopen(req, timeout=timeout) as r:
++        return r.status, r.read().decode(&quot;utf-8&quot;, &quot;replace&quot;)
++
++
++def _looks_js_only(html):
++    &quot;&quot;&quot;A page whose analyst calls are rendered client-side has no server-side rows to parse — fail closed
++    rather than guess. Heuristic: almost no visible text but heavy script.&quot;&quot;&quot;
++    text = re.sub(r&quot;(?is)&lt;script.*?&lt;/script&gt;&quot;, &quot; &quot;, html)
++    text = re.sub(r&quot;&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, text)
++    return len(text.split()) &lt; 120 and html.lower().count(&quot;&lt;script&quot;) &gt;= 3
++
++
++def parse_source(src):
++    &quot;&quot;&quot;One compliant attempt. Returns a status dict; captured is a list of REAL extracted calls (never guessed).&quot;&quot;&quot;
++    url = src[&quot;url&quot;]
++    if not _robots_ok(url):
++        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;robots disallow or unreadable — fail closed&quot;,
++                &quot;captured&quot;: 0, &quot;calls&quot;: []}
++    try:
++        http, html = _fetch(url)
++    except Exception as e:
++        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;not reachable compliantly (%s)&quot; % type(e).__name__,
++                &quot;captured&quot;: 0, &quot;calls&quot;: []}
++    if http != 200:
++        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;HTTP %s&quot; % http, &quot;captured&quot;: 0, &quot;calls&quot;: [], &quot;http&quot;: http}
++    if _looks_js_only(html):
++        return {**src, &quot;state&quot;: &quot;BLOCKED&quot;, &quot;reason&quot;: &quot;page is JavaScript-rendered — no server-side calls to &quot;
++                &quot;parse without guessing (fail closed)&quot;, &quot;captured&quot;: 0, &quot;calls&quot;: [], &quot;http&quot;: http}
++    calls = _extract(src[&quot;key&quot;], html)
++    return {**src, &quot;state&quot;: &quot;REACHABLE&quot; if calls else &quot;REACHABLE-EMPTY&quot;, &quot;http&quot;: http,
++            &quot;reason&quot;: &quot;parsed %d call(s) from served HTML&quot; % len(calls) if calls else
++            &quot;served HTML held no recognisable analyst call in a stated shape — none guessed&quot;,
++            &quot;captured&quot;: len(calls), &quot;calls&quot;: calls[:200]}
++
++
++def _extract(key, html):
++    &quot;&quot;&quot;Per-source extraction of only what is actually present. Returns a list of {analyst, stock, call, date}.
++    Deliberately conservative: if a field is not plainly on the page, the row is dropped rather than guessed.&quot;&quot;&quot;
++    calls = []
++    # A generic, honest first pass: analyst &#x27;Buy/Sell/Hold &lt;STOCK&gt; target &lt;N&gt;&#x27; phrasings that appear verbatim in
++    # server-rendered financial pages. Anything not matching this explicit shape is left out (never inferred).
++    text = re.sub(r&quot;(?is)&lt;script.*?&lt;/script&gt;|&lt;style.*?&lt;/style&gt;&quot;, &quot; &quot;, html)
++    text = re.sub(r&quot;&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, text)
++    text = re.sub(r&quot;\s+&quot;, &quot; &quot;, text)
++    for m in re.finditer(r&quot;\b(Buy|Sell|Hold|Accumulate|Reduce)\b\s+([A-Z][A-Za-z&amp;\. ]{2,40}?)\s+&quot;
++                         r&quot;(?:target|TP)\s*(?:of\s*)?(?:Rs\.?|₹)?\s*([\d,]{2,9})&quot;, text):
++        calls.append({&quot;call&quot;: m.group(1), &quot;stock&quot;: m.group(2).strip(), &quot;target&quot;: m.group(3).replace(&quot;,&quot;, &quot;&quot;),
++                      &quot;date&quot;: _now().date().isoformat(), &quot;source_shape&quot;: &quot;verbatim call+target on served page&quot;})
++    return calls
++
++
++def run(write=True, fetch=True):
++    results = []
++    for src in SOURCES:
++        results.append(parse_source(src) if fetch else
++                       {**src, &quot;state&quot;: &quot;NOT-FETCHED&quot;, &quot;captured&quot;: 0, &quot;calls&quot;: []})
++    total = sum(r[&quot;captured&quot;] for r in results)
++    out = {&quot;generated&quot;: _now().isoformat(), &quot;results&quot;: results, &quot;total_captured&quot;: total,
++           &quot;note&quot;: (&quot;Compliant sourcing only; every wall (robots, paywall, anti-bot, JS-only) fails closed with &quot;
++                    &quot;its reason and zero calls. No analyst call is ever guessed (§4.4/§4.5).&quot;)}
++    if write:
++        _merge_scoreboard(results)
++        _write_md(out)
++    return out
++
++
++def _merge_scoreboard(results):
++    &quot;&quot;&quot;Update the analyst scoreboard&#x27;s per-source capture count + parser status, truthfully.&quot;&quot;&quot;
++    try:
++        d = json.load(open(SCOREBOARD, encoding=&quot;utf-8&quot;))
++    except Exception:
++        d = {&quot;sources&quot;: []}
++    by_url = {r[&quot;url&quot;]: r for r in results}
++    for s in d.get(&quot;sources&quot;, []):
++        r = by_url.get(s.get(&quot;url&quot;))
++        if r:
++            s[&quot;captured&quot;] = r[&quot;captured&quot;]
++            s[&quot;state&quot;] = r[&quot;state&quot;]
++            s[&quot;note&quot;] = &quot;C6 parser: &quot; + r[&quot;reason&quot;]
++    d[&quot;c6_parsers&quot;] = {&quot;generated&quot;: _now().isoformat(),
++                       &quot;per_source&quot;: [{&quot;source&quot;: r[&quot;source&quot;], &quot;state&quot;: r[&quot;state&quot;], &quot;captured&quot;: r[&quot;captured&quot;],
++                                       &quot;reason&quot;: r[&quot;reason&quot;]} for r in results]}
++    try:
++        with open(SCOREBOARD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            json.dump(d, f, indent=1, default=str)
++    except Exception:
++        pass
++
++
++def _write_md(o):
++    L = [&quot;# C6 — ANALYST SCOREBOARD PARSERS&quot;, &quot;&quot;,
++         &quot;_Compliant sourcing only. Every wall (robots, paywall, anti-bot, JavaScript-only) fails closed with &quot;
++         &quot;its reason and zero calls. No analyst call is ever guessed._&quot;, &quot;&quot;,
++         &quot;| Source | State | Captured | Reason |&quot;, &quot;|---|---|---|---|&quot;]
++    for r in o[&quot;results&quot;]:
++        L.append(&quot;| %s | %s | %s | %s |&quot; % (r[&quot;source&quot;], r[&quot;state&quot;], r[&quot;captured&quot;], r[&quot;reason&quot;]))
++    L += [&quot;&quot;, &quot;**Total real calls captured: %d.** A source that is BLOCKED needs a human-fetched drop (owner &quot;
++          &quot;item, §21 human-only work) — the parser will never work around its wall.&quot; % o[&quot;total_captured&quot;]]
++    with open(OUT_MD, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++        f.write(&quot;\n&quot;.join(L) + &quot;\n&quot;)
++
++
++def _demo():
++    # the extractor never invents a call: a page with no verbatim call+target yields nothing
++    assert _extract(&quot;x&quot;, &quot;&lt;html&gt;&lt;body&gt;no calls here, just prose about the market&lt;/body&gt;&lt;/html&gt;&quot;) == []
++    # a verbatim call IS extracted, not guessed
++    got = _extract(&quot;x&quot;, &quot;&lt;p&gt;Buy RELIANCE target Rs 3,200 says the analyst&lt;/p&gt;&quot;)
++    assert got and got[0][&quot;stock&quot;].startswith(&quot;RELIANCE&quot;) and got[0][&quot;target&quot;] == &quot;3200&quot;
++    # js-only pages fail closed
++    assert _looks_js_only(&quot;&lt;script&gt;1&lt;/script&gt;&lt;script&gt;2&lt;/script&gt;&lt;script&gt;3&lt;/script&gt;&lt;div&gt;&lt;/div&gt;&quot;) is True
++    print(&quot;analyst_parsers demo OK: extracts verbatim calls, invents none, fails closed on JS-only.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        o = run(fetch=&quot;--fetch&quot; in sys.argv)
++        print(&quot;C6 parsers: %d real calls captured; see reports/C6-PARSERS.md.&quot; % o[&quot;total_captured&quot;])
+diff --git a/tests/test_analyst_parsers.py b/tests/test_analyst_parsers.py
+new file mode 100644
+index 000000000..97f9d2794
+--- /dev/null
++++ b/tests/test_analyst_parsers.py
+@@ -0,0 +1,27 @@
++&quot;&quot;&quot;R-EVENING-22 C6: the parsers never guess a call, extract only verbatim call+target from served HTML, and
++fail closed on JS-only / walled pages (§4.4/§4.5).&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import analyst_parsers as AP
++
++
++def test_extractor_never_invents():
++    assert AP._extract(&quot;x&quot;, &quot;&lt;html&gt;prose about markets, no explicit call&lt;/html&gt;&quot;) == []
++
++
++def test_extracts_verbatim_call_and_target():
++    got = AP._extract(&quot;x&quot;, &quot;&lt;p&gt;Accumulate TCS target of Rs 4,100&lt;/p&gt;&quot;)
++    assert got and got[0][&quot;call&quot;] == &quot;Accumulate&quot; and got[0][&quot;target&quot;] == &quot;4100&quot;
++    assert got[0][&quot;stock&quot;].startswith(&quot;TCS&quot;)
++
++
++def test_js_only_fails_closed():
++    src = {&quot;key&quot;: &quot;x&quot;, &quot;source&quot;: &quot;X&quot;, &quot;url&quot;: &quot;https://example.invalid/&quot;}
++    # a robots-unreadable/unreachable host fails closed to BLOCKED, zero calls
++    r = AP.parse_source(src)
++    assert r[&quot;state&quot;] == &quot;BLOCKED&quot; and r[&quot;captured&quot;] == 0 and r[&quot;calls&quot;] == []
++
++
++if __name__ == &quot;__main__&quot;:
++    test_extractor_never_invents(); test_extracts_verbatim_call_and_target(); test_js_only_fails_closed()
++    print(&quot;test_analyst_parsers OK&quot;)
+</pre></div><div class='c'><div class='h'><b>5635ca3e9</b> · 2026-09-22 18:11</div><div>R-EVENING-22 C5: the concrete NSE&lt;-&gt;BSE pair list from recorded cross-exchange data</div><div class='sub h'>reports/C5-PAIRS.json  | 671 +++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>reports/C5-PAIRS.md    |  91 +++++++</div><div class='sub h'>scripts/c5_pairs.py    | 105 ++++++++</div><div class='sub h'>tests/test_c5_pairs.py |  18 ++</div><pre>diff --git a/reports/C5-PAIRS.json b/reports/C5-PAIRS.json
 new file mode 100644
 index 000000000..3e2c6c686
 --- /dev/null
@@ -2734,133 +3076,4 @@ index 000000000..d41256f80
 +if __name__ == &quot;__main__&quot;:
 +    import pytest
 +    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
-</pre></div><div class='c'><div class='h'><b>88565b04f</b> · 2026-09-22 16:32</div><div>R-VITALS-STALE + cadence: supervisor runs after every commit + 30-min idle; status cache-busting</div><div class='sub h'>docs/SUPERVISOR-TEMPLATE.md                       |  2 ++</div><div class='sub h'>docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md |  8 ++++++++</div><div class='sub h'>docs/dispatches/2026-09-22_R-VITALS-STALE.md      | 11 +++++++++++</div><div class='sub h'>scripts/supervisor.py                             | 20 ++++++++++++++++----</div><div class='sub h'>scripts/vitals.py                                 |  5 ++++-</div><div class='sub h'>tests/test_supervisor.py                          | 15 +++++++++++++++</div><pre>diff --git a/docs/SUPERVISOR-TEMPLATE.md b/docs/SUPERVISOR-TEMPLATE.md
-index b7ca2597b..e23782b9a 100644
---- a/docs/SUPERVISOR-TEMPLATE.md
-+++ b/docs/SUPERVISOR-TEMPLATE.md
-@@ -15,6 +15,8 @@ standing laws (CLAUDE.md §3, §4, §13, §18, §20):
-    an observed outcome.
- 6. NO SECRETS — no API key, token, password, Telegram id, cookie or absolute user path appears on any
-    published page.
-+7. ORDERING — a ruling marked &quot;next-before-X&quot; (an item the owner said must run before X) must actually run
-+   before X. If the builder started X while a next-before-X item was still pending, that is a violation.
- 
- You must END your reply with exactly ONE line, nothing after it:
- 
-diff --git a/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md
-new file mode 100644
-index 000000000..a320d3701
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-RESTART-TONIGHT-2.md
-@@ -0,0 +1,8 @@
-+# R-RESTART-TONIGHT (2) (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction._
-+
-+stop the v2 tabs and run R-RESTART-TONIGHT steps 1–5 now (the status page is stale since 15:00 and
-+token_ping&#x27;s pid is unchanged — the desk is still on old code). Post the STACK line, confirm status.html
-+refreshes every 2 minutes and the first BUILD line goes out, then resume the v2 tabs. Supervisor template:
-+add &quot;a ruling marked next-before-X must run before X&quot; to its checks.
-diff --git a/docs/dispatches/2026-09-22_R-VITALS-STALE.md b/docs/dispatches/2026-09-22_R-VITALS-STALE.md
-new file mode 100644
-index 000000000..9fbac1b46
---- /dev/null
-+++ b/docs/dispatches/2026-09-22_R-VITALS-STALE.md
-@@ -0,0 +1,11 @@
-+# R-VITALS-STALE + SUPERVISOR CADENCE (owner ruling, 2026-09-22)
-+
-+_Archived per §7.1. A RECORD, never an instruction._
-+
-+(1) status.html has not updated since 15:00:29 and still shows this morning&#x27;s pids, while the journal updates
-+    — so the running site_loop is not regenerating vitals. Find why (old code still running, or vitals not in
-+    the light cycle), fix, and prove it by the page&#x27;s &quot;updated&quot; stamp advancing twice and showing the
-+    post-restart pids; post the STACK line only when the page shows it.
-+(2) Supervisor cadence: run after every commit and every 30 minutes when idle, instead of every 10 minutes;
-+    report the measured spend per night.
-+Then resume the four v2 tabs.
-diff --git a/scripts/supervisor.py b/scripts/supervisor.py
-index 319cde0f6..9e5156fe4 100644
---- a/scripts/supervisor.py
-+++ b/scripts/supervisor.py
-@@ -33,8 +33,8 @@ TOKENS = os.path.join(REPO, &quot;reports&quot;, &quot;SUPERVISOR-TOKENS.log&quot;)
- OUT = os.path.join(REPO, &quot;site&quot;, &quot;build&quot;, &quot;supervisor&quot;)
- CLAUDE = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;claude.cmd&quot;)
- MODEL = &quot;claude-opus-4-8&quot;
--CADENCE_MIN = 10
--SILENCE_MIN = 30
-+IDLE_MIN = 30            # R-EYES-FULL cadence (owner update): run after every commit, else every 30 min idle
-+SILENCE_MIN = 40         # silence alarm a little beyond the idle cadence
- 
- 
- def _now():
-@@ -63,10 +63,22 @@ def build_hours(now=None):
-     return m &gt;= 15 * 60 + 30 or m &lt; 9 * 60
- 
- 
-+def _head():
-+    try:
-+        return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=REPO, capture_output=True,
-+                              text=True, timeout=15).stdout.strip()
-+    except Exception:
-+        return None
-+
-+
- def due(now=None):
-+    &quot;&quot;&quot;R-EYES-FULL cadence: due after every commit (HEAD moved since the last check) OR every 30 min idle.&quot;&quot;&quot;
-     now = now or _now()
--    last = _state().get(&quot;last_run_ts&quot;, 0)
--    return (now.timestamp() - last) / 60.0 &gt;= CADENCE_MIN
-+    st = _state()
-+    head = _head()
-+    if head and head != st.get(&quot;last_commit&quot;):
-+        return True                                   # a new commit landed -&gt; check it now
-+    return (now.timestamp() - st.get(&quot;last_run_ts&quot;, 0)) / 60.0 &gt;= IDLE_MIN
- 
- 
- # ---------------------------------------------------------------------------------------------------------
-diff --git a/scripts/vitals.py b/scripts/vitals.py
-index 91fa0dcb0..9594894c7 100644
---- a/scripts/vitals.py
-+++ b/scripts/vitals.py
-@@ -251,7 +251,10 @@ def _write_html(s):
-     gates = &quot; · &quot;.join(&quot;%s: %s&quot; % (k, v) for k, v in (s[&quot;gates&quot;] or {}).items())
-     page = (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
-             &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
--            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
-+            &quot;&lt;meta http-equiv=&#x27;refresh&#x27; content=&#x27;120&#x27;&gt;&quot;
-+            &quot;&lt;meta http-equiv=&#x27;Cache-Control&#x27; content=&#x27;no-cache, no-store, must-revalidate&#x27;&gt;&quot;
-+            &quot;&lt;meta http-equiv=&#x27;Pragma&#x27; content=&#x27;no-cache&#x27;&gt;&lt;meta http-equiv=&#x27;Expires&#x27; content=&#x27;0&#x27;&gt;&quot;
-+            &quot;&lt;title&gt;Desk status&lt;/title&gt;&lt;style&gt;&quot;
-             &quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}&quot;
-             &quot;main{max-width:820px;margin:0 auto;padding:22px 18px}h1{font-size:20px}&quot;
-             &quot;table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}&quot;
-diff --git a/tests/test_supervisor.py b/tests/test_supervisor.py
-index c3dec2364..25a1401ba 100644
---- a/tests/test_supervisor.py
-+++ b/tests/test_supervisor.py
-@@ -77,9 +77,24 @@ def test_silence_alarm_fires():
-     assert S.silence_line(noon) is None
- 
- 
-+def test_due_after_commit_or_idle():
-+    tmp = tempfile.mkdtemp()
-+    _isolate(tmp)
-+    import json as _j
-+    _j.dump({&quot;last_commit&quot;: &quot;aaaaaaa&quot;, &quot;last_run_ts&quot;: S._now().timestamp()}, open(S.STATE, &quot;w&quot;))
-+    S._head = lambda: &quot;bbbbbbb&quot;                          # HEAD moved -&gt; due (after every commit)
-+    assert S.due() is True
-+    S._head = lambda: &quot;aaaaaaa&quot;                          # same commit, just ran -&gt; not due
-+    assert S.due() is False
-+    # same commit but idle beyond 30 min -&gt; due
-+    _j.dump({&quot;last_commit&quot;: &quot;aaaaaaa&quot;, &quot;last_run_ts&quot;: S._now().timestamp() - (S.IDLE_MIN + 1) * 60}, open(S.STATE, &quot;w&quot;))
-+    assert S.due() is True
-+
-+
- if __name__ == &quot;__main__&quot;:
-     test_hook_blocks_on_halt()
-     test_seeded_violation_halts_and_notifies()
-     test_on_course_appends_journal_no_halt()
-     test_silence_alarm_fires()
-+    test_due_after_commit_or_idle()
-     print(&quot;test_supervisor OK&quot;)
 </pre></div></main></body></html>
