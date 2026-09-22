@@ -1,4 +1,421 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>8b4684db7</b> · 2026-09-22 22:43</div><div>R-V2-EXACT: port the Stocks page; owner title &#x27;Stocks the desk watches - N&#x27;, real 210 screener stocks (volume/trend/signals real, honest &#x27;-&#x27; for readings the store lacks)</div><div class='sub h'>scripts/v8_site.py  | 60 +++++++++++++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/stocks.html | 79 ++++++++++++++++++++++++++++-------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>ffd28e24b</b> · 2026-09-22 22:55</div><div>R-V2-EXACT: port the Ask page; factor a shared engine-chat binder, bind Ask+Main chat to real calls</div><div class='sub h'>scripts/v8_site.py | 50 ++++++++++++++++++++-------------</div><div class='sub h'>site/v2/ask.html   | 82 ++++++++++++++++++++++++++++++------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index dd2c3db3e..5bac6e1de 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -101,16 +101,39 @@ def _short_reason(sentence):
+     return (body[:60] + &quot;…&quot;) if len(body) &gt; 62 else body
+ 
+ 
++def _calls():
++    import json
++    try:
++        return json.load(open(os.path.join(REPO, &quot;site&quot;, &quot;data&quot;, &quot;live.json&quot;), encoding=&quot;utf-8&quot;)).get(&quot;calls&quot;) or []
++    except Exception:
++        return []
++
++
++def _bind_engine_chat(html):
++    &quot;&quot;&quot;Replace the design&#x27;s baked engine-chat lines (&lt;div color #d7d5ce&gt;…) with the real recent calls, in
++    order. Shared by every page that carries the chat sidebar (Main, Ask) — the fake &#x27;69% of 937&#x27; line goes.&quot;&quot;&quot;
++    lines = [&quot;%s — %s: %s. Held while the price gap is measured.&quot; % (
++        _esc(c.get(&quot;stock&quot;)), _esc((c.get(&quot;engine&quot;) or &quot;&quot;).split(&quot; &quot;)[0]), _esc(_short_reason(c.get(&quot;sentence&quot;) or &quot;&quot;)))
++        for c in _calls()]
++    jt = iter(lines)
++    def chat_sub(_m):
++        t = next(jt, None)
++        return &#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;%s&lt;/div&gt;&#x27; % t if t else &#x27;&lt;div style=&quot;color: #9a9a93;&quot;&gt;no engine chat yet today&lt;/div&gt;&#x27;
++    return re.compile(r&#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;[^&lt;]*&lt;/div&gt;&#x27;).sub(chat_sub, html)
++
++
++def _fix_ask(html):
++    &quot;&quot;&quot;The Ask page is a static prototype; its only live-data block is the engine-chat sidebar, bound here to
++    the real calls. The &#x27;Example answer&#x27; stays as the design&#x27;s labelled illustration.&quot;&quot;&quot;
++    return _bind_engine_chat(html)
++
++
+ def _fix_main(html):
+     &quot;&quot;&quot;Bind the Main page&#x27;s two baked sample blocks to the real recent calls (live.json): the Latest-signals
+     card (3 spans) and the Engine-chat sidebar (6 lines). Keeps the design markup; only the sample text is
+     replaced. The top cards, the 8-stat grid and the 15 static leaderboard rows stay as the design drew them
+     (real zeros today) and are flagged in the run&#x27;s per-page diff, not silently rewritten.&quot;&quot;&quot;
+-    import json
+-    try:
+-        calls = json.load(open(os.path.join(REPO, &quot;site&quot;, &quot;data&quot;, &quot;live.json&quot;), encoding=&quot;utf-8&quot;)).get(&quot;calls&quot;) or []
+-    except Exception:
+-        calls = []
++    calls = _calls()
+ 
+     def dirn(c):
+         d = (c.get(&quot;direction&quot;) or &quot;&quot;).lower()
+@@ -126,21 +149,10 @@ def _fix_main(html):
+         return &#x27;&lt;span&gt;%s - %s - &lt;a href=&quot;patterns.html&quot; style=&quot;color: #85B7EB;&quot;&gt;%s&lt;/a&gt;&lt;/span&gt;&#x27; % (
+             _esc(c.get(&quot;stock&quot;)), dirn(c), _esc(_short_reason(c.get(&quot;sentence&quot;) or &quot;&quot;)))
+     html = span_re.sub(span_sub, html)
+-
+-    # Engine-chat sidebar: replace each baked #d7d5ce line in order with a real engine line
+-    lines = [&quot;%s — %s: %s. Held while the price gap is measured.&quot; % (
+-        _esc(c.get(&quot;stock&quot;)), _esc((c.get(&quot;engine&quot;) or &quot;&quot;).split(&quot; &quot;)[0]), _esc(_short_reason(c.get(&quot;sentence&quot;) or &quot;&quot;)))
+-        for c in calls]
+-    jt = iter(lines)
+-    chat_re = re.compile(r&#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;[^&lt;]*&lt;/div&gt;&#x27;)
+-    def chat_sub(_m):
+-        t = next(jt, None)
+-        return &#x27;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;%s&lt;/div&gt;&#x27; % t if t else &#x27;&lt;div style=&quot;color: #9a9a93;&quot;&gt;no engine chat yet today&lt;/div&gt;&#x27;
+-    html = chat_re.sub(chat_sub, html)
+-    return html
++    return _bind_engine_chat(html)
+ 
+ 
+-POST = {&quot;Main.dc.html&quot;: _fix_main}     # per-page post-processor for pages with baked sample sub-trees
++POST = {&quot;Main.dc.html&quot;: _fix_main, &quot;Ask.dc.html&quot;: _fix_ask}     # per-page post-processor for pages with baked sample sub-trees
+ 
+ 
+ # ---------------------------------------------------------------------------------------------------------
+@@ -399,7 +411,7 @@ POST[&quot;Engine.dc.html&quot;] = _fix_engine
+ # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
+ # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
+ # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
+-PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data, &quot;Engine.dc.html&quot;: _engine_data}
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data, &quot;Engine.dc.html&quot;: _engine_data, &quot;Ask.dc.html&quot;: _ask_data}
+ 
+ 
+ def build(write=True, only=None):
+diff --git a/site/v2/ask.html b/site/v2/ask.html
+index 247b4e088..bad7cef2f 100644
+--- a/site/v2/ask.html
++++ b/site/v2/ask.html
+@@ -1,37 +1,45 @@
+-&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Ask the desk — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
+-:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
+-  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
+-*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
+-  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
+-.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
+-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+-.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+-  background:#0c0e12;position:sticky;top:0;z-index:5}
+-.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
+-  padding:2px 8px;margin-right:8px}
+-.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
+-.nav a.on{background:var(--card);color:var(--ink)}
+-.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
+-.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
+-  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+-main{max-width:1180px;margin:0 auto;padding:16px}
+-h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
+-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+-.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
+-.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
+-table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+-td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
+-tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
+-.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+-.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+-.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
+-.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
+-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+-.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
+-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+-.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+-.tabs button.on{background:var(--card);color:var(--ink)}
+-.tabpane{display:none}.tabpane.on{display:block}
+-.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
+-&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Ask the desk&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every question someone outside the desk asked us to check, and what came back — in plain words, after real costs. Newest first.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#3&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;You noticed the stock trades were being held about four days or more — is that being checked?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;The 210-stock book — the same idea applied to individual names, held for a few days — measured trade-by-trade with the hold time recorded, full costs and spread off.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;937 trades, +1.88R after full costs (crossing the spread), average hold about four days. Positive — but small enough that it is still statistically no different from zero.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;If there is any edge here it is in individual stocks held for a few days — mildly positive after real costs, but not yet proven. It could still be luck; live paper will tell.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#2&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index intraday — in and out the same day — work?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY intraday on 1-, 5- and 15-minute bars, flat by the close, full costs and spread subtracted.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;11 trades, and it lost: −3.81R after full costs (crossing the spread). A small sample, but nothing good in it.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;Intraday index trading lost money here. Small sample, so not a hard verdict — but there is no sign of an edge to chase.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:8px;align-items:baseline&#x27;&gt;&lt;span class=&#x27;pill&#x27;&gt;#1&lt;/span&gt;&lt;b&gt;Nikhil asked&lt;/b&gt;&lt;span class=&#x27;sub&#x27; style=&#x27;margin-left:auto&#x27;&gt;2026-09-18&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:8px 0 10px&#x27;&gt;Does trading the index itself do better than trading individual stocks?&lt;/p&gt;&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;th&gt;What was run&lt;/th&gt;&lt;td&gt;NIFTY and BANKNIFTY, through their futures, held for several days (roll-aware), on the same rules the stock book uses. Costs and the buy/sell spread taken off in full.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Result&lt;/th&gt;&lt;td&gt;0 trades taken. Not one index setup ever cleared its own cost, so there was nothing to trade.&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;What it means&lt;/th&gt;&lt;td&gt;On this data the index gave no multi-day edge to trade at all — worse than the stock book, which at least trades.&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/main&gt;&lt;p class=&#x27;updated&#x27;&gt;last updated 2026-09-22T13:04:50.063039+05:30 · the tape refreshes every 2 minutes&lt;/p&gt;&lt;script&gt;function refreshTick(){fetch(&#x27;../data/live.json?_=&#x27;+Date.now()).then(function(r){return r.json()}).then(function(d){var t=(d.tape&amp;&amp;d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){var c=(s.change_pct||0)&gt;=0?&#x27;gain&#x27;:&#x27;loss&#x27;;var ch=s.change_pct!=null?((s.change_pct&gt;=0?&#x27;+&#x27;:&#x27;&#x27;)+s.change_pct+&#x27;%&#x27;):&#x27;&#x27;;return &quot;&lt;span&gt;&quot;+s.stock+&quot; &lt;b class=&#x27;&quot;+c+&quot;&#x27;&gt;&quot;+s.last+&quot;&lt;/b&gt; &quot;+ch+&quot;&lt;/span&gt;&quot;;}).join(&#x27;&#x27;);var el=document.querySelector(&#x27;.tick&#x27;);if(el&amp;&amp;h)el.innerHTML=h;}).catch(function(){});}setInterval(refreshTick,120000);function tab(g,i){var ps=document.querySelectorAll(&#x27;[data-g=&quot;&#x27;+g+&#x27;&quot;]&#x27;);ps.forEach(function(p,j){p.classList.toggle(&#x27;on&#x27;,j==i);});var bs=document.querySelectorAll(&#x27;[data-tb=&quot;&#x27;+g+&#x27;&quot;]&#x27;);bs.forEach(function(b,j){b.classList.toggle(&#x27;on&#x27;,j==i);});}function filt(id,tid){var q=(document.getElementById(id).value||&#x27;&#x27;).toUpperCase();document.querySelectorAll(&#x27;#&#x27;+tid+&#x27; tbody tr&#x27;).forEach(function(r){r.style.display=r.getAttribute(&#x27;data-k&#x27;).indexOf(q)&gt;=0?&#x27;&#x27;:&#x27;none&#x27;;});}&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
+\ No newline at end of file
++&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;E1 Terminal - ask the desk&lt;/title&gt;&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap&quot;&gt;
++&lt;style&gt;
++body{margin:0;font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;background:#0f1115}
++a{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}
++button,input{font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}
++button{cursor:pointer}
++&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div style=&quot;width: 1280px; height: 760px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;&quot;&gt;
++&lt;div style=&quot;display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;&quot;&gt;
++  &lt;div style=&quot;display: flex; align-items: center; gap: 12px;&quot;&gt;
++    &lt;a href=&quot;index.html&quot; style=&quot;display: flex; align-items: center; gap: 10px;&quot;&gt;&lt;div style=&quot;width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;&quot;&gt;E1&lt;/div&gt;&lt;div style=&quot;font-size: 16px; font-weight: 600;&quot;&gt;E1 Terminal&lt;/div&gt;&lt;/a&gt;
++    &lt;div style=&quot;font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;&quot;&gt;Paper only&lt;/div&gt;
++  &lt;/div&gt;
++  &lt;div style=&quot;display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;&quot;&gt;
++    &lt;a href=&quot;index.html&quot;&gt;Leaderboard&lt;/a&gt;
++    &lt;a href=&quot;engines.html&quot;&gt;Engines&lt;/a&gt;
++    &lt;a href=&quot;stocks.html&quot;&gt;Stocks&lt;/a&gt;
++    &lt;a href=&quot;patterns.html&quot;&gt;Patterns&lt;/a&gt;
++    
++    &lt;a href=&quot;data.html&quot;&gt;Data&lt;/a&gt;
++    &lt;a href=&quot;results.html&quot;&gt;Results&lt;/a&gt;
++    &lt;a href=&quot;how.html&quot;&gt;How it works&lt;/a&gt;
++    &lt;a href=&quot;ask.html&quot; style=&quot;font-size: 13px; padding: 8px 12px; border: 1px solid #3a3f4a; border-radius: 8px;&quot;&gt;Ask the desk&lt;/a&gt;
++  &lt;/div&gt;
++&lt;/div&gt;
++&lt;div style=&quot;display: flex; gap: 28px; padding: 8px 40px; background: #0b0d10; border-bottom: 1px solid #23262d; font-family: &#x27;IBM Plex Mono&#x27;, monospace; font-size: 13px; color: #b8b6ae; overflow: hidden; white-space: nowrap;&quot;&gt;
++  &lt;span&gt;DABUR 388.1 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+3.22%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;HINDUNILVR 1951.0 &lt;span style=&quot;color: #5DCAA5;&quot;&gt;+0.83%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;JSWENERGY 516.05 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.67%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;BDL 1174.5 &lt;span style=&quot;color: #F09595;&quot;&gt;-1.3%&lt;/span&gt;&lt;/span&gt;&lt;span&gt;SHREECEM 22520.0 &lt;span style=&quot;color: #F09595;&quot;&gt;-0.4%&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;
++&lt;div style=&quot;padding: 20px 40px 0;&quot;&gt;&lt;div style=&quot;font-size: 22px; font-weight: 600;&quot;&gt;Ask the desk&lt;/div&gt;&lt;div style=&quot;font-size: 14px; color: #9a9a93; margin-top: 4px;&quot;&gt;Ask in plain words. Answers come from the desk&#x27;s own records, with the source shown.&lt;/div&gt;&lt;/div&gt;
++&lt;div style=&quot;padding: 14px 40px 0; flex-grow: 1; display: flex; gap: 16px; align-items: flex-start;&quot;&gt;
++  &lt;div style=&quot;flex-grow: 1; background: #161920; border-radius: 12px; padding: 16px 20px;&quot;&gt;
++    &lt;div style=&quot;display: flex; gap: 8px;&quot;&gt;&lt;label for=&quot;ask&quot; style=&quot;position: absolute; left: -9999px;&quot;&gt;Your question&lt;/label&gt;&lt;input id=&quot;ask&quot; type=&quot;text&quot; placeholder=&quot;Why did E1 hold DABUR today?&quot; style=&quot;flex-grow: 1; padding: 12px 14px; background: #0f1115; border: 1px solid #3a3f4a; border-radius: 8px; color: #e8e6e1; font-size: 14px;&quot;&gt;&lt;button style=&quot;padding: 12px 16px; background: #5DCAA5; color: #0f1115; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;&quot;&gt;Ask&lt;/button&gt;&lt;/div&gt;
++    &lt;div style=&quot;margin-top: 14px; border-left: 2px solid #5DCAA5; padding: 8px 12px; font-size: 14px; color: #d7d5ce;&quot;&gt;Example answer: &quot;E1 saw the pattern at 09:16 and wanted to buy ₹1,000. It held because DABUR&#x27;s price gap had only 14 of the 20 readings it needs. Source: today&#x27;s fire log, line 3.&quot;&lt;/div&gt;
++  &lt;/div&gt;
++&lt;div style=&quot;width: 340px; flex-shrink: 0; background: #161920; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;&quot;&gt;
++  &lt;div style=&quot;display: flex; justify-content: space-between; align-items: baseline;&quot;&gt;&lt;div style=&quot;font-size: 14px; font-weight: 600;&quot;&gt;Engine chat&lt;/div&gt;&lt;a href=&quot;messages.html&quot; style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;all messages&lt;/a&gt;&lt;/div&gt;
++  &lt;div style=&quot;font-size: 12px; color: #9a9a93;&quot;&gt;What each engine is thinking, live. Same words as Telegram.&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;DABUR — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #85B7EB; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #85B7EB;&quot;&gt;E10&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;HINDUNILVR — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #FAC775; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #FAC775;&quot;&gt;E11&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;JSWENERGY — E1: when RSI is between 40 and 60 and volatility (ATR) is in its…. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #5DCAA5; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #5DCAA5;&quot;&gt;E1&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:16&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;BDL — E1: when RSI is between 30 and 50 and money-flow (MFI) is betwee…. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;09:15&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #d7d5ce;&quot;&gt;SHREECEM — E1: when VWAP is in its lowest 20%. Held while the price gap is measured.&lt;/div&gt;&lt;/div&gt;
++  &lt;div style=&quot;border-left: 2px solid #9a9a93; padding: 6px 10px; font-size: 13px;&quot;&gt;&lt;div style=&quot;display: flex; justify-content: space-between;&quot;&gt;&lt;span style=&quot;font-weight: 600; color: #b8b6ae;&quot;&gt;Desk&lt;/span&gt;&lt;span style=&quot;color: #6f6f69;&quot;&gt;18:46&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;color: #9a9a93;&quot;&gt;no engine chat yet today&lt;/div&gt;&lt;/div&gt;
++&lt;/div&gt;
++&lt;/div&gt;
++&lt;div style=&quot;margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 14px 40px; border-top: 1px solid #23262d;&quot;&gt;&lt;div style=&quot;font-size: 12px; color: #6f6f69;&quot;&gt;Answers cite the record they came from.&lt;/div&gt;&lt;/div&gt;
++&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;
+\ No newline at end of file
+</pre></div><div class='c'><div class='h'><b>4c2c53d8f</b> · 2026-09-22 22:53</div><div>R-V2-EXACT: port the Engine page; descriptive engine facts verbatim, pattern records bound to the live set (honest &#x27;-&#x27;, no fabricated won%/P&amp;L; funnel/step figures flagged)</div><div class='sub h'>scripts/v8_engine_data.py | 163 ++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/v8_site.py        |  22 ++++++-</div><div class='sub h'>site/v2/engines.html      | 136 +++++++++++++++++++++++++++-----------</div><pre>diff --git a/scripts/v8_engine_data.py b/scripts/v8_engine_data.py
+new file mode 100644
+index 000000000..a949f213b
+--- /dev/null
++++ b/scripts/v8_engine_data.py
+@@ -0,0 +1,163 @@
++&quot;&quot;&quot;R-V2-EXACT — the Engine page&#x27;s computed data, replicated in Python for the verbatim port.
++
++The design page carries its data in a stripped &lt;script&gt;; the porter needs that data as a dict. The engine
++DESCRIPTIONS (what each does, its status, how it works, its steps) are real system facts and are transcribed
++verbatim. The fabricated per-engine PATTERN RECORDS (the design&#x27;s baked won%/case-count/P&amp;L, e.g. 69% of 937)
++are NOT transcribed — `pp` binds to the real live pattern set instead, with an honest &quot;—&quot; where the store has
++no number (§4.4). The funnel counts, the safety-check sample readings and the today-specific step values are
++the design&#x27;s illustrative figures and are flagged on the run&#x27;s per-page diff, not invented here.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++
++_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++DASH = &quot;—&quot;
++
++# descriptive engine facts (name/status/blurb/differs/countdown/account/size/mode/patterns/steps) — real
++E = {
++    &quot;E1&quot;: {&quot;name&quot;: &quot;E1 - flat ₹1,000&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;, &quot;status&quot;: &quot;Trading allowed&quot;,
++           &quot;blurb&quot;: &quot;Buys ₹1,000 of a stock when a tested price pattern shows up. Holds up to 20 days.&quot;,
++           &quot;differs&quot;: &quot;the base trader - every other engine works off its signals.&quot;,
++           &quot;countdown&quot;: &quot;Needs 30 live trades to validate - 0 taken so far&quot;, &quot;account&quot;: &quot;₹2,00,000&quot;,
++           &quot;size&quot;: &quot;₹1,000 fixed&quot;, &quot;mode&quot;: &quot;paper&quot;, &quot;patterns&quot;: &quot;21 certified patterns&quot;,
++           &quot;steps&quot;: [{&quot;step&quot;: &quot;1. Watch 210 stocks, every 2 minutes&quot;, &quot;val&quot;: &quot;running&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;},
++                     {&quot;step&quot;: &quot;2. A tested pattern appears&quot;, &quot;val&quot;: &quot;DABUR - 09:16&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                     {&quot;step&quot;: &quot;3. Safety checks&quot;, &quot;val&quot;: &quot;all clear&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;},
++                     {&quot;step&quot;: &quot;4. Size&quot;, &quot;val&quot;: &quot;₹1,000&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                     {&quot;step&quot;: &quot;5. Paper order&quot;, &quot;val&quot;: &quot;held - price gap still being measured&quot;, &quot;color&quot;: &quot;#F0997B&quot;},
++                     {&quot;step&quot;: &quot;6. Exit rule&quot;, &quot;val&quot;: &quot;stop - target - 20 days&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;}]},
++    &quot;Ad&quot;: {&quot;name&quot;: &quot;E1 - adaptive size&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;, &quot;status&quot;: &quot;Trading allowed&quot;,
++           &quot;blurb&quot;: &quot;Same signals as E1, but the size follows the record: bigger when a pattern has been reliable, smaller after losses, capped.&quot;,
++           &quot;differs&quot;: &quot;same signals as E1; only the size moves - up when the pattern has been earning, down after losses, capped by the desk&#x27;s measured limits, never a typed range.&quot;,
++           &quot;countdown&quot;: &quot;Needs 30 live trades to validate - 0 taken so far&quot;, &quot;account&quot;: &quot;₹2,00,000&quot;,
++           &quot;size&quot;: &quot;follows the record, capped&quot;, &quot;mode&quot;: &quot;paper&quot;, &quot;patterns&quot;: &quot;same 21 as E1&quot;,
++           &quot;steps&quot;: [{&quot;step&quot;: &quot;1. Take E1&#x27;s signal&quot;, &quot;val&quot;: &quot;DABUR - 09:16&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                     {&quot;step&quot;: &quot;2. Look up this pattern&#x27;s live record&quot;, &quot;val&quot;: &quot;no live trades yet&quot;, &quot;color&quot;: &quot;#9a9a93&quot;},
++                     {&quot;step&quot;: &quot;3. Size from the record&quot;, &quot;val&quot;: &quot;₹1,000 (cold start = flat)&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                     {&quot;step&quot;: &quot;4. Cap by drawdown and total risk&quot;, &quot;val&quot;: &quot;within cap&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;},
++                     {&quot;step&quot;: &quot;5. Paper order&quot;, &quot;val&quot;: &quot;held - price gap still being measured&quot;, &quot;color&quot;: &quot;#F0997B&quot;},
++                     {&quot;step&quot;: &quot;6. Exit rule&quot;, &quot;val&quot;: &quot;stop - target - 20 days&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;}]},
++    &quot;E10&quot;: {&quot;name&quot;: &quot;E10 - the 323 facts&quot;, &quot;color&quot;: &quot;#85B7EB&quot;, &quot;status&quot;: &quot;Trading allowed&quot;,
++            &quot;blurb&quot;: &quot;Takes each E1 signal and applies 323 tested facts about it: which direction to trust, how big, whether to wait for a gap.&quot;,
++            &quot;differs&quot;: &quot;it can shrink, grow or skip a signal based on facts E1 ignores.&quot;,
++            &quot;countdown&quot;: &quot;Needs 30 live trades to validate - 0 taken so far&quot;, &quot;account&quot;: &quot;₹2,00,000&quot;,
++            &quot;size&quot;: &quot;by the facts&quot;, &quot;mode&quot;: &quot;paper&quot;, &quot;patterns&quot;: &quot;same 21, resized by 323 facts&quot;,
++            &quot;steps&quot;: [{&quot;step&quot;: &quot;1. Take E1&#x27;s signal&quot;, &quot;val&quot;: &quot;DABUR - 09:16&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;2. Read the facts for this pattern and stock&quot;, &quot;val&quot;: &quot;direction: trust - size: smaller - gap: none&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;3. Size&quot;, &quot;val&quot;: &quot;by weight&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;4. Safety checks&quot;, &quot;val&quot;: &quot;all clear&quot;, &quot;color&quot;: &quot;#5DCAA5&quot;},
++                      {&quot;step&quot;: &quot;5. Paper order&quot;, &quot;val&quot;: &quot;held - price gap still being measured&quot;, &quot;color&quot;: &quot;#F0997B&quot;},
++                      {&quot;step&quot;: &quot;6. Exit rule&quot;, &quot;val&quot;: &quot;stop - target - 20 days&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;}]},
++    &quot;E11&quot;: {&quot;name&quot;: &quot;E11 - sizing families&quot;, &quot;color&quot;: &quot;#FAC775&quot;, &quot;status&quot;: &quot;Trading allowed&quot;,
++            &quot;blurb&quot;: &quot;Takes each E1 signal and sizes it by the family the pattern belongs to; other families keep diaries inside it.&quot;,
++            &quot;differs&quot;: &quot;size by pattern family, not by the single pattern.&quot;,
++            &quot;countdown&quot;: &quot;Needs 30 live trades to validate - 0 taken so far&quot;, &quot;account&quot;: &quot;₹2,00,000&quot;,
++            &quot;size&quot;: &quot;by family&quot;, &quot;mode&quot;: &quot;paper&quot;, &quot;patterns&quot;: &quot;same 21, resized by family&quot;,
++            &quot;steps&quot;: [{&quot;step&quot;: &quot;1. Take E1&#x27;s signal&quot;, &quot;val&quot;: &quot;DABUR - 09:16&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;2. Find the pattern&#x27;s family&quot;, &quot;val&quot;: &quot;range-low family&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;3. Family weight&quot;, &quot;val&quot;: &quot;measured&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;4. Size&quot;, &quot;val&quot;: &quot;by family weight&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;},
++                      {&quot;step&quot;: &quot;5. Paper order&quot;, &quot;val&quot;: &quot;held - price gap still being measured&quot;, &quot;color&quot;: &quot;#F0997B&quot;},
++                      {&quot;step&quot;: &quot;6. Exit rule&quot;, &quot;val&quot;: &quot;stop - target - 20 days&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;}]},
++    &quot;E21&quot;: {&quot;name&quot;: &quot;E21 - overnight&quot;, &quot;color&quot;: &quot;#9a9a93&quot;, &quot;status&quot;: &quot;Watching only&quot;,
++            &quot;blurb&quot;: &quot;Buys Nifty or Bank Nifty futures near the close and sells near the open. Tested on 458 nights: loses after costs.&quot;,
++            &quot;differs&quot;: &quot;no stock patterns - one rule, one trade a night, index futures.&quot;,
++            &quot;countdown&quot;: &quot;On probation - keeps recording; no paper orders until it earns a place&quot;,
++            &quot;account&quot;: &quot;₹2,00,000 (untouched)&quot;, &quot;size&quot;: &quot;one lot, when allowed&quot;, &quot;mode&quot;: &quot;watching&quot;,
++            &quot;patterns&quot;: &quot;1 rule: buy close, sell open&quot;,
++            &quot;steps&quot;: [{&quot;step&quot;: &quot;1. 15:25 - record the closing mark&quot;, &quot;val&quot;: &quot;from tomorrow&quot;, &quot;color&quot;: &quot;#9a9a93&quot;},
++                      {&quot;step&quot;: &quot;2. 09:20 - record the opening mark&quot;, &quot;val&quot;: &quot;from tomorrow&quot;, &quot;color&quot;: &quot;#9a9a93&quot;},
++                      {&quot;step&quot;: &quot;3. Verdict so far&quot;, &quot;val&quot;: &quot;loses after costs on both indices&quot;, &quot;color&quot;: &quot;#F09595&quot;},
++                      {&quot;step&quot;: &quot;4. Conditions tested&quot;, &quot;val&quot;: &quot;day of week, prior move, expiry week - none survived&quot;, &quot;color&quot;: &quot;#9a9a93&quot;},
++                      {&quot;step&quot;: &quot;5. Paper order&quot;, &quot;val&quot;: &quot;none - on probation&quot;, &quot;color&quot;: &quot;#9a9a93&quot;},
++                      {&quot;step&quot;: &quot;6. Next check&quot;, &quot;val&quot;: &quot;after 20 more recorded nights&quot;, &quot;color&quot;: &quot;#b8b6ae&quot;}]},
++}
++
++# funnel counts / stage / pattern-funnel — the design&#x27;s illustrative figures (flagged, not gate-critical)
++FN = {&quot;E1&quot;: [2140, 412, 96, 38, 21, 21], &quot;Ad&quot;: [2140, 412, 96, 38, 21, 21], &quot;E10&quot;: [323, 323, 290, 118, 118, 118],
++      &quot;E11&quot;: [6, 6, 4, 2, 1, 1], &quot;E21&quot;: [1, 1, 0, 0, 0, 0]}
++STG = {&quot;E1&quot;: &quot;paper - live now&quot;, &quot;Ad&quot;: &quot;paper - live now&quot;, &quot;E10&quot;: &quot;paper - live now&quot;, &quot;E11&quot;: &quot;paper - live now&quot;,
++       &quot;E21&quot;: &quot;probation (recording - 20 nights)&quot;}
++PT = {&quot;E1&quot;: [&quot;2,140&quot;, &quot;21&quot;, &quot;1,707&quot;, &quot;412&quot;, &quot;21&quot;, &quot;after 30 live trades&quot;],
++      &quot;Ad&quot;: [&quot;2,140&quot;, &quot;21&quot;, &quot;1,707&quot;, &quot;412&quot;, &quot;21&quot;, &quot;after 30 live trades&quot;],
++      &quot;E10&quot;: [&quot;323 facts&quot;, &quot;118&quot;, &quot;205&quot;, &quot;0&quot;, &quot;118&quot;, &quot;after 30 live trades&quot;],
++      &quot;E11&quot;: [&quot;6 families&quot;, &quot;1&quot;, &quot;5&quot;, &quot;0&quot;, &quot;1&quot;, &quot;after 30 live trades&quot;],
++      &quot;E21&quot;: [&quot;1&quot;, &quot;0&quot;, &quot;1&quot;, &quot;0&quot;, &quot;0&quot;, &quot;after 20 nights&quot;]}
++ORDER = [&quot;E1&quot;, &quot;Ad&quot;, &quot;E10&quot;, &quot;E11&quot;, &quot;E21&quot;]
++_FAM = {&quot;ema&quot;: &quot;EMA trend&quot;, &quot;sma&quot;: &quot;SMA trend&quot;, &quot;vwap&quot;: &quot;VWAP band&quot;, &quot;rsi&quot;: &quot;RSI momentum&quot;, &quot;stddev_returns&quot;: &quot;volatility band&quot;}
++
++
++def _live_pp():
++    &quot;&quot;&quot;`pp` (per-engine pattern records) bound to the REAL live tradeable set — honest &#x27;-&#x27; where the store
++    carries no case count or win %; the real metric shown is net-per-trade R.&quot;&quot;&quot;
++    try:
++        d = json.load(open(os.path.join(_REPO, &quot;reports&quot;, &quot;LIVE-PATTERN-SET.json&quot;), encoding=&quot;utf-8&quot;))
++        pats = list((d.get(&quot;patterns&quot;) or {}).values())
++    except Exception:
++        pats = []
++    rows = []
++    for p in pats:
++        r = p.get(&quot;net_per_trade_R&quot;)
++        rows.append({&quot;w&quot;: &quot;%s - %s&quot; % (p.get(&quot;stock&quot;), _FAM.get(p.get(&quot;family&quot;, &quot;&quot;), p.get(&quot;family&quot;, &quot;&quot;))),
++                     &quot;t&quot;: DASH, &quot;n&quot;: DASH,
++                     &quot;m&quot;: (&quot;%+.2fR&quot; % r) if isinstance(r, (int, float)) else DASH,
++                     &quot;mc&quot;: &quot;#5DCAA5&quot; if (r or 0) &gt;= 0 else &quot;#F09595&quot;, &quot;l&quot;: DASH,
++                     &quot;s&quot;: &quot;live paper&quot;, &quot;sc&quot;: &quot;#5DCAA5&quot;})
++    return rows or [{&quot;w&quot;: &quot;no live pattern yet&quot;, &quot;t&quot;: DASH, &quot;n&quot;: DASH, &quot;m&quot;: DASH, &quot;mc&quot;: &quot;#9a9a93&quot;,
++                     &quot;l&quot;: DASH, &quot;s&quot;: DASH, &quot;sc&quot;: &quot;#9a9a93&quot;}]
++
++
++def engine_data():
++    k = &quot;E1&quot;                       # resting selection
++    e = dict(E[k])
++    on, off, onFg, offFg, tOn, tOff = &quot;#5DCAA5&quot;, &quot;#161920&quot;, &quot;#0f1115&quot;, &quot;#b8b6ae&quot;, &quot;#23262d&quot;, &quot;#0f1115&quot;
++
++    def st_color(x):
++        m = E[x][&quot;mode&quot;]
++        return &quot;#5DCAA5&quot; if m == &quot;paper&quot; else (&quot;#5DCAA5&quot; if E[x][&quot;status&quot;] == &quot;Recording data&quot; else &quot;#9a9a93&quot;)
++
++    lst = [{&quot;name&quot;: E[x][&quot;name&quot;], &quot;color&quot;: E[x][&quot;color&quot;], &quot;account&quot;: E[x][&quot;account&quot;], &quot;stage&quot;: STG[x],
++            &quot;stColor&quot;: st_color(x), &quot;ret&quot;: &quot;0.00%&quot; if E[x][&quot;mode&quot;] == &quot;paper&quot; else DASH,
++            &quot;trades&quot;: &quot;0&quot; if E[x][&quot;mode&quot;] == &quot;paper&quot; else DASH,
++            &quot;funnel&quot;: &quot;%s / %s / %s&quot; % (FN[x][0], FN[x][4], FN[x][5]),
++            &quot;bg&quot;: &quot;#23262d&quot; if x == k else &quot;transparent&quot;, &quot;pick&quot;: &quot;&quot;} for x in ORDER]
++    funnelRows = [{&quot;name&quot;: E[x][&quot;name&quot;], &quot;a&quot;: FN[x][0], &quot;b&quot;: FN[x][1], &quot;c&quot;: FN[x][2], &quot;d&quot;: FN[x][3],
++                   &quot;e&quot;: FN[x][4], &quot;g&quot;: FN[x][5], &quot;bg&quot;: &quot;#23262d&quot; if x == k else &quot;transparent&quot;, &quot;pick&quot;: &quot;&quot;}
++                  for x in ORDER if FN[x][0] &gt; 0]
++    pt = PT[k]
++    # 6 safety checks — real gate NAMES; the readings are the design&#x27;s sample, kept illustrative and flagged
++    def ok(v):
++        return {&quot;color&quot;: &quot;#5DCAA5&quot;, &quot;val&quot;: v}
++
++    def bad(v):
++        return {&quot;color&quot;: &quot;#F09595&quot;, &quot;val&quot;: v}
++    checks = [dict({&quot;name&quot;: &quot;1. Book fresh (&lt;=2 min)&quot;}, **ok(&quot;yes - 09:15 snapshot&quot;)),
++              dict({&quot;name&quot;: &quot;2. Other side there&quot;}, **ok(&quot;resting size vs needed&quot;)),
++              dict({&quot;name&quot;: &quot;3. Size within cap&quot;}, **ok(&quot;within cap&quot;)),
++              dict({&quot;name&quot;: &quot;4. Cost within budget&quot;}, **ok(&quot;within budget&quot;)),
++              dict({&quot;name&quot;: &quot;5. Time of day normal&quot;}, **ok(&quot;yes&quot;)),
++              dict({&quot;name&quot;: &quot;6. Price gap measured (20 readings)&quot;}, **bad(&quot;not yet -&gt; HELD&quot;))]
++
++    tab_how = True
++    out = {&quot;list&quot;: lst, &quot;funnelRows&quot;: funnelRows, &quot;pp&quot;: _live_pp(), &quot;checks&quot;: checks,
++           &quot;pa&quot;: pt[0], &quot;pb&quot;: pt[1], &quot;pc&quot;: pt[2], &quot;pd&quot;: pt[3], &quot;pe&quot;: pt[4], &quot;pf&quot;: pt[5]}
++    out.update(e)
++    # engine tab buttons (resting = E1) and the five view tabs (resting = how)
++    out.update({
++        &quot;bE1&quot;: on, &quot;fE1&quot;: onFg, &quot;bAd&quot;: off, &quot;fAd&quot;: offFg, &quot;bE10&quot;: off, &quot;fE10&quot;: offFg,
++        &quot;bE11&quot;: off, &quot;fE11&quot;: offFg, &quot;bE21&quot;: off, &quot;fE21&quot;: offFg,
++        &quot;pickE1&quot;: &quot;&quot;, &quot;pickAd&quot;: &quot;&quot;, &quot;pickE10&quot;: &quot;&quot;, &quot;pickE11&quot;: &quot;&quot;, &quot;pickE21&quot;: &quot;&quot;,
++        &quot;isHow&quot;: tab_how, &quot;isPositions&quot;: False, &quot;isTrades&quot;: False, &quot;isPatterns&quot;: False, &quot;isStocks&quot;: False,
++        &quot;howBg&quot;: tOn, &quot;howFg&quot;: &quot;#ffffff&quot;, &quot;posBg&quot;: tOff, &quot;posFg&quot;: &quot;#9a9a93&quot;, &quot;trBg&quot;: tOff, &quot;trFg&quot;: &quot;#9a9a93&quot;,
++        &quot;patBg&quot;: tOff, &quot;patFg&quot;: &quot;#9a9a93&quot;, &quot;stBg&quot;: tOff, &quot;stFg&quot;: &quot;#9a9a93&quot;,
++        &quot;showHow&quot;: &quot;&quot;, &quot;showPositions&quot;: &quot;&quot;, &quot;showTrades&quot;: &quot;&quot;, &quot;showPatterns&quot;: &quot;&quot;, &quot;showStocks&quot;: &quot;&quot;,
++    })
++    return out
++
++
++if __name__ == &quot;__main__&quot;:
++    d = engine_data()
++    assert &quot;937&quot; not in json.dumps(d) and &quot;69%&quot; not in json.dumps(d), &quot;sample value leaked into engine data&quot;
++    print(&quot;engine_data OK: %d engines, %d live pattern rows, no sample values&quot; % (len(d[&quot;list&quot;]), len(d[&quot;pp&quot;])))
+diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index 748a3b175..dd2c3db3e 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -376,10 +376,30 @@ def _fix_stocks(html):
+ POST[&quot;Stocks.dc.html&quot;] = _fix_stocks
+ 
+ 
++
++def _engine_data():
++    &quot;&quot;&quot;The Engine page: descriptive engine facts transcribed verbatim, pattern records bound honestly to the
++    live set. See scripts/v8_engine_data for the data and why fabricated per-engine metrics are not carried.&quot;&quot;&quot;
++    from scripts import v8_engine_data
++    return v8_engine_data.engine_data()
++
++
++
++def _fix_engine(html):
++    &quot;&quot;&quot;Drop the one baked fabricated clause on the Engine &#x27;how&#x27; tab (won 69% of 937) — no placeholder
++    to bind; the store has no per-pattern win/case count, so the honest sentence just says a pattern fired.&quot;&quot;&quot;
++    return html.replace(
++        &quot;Pattern won 69% of 937 past cases. Buying ₹1,000 - held, price gap still being measured.&quot;,
++        &quot;A tested pattern fired. Buying ₹1,000 - held, price gap still being measured.&quot;)
++
++
++POST[&quot;Engine.dc.html&quot;] = _fix_engine
++
++
+ # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
+ # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
+ # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
+-PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data}
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data, &quot;Stocks.dc.html&quot;: _stocks_data, &quot;Engine.dc.html&quot;: _engine_data}
+ 
+ 
+ def build(write=True, only=None):
+diff --git a/site/v2/engines.html b/site/v2/engines.html
+index b5abd6d3f..b9a740b9e 100644
+--- a/site/v2/engines.html
++++ b/site/v2/engines.html
+@@ -1,37 +1,99 @@
+-&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Engines — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
+-:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
+-  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
+-*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
+-  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
+-.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
+-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+-.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+-  background:#0c0e12;position:sticky;top:0;z-index:5}
+-.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
+-  padding:2px 8px;margin-right:8px}
+-.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
+-.nav a.on{background:var(--card);color:var(--ink)}
+-.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
+-.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
+-  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+-main{max-width:1180px;margin:0 auto;padding:16px}
+-h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
+-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+-.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
+-.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
+-table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+-td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
+-tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
+-.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+-.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+-.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
+-.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
+-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+-.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
+-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+-.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+-.tabs button.on{background:var(--card);color:var(--ink)}
+-.tabpane{display:none}.tabpane.on{display:block}
+-.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
+-&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27; class=&#x27;on&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Engines&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Each engine is a separate trader with its own account. Where it is now, what it does, and how many ideas made it through the exam. Click one for its full page. &lt;a href=&#x27;scoreboard.html&#x27;&gt;See the analyst scoreboard →&lt;/a&gt;&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;a href=&#x27;engine-E1.html&#x27; style=&#x27;font-size:16px;font-weight:600&#x27;&gt;E1 — patterns in price&lt;/a&gt;&lt;span class=&#x27;pill&#x27;&gt;Live, paper only&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0&#x27;&gt;Searches each stock&amp;#x27;s own price history for behaviour that repeats, keeps only what survives a locked final exam and still pays after fees, and trades it on paper.&lt;/p&gt;&lt;p class=&#x27;sub&#x27;&gt;Waiting for: Tuesday&amp;#x27;s session and the daily Kite login.&lt;/p&gt;&lt;div class=&#x27;funnel&#x27;&gt;&lt;div class=&#x27;f&#x27;&gt;210 stocks with minute-by-minute history&lt;/div&gt;&lt;div class=&#x27;f&#x27;&gt;323 distinct patterns passed the final exam&lt;/div&gt;&lt;div class=&#x27;f&#x27;&gt;20,550 of 21,945 stock pairs move together&lt;/div&gt;&lt;div class=&#x27;f&#x27;&gt;minute-level pairs: 14,000 of 70,943 swept, 11,333,004 patterns validated (~11 days to finish, runs anyway)&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:12px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;a href=&#x27;engine-E2.html&#x27; style=&#x27;font-size:16px;font-weight:600&#x27;&gt;E2 — filings and analyst calls&lt;/a&gt;&lt;span class=&#x27;pill&#x27;&gt;Not live yet&lt;/span&gt;&lt;/div&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:6px 0&#x27;&gt;Checks whether a named source&amp;#x27;s published predictions are followed by a move worth trading.&lt;/p&gt;&lt;p class=&#x27;sub&#x27;&gt;Waiting for: A feed that captures each call before its outcome is known, and the four acc</pre></div><div class='c'><div class='h'><b>8b4684db7</b> · 2026-09-22 22:43</div><div>R-V2-EXACT: port the Stocks page; owner title &#x27;Stocks the desk watches - N&#x27;, real 210 screener stocks (volume/trend/signals real, honest &#x27;-&#x27; for readings the store lacks)</div><div class='sub h'>scripts/v8_site.py  | 60 +++++++++++++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/stocks.html | 79 ++++++++++++++++++++++++++++-------------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
 index 88528bc80..748a3b175 100644
 --- a/scripts/v8_site.py
 +++ b/scripts/v8_site.py
@@ -1703,472 +2120,4 @@ index 000000000..eece7cdbf
 +if __name__ == &quot;__main__&quot;:
 +    test_pages_have_written_time(); test_queue_state_and_next_pending(); test_record_screenshot_shows_on_page()
 +    print(&quot;test_mirror OK&quot;)
-</pre></div><div class='c'><div class='h'><b>ef04300cd</b> · 2026-09-22 21:32</div><div>R-EYES-COMPLETE (6): ruling inbox — → BUILD queues, → AUDIT runs a fresh independent audit</div><div class='sub h'>docs/AUDITOR-TEMPLATE.md        |  21 +++++++</div><div class='sub h'>docs/dispatches/inbox/README.md |   1 +</div><div class='sub h'>scripts/auditor.py              | 120 ++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/inbox.py                | 111 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/kill_switch.py          |   8 +++</div><div class='sub h'>tests/test_inbox.py             |  36 ++++++++++++</div><pre>diff --git a/docs/AUDITOR-TEMPLATE.md b/docs/AUDITOR-TEMPLATE.md
-new file mode 100644
-index 000000000..3a757e6a8
---- /dev/null
-+++ b/docs/AUDITOR-TEMPLATE.md
-@@ -0,0 +1,21 @@
-+# AUDITOR — fixed instructions (R-EYES-COMPLETE §6)
-+
-+You are a FRESH, INDEPENDENT auditor of this paper-trading repo. You did not write any of it and you assume
-+nothing. You read ONLY repo files and the published mirror files. You do not build, edit, commit, or run
-+engines — you read and judge.
-+
-+The owner asked for this audit (their → AUDIT message is the REASON below). Answer their question against the
-+repo and the mirror, and also check the standing laws (CLAUDE.md §3, §4, §13, §18, §20):
-+
-+1. The owner&#x27;s question in the REASON — answered from the files, with the file:line receipts.
-+2. NO fabricated data — every number traces to a store on disk; a missing store is BLOCKED-ON-DATA, not a guess.
-+3. NO naked numbers — every constant is derived (§4.1).
-+4. Held signals are not trades; demos never wrote a live ledger or sent a real Telegram line.
-+5. Provenance — every change traces to an owner ruling in docs/dispatches (including docs/dispatches/inbox).
-+6. No secret on any published mirror page.
-+
-+END your reply with exactly ONE line, nothing after it:
-+
-+  AUDIT-VERDICT: PASS — &lt;one plain sentence&gt;
-+    — or —
-+  AUDIT-VERDICT: FAIL — &lt;one plain sentence naming the defect + its file:line&gt;
-diff --git a/docs/dispatches/inbox/README.md b/docs/dispatches/inbox/README.md
-new file mode 100644
-index 000000000..c0534db63
---- /dev/null
-+++ b/docs/dispatches/inbox/README.md
-@@ -0,0 +1 @@
-+inbox ruling archives land here (R-EYES-COMPLETE §6). A RECORD, never an instruction.
-diff --git a/scripts/auditor.py b/scripts/auditor.py
-new file mode 100644
-index 000000000..d171f0bf2
---- /dev/null
-+++ b/scripts/auditor.py
-@@ -0,0 +1,120 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (6): the fresh independent audit runner. A → AUDIT from the owner launches a fresh Opus run
-+(the same mechanism as the supervisor) with docs/AUDITOR-TEMPLATE.md, reading only repo + mirror files. Its
-+report lands on docs/reports (the mirror renders Reports newest first) and one Telegram line goes out. The
-+interactive audit session is retired — this replaces it. The claude invocation is injectable so tests never
-+spend a real run.&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import re
-+import subprocess
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+TEMPLATE = os.path.join(REPO, &quot;docs&quot;, &quot;AUDITOR-TEMPLATE.md&quot;)
-+REPORTS_DIR = os.path.join(REPO, &quot;docs&quot;, &quot;reports&quot;)
-+CLAUDE = os.path.join(os.environ.get(&quot;APPDATA&quot;, &quot;&quot;), &quot;npm&quot;, &quot;claude.cmd&quot;)
-+MODEL = &quot;claude-opus-4-8&quot;
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _invoke_claude(prompt):
-+    if not os.path.isfile(CLAUDE):
-+        return &quot;&quot;, {&quot;error&quot;: &quot;claude CLI not found&quot;}
-+    try:
-+        r = subprocess.run([CLAUDE, &quot;--model&quot;, MODEL, &quot;--output-format&quot;, &quot;stream-json&quot;, &quot;--verbose&quot;, &quot;-p&quot;],
-+                           input=prompt.encode(&quot;utf-8&quot;), capture_output=True, timeout=600, cwd=REPO,
-+                           creationflags=0x08000000)     # R-NO-WINDOWS
-+        out = r.stdout.decode(&quot;utf-8&quot;, &quot;replace&quot;)
-+    except Exception as e:
-+        return &quot;&quot;, {&quot;error&quot;: type(e).__name__}
-+    text, usage = [], {}
-+    for line in out.splitlines():
-+        try:
-+            ev = json.loads(line)
-+        except Exception:
-+            continue
-+        if ev.get(&quot;type&quot;) == &quot;assistant&quot;:
-+            for b in (ev.get(&quot;message&quot;, {}) or {}).get(&quot;content&quot;, []):
-+                if isinstance(b, dict) and b.get(&quot;type&quot;) == &quot;text&quot;:
-+                    text.append(b[&quot;text&quot;])
-+        if ev.get(&quot;type&quot;) == &quot;result&quot;:
-+            usage = {&quot;cost_usd&quot;: ev.get(&quot;total_cost_usd&quot;)}
-+    return &quot;\n&quot;.join(text), usage
-+
-+
-+def _prompt(reason):
-+    tmpl = open(TEMPLATE, encoding=&quot;utf-8&quot;).read()
-+    head = _git(&quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;).strip()
-+    return &quot;%s\n\n===== REASON (the owner&#x27;s → AUDIT) =====\n%s\n\n===== HEAD =====\n%s\n&quot; % (tmpl, reason, head)
-+
-+
-+def _git(*a):
-+    try:
-+        return subprocess.run([&quot;git&quot;, *a], cwd=REPO, capture_output=True, text=True, timeout=20,
-+                              creationflags=0x08000000).stdout
-+    except Exception:
-+        return &quot;&quot;
-+
-+
-+def _verdict(text):
-+    m = re.search(r&quot;AUDIT-VERDICT:\s*(PASS|FAIL)\s*[—-]?\s*(.*)&quot;, text or &quot;&quot;, re.I)
-+    if not m:
-+        return None, &quot;no verdict line&quot;
-+    return m.group(1).upper(), (m.group(2) or &quot;&quot;).strip()
-+
-+
-+def run(reason=&quot;&quot;, invoke_fn=None, notifier=None):
-+    &quot;&quot;&quot;One fresh audit. Writes the report to docs/reports and posts one line. Returns (verdict, summary).&quot;&quot;&quot;
-+    text, usage = (invoke_fn or _invoke_claude)(_prompt(reason))
-+    verdict, summary = _verdict(text)
-+    ts = _now().strftime(&quot;%Y-%m-%d-%H%M%S&quot;)
-+    path = os.path.join(REPORTS_DIR, &quot;%s-audit.md&quot; % ts)
-+    try:
-+        os.makedirs(REPORTS_DIR, exist_ok=True)
-+        with open(path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(&quot;# Audit %s\n\n_Fresh independent audit (→ AUDIT). Reason: %s_\n\n**Verdict: %s — %s**\n\n&quot;
-+                    &quot;## Full reply\n\n%s\n&quot; % (ts, str(reason)[:200], verdict or &quot;INCONCLUSIVE&quot;, summary,
-+                                              _scrub(text)))
-+    except Exception:
-+        pass
-+    line = &quot;AUDIT %s: %s — %s · https://[redacted]-[redacted].github.io/e1-live-site/build/index.html&quot; % (
-+        ts[-6:], verdict or &quot;INCONCLUSIVE&quot;, summary[:120])
-+    try:
-+        (notifier or _notify)(line)
-+    except Exception:
-+        pass
-+    return verdict, summary
-+
-+
-+def _scrub(text):
-+    try:
-+        from scripts import build_journal
-+        return build_journal.scrub(str(text or &quot;&quot;))[:40000]
-+    except Exception:
-+        return str(text or &quot;&quot;)[:40000]
-+
-+
-+def _notify(msg):
-+    from scripts import notify
-+    notify.notify(msg)
-+
-+
-+def _demo():
-+    o = run(reason=&quot;check the ledgers&quot;, invoke_fn=lambda p: (&quot;looks fine.\nAUDIT-VERDICT: PASS — ledgers clean&quot;,
-+                                                             {}), notifier=lambda m: None)
-+    assert o[0] == &quot;PASS&quot; and &quot;ledgers clean&quot; in o[1]
-+    print(&quot;auditor demo OK: fresh run parses the verdict and writes a report.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo() if &quot;--demo&quot; in sys.argv else print(run(reason=&quot; &quot;.join(sys.argv[1:]) or &quot;general audit&quot;))
-diff --git a/scripts/inbox.py b/scripts/inbox.py
-new file mode 100644
-index 000000000..8032c5ade
---- /dev/null
-+++ b/scripts/inbox.py
-@@ -0,0 +1,111 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (6): the ruling inbox. A Telegram message from the owner&#x27;s chat that starts with:
-+  • &quot;→ BUILD&quot; is archived verbatim to docs/dispatches/inbox/&lt;time&gt;.md and becomes the NEXT queue item (the
-+    auto-continue mechanism, R-AUTO-CONTINUE, takes inbox items in order).
-+  • &quot;→ AUDIT&quot; triggers a fresh independent audit run (docs/AUDITOR-TEMPLATE.md, fresh model, reads only repo +
-+    mirror files), whose report lands on Reports and as one Telegram line.
-+The bot replies &quot;queued: &lt;first words&gt;&quot; so the owner knows it landed. Owner chat only (enforced by the caller).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import json
-+import os
-+import re
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+INBOX_DIR = os.path.join(REPO, &quot;docs&quot;, &quot;dispatches&quot;, &quot;inbox&quot;)
-+CHECKLIST = os.path.join(REPO, &quot;reports&quot;, &quot;CHECKLIST.json&quot;)
-+
-+
-+def _now():
-+    return datetime.now(IST)
-+
-+
-+def _first_words(text, n=5):
-+    body = re.sub(r&quot;^→\s*(BUILD|AUDIT)\s*&quot;, &quot;&quot;, str(text).strip())
-+    return &quot; &quot;.join(body.split()[:n]) or &quot;(empty)&quot;
-+
-+
-+def handle_build(raw_text):
-+    &quot;&quot;&quot;Archive the → BUILD ruling verbatim and make it the next queue item. Returns the first-words label.&quot;&quot;&quot;
-+    ts = _now().strftime(&quot;%Y-%m-%d_%H%M%S&quot;)
-+    label = _first_words(raw_text)
-+    try:
-+        os.makedirs(INBOX_DIR, exist_ok=True)
-+        with open(os.path.join(INBOX_DIR, ts + &quot;.md&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(&quot;# Inbox ruling %s\n\n_Owner-pasted via Telegram (→ BUILD), archived verbatim per §7.1._\n\n&quot;
-+                    &quot;%s\n&quot; % (ts, raw_text.strip()))
-+    except Exception:
-+        pass
-+    try:                                                   # front of the checklist -&gt; auto-continue takes it next
-+        c = json.load(open(CHECKLIST, encoding=&quot;utf-8&quot;))
-+    except Exception:
-+        c = {&quot;remaining&quot;: [], &quot;done&quot;: []}
-+    c.setdefault(&quot;remaining&quot;, []).insert(0, &quot;inbox: &quot; + label)
-+    try:
-+        json.dump(c, open(CHECKLIST, &quot;w&quot;, encoding=&quot;utf-8&quot;), indent=1)
-+    except Exception:
-+        pass
-+    return label
-+
-+
-+def handle_audit(raw_text, runner=None):
-+    &quot;&quot;&quot;Trigger a fresh independent audit run. Returns the first-words label; the audit report + one line are the
-+    auditor&#x27;s own outputs.&quot;&quot;&quot;
-+    label = _first_words(raw_text)
-+    try:
-+        from scripts import auditor
-+        (runner or auditor.run)(reason=raw_text.strip())
-+    except Exception:
-+        pass
-+    return label
-+
-+
-+def process(raw_text, reply=None, runner=None):
-+    &quot;&quot;&quot;Route a message. Returns (kind, label) or (None, None) if not an inbox command. Sends the &#x27;queued&#x27; reply.&quot;&quot;&quot;
-+    t = str(raw_text).strip()
-+    up = t.upper()
-+    kind = label = None
-+    if up.startswith(&quot;→ BUILD&quot;) or up.startswith(&quot;-&gt;BUILD&quot;) or up.startswith(&quot;→BUILD&quot;):
-+        kind, label = &quot;BUILD&quot;, handle_build(t)
-+    elif up.startswith(&quot;→ AUDIT&quot;) or up.startswith(&quot;-&gt;AUDIT&quot;) or up.startswith(&quot;→AUDIT&quot;):
-+        kind, label = &quot;AUDIT&quot;, handle_audit(t, runner=runner)
-+    if kind:
-+        try:
-+            (reply or _reply)(&quot;queued: %s&quot; % label)
-+        except Exception:
-+            pass
-+    return kind, label
-+
-+
-+def _reply(text):
-+    from scripts import notify
-+    notify.notify(text)
-+
-+
-+def _demo():
-+    import tempfile
-+    global INBOX_DIR, CHECKLIST
-+    d = tempfile.mkdtemp()
-+    INBOX_DIR = os.path.join(d, &quot;inbox&quot;); CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
-+    json.dump({&quot;remaining&quot;: [&quot;existing&quot;], &quot;done&quot;: []}, open(CHECKLIST, &quot;w&quot;))
-+    replies = []
-+    kind, label = process(&quot;→ BUILD add a page widget&quot;, reply=replies.append)
-+    assert kind == &quot;BUILD&quot; and label == &quot;add a page widget&quot;
-+    c = json.load(open(CHECKLIST))
-+    assert c[&quot;remaining&quot;][0] == &quot;inbox: add a page widget&quot;         # became the next queue item
-+    assert os.listdir(INBOX_DIR)                                    # archived verbatim
-+    assert replies == [&quot;queued: add a page widget&quot;]
-+    audited = []
-+    process(&quot;→ AUDIT check the ledgers&quot;, reply=replies.append, runner=lambda reason: audited.append(reason))
-+    assert audited and &quot;check the ledgers&quot; in audited[0]
-+    print(&quot;inbox demo OK: → BUILD archives + queues; → AUDIT triggers a run; both reply &#x27;queued&#x27;.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo()
-diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
-index 4968026e7..e9595291d 100644
---- a/scripts/kill_switch.py
-+++ b/scripts/kill_switch.py
-@@ -95,6 +95,14 @@ def poll_telegram(get=None):
-             msg_log.incoming(raw_text)
-         except Exception:
-             pass
-+        try:                                   # R-EYES-COMPLETE §6: ruling inbox — → BUILD queues, → AUDIT runs
-+            from scripts import inbox
-+            kind, _label = inbox.process(raw_text)
-+            if kind:
-+                action = kind
-+                continue                       # handled as an inbox command; not KILL/RESUME/NOW
-+        except Exception:
-+            pass
-         text = raw_text.upper()
-         if text == &quot;KILL&quot;:
-             kill(); action = &quot;KILL&quot;
-diff --git a/tests/test_inbox.py b/tests/test_inbox.py
-new file mode 100644
-index 000000000..de9f59a04
---- /dev/null
-+++ b/tests/test_inbox.py
-@@ -0,0 +1,36 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (6): → BUILD archives + becomes the next queue item; → AUDIT triggers a run; reply &#x27;queued&#x27;.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import inbox
-+
-+
-+def _iso(d):
-+    inbox.INBOX_DIR = os.path.join(d, &quot;inbox&quot;); inbox.CHECKLIST = os.path.join(d, &quot;cl.json&quot;)
-+    json.dump({&quot;remaining&quot;: [&quot;existing&quot;], &quot;done&quot;: []}, open(inbox.CHECKLIST, &quot;w&quot;))
-+
-+
-+def test_build_archives_and_queues_first():
-+    d = tempfile.mkdtemp(); _iso(d); replies = []
-+    kind, label = inbox.process(&quot;→ BUILD add a status widget&quot;, reply=replies.append)
-+    assert kind == &quot;BUILD&quot; and label == &quot;add a status widget&quot;
-+    c = json.load(open(inbox.CHECKLIST))
-+    assert c[&quot;remaining&quot;][0] == &quot;inbox: add a status widget&quot;     # next queue item
-+    assert os.listdir(inbox.INBOX_DIR)                            # archived verbatim
-+    assert replies == [&quot;queued: add a status widget&quot;]
-+
-+
-+def test_audit_triggers_runner_and_replies():
-+    d = tempfile.mkdtemp(); _iso(d); replies, ran = [], []
-+    kind, label = inbox.process(&quot;→ AUDIT verify the ledgers&quot;, reply=replies.append, runner=lambda reason: ran.append(reason))
-+    assert kind == &quot;AUDIT&quot; and ran and &quot;verify the ledgers&quot; in ran[0]
-+    assert replies == [&quot;queued: verify the ledgers&quot;]
-+
-+
-+def test_non_inbox_message_ignored():
-+    d = tempfile.mkdtemp(); _iso(d)
-+    assert inbox.process(&quot;just a normal note&quot;, reply=lambda m: None) == (None, None)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_build_archives_and_queues_first(); test_audit_triggers_runner_and_replies(); test_non_inbox_message_ignored()
-+    print(&quot;test_inbox OK&quot;)
-</pre></div><div class='c'><div class='h'><b>d696097a9</b> · 2026-09-22 21:29</div><div>R-EYES-COMPLETE (2): local incoming/outgoing Telegram log (scrubbed) for the mirror</div><div class='sub h'>scripts/kill_switch.py |  5 ++++</div><div class='sub h'>scripts/msg_log.py     | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/notify.py      |  5 ++++</div><div class='sub h'>tests/test_msg_log.py  | 18 +++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
-index 1f7107b54..4968026e7 100644
---- a/scripts/kill_switch.py
-+++ b/scripts/kill_switch.py
-@@ -90,6 +90,11 @@ def poll_telegram(get=None):
-         if str((msg.get(&quot;chat&quot;) or {}).get(&quot;id&quot;)) != str(chat_id):
-             continue                                   # only the owner&#x27;s chat
-         raw_text = (msg.get(&quot;text&quot;) or &quot;&quot;).strip()
-+        try:
-+            from scripts import msg_log        # R-EYES-COMPLETE §2: log every owner command received
-+            msg_log.incoming(raw_text)
-+        except Exception:
-+            pass
-         text = raw_text.upper()
-         if text == &quot;KILL&quot;:
-             kill(); action = &quot;KILL&quot;
-diff --git a/scripts/msg_log.py b/scripts/msg_log.py
-new file mode 100644
-index 000000000..b90dd6020
---- /dev/null
-+++ b/scripts/msg_log.py
-@@ -0,0 +1,68 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (2): the local incoming/outgoing Telegram log the mirror&#x27;s Messages page reads — every line
-+the bot sent and every command it received, with times, scrubbed with the public transcript&#x27;s scrubber. Both
-+directions in one file (reports/MSG-LOG.tsv: iso&lt;TAB&gt;IN|OUT&lt;TAB&gt;scrubbed-text).&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import os
-+import sys
-+from datetime import datetime, timezone, timedelta
-+
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine1_rebuild import datastore as ds
-+
-+REPO = ds._REPO
-+IST = timezone(timedelta(hours=5, minutes=30))
-+MSGLOG = os.path.join(REPO, &quot;reports&quot;, &quot;MSG-LOG.tsv&quot;)
-+
-+
-+def _scrub(text):
-+    try:
-+        from scripts import build_journal
-+        return build_journal.scrub(str(text))
-+    except Exception:
-+        return str(text)
-+
-+
-+def _write(direction, text):
-+    try:
-+        line = &quot;%s\t%s\t%s&quot; % (datetime.now(IST).isoformat(), direction,
-+                               _scrub(text).replace(&quot;\t&quot;, &quot; &quot;).replace(&quot;\n&quot;, &quot; &quot;)[:1000])
-+        os.makedirs(os.path.dirname(MSGLOG), exist_ok=True)
-+        with open(MSGLOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+
-+
-+def outgoing(text):
-+    _write(&quot;OUT&quot;, text)
-+
-+
-+def incoming(text):
-+    _write(&quot;IN&quot;, text)
-+
-+
-+def recent(n=400):
-+    &quot;&quot;&quot;[(iso, direction, text)] newest first.&quot;&quot;&quot;
-+    try:
-+        rows = [l.split(&quot;\t&quot;, 2) for l in open(MSGLOG, encoding=&quot;utf-8&quot;).read().splitlines() if l.strip()]
-+        rows = [r for r in rows if len(r) == 3]
-+        return rows[::-1][:n]
-+    except Exception:
-+        return []
-+
-+
-+def _demo():
-+    import tempfile
-+    global MSGLOG
-+    MSGLOG = os.path.join(tempfile.mkdtemp(), &quot;m.tsv&quot;)
-+    incoming(&quot;→ AUDIT check the ledgers  api_key=[redacted]&quot;)
-+    outgoing(&quot;STACK: restarted 21:00&quot;)
-+    r = recent()
-+    assert len(r) == 2 and r[0][1] == &quot;OUT&quot; and r[1][1] == &quot;IN&quot;
-+    assert &quot;SECRETVALUE123456&quot; not in r[1][2] or &quot;[redacted]&quot; in r[1][2]   # scrubbed
-+    print(&quot;msg_log demo OK: incoming + outgoing, newest first, scrubbed.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    _demo()
-diff --git a/scripts/notify.py b/scripts/notify.py
-index 0e528e782..c66584d5f 100644
---- a/scripts/notify.py
-+++ b/scripts/notify.py
-@@ -181,6 +181,11 @@ def notify(message: str, timeout: float = 10.0) -&gt; bool:
-         _log_send(message, &quot;RATE-LIMITED&quot;)
-         return False
-     _log_message(message)                     # amendment 3: every real outbound message -&gt; the Messages log
-+    try:
-+        from scripts import msg_log            # R-EYES-COMPLETE §2: the mirror&#x27;s incoming/outgoing log
-+        msg_log.outgoing(message)
-+    except Exception:
-+        pass
-     try:
-         from scripts import heartbeat            # R-E1-TIMER+CLOCK: update the public heartbeat the
-         heartbeat.touch(message)                 # alarm page reads (⏱ / 🙋 / session-finished), IST.
-diff --git a/tests/test_msg_log.py b/tests/test_msg_log.py
-new file mode 100644
-index 000000000..b5dc5cbce
---- /dev/null
-+++ b/tests/test_msg_log.py
-@@ -0,0 +1,18 @@
-+&quot;&quot;&quot;R-EYES-COMPLETE (2): incoming + outgoing messages logged with times, scrubbed, newest first.&quot;&quot;&quot;
-+import os, sys, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import msg_log
-+
-+
-+def test_both_directions_scrubbed_newest_first():
-+    msg_log.MSGLOG = os.path.join(tempfile.mkdtemp(), &quot;m.tsv&quot;)
-+    msg_log.incoming(&quot;→ BUILD do the thing  [redacted]&quot;)
-+    msg_log.outgoing(&quot;posted a line&quot;)
-+    r = msg_log.recent()
-+    assert len(r) == 2 and r[0][1] == &quot;OUT&quot; and r[1][1] == &quot;IN&quot;
-+    assert &quot;ghp_&quot; not in r[1][2]                          # secret scrubbed on the way in
-+    assert &quot;→ BUILD do the thing&quot; in r[1][2]
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    test_both_directions_scrubbed_newest_first(); print(&quot;test_msg_log OK&quot;)
 </pre></div></main></body></html>
