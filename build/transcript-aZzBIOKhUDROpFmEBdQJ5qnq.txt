@@ -1001,3 +1001,939 @@ tool_result: QB keys: ['days', 'as_of', 'cost_round_trip_frac', 'matches_today',
 INDEX daily calls: 0
  intraday: {"label": "Index intraday-only (1/5/15-min, no overnight)", "calls": 11, "period": "2026-07-10 \u2192 2026-07-15", "win_pct": 45.5, "accuracy_pct": 54.5, "sharpe_mid": null, "sharpe_cross": null, "sortino_mid": null, "sortino_cross": null, "ratios_note": "n/a \u2014 fewer than 30 calls", "max_dd_R_cross": -3.83, "total_R_mid": -2.61, "total_R_cross": -3.81, "band95_total_R_cross": [-8.89, 1.29], "rupees_cross": -3813.0, "pct_of_capital_cross": -1.91, "fees_rupees": 2414.0, "avg_hold_days": 0.112, "avg_hold_minutes": 160.9, "rolls": 0, "verdict": "not distinguishable from zero; live fills decide"}
  parts keys: ['daily_counts', 'daily', 'daily_by_h', 'intraday_counts', 'intraday', 'comparison']
+assistant: Real data confirmed — Dubai: 20 closed trades (4W/16L, ₹−5,440), 13 open, 13 matches today; Index: 0 daily calls, 11 intraday (aggregate only). Let me read the v2 helpers (`R`, `rup`, `_data`, `_foot`, tab JS) so my rewrite matches conventions.
+tool_use Bash {"command": "echo \"=== helpers ===\" && grep -n \"^def R\\|^def rup\\|^def esc\\|^def pct\\|^def _card\\|^def _present\\|^def _data\\|^def _head\\|^def _nav\\|^def _foot\\|^def _write\\|def _acct_equity\" scripts/site_v2.py && echo \"\" && echo \"=== _data + _foot + tab js region ===\" && sed -n '150,200p' scripts/site_v2.py", "description": "Locate helper defs and read foot/tab js"}
+tool_result: === helpers ===
+75:def _data(name):
+82:def esc(x):
+90:def rup(x):
+111:def R(x, plus=True):
+121:def pct(x):
+131:def _head(title):
+164:def _nav(active):
+171:def _foot():
+193:def _write(name, body):
+271:def _card(k, v, cls=""):
+275:def _present(x):
+284:def _acct_equity(v):
+574:def _data_page():
+729:def _write_diaries_data():
+
+=== _data + _foot + tab js region ===
+            cls = "gain" if (ch or 0) >= 0 else "loss"
+            chtxt = ("%+.2f%%" % ch) if ch is not None else ""
+            spans.append("<span>%s <b class='%s'>%s</b> %s</span>" % (
+                esc(s.get("stock", "")), cls, esc(s.get("last", "")), esc(chtxt)))
+        inner = "".join(spans)
+    else:
+        inner = "<span>prices as of %s · live prices arrive with the next session</span>" % esc(asof or "the last close")
+    return "<div class='tick'>" + inner + "</div>"
+
+
+def _screener_asof():
+    return (_data("screener.json") or {}).get("as_of") or ""
+
+
+def _nav(active):
+    links = "".join("<a href='%s'%s>%s</a>" % (href, " class='on'" if href == active else "", esc(label))
+                    for href, label in NAV)
+    return ("<div class='nav'><span class='logo'>E1</span>" + links +
+            "<a class='ask' href='ask.html'>Ask the desk</a></div>" + _ticker())
+
+
+def _foot():
+    live = _data("live.json")
+    upd = live.get("published") or ""
+    js = ("<script>function refreshTick(){fetch('../data/live.json?_='+Date.now()).then(function(r){return r.json()})"
+          ".then(function(d){var t=(d.tape&&d.tape.stocks)||[];if(!t.length)return;var h=t.slice(0,40).map(function(s){"
+          "var c=(s.change_pct||0)>=0?'gain':'loss';var ch=s.change_pct!=null?((s.change_pct>=0?'+':'')+s.change_pct+'%'):'';"
+          "return \"<span>\"+s.stock+\" <b class='\"+c+\"'>\"+s.last+\"</b> \"+ch+\"</span>\";}).join('');"
+          "var el=document.querySelector('.tick');if(el&&h)el.innerHTML=h;}).catch(function(){});}"
+          "setInterval(refreshTick,120000);"
+          "function tab(g,i){var ps=document.querySelectorAll('[data-g=\"'+g+'\"]');ps.forEach(function(p,j){"
+          "p.classList.toggle('on',j==i);});var bs=document.querySelectorAll('[data-tb=\"'+g+'\"]');"
+          "bs.forEach(function(b,j){b.classList.toggle('on',j==i);});}"
+          "function filt(id,tid){var q=(document.getElementById(id).value||'').toUpperCase();"
+          "document.querySelectorAll('#'+tid+' tbody tr').forEach(function(r){"
+          "r.style.display=r.getAttribute('data-k').indexOf(q)>=0?'':'none';});}</script>")
+    return ("<p class='updated'>last updated " + esc(upd) + " · the tape refreshes every 2 minutes</p>"
+            + js + "</body></html>")
+
+
+_OUT = V2                                        # where _write puts pages (build() points this at a staging dir)
+
+
+def _write(name, body):
+    os.makedirs(_OUT, exist_ok=True)
+    with open(os.path.join(_OUT, name), "w", encoding="utf-8") as f:
+        f.write(body)
+
+
+# ---------- pages ----------
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 75, "limit": 55}
+tool_result: 75	def _data(name):
+76	    try:
+77	        return json.load(open(os.path.join(DATA, name), encoding="utf-8"))
+78	    except Exception:
+79	        return {}
+80	
+81	
+82	def esc(x):
+83	    if x is None:
+84	        return "—"
+85	    if isinstance(x, float) and x != x:          # NaN -> em-dash, never the literal 'nan'
+86	        return "—"
+87	    return _html.escape(str(x))
+88	
+89	
+90	def rup(x):
+91	    try:
+92	        n = float(x)
+93	    except (TypeError, ValueError):
+94	        return "—"
+95	    if n != n:
+96	        return "—"
+97	    s = "-" if n < 0 else ""
+98	    n = abs(int(round(n)))
+99	    d = str(n)
+100	    if len(d) > 3:
+101	        h, t = d[:-3], d[-3:]
+102	        parts = []
+103	        while len(h) > 2:
+104	            parts.insert(0, h[-2:]); h = h[:-2]
+105	        if h:
+106	            parts.insert(0, h)
+107	        d = ",".join(parts) + "," + t
+108	    return "₹" + s + d
+109	
+110	
+111	def R(x, plus=True):
+112	    try:
+113	        v = float(x)
+114	    except (TypeError, ValueError):
+115	        return "—"
+116	    if v != v:
+117	        return "—"
+118	    return ("+" if (plus and v >= 0) else "") + ("%.1f R" % v)
+119	
+120	
+121	def pct(x):
+122	    try:
+123	        v = float(x)
+124	    except (TypeError, ValueError):
+125	        return "—"
+126	    if v != v:
+127	        return "—"
+128	    return "%.1f%%" % v
+129	
+assistant: Now let me check the v2 build gate (`render_gate`, the no-jargon check) so my rewrite passes it, then check how the build is invoked (staging dir).
+tool_use Bash {"command": "echo \"=== gate + build ===\" && grep -n \"def render_gate\\|def build\\|JARGON\\|jargon\\|no-jargon\\|banned\\|def main\\|__main__\\|staging\\|_OUT =\" scripts/site_v2.py && echo \"\" && sed -n '900,1013p' scripts/site_v2.py", "description": "Read render gate and build/main"}
+tool_result: === gate + build ===
+8:Plain trader words only (the no-jargon test bans R-/Kelly/Wilson/notional/blotter/script names).
+190:_OUT = V2                                        # where _write puts pages (build() points this at a staging dir)
+259:    """The Engine chat shows the desk's own Telegram feed; internal jargon (ruling codes, script names, the
+260:    word 'loading') must not surface on the public page (the no-jargon build gate). Neutralise those tokens."""
+747:def render_gate(where=None):
+779:def no_jargon_ok(where=None):
+958:def build(publish_gate=True):
+966:    staging = tempfile.mkdtemp(prefix="v2stage_")
+968:    _OUT = staging
+973:        problems = render_gate(staging) if publish_gate else []
+974:        jargon = no_jargon_ok(staging) if publish_gate else []
+975:        if problems or jargon:
+977:                problems, (" | jargon: %s" % jargon) if jargon else ""))
+978:        # gate clean -> swap staging into V2 (remove old pages first so a renamed page can't linger)
+985:        for p in glob.glob(os.path.join(staging, "*.html")):
+988:        _OUT = saved
+989:        shutil.rmtree(staging, ignore_errors=True)
+997:    assert not no_jargon_ok()
+1008:    print("site_v2 demo OK: %d pages server-rendered, gate clean, count=%d, no jargon, no spinner." % (
+1012:if __name__ == "__main__":
+
+    perf = bt.get("performance") or {}
+    brows = ""
+    for b in (by_book if isinstance(by_book, list) else []):
+        brows += "<tr><td>%s</td><td class='n'>%s</td><td class='n'>%s</td></tr>" % (
+            esc(b.get("book") or b.get("name") or b.get("label")),
+            esc(b.get("trades") if b.get("trades") is not None else b.get("N")),
+            R(b.get("net_R") if b.get("net_R") is not None else b.get("total_R")))
+    brows = brows or "<tr><td class='sub' colspan='3'>the per-book split publishes with the next backtest</td></tr>"
+    body = (_head("Backtest — E1 desk") + _nav("backtest.html") + "<main><h1>Backtest</h1>"
+            "<p class='sub'>The desk's measured history, after costs. Paper and history only — not a promise.</p>"
+            "<div class='panel'><span class='sub'>%s trades measured · win rate %s · made %s after costs · "
+            "steadiness %s</span></div>"
+            "<h2>By book</h2><table><thead><tr><th>Book</th><th>Trades</th><th>After costs</th></tr></thead>"
+            "<tbody>%s</tbody></table>"
+            "<p class='sub' style='margin-top:10px'>Every score is <b>conditioned on survivorship</b> and "
+            "<b>design-effect uncorrected</b> until the point-in-time universe and the fire-clustering recorder "
+            "land.</p></main>" % (esc(summ.get("N")), pct(summ.get("win_pct")), R(summ.get("total_R")),
+                                  esc(perf.get("sharpe")), brows))
+    _write("backtest.html", body + _foot())
+
+
+def _is_trader_message(text):
+    """The Messages tab shows the TRADER-facing desk log; build telemetry (BUILD/SUPERVISOR beats, commit
+    chatter with ruling codes or file names) lives in /build/, not here."""
+    import re as _re
+    t = str(text or "")
+    if t.startswith(("BUILD ", "SUPERVISOR", "📊 Build room")):
+        return False
+    if _re.search(r"\bR-[A-Z]", t) or ".py" in t or "loading" in t.lower():
+        return False
+    return True
+
+
+def _messages():
+    """B4: the Messages tab — the plain trader-facing log of what the desk sent to Telegram."""
+    m = _data("messages.json")
+    msgs = m.get("messages") if isinstance(m, dict) else (m if isinstance(m, list) else [])
+    msgs = [e for e in (msgs or []) if _is_trader_message(e.get("text"))]
+    rows = ""
+    for e in list(msgs)[:400]:
+        ts = str(e.get("ts", ""))[:16].replace("T", " ")
+        rows += "<tr><td class='sub n'>%s</td><td>%s</td></tr>" % (esc(ts), esc(e.get("text")))
+    rows = rows or "<tr><td class='sub' colspan='2'>no trader messages recorded yet</td></tr>"
+    body = (_head("Messages — E1 desk") + _nav("messages.html") + "<main><h1>Messages</h1>"
+            "<p class='sub'>Every line the desk sent to Telegram, newest first — the same plain language, "
+            "kept for %s days.</p>"
+            "<table><thead><tr><th>When</th><th>Message</th></tr></thead><tbody>%s</tbody></table></main>"
+            % (esc(m.get("days")) if isinstance(m, dict) else "30", rows))
+    _write("messages.html", body + _foot())
+
+
+def _num(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def build(publish_gate=True):
+    """Generate every page into a STAGING dir, run the build gate, and only swap the pages into site/v2/ when
+    the gate is clean. On failure it raises RenderGateError and leaves the last-good site/v2/ untouched — so a
+    broken build never publishes (R-V2-FIX item 4)."""
+    global _OUT
+    import shutil
+    import tempfile
+    _write_diaries_data()                                  # data files (shared) — safe to refresh either way
+    staging = tempfile.mkdtemp(prefix="v2stage_")
+    saved = _OUT
+    _OUT = staging
+    try:
+        _leaderboard(); _engines(); _stocks(); _patterns(); _deliverables(); _data_page(); _results(); _how(); _ask()
+        _scoreboard()
+        _live_desk(); _portfolio(); _backtest(); _messages()      # B4: the four tabs the swap was waiting on
+        problems = render_gate(staging) if publish_gate else []
+        jargon = no_jargon_ok(staging) if publish_gate else []
+        if problems or jargon:
+            raise RenderGateError("v2 build gate FAILED (site/v2/ left untouched): %s%s" % (
+                problems, (" | jargon: %s" % jargon) if jargon else ""))
+        # gate clean -> swap staging into V2 (remove old pages first so a renamed page can't linger)
+        os.makedirs(V2, exist_ok=True)
+        for stale in glob.glob(os.path.join(V2, "*.html")):
+            try:
+                os.remove(stale)
+            except OSError:
+                pass
+        for p in glob.glob(os.path.join(staging, "*.html")):
+            shutil.copy2(p, os.path.join(V2, os.path.basename(p)))
+    finally:
+        _OUT = saved
+        shutil.rmtree(staging, ignore_errors=True)
+    return {"out": V2, "pages": len(_pages_on_disk(V2))}
+
+
+def _demo():
+    build()
+    problems = render_gate()
+    assert not problems, problems
+    assert not no_jargon_ok()
+    # the certified count is sane (not the minute-validation tally) and appears on the patterns page
+    n = certified_count()
+    assert 0 <= n < 100000, n
+    pat = open(os.path.join(V2, "patterns.html"), encoding="utf-8").read()
+    assert ("%d patterns passed" % n) in pat and "[object Object]" not in pat
+    # holds-on renders names, not objects
+    assert "Holds on:" in pat
+    # ticker is resolved, never a spinner
+    idx = open(os.path.join(V2, "index.html"), encoding="utf-8").read()
+    assert "loading" not in idx.lower()
+    print("site_v2 demo OK: %d pages server-rendered, gate clean, count=%d, no jargon, no spinner." % (
+        len(_pages_on_disk()), n))
+
+
+if __name__ == "__main__":
+    _demo() if "--demo" in sys.argv else print(build())
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 747, "limit": 55}
+tool_result: 747	def render_gate(where=None):
+748	    """R-V2-FIX build gate. Returns a list of (page, problem); empty = clean. Fails on a render bug in any page,
+749	    an empty table where the source has rows, or a shown pattern count above the certified registry."""
+750	    import re
+751	    problems = []
+752	    # Check VISIBLE text (scripts + tags stripped) so JS keywords (change_pct!=null) and the fonts URL don't
+753	    # trip. Render-bug tokens are matched as WHOLE WORDS (so 'BAJFINANCE' does not trip 'nan').
+754	    patterns = [(r"\[object Object\]", "[object Object]"), (r"(?i)\bundefined\b", "undefined"),
+755	                (r"(?i)\bnan\b", "NaN"), (r"(?i)\bnull\b", "null"), (r"(?i)\bloading\b", "loading")]
+756	    cert = certified_count()
+757	    screener_rows = len((_data("screener.json") or {}).get("rows") or [])
+758	    for p in _pages_on_disk(where):
+759	        name = os.path.basename(p)
+760	        t = open(p, encoding="utf-8").read()
+761	        visible = re.sub(r"<script.*?</script>", " ", t, flags=re.S | re.I)
+762	        visible = re.sub(r"<[^>]+>", " ", visible)
+763	        visible = _html.unescape(visible)
+764	        for rx, label in patterns:
+765	            if re.search(rx, visible):
+766	                problems.append((name, "shows %r" % label))
+767	        # empty table (only a header, no body rows) where the screener has rows — stocks page especially
+768	        if name == "stocks.html" and screener_rows and "<tbody></tbody>" in t.replace("\n", ""):
+769	            problems.append((name, "empty stock table but the screener has %d rows" % screener_rows))
+770	        # a pattern count larger than the certified registry
+771	        import re
+772	        for m in re.findall(r"([\d,]{2,})\s+patterns passed", t):
+773	            val = int(m.replace(",", ""))
+774	            if val > cert:
+775	                problems.append((name, "shows %d patterns passed but only %d certified" % (val, cert)))
+776	    return problems
+777	
+778	
+779	def no_jargon_ok(where=None):
+780	    bad = ["R-", "Kelly", "Wilson", "notional", "blotter", ".py"]
+781	    hits = []
+782	    for p in _pages_on_disk(where):
+783	        t = open(p, encoding="utf-8").read()
+784	        for b in bad:
+785	            if b in t:
+786	                hits.append((os.path.basename(p), b))
+787	    return hits
+788	
+789	
+790	def _all_open_positions():
+791	    """Every open paper position across the engine books, each already tagged with its engine. Deduped."""
+792	    from engine1_rebuild import paper_account as ACC
+793	    seen, out = set(), []
+794	    for key in ACC.accounts_summary():
+795	        try:
+796	            for p in (ACC.account(key).get("open_positions") or []):
+797	                k = (p.get("engine") or key, p.get("stock"), p.get("entry"))
+798	                if k in seen:
+799	                    continue
+800	                seen.add(k)
+801	                out.append(dict(p, engine=p.get("engine") or key))
+assistant: Gate rules are clear (`no_jargon`: no `R-`, `.py`, Kelly/Wilson/notional/blotter as substrings; `render_gate`: no visible `null`/`nan`/`undefined`/`loading`/`[object Object]`). Let me dump the full Dubai records to verify no banned substrings and to render real rows.
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/dump.py\" <<'PY'\nimport json,re\nq=json.load(open('reports/QUIET-BUYING.json',encoding='utf-8'))\nprint('made_R=',q.get('made_R'),'made_rupees=',q.get('made_rupees'))\nbanned=['R-','.py','Kelly','Wilson','notional','blotter']\nallstr=json.dumps(q)\nprint('banned substrings present:',[b for b in banned if b in allstr])\nprint('whole-word null/nan/undefined/loading:',[w for w in ('null','nan','undefined','loading') if re.search(r'\\b'+w+r'\\b',allstr,re.I)])\nprint('--- closed (%d) ---'%len(q['closed']))\nfor c in q['closed']:\n    print(c['in'],c['out'],c['stock'],c['entry'],c['exit'],round(c['result_R'],2),'|',c['why'])\nprint('--- open (%d) ---'%len(q['open']))\nfor p in q['open']:\n    print(p['in'],p['stock'],p['entry'],p['sessions'])\nPY\npython \"$SP/dump.py\"", "description": "Dump Dubai records + banned-substring check"}
+tool_result: made_R= -5.44 made_rupees= -5440.0
+banned substrings present: []
+whole-word null/nan/undefined/loading: []
+--- closed (20) ---
+2026-08-27 2026-08-28 NYKAA 340.0 335.65 -0.33 | the signal was gone two sessions
+2026-08-28 2026-08-31 ADANIENSOL 1610.0 1529.01 -1.02 | stop (2x its daily swing)
+2026-08-28 2026-08-31 ADANIENT 3170.0 3058.05 -1.03 | stop (2x its daily swing)
+2026-08-28 2026-08-31 ALKEM 5352.5 5329.5 -0.13 | the signal was gone two sessions
+2026-08-28 2026-08-31 AXISBANK 1256.0 1300.0 1.19 | the signal was gone two sessions
+2026-08-28 2026-08-31 ETERNAL 329.1 328.1 -0.1 | the signal was gone two sessions
+2026-08-28 2026-08-31 ULTRACEMCO 11705.0 11450.0 -0.8 | the signal was gone two sessions
+2026-08-27 2026-09-01 HYUNDAI 2247.0 2179.8 -0.72 | the signal was gone two sessions
+2026-08-31 2026-09-01 ASTRAL 1520.0 1507.0 -0.28 | the signal was gone two sessions
+2026-08-31 2026-09-01 INFY 1138.6 1156.0 0.36 | the signal was gone two sessions
+2026-08-31 2026-09-01 MPHASIS 2443.7 2505.5 0.47 | the signal was gone two sessions
+2026-08-31 2026-09-01 TATAELXSI 3685.0 3638.0 -0.32 | the signal was gone two sessions
+2026-08-31 2026-09-01 VEDL 284.0 274.0 -0.72 | the signal was gone two sessions
+2026-09-04 2026-09-07 DABUR 380.45 375.5 -0.56 | the signal was gone two sessions
+2026-09-04 2026-09-07 GRASIM 3318.9 3302.4 -0.16 | the signal was gone two sessions
+2026-09-07 2026-09-08 JSWENERGY 539.9 526.5 -0.68 | the signal was gone two sessions
+2026-09-08 2026-09-09 ASTRAL 1498.2 1474.8 -0.49 | the signal was gone two sessions
+2026-09-10 2026-09-11 ABB 7400.0 7274.0 -0.48 | the signal was gone two sessions
+2026-09-14 2026-09-15 OFSS 11599.0 11803.0 0.4 | the signal was gone two sessions
+2026-09-18 2026-09-21 TECHM 1558.3 1558.5 -0.03 | the signal was gone two sessions
+--- open (13) ---
+2026-09-21 BPCL 313.0 1
+2026-09-21 BRITANNIA 5001.5 1
+2026-09-21 CHOLAFIN 1806.0 1
+2026-09-21 DIVISLAB 9418.0 1
+2026-09-21 HDFCAMC 2434.9 1
+2026-09-21 ICICIPRULI 492.2 1
+2026-09-21 INDUSINDBK 961.0 1
+2026-09-21 IOC 136.9 1
+2026-09-21 JSWSTEEL 1281.3 1
+2026-09-21 LT 3885.0 1
+2026-09-21 PNB 117.23 1
+2026-09-21 TRENT 2813.9 1
+2026-09-21 TVSMOTOR 4173.1 1
+assistant: I have all real data, all clean. Let me check `_card` signature, then rewrite `_deliverables()`.
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 271, "limit": 18}
+tool_result: 271	def _card(k, v, cls=""):
+272	    return "<div class='card'><div class='k'>%s</div><div class='big %s'>%s</div></div>" % (esc(k), cls, v)
+273	
+274	
+275	def _present(x):
+276	    """True if a value is real to show (not None, not NaN)."""
+277	    if x is None:
+278	        return False
+279	    if isinstance(x, float) and x != x:
+280	        return False
+281	    return True
+282	
+283	
+284	def _acct_equity(v):
+285	    """account.json accounts hold a bare equity number; the desk holds a dict. Return the equity float or None."""
+286	    if isinstance(v, (int, float)):
+287	        return v
+288	    if isinstance(v, dict):
+assistant: Now I'll rewrite `_deliverables()` with the five engine-page tabs, fed only from real records.
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "old_string": "def _deliverables():\n    acct = _data(\"account.json\")\n    desk = acct.get(\"desk\") or {}\n    accounts = acct.get(\"accounts\") or {}\n    cards = \"\"\n    pairs = ([(\"Desk\", desk.get(\"equity\"))] if desk else []) + [(k, _acct_equity(v)) for k, v in accounts.items()]\n    seen = set()\n    for name, eq in pairs:\n        if name in seen or eq is None:\n            continue\n        seen.add(name)\n        cards += (\"<div class='card'><div class='k'>%s account</div><div class='big'>%s</div>\"\n                  \"<div class='sub'>paper only</div></div>\" % (esc(name), rup(eq)))\n    if not cards:\n        cards = \"<div class='card sub'>accounts start at the next session</div>\"\n    body = (_head(\"Deliverables \u2014 E1 desk\") + _nav(\"deliverables.html\") + \"<main><h1>Deliverables</h1>\"\n            \"<p class='sub'>The paper accounts, carried day to day, and the tests the desk was asked to run. \"\n            \"Nothing here is real money.</p><div class='cards'>\" + cards + \"</div>\"\n            \"<h2>The full workbook</h2><div class='panel'><p style='margin:0'>Every call, its simulated fill and \"\n            \"its cost, and the calibrated execution test: <a href='../execution-checklist.xlsx' download>download \"\n            \"the execution workbook \u2192</a></p></div>\"\n            \"<h2>What was asked</h2><div class='panel'><p class='sub' style='margin:0'>See <a href='ask.html'>Ask \"\n            \"the desk</a> for the questions and what came back.</p></div></main>\")\n    _write(\"deliverables.html\", body + _foot())", "new_string": "def _rep(name):\n    \"\"\"Read a store from reports/ (the deliverables' own files live there, not in site/data/).\"\"\"\n    try:\n        return json.load(open(os.path.join(REPO, \"reports\", name), encoding=\"utf-8\"))\n    except Exception:\n        return {}\n\n\ndef _deliverables():\n
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\site_v2.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now let me build the v2 site and run its demo (this is a page build, not a heavy suite — RAM-safe) to confirm the new deliverables page renders and passes the gate.
+tool_use Bash {"command": "python scripts/site_v2.py --demo 2>&1 | tail -20", "description": "Build v2 site + run demo/gate"}
+tool_result: site_v2 demo OK: 20 pages server-rendered, gate clean, count=323, no jargon, no spinner.
+assistant: Gate clean. Let me verify the built deliverables page has the real content and all five tabs.
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/check.py\" <<'PY'\nt=open('site/v2/deliverables.html',encoding='utf-8').read()\nfor tab in ('Positions','Trades','Why each call','How it decides','Record'):\n    print(tab, 'tab:', (\"data-tb='dlv'\" in t) and (('>'+tab+'<') in t))\nchecks={\n '0 calls stated':'0 calls' in t,\n 'NYKAA row':'NYKAA' in t,\n 'money -5,440':'-5,440' in t or '\u20b9-5,440' in t,\n '20 finished':'>20<' in t,\n 'today screen date 2026-09-21':'2026-09-21' in t,\n 'by how much em-dash col':'By how much' in t,\n 'BPCL open':'BPCL' in t,\n 'index intraday 11':'11 trades' in t,\n}\nfor k,v in checks.items(): print(k,':',v)\nprint('len',len(t))\nPY\npython \"$SP/check.py\"", "description": "Verify deliverables content"}
+tool_result: Positions tab: True
+Trades tab: True
+Why each call tab: True
+How it decides tab: True
+Record tab: True
+0 calls stated : True
+NYKAA row : True
+money -5,440 : True
+20 finished : True
+today screen date 2026-09-21 : True
+by how much em-dash col : True
+BPCL open : True
+index intraday 11 : True
+len 18380
+assistant: Item 2's page is done. Now "screenshot each tab to the Screenshots page." Let me understand the Screenshots mechanism.
+tool_use Bash {"command": "echo \"=== SCREENSHOTS.tsv head ===\" && head -8 reports/SCREENSHOTS.tsv 2>&1 && echo \"\" && echo \"=== tail ===\" && tail -6 reports/SCREENSHOTS.tsv 2>&1 && echo \"\" && echo \"=== how screenshots page/logging works ===\" && grep -rniE \"SCREENSHOTS.tsv|screenshots\" scripts/*.py 2>/dev/null | grep -iv \"#\" | head -20 && echo \"\" && echo \"=== screenshot image dir ===\" && ls site/shots 2>/dev/null | head; ls site/screenshots 2>/dev/null | head; find site -iname \"*screenshot*\" -o -iname \"*.png\" 2>/dev/null | grep -i shot | head", "description": "Inspect screenshot mechanism"}
+tool_result: === SCREENSHOTS.tsv head ===
+2026-09-22T21:48:22.558880+05:30	v2-data.png	R-V2-EXACT	v2/data.html
+2026-09-22T21:48:22.576008+05:30	v2-how.png	R-V2-EXACT	v2/how.html
+2026-09-22T21:54:06.343007+05:30	results	R-V2-EXACT	v2/results.html
+2026-09-22T22:00:36.718851+05:30	messages	R-V2-EXACT	v2/messages.html
+2026-09-22T22:08:18.615139+05:30	index-leaderboard	R-V2-EXACT	v2/index.html
+2026-09-22T22:25:10.461585+05:30	patterns	R-V2-EXACT	v2/patterns.html
+2026-09-22T22:42:58.898191+05:30	stocks	R-V2-EXACT	v2/stocks.html
+2026-09-22T22:52:58.076225+05:30	engines	R-V2-EXACT	v2/engines.html
+
+=== tail ===
+2026-09-22T22:08:18.615139+05:30	index-leaderboard	R-V2-EXACT	v2/index.html
+2026-09-22T22:25:10.461585+05:30	patterns	R-V2-EXACT	v2/patterns.html
+2026-09-22T22:42:58.898191+05:30	stocks	R-V2-EXACT	v2/stocks.html
+2026-09-22T22:52:58.076225+05:30	engines	R-V2-EXACT	v2/engines.html
+2026-09-22T22:55:27.338474+05:30	ask	R-V2-EXACT	v2/ask.html
+2026-09-22T22:57:21.471151+05:30	stock	R-V2-EXACT	v2/stock.html
+
+=== how screenshots page/logging works ===
+scripts/build_journal.py:361:        "<li><a href='screenshots.html'>Screenshots</a> — with time, ruling, page</li>"
+scripts/mirror.py:7:  Screenshots — every recorded screenshot with time · ruling · page.
+scripts/mirror.py:25:SHOTS_LOG = os.path.join(REPO, "reports", "SCREENSHOTS.tsv")
+scripts/mirror.py:140:def _screenshots_page():
+scripts/mirror.py:148:    return _page("Screenshots", "<table><tr><th>When</th><th>Ruling</th><th>Page</th><th>Name</th></tr>%s</table>"
+scripts/mirror.py:149:                 % (trs or "<tr><td class='sub' colspan='4'>no screenshots recorded yet</td></tr>"))
+scripts/mirror.py:162:             "tests.html": _tests_page(), "screenshots.html": _screenshots_page(), "eyes.html": _eyes_page()}
+scripts/mirror.py:173:                       "s": _screenshots_page(), "e": _eyes_page()}.items():
+scripts/notify.py:89:    Now/Journal/Commits/Tests/Supervisor/Messages/Reports/Screenshots/Queue/Eyes). A line that already carries
+
+=== screenshot image dir ===
+site/build/screenshots.html
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\mirror.py", "offset": 120, "limit": 55}
+tool_result: 120	
+121	def _tests_page():
+122	    try:
+123	        d = json.load(open(os.path.join(REPO, "reports", "LAST-TESTS.json"), encoding="utf-8"))
+124	        body = "<p>Last recorded suite: <b>%s / %s</b> at %s.</p>" % (d.get("passed"), d.get("total"), d.get("at"))
+125	    except Exception:
+126	        body = "<p class='sub'>no recorded test result yet</p>"
+127	    return _page("Tests", body)
+128	
+129	
+130	def record_screenshot(name, ruling, page):
+131	    """A session records a screenshot it took (R-EYES-COMPLETE §4)."""
+132	    try:
+133	        os.makedirs(os.path.dirname(SHOTS_LOG), exist_ok=True)
+134	        with open(SHOTS_LOG, "a", encoding="utf-8") as f:
+135	            f.write("%s\t%s\t%s\t%s\n" % (_now().isoformat(), _scrub(name), _scrub(ruling), _scrub(page)))
+136	    except Exception:
+137	        pass
+138	
+139	
+140	def _screenshots_page():
+141	    try:
+142	        rows = [l.split("\t") for l in open(SHOTS_LOG, encoding="utf-8").read().splitlines() if l.strip()]
+143	        rows = [r for r in rows if len(r) == 4][::-1]
+144	    except Exception:
+145	        rows = []
+146	    trs = "".join("<tr><td class='sub'>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+147	        _h.escape(r[0][:19]), _h.escape(r[2]), _h.escape(r[3]), _h.escape(r[1])) for r in rows)
+148	    return _page("Screenshots", "<table><tr><th>When</th><th>Ruling</th><th>Page</th><th>Name</th></tr>%s</table>"
+149	                 % (trs or "<tr><td class='sub' colspan='4'>no screenshots recorded yet</td></tr>"))
+150	
+151	
+152	def _eyes_page():
+153	    try:
+154	        txt = open(os.path.join(REPO, "docs", "EYES.md"), encoding="utf-8").read()
+155	    except Exception:
+156	        txt = "(no EYES.md)"
+157	    return _page("Eyes map", "<pre>%s</pre>" % _h.escape(txt))
+158	
+159	
+160	def build(write=True):
+161	    pages = {"queue.html": _queue_page(), "reports.html": _reports_page(), "messages.html": _messages_page(),
+162	             "tests.html": _tests_page(), "screenshots.html": _screenshots_page(), "eyes.html": _eyes_page()}
+163	    if write:
+164	        os.makedirs(OUT, exist_ok=True)
+165	        for name, html in pages.items():
+166	            with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
+167	                f.write(html)
+168	    return sorted(pages)
+169	
+170	
+171	def _demo():
+172	    for name, html in {"q": _queue_page(), "r": _reports_page(), "m": _messages_page(), "t": _tests_page(),
+173	                       "s": _screenshots_page(), "e": _eyes_page()}.items():
+174	        assert "written " in html and "<h1>" in html
+assistant: Screenshots page is a log (`record_screenshot` appends When·Ruling·Page·Name; no images stored). I'll capture the tabs with a browser as genuine proof and record them near the end. First, the fast certain items. **Item 5** — the LIVE-PATTERN-SET.json label. Let me inspect it.
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/lps.py\" <<'PY'\nimport json\nd=json.load(open('reports/LIVE-PATTERN-SET.json',encoding='utf-8'))\nprint('top keys:',list(d.keys()) if isinstance(d,dict) else type(d))\nimport re\ns=json.dumps(d)\nprint('stop_atr occurrences:', s.count('stop_atr'))\nprint('2.0 near stop_atr:', re.findall(r'\"stop_atr\":\\s*[0-9.]+', s)[:10])\nprint('stop1_tgt1.5 present:', 'stop1_tgt1.5' in s)\nprint('template refs:', re.findall(r'\"template\":\\s*\"[^\"]*\"', s)[:10])\n# print a sample pattern entry\nif isinstance(d,dict):\n    for k in d:\n        v=d[k]\n        if isinstance(v,list) and v and isinstance(v[0],dict):\n            print('list',k,'first entry keys:',list(v[0].keys()))\n            print(json.dumps(v[0],indent=1)[:800])\n            break\nPY\npython \"$SP/lps.py\"", "description": "Inspect LIVE-PATTERN-SET.json"}
+tool_result: top keys: ['note', 'source', 'count', 'patterns']
+stop_atr occurrences: 5
+2.0 near stop_atr: ['"stop_atr": 2.0', '"stop_atr": 2.0', '"stop_atr": 2.0', '"stop_atr": 2.0', '"stop_atr": 2.0']
+stop1_tgt1.5 present: False
+template refs: []
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\LIVE-PATTERN-SET.json"}
+tool_result: 1	{
+2	 "note": "E1/E10/E11 trade ONLY these; every other fire is a walk-forward diary (no orders, no cards).",
+3	 "source": "R-EXAMS-REAL survivors",
+4	 "count": 5,
+5	 "patterns": {
+6	  "UNITDSPR|ema": {
+7	   "stock": "UNITDSPR",
+8	   "family": "ema",
+9	   "horizon": 60,
+10	   "stop_atr": 2.0,
+11	   "trail": false,
+12	   "management": "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target",
+13	   "net_per_trade_R": 0.0633
+14	  },
+15	  "UNITDSPR|sma": {
+16	   "stock": "UNITDSPR",
+17	   "family": "sma",
+18	   "horizon": 60,
+19	   "stop_atr": 2.0,
+20	   "trail": false,
+21	   "management": "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target",
+22	   "net_per_trade_R": 0.4776
+23	  },
+24	  "BSE|stddev_returns": {
+25	   "stock": "BSE",
+26	   "family": "stddev_returns",
+27	   "horizon": 40,
+28	   "stop_atr": 2.0,
+29	   "trail": false,
+30	   "management": "hold up to 40 days, stop 2 times the stock's own daily swing, fixed stop and target",
+31	   "net_per_trade_R": 0.4937
+32	  },
+33	  "AUBANK|vwap": {
+34	   "stock": "AUBANK",
+35	   "family": "vwap",
+36	   "horizon": 40,
+37	   "stop_atr": 2.0,
+38	   "trail": false,
+39	   "management": "hold up to 40 days, stop 2 times the stock's own daily swing, fixed stop and target",
+40	   "net_per_trade_R": 0.1652
+41	  },
+42	  "ETERNAL|rsi": {
+43	   "stock": "ETERNAL",
+44	   "family": "rsi",
+45	   "horizon": 60,
+46	   "stop_atr": 2.0,
+47	   "trail": false,
+48	   "management": "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target",
+49	   "net_per_trade_R": 0.2116
+50	  }
+51	 }
+52	}
+assistant: Item 5 needs the exam's actual template. Let me find what `stop1_tgt1.5` means and where the exam recorded it, so the correction is truthful.
+tool_use Bash {"command": "echo \"=== stop1_tgt1.5 refs ===\" && grep -rniE \"stop1_tgt1\\.5|stop1_tgt|tgt1\\.5|stop_atr\" --include=*.py --include=*.json --include=*.md . 2>/dev/null | grep -v node_modules | grep -v \".snapshot\" | grep -iv \"LIVE-PATTERN-SET\" | head -30", "description": "Find the exam template definition"}
+tool_result: === stop1_tgt1.5 refs ===
+./docs/architecture/ENGINE_E1.md:4447:   exactly 1R (1R = stop_atr × ATR). `engine1_rebuild/paper.pattern_stop_atr`.
+./docs/architecture/LEAD_RULINGS.md:9138:**Applied (session E1-REBUILD-2, 17 Sep 2026):** see the commits. The full E1 as-designed backtest (all daily-direction survivors, per-pattern horizon, pattern-first sizing, netting) re-run with (1) the honest HOLDOUT-margin gate + sizing (Wilson lower bound — conservative) and (2) pattern-dictated MAE stops (`paper.pattern_stop_atr`, 90th-pctl MAE of correct train/test predictions, per horizon; size shrunk to 1R). Win-rate-vs-accuracy, Sharpe/Sortino/DD/fees-vs-market/by-regime reported side by side with the previous as-designed run in `reports/E1-OLD-METHOD.md`. The holdout-gating caveat (gating holdout trades on the holdout margin) still applies and is flagged. Audit queued. The slow-wrapper stays published as an experiment.
+./docs/architecture/LEAD_RULINGS.md:9339:> LEAD RULING R-HOLD-AND-FIX (record verbatim, apply immediately; supersedes any "confirmed live" claim in R-SYSTEM-FINAL): 1. HOLD: no paper orders from any loop until this ruling's re-audit passes; recorders, diaries, dashboards continue. Today's session records only. 2. ONE ORDER PATH: retire the intraday ATR-template loop (run_live.py → live.py → live_engine.py) from any order-writing role; the ONLY order path is the 20-day book live_20d.py under the standing architecture (pattern-dictated MAE stop, break-even, trail, partial, insured carry, hedge-by-cause, netting, required-move rule, real fees + measured spread, limit-at-mid with patience window and fills recorded, book guard); build its runner into the post-login chain; wire desk.py rules as callers, not tests. 3. GATES, fail-CLOSED, checked on every poll of every loop: KILL flag, circuit breaker (call circuit_breaker.check()), order hold, moment light (no quote → NOT green), any gate exception → no order. 4. TYPED NUMBERS OUT: DAY_HALT_R, STOP_ATR/TGT_ATR, MAX_SPREAD_FRAC, HALF_SPREAD, CUSHION_M, KELLY_FRACTION and every other governing constant the audit lists become measured values from the blotter/quotes with the formula printed in the readout, or are removed; statutory rates stay typed and cited. 5. IMPORTS: remove cross-engine private imports (E4↔E7, engine1 internals); shared code moves to the shelf module. 6. TRUTH: the registry and site say "20-day book: HELD, never ran" until it runs; the builder's self-written AUDIT-3 is marked superseded; no session audits its own work, ever (CLAUDE.md §18.1 enforced by a check). 7. When done, ✅ and queue AUDIT-3B in the audit session (same seven items, plus a dry run proving KILL stops the 20-day runner within one poll and the breaker trips on a synthetic streak); orders resume only on that PASS.
+./docs/dispatches/2026-09-18_R-HOLD-AND-FIX.md:7:4. TYPED NUMBERS OUT: DAY_HALT_R, STOP_ATR/TGT_ATR, MAX_SPREAD_FRAC, HALF_SPREAD, CUSHION_M, KELLY_FRACTION and every other governing constant the audit lists become measured values from the blotter/quotes with the formula printed in the readout, or are removed; statutory rates stay typed and cited.
+./docs/reports/2026-09-22-live-vs-exam-audit.md:83:   2×ATR / fixed-stop.** Should `book20_runner` read each pattern's `horizon` / `stop_atr` / `trail` from
+./docs/reports/verify-a905edd32.md:37:- *"EOD next-open fill via the exam path (`paper.simulate_trade`, per-pattern horizon/trail)"* → `queue_orders` (`conform.py:100-128`) writes queued EOD rows via `paper.append_rows` for `evening.process_eod_positions`, template `EXAM_TEMPLATE="stop1_tgt1.5"` + pattern horizon. CONFIRMED.
+./docs/reports/verify-a905edd32.md:40:- *Commit's own FINDING* (`stop_atr:2.0` inert because `simulate_trade` ignores it when `manage=False`; exam template governs) → consistent with `conform.py:95-97` and the exam-is-standard rule. Noted, not a defect.
+./engine1_rebuild/analysis.py:340:        for tname in ("stop1_tgt1.5", "stop1_tgt2", "time5"):
+./engine1_rebuild/conform.py:54:                    "horizon": p.get("horizon"), "stop_atr": p.get("stop_atr"), "trail": bool(p.get("trail")),
+./engine1_rebuild/conform.py:69:        mgmt = {"horizon": p["horizon"], "stop_atr": p["stop_atr"], "trail": p["trail"]}
+./engine1_rebuild/conform.py:95:EXAM_TEMPLATE = "stop1_tgt1.5"      # the template the exam certified these patterns under (simulate_trade
+./engine1_rebuild/evening.py:184:                        "pattern": sent, "direction": dirn, "template": "stop1_tgt1.5",
+./engine1_rebuild/evening.py:227:                        "template": "stop1_tgt1.5", "net_edge_R": round(float(r["hold_margin"]), 4),
+./engine1_rebuild/evening.py:232:                                 "template": "stop1_tgt1.5", "queue_date": qdate})
+./engine1_rebuild/live_engine.py:39:# the 20-day book (engine1_rebuild/book20_runner.py using live_20d + desk + paper). STOP_ATR/TGT_ATR/
+./engine1_rebuild/live_engine.py:44:STOP_ATR, TGT_ATR = 1.0, 1.5    # RETIRED-loop replay only (not a governing order constant)
+./engine1_rebuild/live_engine.py:68:    be = paper.breakeven(TGT_ATR / STOP_ATR, 1.0, 0.0)
+./engine1_rebuild/live_engine.py:202:    stop = entry - STOP_ATR * atr if long else entry + STOP_ATR * atr
+./engine1_rebuild/live_engine.py:218:                return done(j, stop, "stop", -STOP_ATR / STOP_ATR)
+./engine1_rebuild/live_engine.py:220:                return done(j, tgt, "target", TGT_ATR / STOP_ATR)
+./engine1_rebuild/live_engine.py:225:                return done(j, tgt, "target", TGT_ATR / STOP_ATR)
+./engine1_rebuild/live_engine.py:244:        return bool(float(train_lb) >= paper.breakeven(TGT_ATR / STOP_ATR, 1.0, cost_R))
+./engine1_rebuild/money.py:208:TEMPLATES = [("stop1_tgt1.5", 1.0, 1.5, 40), ("stop1_tgt2", 1.0, 2.0, 40), ("time5", None, None, 5)]
+./engine1_rebuild/paper.py:79:                   stop_atr: float = 1.0):
+./engine1_rebuild/paper.py:92:        return _simulate_managed(daily, signal_pos, direction, maxH, allow_open, stop_atr=stop_atr)
+./engine1_rebuild/paper.py:136:def pattern_stop_atr(daily: pd.DataFrame, positions, direction: str, horizon: int, test_end: int):
+./engine1_rebuild/paper.py:164:                      stop_atr: float = 1.0):
+./engine1_rebuild/paper.py:165:    """R-E1-DESK live management as the backtest exit: enter next open, INITIAL stop `stop_atr` ATR (never
+./engine1_rebuild/paper.py:167:    R-E1-PATTERN-STOP: `stop_atr` is the pattern-dictated initial stop distance (from its train/test MAE);
+./engine1_rebuild/paper.py:168:    position size shrinks so rupee risk stays 1R, i.e. 1R = stop_atr ATR, so every R here is (move/ATR) /
+assistant: Item 5 is clear: exam template `stop1_tgt1.5` = stop 1.0 ATR / target 1.5 ATR (money.py:208), and `stop_atr:2.0` is inert (verify-a905edd32.md:40 confirms `simulate_trade` ignores it when `manage=False`). Let me confirm conform.py doesn't feed `stop_atr` into a live order path before I edit.
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\conform.py", "offset": 40, "limit": 75}
+tool_result: 40	        cand = evening.active_daily_direction_signals()
+41	    except Exception:
+42	        cand = None
+43	    out = []
+44	    for key, p in pats.items():
+45	        stock, fam = p.get("stock"), p.get("family")
+46	        match = None
+47	        if cand is not None and len(cand):
+48	            for _, r in cand.iterrows():
+49	                if LB._sym(int(r["stock"])) == stock and _FAM_OF(r["metric"]) == fam:
+50	                    match = {"token": int(r["stock"]), "metric": r["metric"],
+51	                             "condition": r["condition"], "direction": r["direction"]}
+52	                    break
+53	        out.append({"key": key, "stock": stock, "family": fam,
+54	                    "horizon": p.get("horizon"), "stop_atr": p.get("stop_atr"), "trail": bool(p.get("trail")),
+55	                    "candidate": match})
+56	    return out
+57	
+58	
+59	def evaluate_at_close(asof=None, reader=None, quotes=None):
+60	    """For each live pattern, decide at the completed daily bar `asof`. Returns a list of decisions:
+61	        {stock, family, fired: bool, verdict: 'QUEUE'|'HELD'|'NO-FIRE', reason, management, check}
+62	    Reuses evening._fire_today (signal) and LB.checklist (the six checks). No order is written here."""
+63	    from engine1_rebuild import evening
+64	    from scripts import liquidity_backtest as LB
+65	    reader = reader or (lambda t: ds.read(int(t), "raw"))
+66	    k, k_meas = _impact_k(LB)
+67	    decisions = []
+68	    for p in live_patterns():
+69	        mgmt = {"horizon": p["horizon"], "stop_atr": p["stop_atr"], "trail": p["trail"]}
+70	        c = p["candidate"]
+71	        if not c:
+72	            decisions.append(_d(p, False, "HELD", "warm-up — no live signal source for this pattern yet",
+73	                                mgmt, "warm-up"))
+74	            continue
+75	        try:
+76	            fired, daily = evening._fire_today(reader, c["token"], c["metric"], c["condition"], asof=asof)
+77	        except Exception as e:
+78	            decisions.append(_d(p, False, "HELD", "warm-up — signal not computable (%s)" % e, mgmt, "warm-up"))
+79	            continue
+80	        if not fired:
+81	            decisions.append(_d(p, False, "NO-FIRE", "pattern did not fire at the close", mgmt, ""))
+82	            continue
+83	        # it fired at the close -> run the SAME six checks the exam gates fills with, on the exit-window move
+84	        entry = float(daily["close"].values[-1])
+85	        bar_date = str(daily.index[-1])[:10]                # the signal's own bar date (proxy/depth basis)
+86	        chk = _checklist(LB, c["token"], entry, quotes, bar_date)
+87	        if chk.get("verdict") == "HELD":
+88	            decisions.append(_d(p, True, "HELD", chk.get("reason", "a check failed"), mgmt,
+89	                                _named_check(chk.get("reason", ""))))
+90	        else:
+91	            decisions.append(_d(p, True, "QUEUE", "fires + six checks pass — queue next-open order", mgmt, ""))
+92	    return decisions
+93	
+94	
+95	EXAM_TEMPLATE = "stop1_tgt1.5"      # the template the exam certified these patterns under (simulate_trade
+96	#                                    ignores stop_atr when manage=False, so the LIVE-PATTERN-SET stop_atr:2.0
+97	#                                    is inert metadata — see the run report's finding). The exam is the standard.
+98	
+99	
+100	def queue_orders(asof=None, reader=None, quotes=None, write=True):
+101	    """Evaluate at the close and, for each QUEUE decision, write a next-open (EOD-) order that the EXISTING
+102	    tested path (evening.process_eod_positions -> paper.simulate_trade at the next open) fills with the exam's
+103	    own management (template EXAM_TEMPLATE + the pattern's horizon; manage=trail — all five are trail=false).
+104	    HELD signals are logged with the named check, never as a trade. Returns {queued, held, decisions}.
+105	
+106	    GATED on the R-EXAM-CONFORM proof marker: no order is written until conformance is proven (the fail-safe)."""
+107	    from engine1_rebuild import book20_runner as B, paper
+108	    decisions = evaluate_at_close(asof=asof, reader=reader, quotes=quotes)
+109	    proven = os.path.exists(B.EXAM_CONFORM_PROOF)
+110	    asof_date = str(asof)[:10] if asof is not None else _today_str()
+111	    rows, held = [], []
+112	    for d in decisions:
+113	        if d["verdict"] == "QUEUE" and proven:
+114	            p = next((x for x in live_patterns() if x["stock"] == d["stock"] and x["family"] == d["family"]), None)
+assistant: Confirmed: the live order path fills via `EXAM_TEMPLATE="stop1_tgt1.5"` + horizon; the per-pattern `stop_atr` is only logged, never sizes an order (conform.py:95-97). So correcting the label is a pure metadata-truth fix. Template = stop 1.0 ATR / target 1.5 ATR (money.py:208). Rewriting the file truthfully:
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\LIVE-PATTERN-SET.json", "content": "{\n \"note\": \"E1/E10/E11 trade ONLY these; every other fire is a walk-forward diary (no orders, no cards).\",\n \"source\": \"R-EXAMS-REAL survivors\",\n \"exam_template\": \"stop1_tgt1.5\",\n \"exam_template_meaning\": \"initial stop 1.0x ATR, target 1.5x ATR (money.TEMPLATES); the exam certified these patterns under this template.\",\n \"label_correction\": \"NIGHT BUNDLE 2 item 5 (2026-09-23): the earlier stop_atr:2.0 was inert metadata. The live order path (conform.queue_orders) fills every QUEUE via EXAM_TEMPLATE='stop1_tgt1.5' + the pattern's horizon and IGNORES this field (simulate_trade ignores stop_atr when manage=False; conform.py:95-97, verify-a905edd32.md:40). The label read 2x-daily-swing while the exam used 1x stop / 1.5x target, so a reader was misled. Corrected here to match the exam template; no behaviour changed (the field is not read by any order path).\",\n \"count\": 5,\n \"patterns\": {\n  \"UNITDSPR|ema\": {\n   \"stock\": \"UNITDSPR\",\n   \"family\": \"ema\",\n   \"horizon\": 60,\n   \"stop_atr\": 1.0,\n   \"target_atr\": 1.5,\n   \"template\": \"stop1_tgt1.5\",\n   \"trail\": false,\n   \"management\": \"hold up to 60 days; exam template stop1_tgt1.5 \u2014 initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed\",\n   \"net_per_trade_R\": 0.0633\n  },\n  \"UNITDSPR|sma\": {\n   \"stock\": \"UNITDSPR\",\n   \"family\": \"sma\",\n   \"horizon\": 60,\n   \"stop_atr\": 1.0,\n   \"target_atr\": 1.5,\n   \"template\": \"stop1_tgt1.5\",\n   \"trail\": false,\n   \"management\": \"hold up to 60 days; exam template stop1_tgt1.5 \u2014 initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed\",\n   \"net_per_trade_R\": 0.4776\n  },\n  \"BSE|stddev_returns\": {\n   \"stock\": \"BSE\",\n   \"family\": \"stddev_returns\",\n   \"horizon\": 40,\n   \"stop_atr\": 1.0,\n   \"target_atr\": 1.5,\n   \"template\": \"st
+tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\LIVE-PATTERN-SET.json has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now validate the JSON and confirm `conform.live_patterns()` still loads 5 patterns (the touched module):
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/v.py\" <<'PY'\nimport json\nd=json.load(open('reports/LIVE-PATTERN-SET.json',encoding='utf-8'))\nassert d['count']==5 and len(d['patterns'])==5\nassert all(p['stop_atr']==1.0 and p['target_atr']==1.5 and p['template']=='stop1_tgt1.5' for p in d['patterns'].values())\nprint('JSON valid; 5 patterns; stop1_tgt1.5 label set.')\nfrom engine1_rebuild import conform\nlp=conform.live_patterns()\nprint('conform.live_patterns() count:',len(lp))\nprint('EXAM_TEMPLATE:',conform.EXAM_TEMPLATE)\nprint('sample stop_atr now seen by conform:',lp[0]['stop_atr'])\nPY\npython \"$SP/v.py\" 2>&1 | tail -15", "description": "Validate JSON + conform loads 5"}
+tool_result: JSON valid; 5 patterns; stop1_tgt1.5 label set.
+Traceback (most recent call last):
+  File "[redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\scratchpad\v.py", line 6, in <module>
+    from engine1_rebuild import conform
+ModuleNotFoundError: No module named 'engine1_rebuild'
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/v.py\" <<'PY'\nimport sys,os; sys.path.insert(0,os.getcwd())\nfrom engine1_rebuild import conform\nlp=conform.live_patterns()\nprint('conform.live_patterns() count:',len(lp))\nprint('EXAM_TEMPLATE:',conform.EXAM_TEMPLATE)\nprint('stop_atr label now:',lp[0]['stop_atr'])\nPY\npython \"$SP/v.py\" 2>&1 | tail -15", "description": "Confirm conform loads 5 patterns"}
+tool_result:   File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\pandas\core\api.py", line 23, in <module>
+    from pandas.core.algorithms import (
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\pandas\core\algorithms.py", line 77, in <module>
+    from pandas.core.array_algos.take import take_nd
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\pandas\core\array_algos\take.py", line 24, in <module>
+    from pandas.core.construction import ensure_wrapped_if_datetimelike
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\pandas\core\construction.py", line 20, in <module>
+    from numpy import ma
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\numpy\ma\__init__.py", line 42, in <module>
+    from . import core
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\numpy\ma\core.py", line 8299, in <module>
+    inner.__doc__ = doc_note(np.inner.__doc__,
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\site-packages\numpy\ma\core.py", line 123, in doc_note
+    notesplit = re.split(r'\n\s*?Notes\n\s*?-----', inspect.cleandoc(initialdoc))
+AttributeError: module 'inspect' has no attribute 'cleandoc'
+assistant: The scratchpad's `inspect.py` (from my earlier temp file) is shadowing stdlib `inspect` for pandas. Let me remove it and rerun.
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && rm -f \"$SP/inspect.py\" \"$SP/dump.py\" \"$SP/lps.py\" && python \"$SP/v.py\" 2>&1 | tail -6", "description": "Remove shadowing file, rerun conform check"}
+tool_result: conform.live_patterns() count: 5
+EXAM_TEMPLATE: stop1_tgt1.5
+stop_atr label now: 1.0
+assistant: Item 5 done. Let me find and run the touched-module tests (conform, site_v2) only — RAM floor respected.
+tool_use Bash {"command": "ls tests/ 2>/dev/null | grep -iE \"conform|site_v2|deliver|pattern_set|live_pattern|exam_conform\" && echo \"---all conform/site tests---\" && grep -rl \"conform\\|site_v2\\|LIVE-PATTERN-SET\" tests/ 2>/dev/null | head", "description": "Locate touched-module tests"}
+tool_result: test_conform.py
+test_live_pattern_set.py
+test_results_deliverables.py
+test_site_v2.py
+---all conform/site tests---
+tests/test_conform.py
+tests/test_diaries.py
+tests/test_fix_3e.py
+tests/test_halt_guard.py
+tests/test_site_v2.py
+tests/test_v2_render.py
+tests/test_v2_tabs.py
+tests/__pycache__/test_conform.cpython-310-pytest-8.2.1.pyc
+tests/__pycache__/test_diaries.cpython-310-pytest-8.2.1.pyc
+tests/__pycache__/test_fix_3e.cpython-310-pytest-8.2.1.pyc
+tool_use Bash {"command": "echo \"=== test_live_pattern_set.py ===\" && cat tests/test_live_pattern_set.py 2>&1 | head -60 && echo \"\" && echo \"=== test_v2_tabs / deliverables asserts ===\" && grep -niE \"deliver|stop_atr|2\\.0|Positions|Trades|Why each|How it decides|Record|tab\" tests/test_v2_tabs.py tests/test_results_deliverables.py tests/test_site_v2.py tests/test_v2_render.py 2>&1 | head -40", "description": "Check tests for assertions my edits affect"}
+tool_result: === test_live_pattern_set.py ===
+"""R-MORNING-22 item 1: the live pattern set = the R-EXAMS-REAL survivors, and only they trade."""
+import json
+import scripts.live_pattern_set as LPS
+
+
+def test_promote_matches_staging_survivors():
+    staging = json.load(open("reports/EXAMS-REAL-STAGING.json", encoding="utf-8"))
+    n = len(staging.get("certified_patterns") or [])
+    out = LPS.promote(write=False)
+    assert out["count"] == n and n >= 1
+
+
+def test_only_survivors_are_live():
+    LPS.promote()                                     # write the live set
+    keys = LPS.live_symbols_families()
+    assert keys and all("|" in k for k in keys)
+    # every live key resolves to management with plain words
+    for k in keys:
+        sym, fam = k.split("|", 1)
+        m = LPS.management_for(sym, fam)
+        assert m and m.get("management")
+    # a random non-survivor is not live (fail-closed)
+    assert not LPS.in_live_set("RELIANCE", "made_up_family")
+
+
+def test_family_parse():
+    assert LPS._family("ema|q1") == "ema"
+    assert LPS._family("sma[10,30]") == "sma"
+    assert LPS._family("VWAP") == "vwap"
+
+
+def test_demo():
+    LPS._demo()
+
+=== test_v2_tabs / deliverables asserts ===
+tests/test_v2_tabs.py:1:"""B4: the four tabs the root swap was waiting on exist in v2 and carry their content."""
+tests/test_v2_tabs.py:7:def test_four_tabs_present_and_linked():
+tests/test_v2_tabs.py:21:    assert "Live desk" in t and "Open positions" in t and "Closed trades" in t
+tests/test_v2_tabs.py:36:    test_four_tabs_present_and_linked(); test_live_desk_names_the_engine_per_row()
+tests/test_v2_tabs.py:37:    test_portfolio_and_backtest_and_messages_content(); print("test_v2_tabs OK")
+tests/test_results_deliverables.py:1:"""R-EVENING-NOW (1): the Deliverables section (in the Results tab) — the 'Requested:' line, the four plain
+tests/test_results_deliverables.py:2:index-test sentences, the calls table, the Excel button; the paper-trades line is gate-computed; no jargon."""
+tests/test_results_deliverables.py:3:from scripts import results_page as RP, deliverables_page as DP
+tests/test_results_deliverables.py:6:def test_section_has_requested_sentences_table_and_excel():
+tests/test_results_deliverables.py:7:    s = RP._deliverables_html()
+tests/test_results_deliverables.py:8:    assert "id='deliverables'" in s and ">Deliverables<" in s
+tests/test_results_deliverables.py:15:    assert "Download Excel (all calls)" in s and "deliverables.xlsx" in s
+tests/test_results_deliverables.py:24:    assert line.startswith("Paper trades: ON") or line.startswith("Paper trades: OFF")
+tests/test_results_deliverables.py:40:def test_deliverables_tab_has_no_jargon_and_has_account_tiles():
+tests/test_results_deliverables.py:41:    s = DP.deliverables_section()
+tests/test_results_deliverables.py:43:        assert bad not in s, "jargon leaked into the Deliverables tab: " + bad
+tests/test_results_deliverables.py:48:def test_deliverables_removed_from_results_page():
+tests/test_results_deliverables.py:54:    assert "id='deliverables'" not in html and "Requested: index-only" not in html   # lives only in the tab
+assistant: `LPS.promote()` regenerates this file — so the real fix belongs in the generator `scripts/live_pattern_set.py`, or my hand-edit is transient. Let me read it.
+tool_use Bash {"command": "cat scripts/live_pattern_set.py 2>&1", "description": "Read the live pattern set generator"}
+tool_result: """R-MORNING-22 item 1 — the LIVE PATTERN SET. E1/E10/E11 trade ONLY the R-EXAMS-REAL survivors (the patterns
+that cleared real costs during certification), each with the management the exam chose for it. Every other
+candidate that fires goes to a walk-forward DIARY — no orders, no cards.
+
+This module promotes the staging survivors (reports/EXAMS-REAL-STAGING.json) into the live set
+(reports/LIVE-PATTERN-SET.json) and answers, for a fire's (symbol, family): is it live, and with what
+management. The live signal path (book20_runner) filters to `in_live_set` and attaches `management_for`; a
+fire not in the set is recorded to its diary instead. FAIL-CLOSED: if the live-set file is missing or
+unreadable, NOTHING is live (every fire becomes a diary) — a set you cannot verify is never traded.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STAGING = os.path.join(_REPO, "reports", "EXAMS-REAL-STAGING.json")
+LIVE_SET = os.path.join(_REPO, "reports", "LIVE-PATTERN-SET.json")
+
+
+def _family(metric):
+    """A candidate's family from its metric string: 'ema|q1' -> 'ema', 'sma[10,30]' -> 'sma'."""
+    s = str(metric or "")
+    return s.split("|")[0].split("[")[0].strip().lower()
+
+
+def promote(write=True):
+    """Read the staging survivors and write the live set (symbol+family -> management). Returns the set dict."""
+    try:
+        d = json.load(open(STAGING, encoding="utf-8"))
+        survivors = d.get("certified_patterns") or []
+    except Exception:
+        survivors = []
+    entries = {}
+    for s in survivors:
+        key = "%s|%s" % (str(s.get("stock", "")).upper(), _family(s.get("family")))
+        entries[key] = {"stock": str(s.get("stock", "")).upper(), "family": _family(s.get("family")),
+                        "horizon": s.get("horizon"), "stop_atr": s.get("stop"), "trail": s.get("trail"),
+                        "management": s.get("management"), "net_per_trade_R": s.get("mean_net_R")}
+    out = {"note": "E1/E10/E11 trade ONLY these; every other fire is a walk-forward diary (no orders, no cards).",
+           "source": "R-EXAMS-REAL survivors", "count": len(entries), "patterns": entries}
+    if write:
+        with open(LIVE_SET, "w", encoding="utf-8") as f:
+            json.dump(out, f, indent=1, default=str)
+    return out
+
+
+def _load():
+    try:
+        return json.load(open(LIVE_SET, encoding="utf-8")).get("patterns") or {}
+    except Exception:
+        return {}                                     # FAIL-CLOSED: unreadable -> empty -> nothing is live
+
+
+def _key(symbol, family):
+    return "%s|%s" % (str(symbol or "").upper(), _family(family))
+
+
+def in_live_set(symbol, family):
+    """True only if this (symbol, family) is a promoted survivor. Fail-closed to False."""
+    return _key(symbol, family) in _load()
+
+
+def management_for(symbol, family):
+    """The survivor's management + plain words, or None if not live."""
+    return _load().get(_key(symbol, family))
+
+
+def live_symbols_families():
+    return sorted(_load().keys())
+
+
+def _demo():
+    out = promote(write=False)
+    # the staging survivors round-trip into the live set, keyed by SYMBOL|family
+    fam = out["patterns"]
+    if fam:
+        k = next(iter(fam))
+        sym, family = fam[k]["stock"], fam[k]["family"]
+        assert "|" in k and fam[k]["management"]
+    # family extraction is robust
+    assert _family("ema|q1") == "ema" and _family("sma[10,30]") == "sma"
+    # fail-closed: a bogus key is never live
+    assert not in_live_set("NOSUCH", "nope")
+    print("live_pattern_set demo OK: %d survivors promote to the live set; family parse + fail-closed hold." %
+          out["count"])
+
+
+if __name__ == "__main__":
+    if "--demo" in sys.argv:
+        _demo()
+    else:
+        o = promote()
+        print("promoted %d survivors to the live set:" % o["count"])
+        for k, v in o["patterns"].items():
+            print("  ", v["stock"], v["family"], "->", v["management"])
+assistant: The label originates in the generator, which copies `stop`/`management` from `EXAMS-REAL-STAGING.json`. Let me see what staging holds so I fix at the true source, not just the output.
+tool_use Bash {"command": "SP=\"[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad\" && cat > \"$SP/st.py\" <<'PY'\nimport json\nd=json.load(open('reports/EXAMS-REAL-STAGING.json',encoding='utf-8'))\nprint('top keys:',list(d.keys()))\ncp=d.get('certified_patterns') or []\nprint('n certified:',len(cp))\nfor s in cp:\n    print({k:s.get(k) for k in ('stock','family','horizon','stop','trail','template','tgt','management')})\nprint('template-ish top fields:',{k:d[k] for k in d if 'templ' in k.lower() or 'exam' in k.lower()})\nPY\npython \"$SP/st.py\" 2>&1 | tail -20", "description": "Inspect exam staging survivors"}
+tool_result: top keys: ['note', 'cost', 'grid', 'reexamined', 'certified', 'probation', 'certified_trades_per_day', 'walk_forward_days', 'certified_patterns', 'probation_patterns']
+n certified: 5
+{'stock': 'UNITDSPR', 'family': 'ema', 'horizon': 60, 'stop': 2.0, 'trail': False, 'template': None, 'tgt': None, 'management': "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target"}
+{'stock': 'UNITDSPR', 'family': 'sma', 'horizon': 60, 'stop': 2.0, 'trail': False, 'template': None, 'tgt': None, 'management': "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target"}
+{'stock': 'BSE', 'family': 'stddev_returns', 'horizon': 40, 'stop': 2.0, 'trail': False, 'template': None, 'tgt': None, 'management': "hold up to 40 days, stop 2 times the stock's own daily swing, fixed stop and target"}
+{'stock': 'AUBANK', 'family': 'vwap', 'horizon': 40, 'stop': 2.0, 'trail': False, 'template': None, 'tgt': None, 'management': "hold up to 40 days, stop 2 times the stock's own daily swing, fixed stop and target"}
+{'stock': 'ETERNAL', 'family': 'rsi', 'horizon': 60, 'stop': 2.0, 'trail': False, 'template': None, 'tgt': None, 'management': "hold up to 60 days, stop 2 times the stock's own daily swing, fixed stop and target"}
+template-ish top fields: {'reexamined': 95}
+assistant: Staging itself carries the stale `stop:2.0`/wrong management (template=None). The exam actually fills via `stop1_tgt1.5`. The durable fix is in the generator: stamp the exam template (derived from `money.TEMPLATES`, not a naked number) instead of copying the stale staging label. Let me check money.py's imports are light.
+tool_use Bash {"command": "sed -n '1,20p' engine1_rebuild/money.py && echo \"...\" && sed -n '200,215p' engine1_rebuild/money.py", "description": "Check money.py imports + TEMPLATES"}
+tool_result: """THE single source of every money constant (owner ruling R-E1-AUDIT-FIX item 4).
+
+Before this, the fee/cushion/ATR-guard constants were defined twice — in paper.py and analysis.py — so
+a change to one silently disagreed with the other. Now they live here once and both import them, so the
+fee the selection charges is exactly the fee the paper book charges. Paper only.
+
+Fee model (conservative, cited): Zerodha intraday-equity + NSE statutory round-trip on turnover, plus a
+half-spread per side. Recomputed from real fills once any exist (the COLD-START badge stays on until
+then, CLAUDE.md §19.2).
+"""
+
+PAPER_R_RUPEES = 1000.0          # 1R = the rupee risk per call (R-E1-NOTIONAL: 0.5% of capital)
+NOTIONAL_CAPITAL = 200000.0      # the stated paper capital returns/drawdowns are measured on (R-E1-NOTIONAL)
+MAX_OPEN = 20                    # at most 20 concurrent paper positions, one per stock
+CUSHION_M = 0.05                 # win-rate cushion added on top of breakeven
+
+COST_STATUTORY_RT = 0.0010       # ~10 bps round-trip: brokerage(0.03%/leg cap Rs20)+STT(0.025% sell)+
+                                 # NSE txn(0.00297%/leg)+SEBI+stamp(0.003% buy)+18% GST on charges
+HALF_SPREAD = 0.0005             # 5 bps per side (conservative for liquid F&O names)
+COST_RT = COST_STATUTORY_RT + 2 * HALF_SPREAD          # ~20 bps round trip (R-E1-FEE-PAPER)
+...
+        "cushion_M": {"value": cushion(), "formula": "median Wilson half-width over blotter fire counts",
+                      "source": "MEASURED" if mc is not None else "cited fallback %.3f (COLD-START)" % CUSHION_M},
+        "day_halt": {"source": "circuit_breaker.worst_backtest_streak (measured) + book_guard measured worst DD; "
+                     "the typed DAY_HALT_R in the retired intraday loop no longer governs any order"},
+    }
+
+
+# (name, stop x ATR, target x ATR or None=time-exit, max bars held)
+TEMPLATES = [("stop1_tgt1.5", 1.0, 1.5, 40), ("stop1_tgt2", 1.0, 2.0, 40), ("time5", None, None, 5)]
+
+
+def _demo():
+    assert abs(COST_RT - 0.002) < 1e-9, COST_RT
+    assert PAPER_R_RUPEES == 0.005 * NOTIONAL_CAPITAL, "1R must be 0.5% of capital (R-E1-NOTIONAL)"
+    assert MAX_OPEN == 20 and 0 < CUSHION_M < 0.2 and MIN_ATR_FRAC > 0 and CLIP_R > 0
+    # F&O cost path (R-E1-E7-FULL): a BANKNIFTY 1-lot parity round trip is dominated by flat brokerage
+assistant: money.py is light and holds `TEMPLATES` (the single source). I'll fix the generator to stamp the exam template (derived from `money.TEMPLATES`, no naked number) instead of copying the stale staging label. Let me edit `promote()`.
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\live_pattern_set.py", "old_string": "def _family(metric):\n    \"\"\"A candidate's family from its metric string: 'ema|q1' -> 'ema', 'sma[10,30]' -> 'sma'.\"\"\"\n    s = str(metric or \"\")\n    return s.split(\"|\")[0].split(\"[\")[0].strip().lower()\n\n\ndef promote(write=True):\n    \"\"\"Read the staging survivors and write the live set (symbol+family -> management). Returns the set dict.\"\"\"\n    try:\n        d = json.load(open(STAGING, encoding=\"utf-8\"))\n        survivors = d.get(\"certified_patterns\") or []\n    except Exception:\n        survivors = []\n    entries = {}\n    for s in survivors:\n        key = \"%s|%s\" % (str(s.get(\"stock\", \"\")).upper(), _family(s.get(\"family\")))\n        entries[key] = {\"stock\": str(s.get(\"stock\", \"\")).upper(), \"family\": _family(s.get(\"family\")),\n                        \"horizon\": s.get(\"horizon\"), \"stop_atr\": s.get(\"stop\"), \"trail\": s.get(\"trail\"),\n                        \"management\": s.get(\"management\"), \"net_per_trade_R\": s.get(\"mean_net_R\")}\n    out = {\"note\": \"E1/E10/E11 trade ONLY these; every other fire is a walk-forward diary (no orders, no cards).\",\n           \"source\": \"R-EXAMS-REAL survivors\", \"count\": len(entries), \"patterns\": entries}\n    if write:\n        with open(LIVE_SET, \"w\", encoding=\"utf-8\") as f:\n            json.dump(out, f, indent=1, default=str)\n    return out", "new_string": "# The template the exam certifies these patterns under == conform.EXAM_TEMPLATE == money.TEMPLATES[0][0].\n# The live order path (conform.queue_orders) fills every QUEUE via this template + the pattern's horizon and\n# NEVER reads the per-pattern stop label, so the label must state the exam template \u2014 not the staging 'stop'\n# field, which recorded a stale \"2x daily swing\" that no order path used (NIGHT BUNDLE 2 item 5, 2026-09-23).\nEXAM_TEMPLATE = \"stop1_tgt
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\live_pattern_set.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now regenerate the live set from the fixed generator and run the touched-module tests (live_pattern_set, conform, v2 site, deliverables):
+tool_use Bash {"command": "python -m scripts.live_pattern_set 2>&1 | tail -8 && echo \"=== regenerated JSON stop label ===\" && grep -E \"stop_atr|target_atr|template|exam_template\" reports/LIVE-PATTERN-SET.json | head -8", "description": "Regenerate live set and confirm labels"}
+tool_result: promoted 5 survivors to the live set:
+   UNITDSPR ema -> hold up to 60 days; exam template stop1_tgt1.5 � initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed
+   UNITDSPR sma -> hold up to 60 days; exam template stop1_tgt1.5 � initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed
+   BSE stddev_returns -> hold up to 40 days; exam template stop1_tgt1.5 � initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed
+   AUBANK vwap -> hold up to 40 days; exam template stop1_tgt1.5 � initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed
+   ETERNAL rsi -> hold up to 60 days; exam template stop1_tgt1.5 � initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed
+=== regenerated JSON stop label ===
+ "exam_template": "stop1_tgt1.5",
+ "exam_template_meaning": "initial stop 1x ATR, target 1.5x ATR (money.TEMPLATES); the exam certified these under this template.",
+ "label_correction": "NIGHT BUNDLE 2 item 5 (2026-09-23): the earlier stop_atr:2.0 (copied from the staging 'stop' field) was inert, stale metadata. The order path fills via the exam template above and never reads this field (conform.py:95-97; verify-a905edd32.md:40). Stamped to match the exam; no behaviour changed.",
+   "stop_atr": 1.0,
+   "target_atr": 1.5,
+   "template": "stop1_tgt1.5",
+   "management": "hold up to 60 days; exam template stop1_tgt1.5 \u2014 initial stop 1x and target 1.5x the stock's own daily swing (ATR), fixed",
+   "stop_atr": 1.0,
+assistant: The `\u2014` (em-dash) is correct in the file; the `�` is just the console codepage. The generator now produces the truthful label durably. Let me run the touched-module tests.
+tool_use Bash {"command": "python -m pytest tests/test_live_pattern_set.py tests/test_conform.py tests/test_site_v2.py tests/test_v2_tabs.py tests/test_v2_render.py tests/test_results_deliverables.py -q 2>&1 | tail -25", "description": "Run touched-module tests"}
+tool_result: ......................                                                   [100%]
+22 passed in 96.74s (0:01:36)
