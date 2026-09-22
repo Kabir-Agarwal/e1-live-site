@@ -1,33 +1,49 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 02:22 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 02:33 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>verify-a905edd32.md</h3><pre># verify-a905edd32
 
-VERDICT: FAIL
+VERDICT: PASS
 
-- rung: (d) fresh independent Claude run (supervisor mechanism)
+- rung: (a) Codex CLI (ChatGPT sign-in)
 - claimed step: R-EXAM-CONFORM conforming evaluator (signal+six checks+EOD fill reuse the exam; order-writing gated on the proof marker)
 
 ## evidence
 
-I&#x27;ll act as the independent verifier. Let me read the template, the verify-map, and the touched files, then run the checks.
-Now let me run the checks. This is a trading-path change (signal/order/ledger), so per VERIFY-MAP I run the module&#x27;s demo and the tests. Let me start.
-Demo passes. Now the touched-module tests and the full suite (VERIFY-MAP &quot;always&quot; row).
-Now the full suite. Let me check free RAM first per the R-VERIFIER standing rule, then run it.
-The full-suite invocation hits module-name collisions across directories — a known collection quirk, not a test failure. Let me find how this repo actually runs its suite.
-The canonical suite is `pytest tests/` (root-level collision is documented). Before the heavy full run, let me verify the specific reuse and gating claims with running evidence, and check the proof-marker state.
-Reuse targets confirmed, all called (no reimplementation), and the proof marker is absent → fail-safe active. Now confirm the disclosed `stop_atr` finding, then launch the full suite (background, ~21 min).
-Finding confirmed: `stop_atr` is only used inside `if manage:`, and all five patterns are `trail=False` → stop_atr:2.0 is inert metadata, exactly as disclosed. Now the full `tests/` suite (the documented non-colliding invocation). Running it in the background.
-While the suite runs, let me confirm the &quot;reuses the EOD path&quot; claim — that the queued rows conform&#x27;s `queue_orders` writes are actually consumed by the existing `process_eod_positions` → `simulate_trade` next-open path.
-EOD-path reuse confirmed: `process_eod_positions` fills `EOD-`/`queued` rows via `paper.simulate_trade` at the next daily open using the row&#x27;s template+horizon — no second fill copy. All targeted claims are substantiated. Now I wait on the full suite. Let me check interim progress.
-The suite is running (output buffers until the end with `-q`). I&#x27;ll wait for the completion notification rather than poll. Let me schedule a fallback check in case it hangs.
-I&#x27;ve completed the targeted verification and launched the full `tests/` suite. Waiting on its result before issuing the verdict. Progress so far:
+pre-run FULL suite (run ALONE under the RAM gate) sha256=d48652511d5fe351ea7ea409cadeec5701a4752079ab54b07dcf657f0872d6ae: status=green, 330 passed, 0 failed, min_free=0.73 GB, peak_used=7.07 GB
 
-- ✅ `python -m engine1_rebuild.conform` → `conform demo OK: 5 live patterns; decisions reuse evening._fire_today + LB.checklist`
-- ✅ `pytest tests/test_conform.py` → `3 passed`
-- ✅ Reuse targets exist and are actually called (no reimplementation): `evening._fire_today`, `LB.checklist`, `paper.append_rows`, `evening.process_eod_positions`
-- ✅ Fail-safe active: proof marker `reports/EXAM-CONFORM-PROVEN` does **not** exist → nothing writes to the live ledger
-- ✅ EOD-path reuse: `process_eod_positions` fills conform&#x27;s `EOD-CONFORM-…`/`queued` rows via `paper.simulate_trade` at next daily open
-- ✅ Disclosed `stop_atr`-inert finding is accurate (all five patterns `trail=False`; `simulate_trade` only uses `stop_atr` under `if manage:`)
+I&#x27;m the independent verifier. Running the two targeted checks and confirming the pre-run suite sha256. Read-only, no edits.
+All three targeted checks pass and the sha256 matches. Let me confirm the commit&#x27;s claims against the actual code.
+Confirming the gate reference (`B.EXAM_CONFORM_PROOF`) is real, not a phantom.
+VERDICT: PASS
 
-The full `tests/` suite (~21 min, ~330 tests) is running in the background; I&#x27;ll post the VERDICT once it returns its `N passed` line.
+**Independent verifier report — commit a905edd32, step: &quot;R-EXAM-CONFORM conforming evaluator (signal+six checks+EOD fill reuse the exam; order-writing gated on the proof marker)&quot;**
+
+Read-only. No file modified, staged, or committed. HEAD unchanged at `972650ae6`.
+
+**Targeted checks run (this exact interpreter, `-B`):**
+
+1. `...python.exe -B -m engine1_rebuild.conform`
+   → `conform demo OK: 5 live patterns; decisions reuse evening._fire_today + LB.checklist` — EXIT=0 ✅
+
+2. `...python.exe -B -m pytest tests/test_conform.py -q -p no:cacheprovider`
+   → `3 passed in 7.60s` — EXIT=0 ✅
+
+**Pre-run full suite (authoritative, run alone under RAM gate — not re-run per instruction):**
+- `sha256sum reports/CONFORM-SUITE-RESULT.json` → `d48652511d5fe351ea7ea409cadeec5701a4752079ab54b07dcf657f0872d6ae` — **matches** the handed hash ✅
+- File content on disk: `status=green, returncode=0, 330 passed, 0 failed, min_free=0.73 GB, peak_used=7.07 GB` ✅
+
+**Claim-by-claim against the code (each cited):**
+
+- *&quot;signal reuses the exam&#x27;s `evening._fire_today`&quot;* → `conform.py:76` `fired, daily = evening._fire_today(reader, c[&quot;token&quot;], c[&quot;metric&quot;], c[&quot;condition&quot;], asof=asof)`. CONFIRMED.
+- *&quot;six checks reuse `LB.checklist`&quot;* → `conform.py:137` `chk = LB.checklist(...)` inside `_checklist`. CONFIRMED — no second copy.
+- *&quot;EOD next-open fill via the exam path (`paper.simulate_trade`, per-pattern horizon/trail)&quot;* → `queue_orders` (`conform.py:100-128`) writes queued EOD rows via `paper.append_rows` for `evening.process_eod_positions`, template `EXAM_TEMPLATE=&quot;stop1_tgt1.5&quot;` + pattern horizon. CONFIRMED.
+- *&quot;missing input → HELD with named check incl warm-up&quot;* → `conform.py:72,78,87-89` + `_named_check` (`144-157`); exercised by the 3 passing `test_conform` cases. CONFIRMED.
+- *&quot;order-writing gated on the proof marker (fail-safe)&quot;* → `conform.py:109` `proven = os.path.exists(B.EXAM_CONFORM_PROOF)`, `:113` queues only when `proven`. Marker constant is real: `book20_runner.py:46` `EXAM_CONFORM_PROOF = .../reports/EXAM-CONFORM-PROVEN`. Marker file does not yet exist on disk, so the fail-safe HELDs everything until conformance is proven — matches the claim. CONFIRMED.
+- *Commit&#x27;s own FINDING* (`stop_atr:2.0` inert because `simulate_trade` ignores it when `manage=False`; exam template governs) → consistent with `conform.py:95-97` and the exam-is-standard rule. Noted, not a defect.
+
+**Scope note:** `conform.py` is a trading-path module, so VERIFY-MAP normally also calls for the end-to-end rehearsal + twin run. Per the ruling handed to this verifier, the operative scope was the two targeted checks + the pre-run suite on brain rung (d); the twin run&#x27;s standing finding (live-vs-exam management unresolved) is the very drift this rewire exists to close, and the order path is inert behind a not-yet-present proof marker, so no live order can be written. Verdict is scoped accordingly.
+
+Every claim in the step carries a running-evidence or cited-code line, and no run contradicts the claim → **PASS**.
+
+`VERIFY PASS R-EXAM-CONFORM-step1 a905edd32`
 </pre><h3>2026-09-23-exam-conform-status.md</h3><pre># R-EXAM-CONFORM — status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)
 
 ## What is DONE and safe (committed 0aa11e331)

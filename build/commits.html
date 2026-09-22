@@ -1,4 +1,71 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>80b664c5c</b> · 2026-09-23 02:20</div><div>R-VERIFIER launcher fix (owner ruling 23 Sep): rung (a) Codex actually invoked, pre-run suite result trusted, cap raised</div><div class='sub h'>scripts/supervisor.py |  7 +++--</div><div class='sub h'>scripts/verifier.py   | 76 +++++++++++++++++++++++++++++++++++++++++----------</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>972650ae6</b> · 2026-09-23 02:27</div><div>R-VERIFIER: fall back to rung (d) when Codex&#x27;s sandbox cannot execute the checks</div><div class='sub h'>scripts/verifier.py | 17 ++++++++++++++++-</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 328f47f13..353af623f 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -158,6 +158,15 @@ def _suite_evidence():
+         return &quot;&quot;, &quot;&quot;
+ 
+ 
++def _codex_blocked(out):
++    &quot;&quot;&quot;True when Codex&#x27;s reply shows the required checks could not EXECUTE (its read-only sandbox cannot run the
++    Python interpreter on this machine) — i.e. not a substantive verdict, so the caller falls back to rung (d).&quot;&quot;&quot;
++    o = (out or &quot;&quot;).lower()
++    return any(m in o for m in (&quot;commandnotfoundexception&quot;, &quot;not recognized as&quot;, &quot;no installed python&quot;,
++                                &quot;could not execute&quot;, &quot;could not start&quot;, &quot;failed to start&quot;, &quot;checks were blocked&quot;,
++                                &quot;checks failed to start&quot;))
++
++
+ def _run_codex(prompt):
+     &quot;&quot;&quot;Rung (a): run the verify via Codex CLI non-interactively (codex.cmd exec). Returns the reply text, or None
+     on any failure so the caller falls back to rung (d).&quot;&quot;&quot;
+@@ -194,7 +203,13 @@ def _run_rung(rung, inputs):
+               &quot;evidence.\n\nPRE-RUN SUITE: %s\n%s\n\nRULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n&quot; %
+               (py, py, py, suite_line, suite_blob[:1500], inputs[&quot;ruling&quot;][:6000], inputs[&quot;step&quot;], inputs[&quot;commit&quot;],
+                inputs[&quot;diff&quot;]))
+-    out = _run_codex(prompt) if rung == &quot;a&quot; else None
++    out = None
++    if rung == &quot;a&quot;:
++        cx = _run_codex(prompt)
++        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when
++        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).
++        if cx is not None and (re.search(r&quot;(?im)^\s*VERDICT:\s*PASS\b&quot;, cx) or not _codex_blocked(cx)):
++            out = cx
+     if out is None:
+         from scripts import supervisor
+         out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -&gt; unpack
+</pre></div><div class='c'><div class='h'><b>22f4ed7ad</b> · 2026-09-23 02:25</div><div>R-VERIFIER: hand the brain the real interpreter path + exact targeted commands (the &#x27;py&#x27; launcher is not installed, which blocked Codex&#x27;s demo/test checks). -B avoids .pyc writes under a read-only sandbox.</div><div class='sub h'>scripts/verifier.py | 17 ++++++++++++-----</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
+index ede6ab60d..328f47f13 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -178,15 +178,22 @@ def _run_rung(rung, inputs):
+     mechanism); (a) falls back to (d) on any Codex failure. Both are handed the pre-run FULL suite result +
+     its hash and told NOT to re-run the ~21-min suite (it cannot finish in a single shot); they run only the
+     fast TARGETED checks (module demo + touched-module tests) and confirm the suite hash.&quot;&quot;&quot;
++    import sys as _sys
++    py = _sys.executable                                  # the real interpreter; the &#x27;py&#x27; launcher is NOT installed
+     suite_line, suite_blob = _suite_evidence()
+     prompt = (&quot;You are the INDEPENDENT VERIFIER. Follow docs/VERIFIER-TEMPLATE.md and run ONLY the TARGETED checks &quot;
+-              &quot;in docs/VERIFY-MAP.md for the touched paths (the module demo + the touched-module tests). DO NOT &quot;
+-              &quot;re-run the full ~21-min suite: its result was produced ALONE under the RAM gate and is given below &quot;
+-              &quot;as authoritative evidence — confirm the sha256 matches reports/CONFORM-SUITE-RESULT.json on disk. &quot;
+-              &quot;Do NOT modify, stage, or commit any file; run read-only checks only. A claim without a &quot;
++              &quot;in docs/VERIFY-MAP.md for the touched paths. Run commands with THIS exact Python interpreter (the &quot;
++              &quot;&#x27;py&#x27; launcher is NOT installed on this machine): %s\n&quot;
++              &quot;Targeted checks to run and quote the output of (the -B avoids .pyc writes under a read-only sandbox):\n&quot;
++              &quot;  1) \&quot;%s\&quot; -B -m engine1_rebuild.conform\n&quot;
++              &quot;  2) \&quot;%s\&quot; -B -m pytest tests/test_conform.py -q -p no:cacheprovider\n&quot;
++              &quot;DO NOT re-run the full ~21-min suite: its result was produced ALONE under the RAM gate and is given &quot;
++              &quot;below as authoritative evidence — confirm the sha256 matches reports/CONFORM-SUITE-RESULT.json on &quot;
++              &quot;disk. Do NOT modify, stage, or commit any file; run read-only checks only. A claim without a &quot;
+               &quot;running-evidence line is FAIL. Reply with a first line &#x27;VERDICT: PASS&#x27; or &#x27;VERDICT: FAIL&#x27; then the &quot;
+               &quot;evidence.\n\nPRE-RUN SUITE: %s\n%s\n\nRULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n&quot; %
+-              (suite_line, suite_blob[:1500], inputs[&quot;ruling&quot;][:6000], inputs[&quot;step&quot;], inputs[&quot;commit&quot;], inputs[&quot;diff&quot;]))
++              (py, py, py, suite_line, suite_blob[:1500], inputs[&quot;ruling&quot;][:6000], inputs[&quot;step&quot;], inputs[&quot;commit&quot;],
++               inputs[&quot;diff&quot;]))
+     out = _run_codex(prompt) if rung == &quot;a&quot; else None
+     if out is None:
+         from scripts import supervisor
+</pre></div><div class='c'><div class='h'><b>80b664c5c</b> · 2026-09-23 02:20</div><div>R-VERIFIER launcher fix (owner ruling 23 Sep): rung (a) Codex actually invoked, pre-run suite result trusted, cap raised</div><div class='sub h'>scripts/supervisor.py |  7 +++--</div><div class='sub h'>scripts/verifier.py   | 76 +++++++++++++++++++++++++++++++++++++++++----------</div><pre>diff --git a/scripts/supervisor.py b/scripts/supervisor.py
 index c6dc3f8fb..9d6db827b 100644
 --- a/scripts/supervisor.py
 +++ b/scripts/supervisor.py
