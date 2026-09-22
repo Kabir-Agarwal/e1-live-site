@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Eyes map</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 02:33 IST · <a href='index.html'>build room</a></p><h1>Eyes map</h1><pre># EYES — every watcher on the desk (R-EYES-COMPLETE §8)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Eyes map</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 02:44 IST · <a href='index.html'>build room</a></p><h1>Eyes map</h1><pre># EYES — every watcher on the desk (R-EYES-COMPLETE §8)
 
 Linked from status.html. For each watcher: what it sees · how old at most (from the writer&#x27;s cadence, not
 typed) · what freezes it · what still needs the owner.
@@ -35,7 +35,18 @@ Dedup is the existing notify rate-limit: a frozen page keeps the same written ti
 
 | NIGHT DRY RUN | can the stack restart from the last verified commit after build hours | runs nightly (scheduled under START_E1_STACK); skips 05:30–15:45 | a PASS; a FAIL auto-reverts to the tag and restarts on it | a FAIL raises 🙋 LEAD RULING NEEDED; owner registers the schedule via START_E1_STACK |
 
-## R-EYE-EMOJI (2026-09-23) — the freshness eye on every desk line
+## R-OWNER-EMOJI (2026-09-23) — supersedes the 🙈 half of R-EYE-EMOJI
 
-Every BUILD line, the 08:30 READY line, and the restart announcement carry a 👀/🙈 read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page). 👀 = public written time under 2 min old; 🙈 = older, with that time shown. A failed fetch is 🙈, never a false 👀. Three 🙈 in a row sets `blocked` (fixing the page becomes the only work). The restart line stays silent until the public page is confirmed under 2 min old, then posts &quot;👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT…&quot;. Helper: `watchers.public_eye` / `watchers.eye_prefix`.
+**The freshness eye.** Every BUILD line, the 08:30 READY line, and the restart announcement carry the eye read from the **public** status page (fetched over the URL, never the local file — a local read could show 👀 while the owner sees a frozen page).
+- **Fresh (public written time under 2 min old) → 👀** (unchanged).
+- **Stale → NO emoji**; the line carries the words **`page stale since HH:MM`** instead of 🙈. A failed fetch is stale. Three stale reads in a row set `blocked` (fixing the page becomes the only work). Helper: `watchers.public_eye` / `watchers.eye_prefix` (stale prefix = `page stale since HH:MM · `).
+
+**🙋 is the one and only owner→lead signal.** 🙋 is reserved for lines the owner must act on or paste to the lead: LEAD RULING NEEDED, NOT READY at 08:30, a needed human restart, a sign-in tap, the 06:00 login link. **No other line may start with 🙋.** Every 🙋 line ends with **exactly one** of these closers:
+- `send this to the lead`
+- `tap the login`
+- `reply restart now`
+
+👀 lines are never owner-actioned; if a 👀-context line ever needs the owner, it also carries 🙋 (and thus one of the three closers). Central guard: `notify.owner_signal_ok(msg)` flags a 🙋 line missing a closer (a guard, never a filter — the line still sends). Read-only line types (✅ done, ⏱ progress, beat and card lines) are unchanged.
+
+**Remaining reconciliation (follow-up):** the many existing 🙋 call-sites (`token_ping` login link, `kite_login`, `day_report`, `alarm`, …) should each be checked to end with one of the three exact closers; the central `notify` guard surfaces any that do not. Not swept tonight to avoid editing launch-adjacent files near the 05:00 freeze.
 </pre></main></body></html>
