@@ -1,4 +1,120 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3ee816889</b> · 2026-09-22 22:08</div><div>R-V2-EXACT: port the Main/Leaderboard page; bind the engine-chat sidebar and latest-signals card to the real calls (top cards/stat grid/leaderboard rows still baked, flagged for binding)</div><div class='sub h'>scripts/v8_site.py |  70 ++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/index.html | 128 +++++++++++++++++++++++++++++++++++++----------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>7f5ffbc72</b> · 2026-09-22 22:25</div><div>R-V2-EXACT: port the Patterns page; owner opening line + real 5 live patterns bound (honest &#x27;-&#x27; where the store has no case/win count; baked readings/summary flagged)</div><div class='sub h'>scripts/v8_site.py    |  61 +++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/patterns.html | 100 +++++++++++++++++++++++++++++++-------------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index c5acbfd8b..88528bc80 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -259,10 +259,69 @@ def _main_data():
+             &quot;expandLabel&quot;: &quot;Expand - fees, hold time, exit rule&quot;, &quot;toggle&quot;: &quot;&quot;}
+ 
+ 
++
++_FAM = {&quot;ema&quot;: &quot;EMA trend&quot;, &quot;sma&quot;: &quot;SMA trend&quot;, &quot;vwap&quot;: &quot;VWAP band&quot;, &quot;rsi&quot;: &quot;RSI momentum&quot;,
++        &quot;stddev_returns&quot;: &quot;volatility band&quot;}
++
++
++def _pattern_data():
++    &quot;&quot;&quot;The Patterns page: the master-detail bound to the REAL live tradeable set (LIVE-PATTERN-SET.json) —
++    the five the desk actually trades. Each carries a plain-English rule (its management string) and its real
++    net-per-trade R; the store has no per-pattern case count or win %, so those honest-show as &#x27;—&#x27; rather than
++    fabricate (§4.4). All five are exam survivors → &#x27;live paper&#x27;, requirements &#x27;passed&#x27;; the four design exam
++    sub-steps are not in the store, so they show &#x27;—&#x27; instead of an invented pass/fail.&quot;&quot;&quot;
++    import json
++    try:
++        d = json.load(open(os.path.join(REPO, &quot;reports&quot;, &quot;LIVE-PATTERN-SET.json&quot;), encoding=&quot;utf-8&quot;))
++        pats = list((d.get(&quot;patterns&quot;) or {}).values())
++    except Exception:
++        pats = []
++    G, GREY = &quot;#5DCAA5&quot;, &quot;#9a9a93&quot;
++    full = []
++    for p in pats:
++        fam = _FAM.get(p.get(&quot;family&quot;, &quot;&quot;), (p.get(&quot;family&quot;) or &quot;&quot;).upper())
++        r = p.get(&quot;net_per_trade_R&quot;)
++        full.append({
++            &quot;words&quot;: &quot;%s — %s (%s-day hold)&quot; % (p.get(&quot;stock&quot;), fam, p.get(&quot;horizon&quot;)),
++            &quot;rule&quot;: &quot;Rule: %s.&quot; % (p.get(&quot;management&quot;) or &quot;tested rule&quot;),
++            &quot;who&quot;: &quot;E1, E10, E11&quot;, &quot;cases&quot;: &quot;—&quot;, &quot;won&quot;: &quot;—&quot;, &quot;wonAdj&quot;: &quot;—&quot;,
++            &quot;move&quot;: (&quot;%+.2fR per trade&quot; % r) if isinstance(r, (int, float)) else &quot;—&quot;,
++            &quot;req&quot;: &quot;passed&quot;, &quot;reqColor&quot;: G, &quot;rank&quot;: &quot;—&quot;,
++            &quot;stage&quot;: &quot;live paper&quot;, &quot;stageColor&quot;: G,
++            &quot;s2&quot;: &quot;passed the final exam&quot;, &quot;c2&quot;: G, &quot;s3&quot;: &quot;—&quot;, &quot;c3&quot;: GREY,
++            &quot;s4&quot;: &quot;—&quot;, &quot;c4&quot;: GREY, &quot;s5&quot;: &quot;live paper&quot;, &quot;c5&quot;: G,
++        })
++    if not full:
++        full = [{&quot;words&quot;: &quot;no live pattern yet&quot;, &quot;rule&quot;: &quot;Rule: —.&quot;, &quot;who&quot;: &quot;—&quot;, &quot;cases&quot;: &quot;—&quot;,
++                 &quot;won&quot;: &quot;—&quot;, &quot;wonAdj&quot;: &quot;—&quot;, &quot;move&quot;: &quot;—&quot;, &quot;req&quot;: &quot;—&quot;, &quot;reqColor&quot;: GREY,
++                 &quot;rank&quot;: &quot;—&quot;, &quot;stage&quot;: &quot;—&quot;, &quot;stageColor&quot;: GREY, &quot;s2&quot;: &quot;—&quot;, &quot;c2&quot;: GREY,
++                 &quot;s3&quot;: &quot;—&quot;, &quot;c3&quot;: GREY, &quot;s4&quot;: &quot;—&quot;, &quot;c4&quot;: GREY, &quot;s5&quot;: &quot;—&quot;, &quot;c5&quot;: GREY}]
++    lst = [{&quot;words&quot;: p[&quot;words&quot;], &quot;stage&quot;: p[&quot;stage&quot;], &quot;stageColor&quot;: p[&quot;stageColor&quot;],
++            &quot;cases&quot;: p[&quot;cases&quot;], &quot;won&quot;: p[&quot;won&quot;], &quot;bg&quot;: &quot;#23262d&quot; if k == 0 else &quot;transparent&quot;, &quot;pick&quot;: &quot;&quot;}
++           for k, p in enumerate(full)]
++    out = {&quot;list&quot;: lst}
++    out.update(full[0])                 # detail = first live pattern (resting selection)
++    return out
++
++
++def _fix_pattern(html):
++    &quot;&quot;&quot;The owner&#x27;s required opening line for the Patterns page (R-V2-EXACT point 3).&quot;&quot;&quot;
++    html = html.replace(
++        &quot;Every pattern the desk knows, with its rule, who calls it, and its record. Click one to open it.&quot;,
++        &quot;A pattern is a tested rule. Only the five with ‘live paper’ are traded.&quot;)
++    # a baked sample count sits in a hardcoded sentence (no placeholder); the store has no per-pattern count
++    return html.replace(
++        &quot;The 937 backtest calls for this pattern are in the Excel below.&quot;,
++        &quot;This pattern’s backtest calls are in the Excel below.&quot;)
++
++
++POST[&quot;Pattern.dc.html&quot;] = _fix_pattern
++
++
+ # the providers wired so far — a design page is only WRITTEN once its provider is here and its gate is clean.
+ # Static prototypes with baked sample Q&amp;A/records (Ask, Stock) and the {{}}-heavy data pages (Main, Engine,
+ # Stocks, Pattern, Data, Results, Messages) are ported one at a time as their data binding lands.
+-PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data}
++PROVIDERS = {&quot;How.dc.html&quot;: _how_data, &quot;Data.dc.html&quot;: _data_data, &quot;Results.dc.html&quot;: _results_data, &quot;Messages.dc.html&quot;: _messages_data, &quot;Main.dc.html&quot;: _main_data, &quot;Pattern.dc.html&quot;: _pattern_data}
+ 
+ 
+ def build(write=True, only=None):
+diff --git a/site/v2/patterns.html b/site/v2/patterns.html
+index 08a7b6d9a..452e9119f 100644
+--- a/site/v2/patterns.html
++++ b/site/v2/patterns.html
+@@ -1,37 +1,63 @@
+-&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Patterns — E1 desk&lt;/title&gt;&lt;link rel=&#x27;preconnect&#x27; href=&#x27;https://fonts.googleapis.com&#x27;&gt;&lt;link href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&#x27; rel=&#x27;stylesheet&#x27;&gt;&lt;style&gt;
+-:root{--ground:#0f1115;--card:#161920;--line:#23262d;--ink:#e8e6e1;--ink2:#b8b6ae;--ink3:#9a9a93;
+-  --gain:#5DCAA5;--loss:#F09595;--warn:#FAC775;--link:#85B7EB}
+-*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);
+-  font-family:&#x27;IBM Plex Sans&#x27;,system-ui,sans-serif;font-size:15px;line-height:1.5}
+-.num,td.n,.big{font-family:&#x27;IBM Plex Mono&#x27;,ui-monospace,monospace}
+-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+-.nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+-  background:#0c0e12;position:sticky;top:0;z-index:5}
+-.nav .logo{font-family:&#x27;IBM Plex Mono&#x27;;font-weight:600;background:var(--gain);color:#0c0e12;border-radius:6px;
+-  padding:2px 8px;margin-right:8px}
+-.nav a{color:var(--ink2);padding:5px 10px;border-radius:8px;font-size:14px}
+-.nav a.on{background:var(--card);color:var(--ink)}
+-.nav .ask{margin-left:auto;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ink)}
+-.tick{display:flex;gap:18px;overflow-x:auto;padding:6px 16px;border-bottom:1px solid var(--line);
+-  font-family:&#x27;IBM Plex Mono&#x27;;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+-main{max-width:1180px;margin:0 auto;padding:16px}
+-h1{font-size:19px;margin:6px 0}h2{font-size:16px;margin:22px 0 8px}.sub{color:var(--ink3);font-size:13px}
+-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+-.card .k{color:var(--ink3);font-size:12px}.card .big{font-size:22px;margin-top:4px}
+-.gain{color:var(--gain)}.loss{color:var(--loss)}.warn{color:var(--warn)}
+-table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+-td,th{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left}th{color:var(--ink3);font-weight:500}
+-tr.click{cursor:pointer}tr.click:hover{background:#1b1e26}
+-.grid2{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+-.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+-.chat{max-height:70vh;overflow:auto}.chat .m{border-bottom:1px solid var(--line);padding:7px 0;font-size:13px}
+-.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2)}
+-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+-.funnel .f{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px}
+-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+-.tabs button{background:#0c0e12;border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+-.tabs button.on{background:var(--card);color:var(--ink)}
+-.tabpane{display:none}.tabpane.on{display:block}
+-.updated{color:var(--ink3);font-size:12px;margin:12px 0 4px}
+-&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class=&#x27;nav&#x27;&gt;&lt;span class=&#x27;logo&#x27;&gt;E1&lt;/span&gt;&lt;a href=&#x27;index.html&#x27;&gt;Leaderboard&lt;/a&gt;&lt;a href=&#x27;engines.html&#x27;&gt;Engines&lt;/a&gt;&lt;a href=&#x27;stocks.html&#x27;&gt;Stocks&lt;/a&gt;&lt;a href=&#x27;patterns.html&#x27; class=&#x27;on&#x27;&gt;Patterns&lt;/a&gt;&lt;a href=&#x27;deliverables.html&#x27;&gt;Deliverables&lt;/a&gt;&lt;a href=&#x27;data.html&#x27;&gt;Data&lt;/a&gt;&lt;a href=&#x27;results.html&#x27;&gt;Results&lt;/a&gt;&lt;a href=&#x27;how.html&#x27;&gt;How it works&lt;/a&gt;&lt;a class=&#x27;ask&#x27; href=&#x27;ask.html&#x27;&gt;Ask the desk&lt;/a&gt;&lt;/div&gt;&lt;div class=&#x27;tick&#x27;&gt;&lt;span&gt;DABUR &lt;b class=&#x27;gain&#x27;&gt;388.1&lt;/b&gt; +3.22%&lt;/span&gt;&lt;span&gt;HINDUNILVR &lt;b class=&#x27;gain&#x27;&gt;1951.0&lt;/b&gt; +0.83%&lt;/span&gt;&lt;span&gt;JSWENERGY &lt;b class=&#x27;loss&#x27;&gt;516.05&lt;/b&gt; -1.67%&lt;/span&gt;&lt;span&gt;BDL &lt;b class=&#x27;loss&#x27;&gt;1174.5&lt;/b&gt; -1.30%&lt;/span&gt;&lt;span&gt;SHREECEM &lt;b class=&#x27;loss&#x27;&gt;22520.0&lt;/b&gt; -0.40%&lt;/span&gt;&lt;/div&gt;&lt;main&gt;&lt;h1&gt;Patterns&lt;/h1&gt;&lt;h2&gt;The five live patterns&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;These five cleared real execution costs, so E1/E10/E11 trade them. The rest below are on paper diaries. Paper only — not advice; small samples, high bar.&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;BSE&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;BSE, held for weeks: when how choppy its recent daily returns have been sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: how choppy its recent daily returns have been · Managed: hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.5 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;UNITDSPR&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;UNITDSPR, held for weeks: when its price against a simple moving average sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against a simple moving average · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.5 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;ETERNAL&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27;&gt;fired today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;ETERNAL, held for weeks: when a momentum reading (RSI) sits in a particular band, its price tends to go UP.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: a momentum reading (RSI) · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 9 trades · won 100.0% · average +0.2 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;AUBANK&lt;/b&gt;&lt;span class=&#x27;pill gain&#x27;&gt;fired today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;AUBANK, held for weeks: when its price against the day&amp;#x27;s volume-weighted average price (VWAP) sits in a particular band, its price tends to go UP.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against the day&amp;#x27;s volume-weighted average price (VWAP) · Managed: hold up to 40 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 13 trades · won 92.3% · average +0.2 R after costs&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;div style=&#x27;display:flex;gap:10px;align-items:baseline&#x27;&gt;&lt;b style=&#x27;font-size:15px&#x27;&gt;UNITDSPR&lt;/b&gt;&lt;span class=&#x27;pill&#x27;&gt;no fire today&lt;/span&gt;&lt;/div&gt;&lt;p style=&#x27;margin:6px 0&#x27;&gt;UNITDSPR, held for weeks: when its price against a moving-average trend line sits in a particular band, its price tends to move in its measured direction.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;Reads: its price against a moving-average trend line · Managed: hold up to 60 days, stop 2 times the stock&amp;#x27;s own daily swing, fixed stop and target&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Past cases: 10 trades · won 100.0% · average +0.1 R after costs&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;All patterns that passed the exam&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;The behaviours that passed test edge, a sealed hold-out and a cost hurdle. &lt;b&gt;323 patterns passed.&lt;/b&gt;&lt;/p&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1156 times · edge 3.5 pts · held out 15.2%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1128 times · edge 8.2 pts · held out 61.9%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1108 times · edge 3.2 pts · held out 15.5%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1099 times · edge 3.6 pts · held out 15.0%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1086 times · edge 4.0 pts · held out 15.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1075 times · edge 4.2 pts · held out 17.7%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1071 times · edge 8.7 pts · held out 62.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading sits in a particular band, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1067 times · edge 9.6 pts · held out 61.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volume-flow reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1065 times · edge 8.8 pts · held out 62.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1064 times · edge 8.0 pts · held out 61.4%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading and price&amp;#x27;s distance from the day&amp;#x27;s average price both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1059 times · edge 6.8 pts · held out 60.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When the stock&amp;#x27;s position in its recent range and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1058 times · edge 7.5 pts · held out 60.9%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a trend-strength reading and a volatility reading both sit in particular bands at the same time, the next move tends to be bigger than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1053 times · edge 8.7 pts · held out 62.1%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a volatility reading and a stretch-from-average reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1049 times · edge 3.9 pts · held out 15.3%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a moving-average reading and a volatility reading both sit in particular bands at the same time, price tends to cross back through the day&amp;#x27;s opening price.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1043 times · edge 3.3 pts · held out 14.8%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When a momentum reading (like RSI) and a volatility reading both sit in particular bands at the same time, the next move tends to be smaller than usual.&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:0&#x27;&gt;210 stocks · seen 1023 times · edge 6.1 pts · held out 59.2%&lt;/p&gt;&lt;p class=&#x27;sub&#x27; style=&#x27;margin:4px 0 0&#x27;&gt;Holds on: A2ZINFRA, ABB, ABCAPITAL, ADANIENSOL, ADANIENT, ADANIGREEN, ADANIPORTS, ADANIPOWER, ALKEM, AMBER and 200 more&lt;/p&gt;&lt;/div&gt;&lt;div class=&#x27;panel&#x27; style=&#x27;margin:10px 0&#x27;&gt;&lt;p style=&#x27;margin:0 0 6px&#x27;&gt;When two different volatility readings both sit in particular bands at the same time, the next move </pre></div><div class='c'><div class='h'><b>3ee816889</b> · 2026-09-22 22:08</div><div>R-V2-EXACT: port the Main/Leaderboard page; bind the engine-chat sidebar and latest-signals card to the real calls (top cards/stat grid/leaderboard rows still baked, flagged for binding)</div><div class='sub h'>scripts/v8_site.py |  70 ++++++++++++++++++++++++++++-</div><div class='sub h'>site/v2/index.html | 128 +++++++++++++++++++++++++++++++++++++----------------</div><pre>diff --git a/scripts/v8_site.py b/scripts/v8_site.py
 index 0e30300e3..c5acbfd8b 100644
 --- a/scripts/v8_site.py
 +++ b/scripts/v8_site.py
@@ -1927,78 +2043,4 @@ index 000000000..63b77799b
 +
 +BUILT, not live: the running site_loop still carries the pre-R-NOW-LINE vitals; the NOW line goes live on the
 +next stack restart (a human/owner act). The auditor confirms it in the running loop next.
-</pre></div><div class='c'><div class='h'><b>3c8675e99</b> · 2026-09-22 21:22</div><div>R-NOW-LINE (5): token_ping answers &#x27;now&#x27; with the NOW line + status one-liner (reply-only)</div><div class='sub h'>scripts/kill_switch.py  | 27 +++++++++++++++++++++++++++</div><div class='sub h'>tests/test_now_reply.py | 27 +++++++++++++++++++++++++++</div><pre>diff --git a/scripts/kill_switch.py b/scripts/kill_switch.py
-index c11a2ef5f..1f7107b54 100644
---- a/scripts/kill_switch.py
-+++ b/scripts/kill_switch.py
-@@ -103,9 +103,36 @@ def poll_telegram(get=None):
-                 action = &quot;CLEAR-HALT&quot; if ok else action
-             except Exception:
-                 pass
-+        elif text == &quot;NOW&quot;:                            # R-NOW-LINE §5: reply-only — the NOW line + status one-liner
-+            try:
-+                _reply_now()
-+                action = &quot;NOW&quot;
-+            except Exception:
-+                pass
-     return action
- 
- 
-+def _reply_now():
-+    &quot;&quot;&quot;Answer &#x27;now&#x27; with the current NOW scene plus the status one-liner. Reply-only; changes nothing.&quot;&quot;&quot;
-+    import json
-+    from scripts import notify as N
-+    scene = &quot;(no scene yet)&quot;
-+    try:
-+        from scripts import vitals
-+        line, _age, _stale = vitals.now_line()
-+        scene = line or scene
-+    except Exception:
-+        pass
-+    plain = &quot;&quot;
-+    try:
-+        d = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-+                                        &quot;reports&quot;, &quot;STATUS.json&quot;), encoding=&quot;utf-8&quot;))
-+        plain = d.get(&quot;plain&quot;) or &quot;&quot;
-+    except Exception:
-+        pass
-+    N.notify(&quot;NOW: %s\n%s&quot; % (scene, plain))
-+
-+
- def _tg_creds():
-     from scripts import notify as N
-     return N._creds()
-diff --git a/tests/test_now_reply.py b/tests/test_now_reply.py
-new file mode 100644
-index 000000000..9f2a9c880
---- /dev/null
-+++ b/tests/test_now_reply.py
-@@ -0,0 +1,27 @@
-+&quot;&quot;&quot;R-NOW-LINE (5): &#x27;now&#x27; from the owner&#x27;s chat gets a reply (NOW line + status one-liner); reply-only.&quot;&quot;&quot;
-+import os, sys, json, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+
-+
-+def test_now_replies_and_changes_nothing(monkeypatch):
-+    from scripts import kill_switch, notify, vitals
-+    sent = []
-+    monkeypatch.setattr(notify, &quot;notify&quot;, lambda m, *a, **k: sent.append(m) or True)
-+    nf = os.path.join(tempfile.mkdtemp(), &quot;now.txt&quot;); open(nf, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;porting the Live desk&quot;)
-+    vitals.NOW_FILE = nf
-+    monkeypatch.setattr(kill_switch, &quot;_tg_creds&quot;, lambda: (&quot;tok&quot;, &quot;999&quot;))
-+    monkeypatch.setattr(kill_switch, &quot;_read_offset&quot;, lambda: 0)
-+    monkeypatch.setattr(kill_switch, &quot;_write_offset&quot;, lambda v: None)
-+    # a KILL flag would flip state; &#x27;now&#x27; must not
-+    killed = {&quot;flag&quot;: False}
-+    monkeypatch.setattr(kill_switch, &quot;kill&quot;, lambda *a, **k: killed.__setitem__(&quot;flag&quot;, True))
-+    data = json.dumps({&quot;result&quot;: [{&quot;update_id&quot;: 5, &quot;message&quot;: {&quot;chat&quot;: {&quot;id&quot;: 999}, &quot;text&quot;: &quot;now&quot;}}]})
-+    act = kill_switch.poll_telegram(get=lambda u: data)
-+    assert act == &quot;NOW&quot;
-+    assert sent and &quot;NOW:&quot; in sent[0] and &quot;porting the Live desk&quot; in sent[0]
-+    assert killed[&quot;flag&quot;] is False                            # reply-only, no state change
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import pytest
-+    raise SystemExit(pytest.main([__file__, &quot;-q&quot;]))
 </pre></div></main></body></html>
