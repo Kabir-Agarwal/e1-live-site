@@ -1,4 +1,116 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>5d845e735</b> · 2026-09-23 16:43</div><div>NB22-B item 61: E1-only thin start — launch_e1 starts only the Price Engine chain (depth-only recorder; the six checks read depth, conform.py:132) until one clean trade; plan()/e1_only() tested; ON/OFF listed</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  1 +</div><div class='sub h'>scripts/launch_e1.py     | 42 +++++++++++++++++++++++++++++++++++++++---</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c90dc2f68</b> · 2026-09-23 18:02</div><div>auto-advance progress: AUBANK/ETERNAL expired + item 53 done; heavy items (evening run, dry-run) deferred on the 0.37 GB memory floor</div><div class='sub h'>docs/NEXT-PASTE.md | 7 ++++++-</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
+index 8d6463070..5adfb9854 100644
+--- a/docs/NEXT-PASTE.md
++++ b/docs/NEXT-PASTE.md
+@@ -73,8 +73,13 @@ it was ABSENT; real 09:15 hold was moment-light; f591393a6; see docs/HOLD-FLAG-L
+ `resurrect_jobs` revives NOTHING — recorders AND run_evening stay dead once reaped/exited. Only book20
+ (resurrect_runner) and supervisor (resurrect_supervisor) have dedicated resurrectors. (Logged: LEAD-MISTAKES.)
+ 
++PROGRESS (auto-advance): item 58 recorder keep-alive ✅ · NB22-A auto-continue ✅ · NB22-B thin start ✅ ·
++AUBANK+ETERNAL EXPIRED ✅ (03b372ab3 — status queued→expired, exam rule paper.py:80) · item 53 08:15 line ✅
++(9acde981f — scripts/preopen_line.py, tested). Free RAM 0.37 GB → the NB20 memory-floor STOP holds for HEAVY
++work: the EVENING JOB RUN and the item-4 dry-run WAIT until the thin start (after restart) frees RAM.
++
+ REMAINING (auto-advance, one per session, launch-path built→live via the nightly dry-run+verify):
+-- **EVENING JOB (NB19-R #1):** run_evening is a wait-until-close ONE-SHOT (run_evening.py:19-20 sleep→:43 exit),
++- **EVENING JOB (NB19-R #1) — RUN deferred (heavy, RAM 0.37 GB &lt; floor):** run_evening is a wait-until-close ONE-SHOT (run_evening.py:19-20 sleep→:43 exit),
+   started only by launch_e1 at login (ESSENTIAL, launch_e1.py:47), NOT resurrected (empty keep-alive above). FIX =
+   make the keep-alive actually work (un-comment/real .bat jobs OR parse the keep-alive block) + include run_evening
+   and the 5 recorder lanes, token+RAM gated; then RUN tonight&#x27;s evening eval (write=True) for Thursday&#x27;s queue.
+</pre></div><div class='c'><div class='h'><b>9acde981f</b> · 2026-09-23 18:01</div><div>NB19 item 53: 08:15 self-check line (scripts/preopen_line.py) — READY only if cameras fresh + gate open + queue loaded; NOT READY names the gap; tested. Runtime wiring is the launch-path wire-in</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  2 +-</div><div class='sub h'>scripts/preopen_line.py  | 64 ++++++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+index bc4c63021..dcadcd4e7 100644
+--- a/docs/MASTER-CHECKLIST.md
++++ b/docs/MASTER-CHECKLIST.md
+@@ -83,7 +83,7 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
+ - [AFTER-1545] 50. one item per session (CLAUDE.md §23.3) — session ends cleanly on item done, next item starts fresh; enabled by item 44&#x27;s watchdog relaunch (the one §14.7 exception, OWNER-SAID); wire with item 44
+ - [NOW] 51. commit-small pre-commit check (CLAUDE.md §23.4) — a pre-commit hook refuses a CODE commit that sweeps generated files (site/, reports/*.json, readouts); never `git commit -a`. Rule RECORDED; the hook script is the build (doable now, non-launch) — see NEXT-PASTE
+ - [DONE] 52. state in files, not context (CLAUDE.md §23.5) — every decision/ruling/finding written to its file the moment made; in force this run (dispatches archived first, checklist/NEXT-PASTE updated per step)
+-- [AFTER-1545] 53. 08:15 self-check line (NB19, OWNER-SAID) — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page&#x27;s own measure; the real order gate is open; tomorrow&#x27;s queue is loaded) and posts EXACTLY ONE of &quot;✅ READY — N cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY only after every check passes. REPLACES the 09:00 pre-open line. Launch-path (needs the gate/recorder); wire tonight
++- [AFTER-1545] 53. 08:15 self-check line (NB19, OWNER-SAID) — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page&#x27;s own measure; the real order gate is open; tomorrow&#x27;s queue is loaded) and posts EXACTLY ONE of &quot;✅ READY — N cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY only after every check passes. REPLACES the 09:00 pre-open line. BUILT: scripts/preopen_line.py (the pure READY/NOT-READY line — cameras-fresh + gate-open + queue-loaded, NOT-READY names the gap and ends &quot;send this to the lead&quot;; tested). Runtime wiring (vitals build → freshness/queue → post at 08:15) is the launch-path wire-in, LIVE via dry-run + restart
+ - [NOW] 54. &quot;data its gates need&quot; line — required before any engine is armed; written into the ruling template (field 9, DONE) and to be written into ENGINE_CATALOGUE (the on-disk store each gate reads, §13 four-part standard)
+ - [DAYS] 55. one exam per cadence class — intraday engines (Gap Timer, Pairs tick lane) get their own exam with intraday fills (DESIGN-LATER, the lead writes it)
+ - [DAYS] 56. cost-efficiency size floor in adaptive sizing (DESIGN-LATER, the lead writes it)
+diff --git a/scripts/preopen_line.py b/scripts/preopen_line.py
+new file mode 100644
+index 000000000..80346e66d
+--- /dev/null
++++ b/scripts/preopen_line.py
+@@ -0,0 +1,64 @@
++&quot;&quot;&quot;NB19 item 53 — the 08:15 self-check line (replaces the 09:00 pre-open line).
++
++At 08:15 the machine checks itself and posts EXACTLY ONE line:
++  ✅ READY — N cameras up, gate open, N orders queued        (only when EVERY check passes)
++  🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead
++
++Pure over a status dict (testable, no heavy import). The runtime poster builds the status from vitals — each
++recorder lane&#x27;s freshness (a row in the last 10 min, the status page&#x27;s own measure), the REAL order gate
++(orders_allowed_now, NOT the kill switch) with its hold reason, and whether tomorrow&#x27;s queue is loaded — then
++calls line(). READY is printed only after every check passes; a no-trade day is READY with &quot;0 orders queued&quot;.
++The runtime wiring (vitals build → post at 08:15) is launch-path, LIVE via the nightly dry-run + restart.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++CLOSER = &quot;send this to the lead&quot;          # NB21: a 🙋 (owner-action) line ends with a sanctioned action
++
++
++def line(status, expected_cameras=1):
++    &quot;&quot;&quot;The 08:15 line for `status`. `status`: {streams:{name:{fresh:bool}}, orders_allowed_now, gates:{hold_reason},
++    queue_loaded:bool, orders_queued:int}. Every gate must pass for READY.&quot;&quot;&quot;
++    streams = status.get(&quot;streams&quot;) or {}
++    up = [n for n, v in streams.items() if (v or {}).get(&quot;fresh&quot;)]
++    down = [n for n, v in streams.items() if not (v or {}).get(&quot;fresh&quot;)]
++    gate_open = bool(status.get(&quot;orders_allowed_now&quot;))
++    queue_loaded = bool(status.get(&quot;queue_loaded&quot;))
++    n_queued = int(status.get(&quot;orders_queued&quot;) or 0)
++    problems = []
++    if len(up) &lt; expected_cameras:
++        problems.append(&quot;cameras down: %s&quot; % (&quot;, &quot;.join(down) if down else &quot;none reporting&quot;))
++    if not gate_open:
++        reason = (status.get(&quot;gates&quot;) or {}).get(&quot;hold_reason&quot;) or &quot;not open&quot;
++        problems.append(&quot;order gate HELD (%s)&quot; % reason)
++    if not queue_loaded:
++        problems.append(&quot;tomorrow&#x27;s queue not loaded&quot;)
++    if problems:
++        return &quot;🙋 NOT READY — %s — %s&quot; % (&quot;; &quot;.join(problems), CLOSER)
++    return &quot;✅ READY — %d cameras up, gate open, %d orders queued&quot; % (len(up), n_queued)
++
++
++def _demo():
++    fresh = {&quot;Order-book depth&quot;: {&quot;fresh&quot;: True}}
++    stale = {&quot;Order-book depth&quot;: {&quot;fresh&quot;: False}}
++    # every check passes -&gt; READY (a no-trade day is READY with 0 queued)
++    r = line({&quot;streams&quot;: fresh, &quot;orders_allowed_now&quot;: True, &quot;queue_loaded&quot;: True, &quot;orders_queued&quot;: 0})
++    assert r == &quot;✅ READY — 1 cameras up, gate open, 0 orders queued&quot;, r
++    r = line({&quot;streams&quot;: fresh, &quot;orders_allowed_now&quot;: True, &quot;queue_loaded&quot;: True, &quot;orders_queued&quot;: 2})
++    assert &quot;2 orders queued&quot; in r and r.startswith(&quot;✅ READY&quot;)
++    # a held gate -&gt; NOT READY with the reason, ends with the sanctioned action
++    r = line({&quot;streams&quot;: fresh, &quot;orders_allowed_now&quot;: False, &quot;gates&quot;: {&quot;hold_reason&quot;: &quot;R-HOLD-AND-FIX flag&quot;},
++              &quot;queue_loaded&quot;: True, &quot;orders_queued&quot;: 0})
++    assert r.startswith(&quot;🙋 NOT READY&quot;) and &quot;R-HOLD-AND-FIX flag&quot; in r and r.endswith(CLOSER), r
++    # a stale camera -&gt; NOT READY naming it
++    r = line({&quot;streams&quot;: stale, &quot;orders_allowed_now&quot;: True, &quot;queue_loaded&quot;: True, &quot;orders_queued&quot;: 0})
++    assert &quot;cameras down: Order-book depth&quot; in r and r.startswith(&quot;🙋 NOT READY&quot;)
++    # queue not loaded -&gt; NOT READY
++    r = line({&quot;streams&quot;: fresh, &quot;orders_allowed_now&quot;: True, &quot;queue_loaded&quot;: False, &quot;orders_queued&quot;: 0})
++    assert &quot;queue not loaded&quot; in r
++    print(&quot;preopen_line demo OK: READY only when cameras up + gate open + queue loaded; NOT READY names the gap.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+</pre></div><div class='c'><div class='h'><b>03b372ab3</b> · 2026-09-23 17:59</div><div>NB19-R #2: EXPIRE the two stale queued orders (EOD-CONFORM-AUBANK/ETERNAL-2026-09-23) — exam rule paper.py:80 (entry = next open after signal bar; a day late = stale). status queued-&gt;expired, reason &#x27;missed next open (recorders down + hold flag)&#x27;. Not carried to Thursday</div><div class='sub h'>engine1_rebuild/paper/ledger.csv | 4 ++--</div><pre>diff --git a/engine1_rebuild/paper/ledger.csv b/engine1_rebuild/paper/ledger.csv
+index 00cc7537b..34d6befa7 100644
+--- a/engine1_rebuild/paper/ledger.csv
++++ b/engine1_rebuild/paper/ledger.csv
+@@ -1,3 +1,3 @@
+ trade_id,status,stock,pattern,direction,template,queue_date,entry_date,entry_price,stop,target,exit_date,exit_price,exit_reason,cost_R,result_R,result_rupees,mark_R,ts,side,entry,atr,hold_ticks,patience_end
+-EOD-CONFORM-AUBANK-2026-09-23,queued,5436929,AUBANK vwap (exam-conform) next 40 days,direct,stop1_tgt1.5,2026-09-23,,,,,,,,,,,,,,,,,
+-EOD-CONFORM-ETERNAL-2026-09-23,queued,1304833,ETERNAL rsi (exam-conform) next 60 days,direct,stop1_tgt1.5,2026-09-23,,,,,,,,,,,,,,,,,
++EOD-CONFORM-AUBANK-2026-09-23,expired,5436929,AUBANK vwap (exam-conform) next 40 days,direct,stop1_tgt1.5,2026-09-23,,,,,2026-09-23,,expired - missed next open (recorders down + hold flag),,,,,,,,,,
++EOD-CONFORM-ETERNAL-2026-09-23,expired,1304833,ETERNAL rsi (exam-conform) next 60 days,direct,stop1_tgt1.5,2026-09-23,,,,,2026-09-23,,expired - missed next open (recorders down + hold flag),,,,,,,,,,
+</pre></div><div class='c'><div class='h'><b>5d845e735</b> · 2026-09-23 16:43</div><div>NB22-B item 61: E1-only thin start — launch_e1 starts only the Price Engine chain (depth-only recorder; the six checks read depth, conform.py:132) until one clean trade; plan()/e1_only() tested; ON/OFF listed</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  1 +</div><div class='sub h'>scripts/launch_e1.py     | 42 +++++++++++++++++++++++++++++++++++++++---</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
 index 91a56ce0c..bc4c63021 100644
 --- a/docs/MASTER-CHECKLIST.md
 +++ b/docs/MASTER-CHECKLIST.md
@@ -1045,140 +1157,4 @@ index 000000000..1fba2d856
 +        _demo()
 +    else:
 +        print(&quot;Lead mistakes today: %d&quot; % count_today())
-</pre></div><div class='c'><div class='h'><b>6dc978e15</b> · 2026-09-23 08:43</div><div>NB18 emergency: 4 causes (depth death, audit-vs-header, 08:30 READY); recorder relaunch HELD owner-only (14.10 &#x27;never a session&#x27;); archive NB18</div><div class='sub h'>docs/NEXT-PASTE.md                            | 25 +++++++++++++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-18.md |  5 +++++</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index 7dca321b0..634add311 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -60,6 +60,31 @@ plan; 15:45 executes it. This avoids repeating the NB8 unverified-UI mistake.
- 10. After 1–8: re-run the click-through + reachability gate and make it a HARD build-block (item 48); post one
-     🙋 &quot;UI fixes done — review again · send this to the lead&quot;. **No swap until the owner says so after that review.**
- 
-+## 🚨 NB18 EMERGENCY findings (2026-09-23 ~08:41) — 4 causes; recorder relaunch HELD as owner-only
-+
-+**Item 1 (relaunch) NOT done — same wall as NB16, and the §14.10 amendment does not move it.** The amendment
-+authorised **the WATCHDOG** to relaunch dead recorders (token+RAM gated, logged); it explicitly keeps &quot;**never a
-+session**&quot;. There is **no recorder resurrect/arm function** in watchdog.py (only resurrect_jobs/runner/
-+supervisor), so the only ways to start recorders are `launch_e1` (a SESSION starting the stack) or adding them to
-+the watchdog keep-alive (a FILE EDIT) — both barred by §14.10 AND by NB18&#x27;s own &quot;no file edits / no restart_stack&quot;.
-+So it stays owner-only until item 58 wires the watchdog tonight. **Owner action to get them up before 09:15:**
-+ensure the Kite login is done (token was ABSENT at 06:02), then re-run the login landing / double-click the stack
-+starter so token_ping re-arms the recorders. I did NOT post a &quot;which are up&quot; ⏱ — there is no relaunch of mine to confirm.
-+- **Item 2 — why the DEPTH recorder died after 06:02:** started 06:02:08 at ~0.94 GB free with the token absent
-+  (LAUNCH-RAM.log), reaped under the night&#x27;s memory pressure, and the watchdog never relaunches recorders (not in
-+  its keep-alive list) — identical to E4/E12. Fix = item 58 (tonight).
-+- **Item 3 — audit FAIL vs &quot;orders allowed&quot; header:** the header&#x27;s &quot;orders allowed&quot; reads only the KILL SWITCH
-+  (`vitals.py:145` → `kill_switch.orders_allowed()` = kill switch not pulled); the REAL order gate is HELD — the
-+  audit&#x27;s own gate check PASSED with `allowed=False` (R-HOLD-AND-FIX). So **no orders are actually allowed**; the
-+  header shows the wrong layer (a display bug — fold into UI-1). The other audit FAIL, &quot;engine books all
-+  ₹2,00,000=False&quot;, is because at least one paper book has realised P&amp;L (Dubai/QB closed −5.45R → not exactly
-+  ₹2,00,000); the check conflates starting capital with current balance. **CONFIRM read-only at 15:45 which book
-+  differs — including whether the NB12 E21 archival left E21&#x27;s balance off ₹2,00,000** (I verified the rows moved
-+  intact, not the account field). No ledger edits, no gate changes made.
-+- **Item 4 — why the 08:30 READY line was not posted:** nothing posts a READY line at 08:30 — `day_report`
-+  posts its pre-open line at 09:00, and the 08:15 pre-open READY/NOT-READY gate is item 53, NOT built yet
-+  (AFTER-1545). Fix tonight = build item 53 (posts NOT READY if any armed engine&#x27;s instrument has no recorded data).
-+
- ## 🚨 NB16 EMERGENCY (2026-09-23 ~07:54) — E4/E12 recorders down, root-cause fix for tonight (launch-path)
- 
- **What happened.** `launch_e1` started the E4 chain recorder (`engine4_options.chain_recorder`) and the E12
-diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-18.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-18.md
-new file mode 100644
-index 000000000..7748fc686
---- /dev/null
-+++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-18.md
-@@ -0,0 +1,5 @@
-+# NIGHT BUNDLE 18 (ID:NB18) — dispatch archived verbatim (2026-09-23)
-+
-+**Origin tag (per §5):** LEAD-PROPOSED (under the owner&#x27;s 08:05 recorder-relaunch approval).
-+
-+→ BUILD  ID:NB18  (EMERGENCY, lead ruling under the owner&#x27;s 08:05 recorder-relaunch approval — before 09:00 by the machine clock; no file edits, no restart_stack) 1. Relaunch the dead recorders — order-book depth FIRST, then option chains and NSE/BSE — through the watchdog&#x27;s own resurrect/arm function, hidden windows, single instance, only if free memory is above the floor; log each relaunch. Confirm with the process list and post one ⏱ line listing which are up. 2. One line: why the depth recorder died after 06:02. 3. One line: why the desk audit reads FAIL (&quot;ledgers clean + accounts ₹2,00,000&quot; at 93b5086b6) while the header says orders allowed — cause only, no ledger edits, no gate changes. 4. Why the 08:30 READY line was not posted — cause only, fix tonight. Then return to the UI-1 pause. Self-flag line.
-</pre></div><div class='c'><div class='h'><b>b3759bd00</b> · 2026-09-23 08:37</div><div>OWNER-SAID 08:40: deliverables REDEFINED as a whole separate site (github.io/e1-live-site/deliverables/), /v2/deliverables.html removed; item 23 -&gt; AFTER-1545, build first at 15:45</div><div class='sub h'>docs/MASTER-CHECKLIST.md                                    |  2 +-</div><div class='sub h'>docs/NEXT-PASTE.md                                          | 13 +++++++++----</div><div class='sub h'>.../2026-09-23_OWNER-SAID-DELIVERABLES-SEPARATE-SITE.md     |  5 +++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 7edf050e6..4218f0547 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -39,7 +39,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
- - [AFTER-1545] 45. NIFTY near-month + next-month futures in the depth recorder (needs recorder code: NFO segment + expiry/rollover) — until then the Overnight Engine&#x27;s 15:25 futures order is HELD (audit 035732 / R-FUTURES-DEPTH); FIRST AFTER-1545 item. PREPARE DEFERRED this run: scripts/universe_full.py NOT built — the full list (top ~2,000 NSE by turnover) needs a real turnover source (inventing membership = fabricating data, §4.4) and the futures side needs the recorder&#x27;s real NFO expiry calendar (launch-path). Both wait for the data/recorder; see NEXT-PASTE
- 
- ## D. Site
--- [DONE] 23. deliverables inside v2 — design already approved, builder ports directly, no owner approval
-+- [AFTER-1545] 23. deliverables — **REDEFINED (OWNER-SAID 2026-09-23 08:40, supersedes &quot;inside v2&quot;):** a WHOLE SEPARATE SITE at https://[redacted]-[redacted].github.io/e1-live-site/deliverables/ — its own home page listing each deliverable (Index tests, Dubai Strategies), each opening to its own five tabs (Positions · Trades · Why each call · How it decides · Record) with every call IN FULL and a plain-words &quot;what this test is&quot; at the top. v2 design, but NO main-site menu on it and NO link to it from the main site. `/v2/deliverables.html` is REMOVED. Build at 15:45 as the FIRST site item, phone-width screenshots, click-through gate. (No link from main site → the reachability gate must treat it as an intentional island, not &quot;unreachable&quot;.)
- - [DONE] 24. v2 remaining pages — page ownership resolved (R-V2-PAGE-OWNERS): v8_site owns design pages, site_v2 owns the rest; registry + refusal + conflict gate + docs/V2-PAGE-OWNERS.md; Deliverables stays in nav. (Open sub-item: live-desk/portfolio/backtest not yet in the design nav — see NEXT-PASTE.)
- - [DONE] 25. record-store views — read-only per-engine/pattern/stock views over the ledgers + exam outputs (scripts/record_store.py → site/data/record_store.json), every column mapping cited in docs/RECORD-STORE.md; refreshed in the site build; nothing invented, &quot;—&quot; for unmapped. (Open sub-item: wiring specific v2 pages to consume it needs the engine-code→page mapping — see NEXT-PASTE.)
- - [NEEDS-OWNER] 26. root-swap re-diff → owner replies &quot;swap&quot; — **NOT approved.** NB8&#x27;s &quot;diff empty → swap 🙋&quot; was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner&#x27;s UI review after 15:45 lists them and they are fixed. NO further swap 🙋. **HARDENED (OWNER-SAID 2026-09-23): NO swap until the owner SAYS he is satisfied with the new site end to end — and NO swap 🙋 before that. The gate is the owner&#x27;s word, not a passing check; fixing UI-1 + the reachability gate is necessary but not sufficient.**
-diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index c92bbd13d..7dca321b0 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -39,10 +39,15 @@ plan; 15:45 executes it. This avoids repeating the NB8 unverified-UI mistake.
- 5. **Deliverables OUT of the v2 nav** — `v8_site._fix_nav_and_links` CURRENTLY KEEPS it (comment cites
-    R-V2-PAGE-OWNERS item 1). **UI-1 item 5 is a later OWNER-SAID that REVERSES that** (ruling-precedence: later
-    item-specific owner instruction governs). Strip the Deliverables nav tab + any v2 link; KEEP the build-room
--   and Telegram-READY links. **CLARIFIED (OWNER-SAID 2026-09-23): Deliverables IS the v2-theme page at
--   `/v2/deliverables.html`, kept as a SEPARATE site (not in the main nav); the OLD `/deliverables/` address
--   REDIRECTS to it tonight (launch-path — this run does not set the redirect up).** Strip-the-tab is quick +
--   gate-verifiable — do it FIRST at 15:45; the `/deliverables/` → `/v2/deliverables.html` redirect is a tonight wire-in.
-+   and Telegram-READY links. **REDEFINED (OWNER-SAID 2026-09-23 08:40, supersedes the /v2/deliverables.html
-+   note): Deliverables is a WHOLE SEPARATE SITE at https://[redacted]-[redacted].github.io/e1-live-site/deliverables/ —
-+   its own home page listing each deliverable (Index tests, Dubai Strategies), each opening to its own five tabs
-+   (Positions · Trades · Why each call · How it decides · Record), every call IN FULL, plain-words &quot;what this
-+   test is&quot; at the top. v2 design, but NO main-site menu on it and NO link to it from the main site.
-+   `/v2/deliverables.html` is REMOVED.** Also strip the Deliverables tab/link from the main v2 nav. **Build the
-+   separate deliverables site FIRST at 15:45** (phone-width screenshots, click-through gate). NOTE for the gate:
-+   with no link from the main site, the reachability check must treat the deliverables site as an intentional
-+   island, not flag it &quot;unreachable&quot;.
- 6. **Messages** — `v8_site` messages page + its data binding: fix the shared header (item 1); split BUILD messages
-    into their own section (not mixed with trading); make the chips (Price Engine / 323 Facts / Sizing Families /
-    Desk / trading-only) actually filter.
-diff --git a/docs/dispatches/2026-09-23_OWNER-SAID-DELIVERABLES-SEPARATE-SITE.md b/docs/dispatches/2026-09-23_OWNER-SAID-DELIVERABLES-SEPARATE-SITE.md
-new file mode 100644
-index 000000000..f5c692b28
---- /dev/null
-+++ b/docs/dispatches/2026-09-23_OWNER-SAID-DELIVERABLES-SEPARATE-SITE.md
-@@ -0,0 +1,5 @@
-+# OWNER-SAID 2026-09-23 08:40 — Deliverables is a whole separate site (dispatch archived verbatim)
-+
-+**Origin tag (per §5):** OWNER-SAID. **Supersedes** the earlier (08:40-prior) deliverables notes.
-+
-+→ BUILD  OWNER-SAID 23 Sep 08:40 — SUPERSEDES the earlier deliverables note: deliverables is a WHOLE SEPARATE SITE at https://[redacted]-[redacted].github.io/e1-live-site/deliverables/ — own home page listing each deliverable (Index tests, Dubai Strategies), each opening to its own five tabs (Positions · Trades · Why each call · How it decides · Record) with every call in full and a plain-words &quot;what this test is&quot; at the top; v2 design but NO main-site menu on it and NO link to it from the main site; /v2/deliverables.html is removed. Build at 15:45 as the first site item, phone-width screenshots, click-through gate. MASTER-CHECKLIST: record this as the deliverables definition; item 26 unchanged (no swap until the owner is satisfied end to end).
-</pre></div><div class='c'><div class='h'><b>ea0328a21</b> · 2026-09-23 08:32</div><div>OWNER-SAID: item 26 swap gate = owner satisfied end-to-end (no swap 🙋 before); Deliverables at /v2/deliverables.html, old /deliverables/ redirects tonight</div><div class='sub h'>docs/MASTER-CHECKLIST.md                                       | 2 +-</div><div class='sub h'>docs/NEXT-PASTE.md                                             | 6 ++++--</div><div class='sub h'>docs/dispatches/2026-09-23_OWNER-SAID-SWAP-AND-DELIVERABLES.md | 5 +++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 7bd5fb0a3..7edf050e6 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -42,7 +42,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
- - [DONE] 23. deliverables inside v2 — design already approved, builder ports directly, no owner approval
- - [DONE] 24. v2 remaining pages — page ownership resolved (R-V2-PAGE-OWNERS): v8_site owns design pages, site_v2 owns the rest; registry + refusal + conflict gate + docs/V2-PAGE-OWNERS.md; Deliverables stays in nav. (Open sub-item: live-desk/portfolio/backtest not yet in the design nav — see NEXT-PASTE.)
- - [DONE] 25. record-store views — read-only per-engine/pattern/stock views over the ledgers + exam outputs (scripts/record_store.py → site/data/record_store.json), every column mapping cited in docs/RECORD-STORE.md; refreshed in the site build; nothing invented, &quot;—&quot; for unmapped. (Open sub-item: wiring specific v2 pages to consume it needs the engine-code→page mapping — see NEXT-PASTE.)
--- [NEEDS-OWNER] 26. root-swap re-diff → owner replies &quot;swap&quot; — **NOT approved.** NB8&#x27;s &quot;diff empty → swap 🙋&quot; was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner&#x27;s UI review after 15:45 lists them and they are fixed. NO further swap 🙋.
-+- [NEEDS-OWNER] 26. root-swap re-diff → owner replies &quot;swap&quot; — **NOT approved.** NB8&#x27;s &quot;diff empty → swap 🙋&quot; was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner&#x27;s UI review after 15:45 lists them and they are fixed. NO further swap 🙋. **HARDENED (OWNER-SAID 2026-09-23): NO swap until the owner SAYS he is satisfied with the new site end to end — and NO swap 🙋 before that. The gate is the owner&#x27;s word, not a passing check; fixing UI-1 + the reachability gate is necessary but not sufficient.**
- - [AFTER-1545] 27. event-driven publish on every trade — PREPARED (scripts/publish_event.py built + tested: a PLACED/CLOSED row rebuilds status + live-desk; build injected); wire-in pending (tonight = runner hook)
- - [DONE] 28. engine pages for all engines, same layout
- 
-diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index e96922af1..c92bbd13d 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -39,8 +39,10 @@ plan; 15:45 executes it. This avoids repeating the NB8 unverified-UI mistake.
- 5. **Deliverables OUT of the v2 nav** — `v8_site._fix_nav_and_links` CURRENTLY KEEPS it (comment cites
-    R-V2-PAGE-OWNERS item 1). **UI-1 item 5 is a later OWNER-SAID that REVERSES that** (ruling-precedence: later
-    item-specific owner instruction governs). Strip the Deliverables nav tab + any v2 link; KEEP the build-room
--   and Telegram-READY links (Deliverables stays a separate site in the same theme). Quick + gate-verifiable;
--   do this one FIRST at 15:45.
-+   and Telegram-READY links. **CLARIFIED (OWNER-SAID 2026-09-23): Deliverables IS the v2-theme page at
-+   `/v2/deliverables.html`, kept as a SEPARATE site (not in the main nav); the OLD `/deliverables/` address
-+   REDIRECTS to it tonight (launch-path — this run does not set the redirect up).** Strip-the-tab is quick +
-+   gate-verifiable — do it FIRST at 15:45; the `/deliverables/` → `/v2/deliverables.html` redirect is a tonight wire-in.
- 6. **Messages** — `v8_site` messages page + its data binding: fix the shared header (item 1); split BUILD messages
-    into their own section (not mixed with trading); make the chips (Price Engine / 323 Facts / Sizing Families /
-    Desk / trading-only) actually filter.
-diff --git a/docs/dispatches/2026-09-23_OWNER-SAID-SWAP-AND-DELIVERABLES.md b/docs/dispatches/2026-09-23_OWNER-SAID-SWAP-AND-DELIVERABLES.md
-new file mode 100644
-index 000000000..c821ad6ff
---- /dev/null
-+++ b/docs/dispatches/2026-09-23_OWNER-SAID-SWAP-AND-DELIVERABLES.md
-@@ -0,0 +1,5 @@
-+# OWNER-SAID 2026-09-23 — swap gate + Deliverables address (dispatch archived verbatim)
-+
-+**Origin tag (per §5):** OWNER-SAID.
-+
-+→ BUILD  OWNER-SAID 23 Sep: (1) MASTER-CHECKLIST item 26 — NO swap until the owner says he is satisfied with the new site end to end; no swap 🙋 before that. (2) Deliverables = the v2-theme page at /v2/deliverables.html, kept as a separate site; the old /deliverables/ address redirects to it tonight.
 </pre></div></main></body></html>
