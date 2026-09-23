@@ -1,1 +1,386 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><p class='sub'>none yet.</p></main></body></html>
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>0702fba03</b> · 2026-09-24 00:10</div><div>NB33: strengthen the verifier hash-check — a PASS also requires the hash-matched suite to be GREEN (a red suite for this HEAD cannot back a PASS); makes the self-test deterministic, not brain-dependent</div><div class='sub h'>scripts/verifier.py    | 21 ++++++++++++++-------</div><div class='sub h'>tests/test_verifier.py |  2 ++</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 72f8002fd..9953f6ff5 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -167,16 +167,23 @@ def suite_commit(result_path=None):
+ 
+ 
+ def suite_matches(commit, result_path=None):
+-    &quot;&quot;&quot;(ok, why) — NB33 hash-check: a PASS is valid ONLY if the pinned suite result carries the commit hash of
+-    the EXACT HEAD being verified. A missing hash or a different hash is NOT trusted (it is the NB31 hole: a
+-    stale 02:03 suite pinned to a later HEAD). Tolerates short/full hash forms.&quot;&quot;&quot;
+-    sc = suite_commit(result_path)
++    &quot;&quot;&quot;(ok, why) — NB33: a PASS is valid ONLY if the pinned suite result (a) carries the commit hash of the EXACT
++    HEAD being verified, and (b) is GREEN. A missing/different hash is the NB31 hole (a stale suite pinned to a
++    later HEAD); a red suite for this HEAD cannot back a PASS either. Tolerates short/full hash forms.&quot;&quot;&quot;
++    import json as _json
++    try:
++        d = _json.loads(open(result_path or SUITE_RESULT, encoding=&quot;utf-8&quot;).read())
++    except Exception:
++        return False, &quot;no readable suite result to hash-check&quot;
++    sc = str(d.get(&quot;commit&quot;) or &quot;&quot;)
+     c = str(commit or &quot;&quot;)
+     if not sc:
+         return False, &quot;the pinned suite result carries NO commit hash — cannot confirm it ran on this HEAD (stale/absent)&quot;
+-    if sc == c or (c and sc.startswith(c)) or (sc and c.startswith(sc)):
+-        return True, &quot;suite result matches HEAD %s&quot; % c
+-    return False, &quot;the pinned suite result is for commit %s, not the HEAD being verified (%s) — stale&quot; % (sc, c)
++    if not (sc == c or (c and sc.startswith(c)) or (sc and c.startswith(sc))):
++        return False, &quot;the pinned suite result is for commit %s, not the HEAD being verified (%s) — stale&quot; % (sc, c)
++    if str(d.get(&quot;status&quot;)) != &quot;green&quot;:
++        return False, &quot;the pinned suite for this HEAD is not green (status=%s, %s failed)&quot; % (d.get(&quot;status&quot;), d.get(&quot;failed&quot;))
++    return True, &quot;suite result matches HEAD %s and is green&quot; % c
+ 
+ 
+ def _suite_evidence():
+diff --git a/tests/test_verifier.py b/tests/test_verifier.py
+index d975445f8..41f6915c5 100644
+--- a/tests/test_verifier.py
++++ b/tests/test_verifier.py
+@@ -28,6 +28,8 @@ def test_hashcheck_trusts_only_this_heads_suite(tmp_path):
+     assert v.suite_matches(&quot;bbbb2222&quot;, str(r))[0] is False            # RED: a later/different HEAD -&gt; stale
+     r.write_text(json.dumps({&quot;status&quot;: &quot;green&quot;, &quot;passed&quot;: 330, &quot;failed&quot;: 0}))  # the NB31 02:03 hole: no commit
+     assert v.suite_matches(&quot;aaaa1111&quot;, str(r))[0] is False            # RED: missing hash is never trusted
++    r.write_text(json.dumps({&quot;status&quot;: &quot;red&quot;, &quot;passed&quot;: 388, &quot;failed&quot;: 1, &quot;commit&quot;: &quot;aaaa1111&quot;}))
++    assert v.suite_matches(&quot;aaaa1111&quot;, str(r))[0] is False            # RED: a red suite for this HEAD can&#x27;t back a PASS
+ 
+ 
+ def test_pass_downgraded_to_fail_on_stale_suite():
+</pre></div><div class='c'><div class='h'><b>455d2b626</b> · 2026-09-24 00:06</div><div>NB33 RULE FIRST: verifier hash-check — a PASS is valid only if the pinned suite result carries the commit hash of the exact HEAD (suite_matches); a missing/stale hash downgrades PASS-&gt;FAIL (closes NB31&#x27;s hole). Suite runner now records the HEAD it ran on. TDD: match/mismatch/missing tests green; verify() downgrade proven; archive NB33</div><div class='sub h'>docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md |  24 ++++</div><div class='sub h'>scripts/_conform_suite_runner.py              | 175 ++++++++++++++++++++++++++</div><div class='sub h'>scripts/verifier.py                           |  39 +++++-</div><div class='sub h'>tests/test_verifier.py                        |  33 ++++-</div><pre>diff --git a/docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md
+new file mode 100644
+index 000000000..ed6d5be5d
+--- /dev/null
++++ b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md
+@@ -0,0 +1,24 @@
++# NIGHT BUNDLE 33 (ID:NB33) — dispatch archived verbatim (2026-09-24)
++
++**Origin tag (per §5):** LEAD ruling within remit; arming delegated to the builder under the owner&#x27;s 23 Sep 16:25 delegation. The login flow is not touched either way.
++
++DISPATCH ID: NB33 — RULING ON ITEM 4 + THE REOPEN PROOF (24 Sep 2026, 00:05 IST) → BUILD
++READ: NB32 report (item 4 blocked: item14 branch 363 files stale; verifier runs targeted checks + trusts the
++pre-run suite hash; VERIFIER-ARMED owner-placed; auto-continue reopen unproven; free RAM 0.55 GB at stop).
++ORIGIN: LEAD ruling within remit; arming delegated to the builder under the owner&#x27;s 23 Sep 16:25 delegation.
++RULE FIRST (closes the hole NB31 exposed): a verifier PASS is valid only if the pinned suite result carries the
++commit hash of the exact HEAD being verified; a stale or missing hash = FAIL, never &quot;trusted&quot;. Build this check
++TDD (RED on the 02:03 result vs a later HEAD → GREEN).
++ITEM 4, redesigned: (a) create a fresh throwaway branch off current master with ONE deliberately failing test;
++(b) in a quiet-box window (stop → verify alone → start; measure and record the reopen/verify RAM numbers, no
++typed floors) the verifier must re-run the suite on that branch, return FAIL, post one 🚩 — cite; (c) then place
++E1-DESK\VERIFIER-ARMED under the owner&#x27;s delegation and log it: from now a commit is never called PASS without a
++hash-matched verify. Delete the stale item14 branch; record the new one as the standing self-test.
++TIMING: if free RAM allows before 05:00, do it tonight (NB24 quiet-box route valid until the 06:00 login);
++otherwise it is the FIRST item after Thursday&#x27;s close-done line — the login flow is not touched either way.
++REOPEN PROOF: when NB33&#x27;s items are done, END THE SESSION deliberately with item 54 still NOW. Do not type
++anything. The watchdog must reopen `claude --continue` by itself and start item 54; the lead reads the page&#x27;s
++NOW line for the proof. If it does not reopen within the cooldown, the reopened-or-not fact goes in the next
++report as a FAIL with its cause.
++Report &quot;NB33&quot;: hash-check red→green, self-test verdict + 🚩, ARMED placed y/n, RAM numbers measured; end with
++NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+diff --git a/scripts/_conform_suite_runner.py b/scripts/_conform_suite_runner.py
+new file mode 100644
+index 000000000..e1c864aac
+--- /dev/null
++++ b/scripts/_conform_suite_runner.py
+@@ -0,0 +1,175 @@
++&quot;&quot;&quot;Tonight-only (owner ruling 23 Sep ~01:46): run the full R-EXAM-CONFORM suite under a RAM gate.
++
++Waits until 03:00 IST (or until free RAM reaches the 2.0 GB heavy floor, whichever comes first), then runs
++the suite SINGLE-PROCESS (pytest default; no xdist installed = no parallel workers). Logs free RAM before
++the run and every 60 s during it. ABORTS the run (kills the pytest tree) if free RAM falls below the sweep&#x27;s
++light floor (0.5 GB) or if the 04:45 hard stop is reached; an abort is a FAIL (HELD day). Writes a verdict
++JSON so the parent session can proceed to the proof only on a genuine green run.
++&quot;&quot;&quot;
++import json, os, re, subprocess, sys, time
++from datetime import datetime, timezone, timedelta
++
++REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++sys.path.insert(0, REPO)
++from scripts import memory_guard as M
++
++IST = timezone(timedelta(hours=5, minutes=30))
++HEAVY = M.HEAVY_START_GB          # 2.0 GB — the floor RAM should reach by 03:00
++LIGHT = M.WEEKEND_SWEEP_FLOOR_GB  # 0.5 GB — the sweep&#x27;s light floor; abort below it
++RUN_AT = (3, 0)                   # 03:00 IST fallback trigger
++HARD_STOP = (4, 45)               # 04:45 IST hard stop
++RAM_LOG = os.path.join(REPO, &quot;reports&quot;, &quot;CONFORM-SUITE-RAM.log&quot;)
++RESULT = os.path.join(REPO, &quot;reports&quot;, &quot;CONFORM-SUITE-RESULT.json&quot;)
++
++
++def _ist():
++    return datetime.now(IST)
++
++
++def _total_gb():
++    &quot;&quot;&quot;Total physical RAM in GB (for peak-usage = total - min free). None if unreadable.&quot;&quot;&quot;
++    try:
++        import ctypes
++
++        class _MS(ctypes.Structure):
++            _fields_ = [(&quot;dwLength&quot;, ctypes.c_ulong), (&quot;dwMemoryLoad&quot;, ctypes.c_ulong),
++                        (&quot;ullTotalPhys&quot;, ctypes.c_ulonglong), (&quot;ullAvailPhys&quot;, ctypes.c_ulonglong),
++                        (&quot;ullTotalPageFile&quot;, ctypes.c_ulonglong), (&quot;ullAvailPageFile&quot;, ctypes.c_ulonglong),
++                        (&quot;ullTotalVirtual&quot;, ctypes.c_ulonglong), (&quot;ullAvailVirtual&quot;, ctypes.c_ulonglong),
++                        (&quot;ullAvailExtendedVirtual&quot;, ctypes.c_ulonglong)]
++        ms = _MS(); ms.dwLength = ctypes.sizeof(_MS)
++        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):
++            return round(ms.ullTotalPhys / (1024 ** 3), 2)
++    except Exception:
++        pass
++    return None
++
++
++def _hm(now=None):
++    now = now or _ist()
++    return (now.hour, now.minute)
++
++
++def _log(msg):
++    line = &quot;%s | free %s GB | %s&quot; % (_ist().strftime(&quot;%Y-%m-%d %H:%M:%S&quot;), M.free_gb(), msg)
++    try:
++        with open(RAM_LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as fh:
++            fh.write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++
++
++def _head():
++    &quot;&quot;&quot;The git HEAD the suite ran against — pinned into the result so a verify can hash-check it (NB33).&quot;&quot;&quot;
++    try:
++        return subprocess.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=REPO,
++                              capture_output=True, text=True).stdout.strip()
++    except Exception:
++        return &quot;&quot;
++
++
++def _write(result):
++    result[&quot;written&quot;] = _ist().isoformat()
++    result.setdefault(&quot;commit&quot;, _head())            # NB33: record which HEAD this suite result belongs to
++    with open(RESULT, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:
++        json.dump(result, fh, indent=1)
++
++
++def _wait_for_window():
++    &quot;&quot;&quot;Return &#x27;go&#x27; when it is time to run, or &#x27;no-window&#x27; if we passed the safe start time.&quot;&quot;&quot;
++    _log(&quot;runner armed; waiting for 03:00 IST or free RAM &gt;= %.1f GB&quot; % HEAVY)
++    while True:
++        now = _ist()
++        f = M.free_gb() or 0.0
++        if f &gt;= HEAVY:
++            _log(&quot;free RAM reached %.2f GB (&gt;= %.1f) — starting early&quot; % (f, HEAVY))
++            return &quot;go&quot;
++        if _hm(now) &gt;= RUN_AT:
++            _log(&quot;03:00 reached, free RAM %.2f GB &lt; %.1f — single-process fallback per ruling&quot; % (f, HEAVY))
++            return &quot;go&quot;
++        if _hm(now) &gt;= (4, 20):     # too late to start a ~20-40 min run before the 04:45 hard stop
++            return &quot;no-window&quot;
++        time.sleep(60)
++
++
++def _run_suite():
++    if (M.free_gb() or 0.0) &lt; LIGHT:
++        _write({&quot;status&quot;: &quot;aborted&quot;, &quot;why&quot;: &quot;free RAM below light floor %.1f GB before start&quot; % LIGHT,
++                &quot;min_free_gb&quot;: M.free_gb(), &quot;held&quot;: True})
++        return
++    _log(&quot;SUITE START (single-process). free RAM printed above; total %s GB.&quot; % _total_gb())
++    out_path = os.path.join(REPO, &quot;reports&quot;, &quot;CONFORM-SUITE-PYTEST.txt&quot;)
++    env = dict(os.environ, PYTHONUTF8=&quot;1&quot;, PYTHONIOENCODING=&quot;utf-8&quot;)
++    of = open(out_path, &quot;w&quot;, encoding=&quot;utf-8&quot;)
++    proc = subprocess.Popen([sys.executable, &quot;-m&quot;, &quot;pytest&quot;, &quot;tests&quot;, &quot;-q&quot;, &quot;-p&quot;, &quot;no:cacheprovider&quot;],
++                            cwd=REPO, stdout=of, stderr=subprocess.STDOUT, env=env)
++    min_free = M.free_gb() or 0.0
++    aborted = None
++    while proc.poll() is None:
++        time.sleep(60)
++        f = M.free_gb()
++        _log(&quot;suite running (pid %s)&quot; % proc.pid)
++        if f is not None:
++            min_free = min(min_free, f)
++        if f is not None and f &lt; LIGHT:
++            aborted = &quot;free RAM %.2f GB &lt; light floor %.1f GB&quot; % (f, LIGHT)
++        elif _hm() &gt;= HARD_STOP:
++            aborted = &quot;04:45 hard stop reached mid-run&quot;
++        if aborted:
++            _log(&quot;ABORT: %s — killing pytest tree pid %s&quot; % (aborted, proc.pid))
++            subprocess.run([&quot;taskkill&quot;, &quot;/PID&quot;, str(proc.pid), &quot;/T&quot;, &quot;/F&quot;], capture_output=True)
++            break
++    of.close()
++    total = _total_gb()
++    peak_used = round(total - min_free, 2) if (total is not None) else None
++    if aborted:
++        _write({&quot;status&quot;: &quot;aborted&quot;, &quot;why&quot;: aborted, &quot;min_free_gb&quot;: min_free,
++                &quot;total_gb&quot;: total, &quot;peak_used_gb&quot;: peak_used, &quot;held&quot;: True})
++        _log(&quot;ABORTED: min_free=%.2f GB peak_used=%s GB&quot; % (min_free, peak_used))
++        return
++    rc = proc.returncode
++    try:
++        text = open(out_path, encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;).read()
++    except Exception:
++        text = &quot;&quot;
++    m = re.search(r&quot;(\d+) failed,?\s*(\d+) passed&quot;, text)
++    passed = failed = None
++    if m:
++        failed, passed = int(m.group(1)), int(m.group(2))
++    else:
++        m2 = re.search(r&quot;(\d+) passed&quot;, text)
++        if m2:
++            passed, failed = int(m2.group(1)), 0
++    green = (rc == 0 and (failed == 0))
++    tail = &quot;\n&quot;.join(text.strip().splitlines()[-8:])
++    try:
++        from scripts import build_beat
++        if passed is not None:
++            build_beat.record_tests(passed, (passed or 0) + (failed or 0))
++    except Exception:
++        pass
++    _write({&quot;status&quot;: &quot;green&quot; if green else &quot;red&quot;, &quot;returncode&quot;: rc, &quot;passed&quot;: passed, &quot;failed&quot;: failed,
++            &quot;min_free_gb&quot;: min_free, &quot;total_gb&quot;: total, &quot;peak_used_gb&quot;: peak_used,
++            &quot;held&quot;: (not green), &quot;summary_tail&quot;: tail})
++    _log(&quot;SUITE DONE: %s (passed=%s failed=%s rc=%s min_free=%.2f GB peak_used=%s GB) — measured floor input: &quot;
++         &quot;a clean run needs at least %s GB free to stay above the 0.5 GB abort line&quot;
++         % (&quot;GREEN&quot; if green else &quot;RED&quot;, passed, failed, rc, min_free, peak_used, peak_used))
++
++
++def main():
++    _write({&quot;status&quot;: &quot;waiting&quot;, &quot;held&quot;: None})
++    if os.environ.get(&quot;CONFORM_RUN_NOW&quot;) == &quot;1&quot;:
++        _log(&quot;START NOW per owner ruling (Edge/Chrome/[redacted] Voice ended); skipping the 03:00 wait.&quot;)
++        _run_suite()
++        return
++    w = _wait_for_window()
++    if w == &quot;no-window&quot;:
++        _write({&quot;status&quot;: &quot;no-window&quot;, &quot;why&quot;: &quot;passed 04:20 IST without reaching a start; not enough time before 04:45&quot;,
++                &quot;held&quot;: True})
++        _log(&quot;NO WINDOW — not started&quot;)
++        return
++    _run_suite()
++
++
++if __name__ == &quot;__main__&quot;:
++    main()
+diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 1350a6838..72f8002fd 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -92,11 +92,13 @@ def gate_reason(head=None, arm_file=None):
+     return &quot;verify the last commit (%s) first — no verify-PASS on the mirror&quot; % head
+ 
+ 
+-def verify(commit, ruling_text=&quot;&quot;, claimed_step=&quot;&quot;, brain_fn=None, post_fn=None):
++def verify(commit, ruling_text=&quot;&quot;, claimed_step=&quot;&quot;, brain_fn=None, post_fn=None, suite_ok_fn=None):
+     &quot;&quot;&quot;Run the verifier for one commit. brain_fn(inputs)-&gt;{&#x27;verdict&#x27;,&#x27;evidence&#x27;} does the actual exam; default
+-    wires to the active rung. Writes docs/reports/verify-&lt;commit&gt;.md and posts one line. Returns the verdict.&quot;&quot;&quot;
++    wires to the active rung. Writes docs/reports/verify-&lt;commit&gt;.md and posts one line. Returns the verdict.
++    NB33: a PASS is downgraded to FAIL unless suite_ok_fn(commit) confirms the pinned suite ran on THIS HEAD.&quot;&quot;&quot;
+     rung, name, avail = active_rung()
+     post_fn = post_fn or _post
++    suite_ok_fn = suite_ok_fn or suite_matches
+     if not avail:
+         _write_report(commit, &quot;UNAVAILABLE&quot;, rung, name, claimed_step, &quot;no brain rung available&quot;)
+         post_fn(&quot;VERIFY UNAVAILABLE %s %s&quot; % (claimed_step, commit))
+@@ -112,7 +114,13 @@ def verify(commit, ruling_text=&quot;&quot;, claimed_step=&quot;&quot;, brain_fn=None, post_fn=None)
+     verdict = str(res.get(&quot;verdict&quot;, &quot;FAIL&quot;)).upper()
+     if verdict not in (&quot;PASS&quot;, &quot;FAIL&quot;):
+         verdict = &quot;FAIL&quot;
+-    _write_report(commit, verdict, rung, name, claimed_step, res.get(&quot;evidence&quot;, &quot;&quot;))
++    evidence = res.get(&quot;evidence&quot;, &quot;&quot;)
++    if verdict == &quot;PASS&quot;:                       # NB33 hash-check: never trust a suite that is not this HEAD&#x27;s
++        ok, why = suite_ok_fn(commit)
++        if not ok:
++            verdict = &quot;FAIL&quot;
++            evidence = &quot;HASH-CHECK FAIL (NB33): %s\n\n%s&quot; % (why, evidence)
++    _write_report(commit, verdict, rung, name, claimed_step, evidence)
+     post_fn(&quot;VERIFY %s %s %s&quot; % (verdict, claimed_step, commit))
+     if verdict == &quot;FAIL&quot;:
+         try:                            # NB21/NB24: a verifier FAIL is a lead mistake — logs a row + posts one 🚩 line
+@@ -149,6 +157,28 @@ def _read(p):
+         return &quot;&quot;
+ 
+ 
++def suite_commit(result_path=None):
++    &quot;&quot;&quot;The git HEAD the pinned suite result was run against, or &#x27;&#x27; if it records none (NB33).&quot;&quot;&quot;
++    import json as _json
++    try:
++        return str(_json.loads(open(result_path or SUITE_RESULT, encoding=&quot;utf-8&quot;).read()).get(&quot;commit&quot;) or &quot;&quot;)
++    except Exception:
++        return &quot;&quot;
++
++
++def suite_matches(commit, result_path=None):
++    &quot;&quot;&quot;(ok, why) — NB33 hash-check: a PASS is valid ONLY if the pinned suite result carries the commit hash of
++    the EXACT HEAD being verified. A missing hash or a different hash is NOT trusted (it is the NB31 hole: a
++    stale 02:03 suite pinned to a later HEAD). Tolerates short/full hash forms.&quot;&quot;&quot;
++    sc = suite_commit(result_path)
++    c = str(commit or &quot;&quot;)
++    if not sc:
++        return False, &quot;the pinned suite result carries NO commit hash — cannot confirm it ran on this HEAD (stale/absent)&quot;
++    if sc == c or (c and sc.startswith(c)) or (sc and c.startswith(sc)):
++        return True, &quot;suite result matches HEAD %s&quot; % c
++    return False, &quot;the pinned suite result is for commit %s, not the HEAD being verified (%s) — stale&quot; % (sc, c)
++
++
+ def _suite_evidence():
+     &quot;&quot;&quot;R-VERIFIER (owner 23 Sep): the pre-run FULL suite result (run ALONE under the RAM gate), with a sha256 so
+     the report pins exactly which result was trusted. The verifier reads this instead of re-running the ~21-min
+@@ -279,7 +309,8 @@ def _demo():
+     lead_mistakes.LEDGER = _os.path.join(tempfile.mkdtemp(), &quot;LM.md&quot;)
+     posts = []
+     v = verify(&quot;deadbeef&quot;, ruling_text=&quot;R-TEST&quot;, claimed_step=&quot;1&quot;,
+-               brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;pytest: 10 passed&quot;}, post_fn=posts.append)
++               brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;pytest: 10 passed&quot;}, post_fn=posts.append,
++               suite_ok_fn=lambda c: (True, &quot;ok&quot;))
+     assert v == &quot;PASS&quot; and has_pass(&quot;deadbeef&quot;) and posts == [&quot;VERIFY PASS 1 deadbeef&quot;], (v, posts)
+     f = verify(&quot;badc0de&quot;, claimed_step=&quot;2&quot;,
+                brain_fn=lambda i: {&quot;verdict&quot;: &quot;FAIL&quot;, &quot;evidence&quot;: &quot;test_x failed&quot;}, post_fn=posts.append)
+diff --git a/tests/test_verifier.py b/tests/test_verifier.py
+index b984a6298..d975445f8 100644
+--- a/tests/test_verifier.py
++++ b/tests/test_verifier.py
+@@ -14,10 +14,38 @@ def test_pass_report_and_gate():
+     _iso()
+     posts = []
+     verdict = v.verify(&quot;abc123&quot;, ruling_text=&quot;R-X&quot;, claimed_step=&quot;1&quot;,
+-                       brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;pytest: 10 passed&quot;}, post_fn=posts.append)
++                       brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;pytest: 10 passed&quot;},
++                       post_fn=posts.append, suite_ok_fn=lambda c: (True, &quot;ok&quot;))
+     assert verdict == &quot;PASS&quot; and v.has_pass(&quot;abc123&quot;) and posts == [&quot;VERIFY PASS 1 abc123&quot;]
+ 
+ 
++def test_hashcheck_trusts_only_this_heads_suite(tmp_path):
++    # NB33 RULE: a suite result is trusted ONLY if it carries the commit hash of the HEAD being verified.
++    import json
++    r = tmp_path / &quot;SUITE.json&quot;
++    r.write_text(json.dumps({&quot;status&quot;: &quot;green&quot;, &quot;passed&quot;: 1, &quot;failed&quot;: 0, &quot;commit&quot;: &quot;aaaa1111&quot;}))
++    assert v.suite_matches(&quot;aaaa1111&quot;, str(r))[0] is True             # GREEN: hash matches this HEAD
++    assert v.suite_matches(&quot;bbbb2222&quot;, str(r))[0] is False            # RED: a later/different HEAD -&gt; stale
++    r.write_text(json.dumps({&quot;status&quot;: &quot;green&quot;, &quot;passed&quot;: 330, &quot;failed&quot;: 0}))  # the NB31 02:03 hole: no commit
++    assert v.suite_matches(&quot;aaaa1111&quot;, str(r))[0] is False            # RED: missing hash is never trusted
++
++
++def test_pass_downgraded_to_fail_on_stale_suite():
++    _iso()
++    posts = []
++    # the brain says PASS, but the pinned suite is not this HEAD&#x27;s -&gt; verify() must return FAIL (never &quot;trusted&quot;)
++    verdict = v.verify(&quot;newhead9&quot;, brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;ok&quot;},
++                       post_fn=posts.append, suite_ok_fn=lambda c: (False, &quot;stale suite&quot;))
++    assert verdict == &quot;FAIL&quot; and not v.has_pass(&quot;newhead9&quot;)
++    assert any(&quot;HASH-CHECK FAIL&quot; in _read_report(&quot;newhead9&quot;) for _ in [0])
++
++
++def _read_report(commit):
++    import os as _os
++    p = _os.path.join(v.REPORTS, &quot;verify-%s.md&quot; % commit)
++    return open(p, encoding=&quot;utf-8&quot;).read() if _os.path.exists(p) else &quot;&quot;
++
++
+ def test_fail_report_blocks_gate():
+     _iso()
+     posts = []
+@@ -49,5 +77,6 @@ def test_gate_advisory_until_armed(tmp_path):
+     arm.write_text(&quot;armed&quot;)
+     assert &quot;verify the last commit&quot; in (v.gate_reason(head=&quot;nopass&quot;, arm_file=str(arm)) or &quot;&quot;)
+     # armed + a verify-PASS on the mirror -&gt; allow
+-    v.verify(&quot;passed1&quot;, brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;ok&quot;}, post_fn=lambda _l: None)
++    v.verify(&quot;passed1&quot;, brain_fn=lambda i: {&quot;verdict&quot;: &quot;PASS&quot;, &quot;evidence&quot;: &quot;ok&quot;}, post_fn=lambda _l: None,
++             suite_ok_fn=lambda c: (True, &quot;ok&quot;))
+     assert v.gate_reason(head=&quot;passed1&quot;, arm_file=str(arm)) is None
+</pre></div></main></body></html>

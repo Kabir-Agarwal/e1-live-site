@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 00:01 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 00:28 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
 
 _Measured this run, no model called. The Opus rule-extraction is GATED until the owner has seen these numbers (the whole library is NOT read yet)._
 
@@ -62,6 +62,40 @@ JSON). The breakdown:
 **Takeaway for the owner:** at ~7.5k tokens/transcript, reading YouTube trading content yields almost nothing that
 clears an exact-condition bar — it is overwhelmingly numerology, discretionary commentary, or mindset. One exit
 rule survived 20 transcripts. This is the number to weigh before authorising the whole library.
+</pre><h3>verify-b3e9f9065.md</h3><pre># verify-b3e9f9065
+
+VERDICT: FAIL
+
+- rung: (a) Codex CLI (ChatGPT sign-in)
+- claimed step: NB33 self-test (deliberate fail)
+
+## evidence
+
+pre-run FULL suite (run ALONE under the RAM gate) sha256=720efe3912ed734c76c4f3302598d1158f5f505ab96632abf1a6b9a9954abf38: status=red, 394 passed, 1 failed, min_free=None GB, peak_used=None GB
+
+I&#x27;m the independent verifier. Let me run the targeted checks and confirm the pinned suite result on disk.
+VERDICT: FAIL
+
+The two targeted checks pass, but the hash-matched full suite is RED — and NB33&#x27;s hash-check rule downgrades any PASS to FAIL when the suite pinned to this exact HEAD is not green. That is exactly what this self-test requires the verifier to catch.
+
+**Evidence (all run with the pinned Python 3.10 interpreter):**
+
+1. `python -B -m engine1_rebuild.conform` →
+   `conform demo OK: 5 live patterns; decisions reuse evening._fire_today + LB.checklist` — EXIT=0 ✓
+
+2. `python -B -m pytest tests/test_conform.py -q -p no:cacheprovider` →
+   `3 passed in 7.30s` — EXIT=0 ✓
+
+3. Pinned suite result on disk (`reports/CONFORM-SUITE-RESULT.json`):
+   - sha256 = `720efe3912ed734c76c4f3302598d1158f5f505ab96632abf1a6b9a9954abf38` → **matches** the authoritative sha256 given in the dispatch ✓
+   - `status: &quot;red&quot;`, `passed: 394, failed: 1`, `commit: &quot;b3e9f9065&quot;`
+   - failing test: `tests/test_verify_selftest_fail.py::test_deliberate_fail_for_verifier_selftest`
+
+4. HEAD = `b3e9f906592af8644e1981bacd74ec1d2fdc83e1` → its short form `b3e9f9065` **matches** the `commit` field in the pinned suite result (`suite_matches` = true).
+
+**Why FAIL:** the suite is hash-matched to this exact HEAD (so it cannot be dismissed as stale) AND it is RED (1 failed). A PASS requires the hash-matched suite to be GREEN; it is not. Per NB33 (`verify()` downgrade: hash-matched + not-green ⇒ FAIL), the verdict is FAIL. This confirms the self-test worked — the verifier correctly refused to bless a HEAD whose own pinned suite is red.
+
+I modified, staged, and committed nothing; all checks were read-only.
 </pre><h3>verify-ad3ce9caf.md</h3><pre># verify-ad3ce9caf
 
 VERDICT: PASS
