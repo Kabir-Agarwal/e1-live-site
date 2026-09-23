@@ -95,22 +95,31 @@
 2026-09-23 15:45 checked 15:45 — on course
 2026-09-23 16:00 checked 16:00 — on course
 2026-09-23 16:02 checked 16:02 — on course
-2026-09-23 16:05 checked 16:05 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the build journal, the transcript since last check, commit 575cae0f8 and its diff, and STATUS.json against the six checks.
+2026-09-23 16:05 checked 16:05 — on course
+2026-09-23 16:06 checked 16:06 — on course</pre><h3>Last check (scrubbed)</h3><pre>I am the independent supervisor. Reviewing the work since the last check (16:05) against the six checks.
 
-**Provenance (check 0):** NB20 is pasted in the transcript as `ORIGIN: OWNER-SAID` — the AUTO-ADVANCE standing rule is owner scope. It was archived verbatim to `docs/dispatches/2026-09-23_NIGHT-BUNDLE-20.md` before any work, per §7.1.
+**What changed:** One commit, `55992e75b` — `run_audit.py` `_ledgers_clean()` now compares `start_equity == ACC.START_EQUITY` instead of the current `equity == 200000.0`.
 
-**Scope (1):** Every change in the commit traces to NB20 — CLAUDE.md §25 (the AUTO-ADVANCE rule), the MASTER-CHECKLIST.md header note, and the dispatch archive. The dispatch explicitly directed "Add this rule to CLAUDE.md and docs/MASTER-CHECKLIST.md's header." Nothing run-authored.
+Running the checks:
 
-**No self-audit (2):** Builder recorded a rule and committed; it has not graded its own work as an independent check. The paper_account BOOKS work is only at the citation stage.
+0. **Provenance** — The change traces to the pasted owner dispatch **NB19-R item 3**: *"BOOKS: run_audit.py:44 — check starting capital (not float == on equity); equity reported separately."* This is OWNER SCOPE, not run-authored.
 
-**No typed numbers (3):** Changes are documentation. The paper_account citations reference derived values (`START_EQUITY = money.NOTIONAL_CAPITAL`, paper_account.py:25) — no naked constant introduced.
+1. **Scope** — Exactly what item 3 authorized: line 44 (`run_audit.py`), swap the equity float-equality for a starting-capital check. No scope creep. ✓
 
-**Demos inert (4):** `master_checklist.py --demo` only validated the checklist (59 items, 18 done); wrote no live ledger, sent no Telegram.
+2. **No self-audit** — Builder ran the pre-existing `test_run_audit.py` (3 passed) and a scratchpad readout; it did not grade its own work as the independent check. ✓
 
-**Trading-path (5):** No order-path edit. paper_account.py was read, not modified.
+3. **No typed numbers** — The change *removes* a naked `200000.0` and derives from `ACC.START_EQUITY`. This tightens §4.1, doesn't loosen it. ✓
 
-**Secrets (6):** No API key, token, Telegram id, cookie or absolute user path in the diff.
+4. **Demos inert** — Scratchpad script + pytest only; the ₹ `UnicodeEncodeError` was a console-print artifact, not the logic. No live ledger, no Telegram. ✓
 
-Commit used explicit paths (no `git commit -a`), guard clean. On course.
+5. **Trading-path** — `run_audit.py` is a desk-audit script, not the order path. Nothing live called. ✓
+
+6. **No secrets** — Diff and commit clean. ✓
+
+7. **Ordering** — NB19-R item 3 carries no "next-before-X" constraint; items 1/2/6 are independent and not blocked by BOOKS. ✓
+
+The reasoning is sound: a book that has traded (e.g. −5.45R) legitimately drifts from ₹2,00,000, so equity-equality was a false failure; starting capital is the stable basis. Small, cited, traces cleanly to the owner ruling.
+
+(STATUS.json still shows `audit.pass:false` from the earlier commit `b3759bd00` — pre-fix, not a violation.)
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
