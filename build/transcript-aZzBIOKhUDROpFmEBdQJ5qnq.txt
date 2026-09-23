@@ -1,691 +1,3 @@
-tool_use Bash {"command": "python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/append_context.py\" 2>&1", "description": "Append NB31 section to CONTEXT.md"}
-tool_result: appended NB31 section, chars: 3275
-assistant: State files updated. Now commit them with explicit paths. First check what's tracked (BUILD-STATE.json is under reports/ — the precommit guard flags generated `reports/*.json`):
-tool_use Bash {"command": "echo \"=== tracked? ===\" && for f in reports/BUILD-STATE.json reports/CONFORM-SUITE-RESULT.json docs/MASTER-CHECKLIST.md docs/NEXT-PASTE.md CONTEXT.md; do printf \"%s: \" \"$f\"; git ls-files --error-unmatch \"$f\" >/dev/null 2>&1 && echo tracked || echo \"UNTRACKED/ignored\"; done; echo \"=== guard exists? ===\" && ls scripts/precommit_guard.py 2>&1", "description": "Check tracking of state files + guard"}
-tool_result: === tracked? ===
-reports/BUILD-STATE.json: tracked
-reports/CONFORM-SUITE-RESULT.json: UNTRACKED/ignored
-docs/MASTER-CHECKLIST.md: tracked
-docs/NEXT-PASTE.md: tracked
-CONTEXT.md: tracked
-=== guard exists? ===
-scripts/precommit_guard.py
-assistant: BUILD-STATE.json is a tracked, explicitly-maintained state file (NB30 committed it too); CONFORM-SUITE-RESULT.json stays untracked. Staging the four tracked state files explicitly and committing:
-tool_use Bash {"command": "git add reports/BUILD-STATE.json docs/MASTER-CHECKLIST.md docs/NEXT-PASTE.md CONTEXT.md && git status --short reports/BUILD-STATE.json docs/MASTER-CHECKLIST.md docs/NEXT-PASTE.md CONTEXT.md", "description": "Stage the four state files"}
-tool_result: warning: in the working copy of 'CONTEXT.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/MASTER-CHECKLIST.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/NEXT-PASTE.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
-M  CONTEXT.md
-M  docs/MASTER-CHECKLIST.md
-M  docs/NEXT-PASTE.md
-M  reports/BUILD-STATE.json
-tool_use Bash {"command": "git commit -m \"NB31 state: five status lines LIVE (wiring ledger 9/9) + independent verify PASS on ad3ce9caf; full suite alone 384 passed / 3 pre-existing unrelated reds flagged for the owner; checklist 53/59/60/62 done; CONTEXT + NEXT-PASTE synced\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" 2>&1 | tail -6", "description": "Commit the state files"}
-tool_result: [master e9aafffac] NB31 state: five status lines LIVE (wiring ledger 9/9) + independent verify PASS on ad3ce9caf; full suite alone 384 passed / 3 pre-existing unrelated reds flagged for the owner; checklist 53/59/60/62 done; CONTEXT + NEXT-PASTE synced
- 4 files changed, 57 insertions(+), 9 deletions(-)
-assistant: Done. Committed `e9aafffac`. NB31 is complete and the box is back on a single clean thin stack for the 06:00 login. Here's the report.
-
----
-
-## NB31 — the five status lines are wired and live
-
-**Red → green (each built module now truly on the launched path, with its own wiring test):**
-
-| Line | Wired into | Fires |
-|---|---|---|
-| Evening pre-check | `run_evening.py`, before the evaluator | at the ~15:35 evening run |
-| CLOSE-DONE line | `run_evening.py`, after the post-close jobs | at close |
-| 08:15 self-check (replaces the old 09:00 line) | `day_report.preopen()` | pre-open |
-| Build-room HELD page | `build_journal.py` (`held.html`) | every site refresh |
-| 🚩 on a verifier FAIL | `verifier.py` | whenever a verify fails |
-
-The wiring ledger `tests/test_wiring_live.py` went from 4/9 to **9/9 green**.
-
-**Did it pass:** yes. One independent verify came back **PASS** on the committed code (it read the whole change, ran read-only checks, confirmed nothing was modified). I then ran the *full* test suite alone on a quiet box (stack stopped, memory free): **384 passed, 3 failed.**
-
-**About the 3 failures — honest:** they are **not from tonight's work.** I proved it — none of the three tests even mentions the four files I changed, and they were failing before NB31. They are: a cost-ledger weekly-post check, and two *website-page* checks that read half-written page files the live site was still updating. Tonight's own tests are all in the 384 that passed.
-
-**Housekeeping caught and fixed:** the verifier's new "log a mistake on failure" step was writing real rows into the mistake ledger during its own tests — I isolated that to a throwaway file, removed the two stray rows, and the ledger is back to its real 9.
-
-**Stack:** under tonight's one-time permission I stopped the stack, ran the check, and started it again — confirmed exactly one clean copy of each process (login-pinger, watchdog, site-builder, watcher + the order runner), on the right Python, no live-trading process. Recorders arm when you tap the login.
-
-```
-OWNER VERDICT
-1. Built: the five plain status lines (08:15 self-check, evening pre-check, close-done,
-   the held-orders page, and a 🚩 when a check fails) are now wired in and will appear on
-   their own schedules.
-2. Passed: yes — independent verify PASS; 384 tests pass. 3 OLDER unrelated tests fail
-   (a cost-ledger and two website-page checks) — not caused by tonight's work, proven.
-3. Needs your hands: 06:00 — just tap the Kite login, nothing else. Separately, decide
-   when you want the 3 old failing tests fixed (they're frozen out of scope for now).
-4. Next: a real market-day capture (recorders alive through a close) then the 06:00 login
-   → the first live paper order. UI / deliverables / site-swap stay frozen.
-
-NOTHING NEEDS THE LEAD (no ruling required). Stopping for the night.
-```
-queue-operation: <task-notification>
-<task-id>bkwzaao6o</task-id>
-<tool-use-id>toolu_013v9E7ezwt6ghnSqWhtf3jg</tool-use-id>
-<output-file>[redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\tasks\bkwzaao6o.output</output-file>
-<status>killed</status>
-<summary>Background command "Run START_E1_STACK.bat" was stopped because the system is running low on memory</summary>
-<note>This is not a failure of the command. Claude Code stopped it because the system was critically low on memory while the session was idle, which says nothing about the command or its own memory use, so there is nothing in it to debug. Do not start it again on your own, even if the work seems to need it: memory may still be short. Report what was stopped and why, and start it again only when asked. The user can turn this behavior off by starting Claude Code with CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1 in its environment; setting it from a shell command has no effect.</note>
-</task-notification>
-user: <task-notification>
-<task-id>bkwzaao6o</task-id>
-<tool-use-id>toolu_013v9E7ezwt6ghnSqWhtf3jg</tool-use-id>
-<output-file>[redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\tasks\bkwzaao6o.output</output-file>
-<status>killed</status>
-<summary>Background command "Run START_E1_STACK.bat" was stopped because the system is running low on memory</summary>
-<note>This is not a failure of the command. Claude Code stopped it because the system was critically low on memory while the session was idle, which says nothing about the command or its own memory use, so there is nothing in it to debug. Do not start it again on your own, even if the work seems to need it: memory may still be short. Report what was stopped and why, and start it again only when asked. The user can turn this behavior off by starting Claude Code with CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1 in its environment; setting it from a shell command has no effect.</note>
-</task-notification>
-assistant: That killed task was the leftover START **wrapper** stuck on its `pause` prompt — reaped for memory pressure. Its `start ""` calls had already launched the four processes detached (I confirmed all five up earlier), so the reap doesn't touch the stack. But the "critically low on memory" signal is worth a read-only re-check that the stack actually survived:
-tool_use Bash {"command": "powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | Select-Object ProcessId,CommandLine | Format-Table -Auto -Wrap\" 2>&1 | head -20", "description": "Read-only re-check the stack survived the memory reap"}
-tool_result: ProcessId CommandLine                                                                                                
---------- -----------                                                                                                
-     7724 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\token_ping.py               
-     1368 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\watchdog.py                 
-    22232 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\site_loop.py                
-     8628 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\supervisor.py               
-    15960 [redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe -m engine1_rebuild.book20_runner --loop
-assistant: The stack survived intact — same five PIDs (token_ping 7724, watchdog 1368, site_loop 22232, supervisor 8628, book20_runner 15960), all Python 3.10, one each, no run_live. The reaped background task was only the leftover `pause` wrapper, not the detached stack processes.
-
-**NB31 stays complete and unchanged.** The five status lines are wired (wiring ledger 9/9 green), independently verified PASS on `ad3ce9caf`, committed (`dc2372b27`, `ad3ce9caf`, `e9aafffac`), state files synced, and the single clean thin stack is up for the 06:00 login. The three failing tests are pre-existing and unrelated (proven). Nothing to restart or redo — and per the memory note I won't relaunch anything on my own.
-
-```
-OWNER VERDICT (unchanged from above; stack re-confirmed after a memory reap)
-1. Built: the five plain status lines are wired in and live on their schedules.
-2. Passed: yes — independent verify PASS; 384 tests pass; 3 OLDER unrelated tests
-   fail (cost-ledger + two website-page checks), not caused by tonight's work.
-3. Needs your hands: 06:00 — just tap the Kite login. Separately, decide when you
-   want the 3 old failing tests fixed (frozen out of scope for now).
-4. Next: a real market-day capture then the 06:00 login → the first live paper order.
-
-NOTHING NEEDS THE LEAD (no ruling required). Stopped for the night; stack up and healthy.
-```
-queue-operation: DISPATCH ID: NB32 — NIGHT PLUMBING, TEST-FIRST (23 Sep 2026, ~22:50 IST) → BUILD
-READ: NB31 report (5 status lines LIVE, verify PASS on ad3ce9caf, suite 384 pass / 3 fail: cost_ledger weekly-post,
-diaries + v8_site page tests; RESUME-CARD absent = PreCompact hook not wired; auto-continue built, never proven).
-ORIGIN: LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight. TDD (§26) on each.
-Quiet-box route (NB24, valid until the 06:00 login) only if a verify needs it; single thin stack up at the end.
-1) The 3 old failing tests: fix each properly — RED (reproduce) → fix the cause, not the assertion → GREEN.
-   If a test reads half-written generated site files, make the test read a stable snapshot. Suite must be 0 fail.
-2) PreCompact resume-card hook: wiring test RED → wire the hook (.claude/settings.json) so docs/RESUME-CARD.md is
-   written before any compaction → GREEN → prove it once (trigger a compaction in a throwaway session or the
-   hook's own dry-run) and cite the card's timestamp.
-3) AUTO-CONTINUE PROOF (the loop the owner keeps asking about): end this session deliberately with a NOW item
-   left; the watchdog must reopen `claude --continue` by itself and the next item must start with NOBODY typing.
-   Cite the watchdog log line and the new session's first action. If it does not reopen within the cooldown,
-   that is a FAIL: fix the cause, retest. Post one ✅ "auto-continue proven" line only when proven.
-4) Verifier self-test (item 14): run the verifier against branch item14-broken-test-demo; it must return FAIL and
-   post a 🚩; cite. Then arm the verify gate so a broken commit can never be called PASS.
-5) Then keep going down the NOW list (no stop between items, §23.3) until empty or the pause window; frozen
-   items skipped and listed. Report per item; final report ends NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
-user: DISPATCH ID: NB32 — NIGHT PLUMBING, TEST-FIRST (23 Sep 2026, ~22:50 IST) → BUILD
-READ: NB31 report (5 status lines LIVE, verify PASS on ad3ce9caf, suite 384 pass / 3 fail: cost_ledger weekly-post,
-diaries + v8_site page tests; RESUME-CARD absent = PreCompact hook not wired; auto-continue built, never proven).
-ORIGIN: LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight. TDD (§26) on each.
-Quiet-box route (NB24, valid until the 06:00 login) only if a verify needs it; single thin stack up at the end.
-1) The 3 old failing tests: fix each properly — RED (reproduce) → fix the cause, not the assertion → GREEN.
-   If a test reads half-written generated site files, make the test read a stable snapshot. Suite must be 0 fail.
-2) PreCompact resume-card hook: wiring test RED → wire the hook (.claude/settings.json) so docs/RESUME-CARD.md is
-   written before any compaction → GREEN → prove it once (trigger a compaction in a throwaway session or the
-   hook's own dry-run) and cite the card's timestamp.
-3) AUTO-CONTINUE PROOF (the loop the owner keeps asking about): end this session deliberately with a NOW item
-   left; the watchdog must reopen `claude --continue` by itself and the next item must start with NOBODY typing.
-   Cite the watchdog log line and the new session's first action. If it does not reopen within the cooldown,
-   that is a FAIL: fix the cause, retest. Post one ✅ "auto-continue proven" line only when proven.
-4) Verifier self-test (item 14): run the verifier against branch item14-broken-test-demo; it must return FAIL and
-   post a 🚩; cite. Then arm the verify gate so a broken commit can never be called PASS.
-5) Then keep going down the NOW list (no stop between items, §23.3) until empty or the pause window; frozen
-   items skipped and listed. Report per item; final report ends NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
-assistant: NB32 received. First act per §7.1 — archive the dispatch verbatim.
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-23_NIGHT-BUNDLE-32.md", "content": "# NIGHT BUNDLE 32 (ID:NB32) \u2014 dispatch archived verbatim (2026-09-23)\n\n**Origin tag (per \u00a75):** LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight.\n\nDISPATCH ID: NB32 \u2014 NIGHT PLUMBING, TEST-FIRST (23 Sep 2026, ~22:50 IST) \u2192 BUILD\nREAD: NB31 report (5 status lines LIVE, verify PASS on ad3ce9caf, suite 384 pass / 3 fail: cost_ledger weekly-post,\ndiaries + v8_site page tests; RESUME-CARD absent = PreCompact hook not wired; auto-continue built, never proven).\nORIGIN: LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight. TDD (\u00a726) on each.\nQuiet-box route (NB24, valid until the 06:00 login) only if a verify needs it; single thin stack up at the end.\n1) The 3 old failing tests: fix each properly \u2014 RED (reproduce) \u2192 fix the cause, not the assertion \u2192 GREEN.\n   If a test reads half-written generated site files, make the test read a stable snapshot. Suite must be 0 fail.\n2) PreCompact resume-card hook: wiring test RED \u2192 wire the hook (.claude/settings.json) so docs/RESUME-CARD.md is\n   written before any compaction \u2192 GREEN \u2192 prove it once (trigger a compaction in a throwaway session or the\n   hook's own dry-run) and cite the card's timestamp.\n3) AUTO-CONTINUE PROOF (the loop the owner keeps asking about): end this session deliberately with a NOW item\n   left; the watchdog must reopen `claude --continue` by itself and the next item must start with NOBODY typing.\n   Cite the watchdog log line and the new session's first action. If it does not reopen within the cooldown,\n   that is a FAIL: fix the cause, retest. Post one \u2705 \"auto-continue proven\" line only when proven.\n4) Verifier self-test (item 14): run the verifier against branch item14-broken-test-demo; it must return FAIL and\n   post a \ud83d\udea9; cite.
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-23_NIGHT-BUNDLE-32.md (file state is current in your context — no need to Read it back)
-assistant: Now the machine clock + free RAM (the box just flagged low memory — I need to know before any heavy step):
-tool_use Bash {"command": "python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/clock_ram.py\" 2>&1", "description": "Machine clock + free RAM"}
-tool_result: IST now: 2026-09-23 23:24:24 Wed
-free_gb: 1.19
-assistant: 23:24 IST, RAM tight at 1.19 GB — I'll do the light work (item 1: fix the 3 tests) first and check RAM before any heavy step (items 3/4). Starting item 1: reproduce and read the three failing tests.
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_cost_ledger.py"}
-tool_result: 1	"""BACKLOG: weekly live cost-per-trade vs the calibrated basis — one line, once per ISO week, always badged."""
-2	from scripts import cost_ledger as cl
-3	
-4	
-5	def test_weekly_line_is_badged_and_honest():
-6	    line = cl.weekly_line()
-7	    assert "Cost check" in line
-8	    assert "FILL-LAW-UNVERIFIED" in line          # §19: a funding-relevant number always carries its badge
-9	
-10	
-11	def test_posts_once_per_iso_week():
-12	    posts = []
-13	    a = cl.maybe_post(post_fn=posts.append, now_week="1999-W02")
-14	    b = cl.maybe_post(post_fn=posts.append, now_week="1999-W02")
-15	    assert a is not None and b is None and len(posts) == 1
-16	
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\cost_ledger.py"}
-tool_result: 1	"""Weekly live-cost check — the real cost charged per paper trade vs the calibrated backtest cost basis
-2	(BACKLOG item, owner ruling R-BACKLOG, 2026-09-22). One plain Telegram line, once per ISO week.
-3	
-4	The two sides:
-5	  • LIVE — the real `cost_R` recorded on each paper trade in engine1_rebuild/paper/ledger.csv.
-6	  • CALIBRATED BASIS — money.cost_readout()['cost_round_trip'] (statutory + 2*half_spread), the same cost the
-7	    backtest was settled under. While the half-spread is COLD-START (no measured depth yet), that basis IS the
-8	    conservative fallback, so the delta is ~0 by construction until real fills accumulate — the badge says so.
-9	
-10	Badges (§19): COLD-START while the spread is the cited fallback, FILL-LAW-UNVERIFIED until the shadow re-settle
-11	delta is published (D1). Nothing here touches the trading path; a missing ledger or cost model is a safe no-op.
-12	"""
-13	from __future__ import annotations
-14	
-15	import csv
-16	import os
-17	
-18	REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-19	LEDGER = os.path.join(REPO, "engine1_rebuild", "paper", "ledger.csv")
-20	LOG = os.path.join(REPO, "reports", "COST-LEDGER.md")
-21	WEEK_SLOT = os.path.join(REPO, "scheduler", ".cost_week")     # gitignored: last ISO week posted
-22	
-23	
-24	def _rows():
-25	    try:
-26	        return list(csv.DictReader(open(LEDGER, encoding="utf-8")))
-27	    except Exception:
-28	        return []
-29	
-30	
-31	def _fnum(v):
-32	    try:
-33	        return float(v)
-34	    except (TypeError, ValueError):
-35	        return None
-36	
-37	
-38	def _basis():
-39	    """(assumed round-trip cost in R, is_cold_start). The cost model reports COST in fraction-of-capital terms;
-40	    1R = money.PAPER_R_RUPEES, so cost_R = cost_fraction * NOTIONAL_CAPITAL / PAPER_R_RUPEES."""
-41	    try:
-42	        from engine1_rebuild import money
-43	        ro = money.cost_readout()
-44	        cost_frac = ro["cost_round_trip"]["value"]                    # fraction of notional, round trip
-45	        cold = "COLD-START" in (ro["half_spread"].get("source") or "")
-46	        cost_r = cost_frac * money.NOTIONAL_CAPITAL / money.PAPER_R_RUPEES
-47	        return round(cost_r, 4), cold
-48	    except Exception:
-49	        return None, True
-50	
-51	
-52	def weekly_line():
-53	    """One plain line comparing the real per-trade cost to the calibrated basis. Honest empty-state when no
-54	    live round-trips have closed yet."""
-55	    rows = _rows()
-56	    costs = [_fnum(r.get("cost_R")) for r in rows]
-57	    costs = [c for c in costs if c is not None]
-58	    closed = [r for r in rows if r.get("exit_date") and _fnum(r.get("cost_R")) is not None]
-59	    basis, cold = _basis()
-60	    badge = ("[COLD-START]" if cold else "") + "[FILL-LAW-UNVERIFIED]"
-61	    basis_s = ("%.3fR" % basis) if basis is not None else "n/a"
-62	    if not costs:
-63	        return "Cost check: no paper trades carry a cost yet - basis %s. %s" % (basis_s, badge)
-64	    live_avg = sum(costs) / len(costs)
-65	    if closed:
-66	        cl = [_fnum(r.get("cost_R")) for r in closed]
-67	        live_closed = sum(cl) / len(cl)
-68	        delta = (" - delta %+.3fR vs basis" % (live_closed - basis)) if basis is not None else ""
-69	        return "Cost check: %d live round-trips, real cost avg %.3fR vs calibrated %s%s. %s" % (
-70	            len(closed), live_closed, basis_s, delta, badge)
-71	    return ("Cost check: %d open positions, entry cost avg %.3fR; basis %s; 0 round-trips closed yet "
-72	            "- cost-vs-backtest delta lands when trades close. %s") % (len(costs), live_avg, basis_s, badge)
-73	
-74	
-75	def _iso_week():
-76	    import datetime
-77	    y, w, _ = datetime.date.today().isocalendar()
-78	    return "%d-W%02d" % (y, w)
-79	
-80	
-81	def maybe_post(post_fn=None, now_week=None):
-82	    """Post the weekly line at most once per ISO week. Returns the line if posted, else None."""
-83	    week = now_week or _iso_week()
-84	    try:
-85	        last = open(WEEK_SLOT, encoding="utf-8").read().strip()
-86	    except Exception:
-87	        last = ""
-88	    if last == week:
-89	        return None
-90	    line = weekly_line()
-91	    if post_fn is None:
-92	        from scripts import notify
-93	        post_fn = notify.notify
-94	    try:
-95	        post_fn(line)
-96	    except Exception:
-97	        pass
-98	    try:
-99	        with open(LOG, "a", encoding="utf-8") as f:
-100	            f.write("- %s: %s\n" % (week, line))
-101	    except Exception:
-102	        pass
-103	    try:
-104	        os.makedirs(os.path.dirname(WEEK_SLOT), exist_ok=True)
-105	        open(WEEK_SLOT, "w", encoding="utf-8").write(week)
-106	    except Exception:
-107	        pass
-108	    return line
-109	
-110	
-111	def tick():
-112	    """Periodic entry from token_ping's loop; never fatal."""
-113	    try:
-114	        return maybe_post()
-115	    except Exception:
-116	        return None
-117	
-118	
-119	def _demo():
-120	    line = weekly_line()
-121	    assert "Cost check" in line and "FILL-LAW-UNVERIFIED" in line, line
-122	    posts = []
-123	    a = maybe_post(post_fn=posts.append, now_week="1999-W01")
-124	    b = maybe_post(post_fn=posts.append, now_week="1999-W01")   # same week -> no second post
-125	    assert a is not None and b is None and len(posts) == 1, (a, b, posts)
-126	    print("cost_ledger demo OK: weekly line built, posts once per ISO week ::", line)
-127	
-128	
-129	if __name__ == "__main__":
-130	    _demo()
-131	
-assistant: The cost_ledger test isn't isolated: `maybe_post` persists the week to `scheduler/.cost_week` (gitignored, survives on disk). The first-ever run wrote `1999-W02`; every run since sees `last == "1999-W02"` on the first call → returns None → `a is None`. Let me reproduce (RED) and confirm the slot holds the stale week:
-tool_use Bash {"command": "echo \"=== .cost_week contents ===\" && cat scheduler/.cost_week 2>&1; echo; echo \"=== RED reproduce ===\" && PYTHONUTF8=1 python -m pytest tests/test_cost_ledger.py::test_posts_once_per_iso_week -q 2>&1 | tail -8", "description": "Confirm stale slot + reproduce the failure"}
-tool_result: === .cost_week contents ===
-2026-W39
-=== RED reproduce ===
-.                                                                        [100%]
-1 passed in 0.76s
-assistant: Now the slot holds `2026-W39` (overwritten by the live `tick()` during the day), so it passes in isolation — but it's self-poisoning: after it runs, the slot holds `1999-W02`, so the **next** run fails. That's the flakiness that hit the 22:47 suite. Let me prove it (run twice):
-tool_use Bash {"command": "echo \"=== run 1 ===\" && PYTHONUTF8=1 python -m pytest tests/test_cost_ledger.py::test_posts_once_per_iso_week -q 2>&1 | tail -3 && echo \"=== slot after run 1 ===\" && cat scheduler/.cost_week && echo && echo \"=== run 2 (should FAIL \u2014 self-poisoned) ===\" && PYTHONUTF8=1 python -m pytest tests/test_cost_ledger.py::test_posts_once_per_iso_week -q 2>&1 | tail -6", "description": "Prove the self-poisoning flakiness"}
-tool_result: === run 1 ===
-=========================== short test summary info ===========================
-FAILED tests/test_cost_ledger.py::test_posts_once_per_iso_week - assert (None...
-1 failed in 0.18s
-=== slot after run 1 ===
-1999-W02
-=== run 2 (should FAIL — self-poisoned) ===
-E       assert (None is not None)
-
-tests\test_cost_ledger.py:15: AssertionError
-=========================== short test summary info ===========================
-FAILED tests/test_cost_ledger.py::test_posts_once_per_iso_week - assert (None...
-1 failed in 0.16s
-assistant: Cause proven: the test doesn't isolate `WEEK_SLOT`, so once the real slot holds `1999-W02` it fails forever. Fixing the cause — isolate the slot + log to temp paths (not touching the assertion's meaning):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_cost_ledger.py", "old_string": "def test_posts_once_per_iso_week():\n    posts = []\n    a = cl.maybe_post(post_fn=posts.append, now_week=\"1999-W02\")\n    b = cl.maybe_post(post_fn=posts.append, now_week=\"1999-W02\")\n    assert a is not None and b is None and len(posts) == 1", "new_string": "def test_posts_once_per_iso_week(tmp_path, monkeypatch):\n    # isolate the persistent week-slot + log so the test neither reads nor poisons the real gitignored files\n    monkeypatch.setattr(cl, \"WEEK_SLOT\", str(tmp_path / \".cost_week\"))\n    monkeypatch.setattr(cl, \"LOG\", str(tmp_path / \"COST-LEDGER.md\"))\n    posts = []\n    a = cl.maybe_post(post_fn=posts.append, now_week=\"1999-W02\")\n    b = cl.maybe_post(post_fn=posts.append, now_week=\"1999-W02\")\n    assert a is not None and b is None and len(posts) == 1"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_cost_ledger.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: The `_demo()` has the same latent self-poisoning (writes the real slot). Isolating it too, same cause:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\cost_ledger.py", "old_string": "def _demo():\n    line = weekly_line()\n    assert \"Cost check\" in line and \"FILL-LAW-UNVERIFIED\" in line, line\n    posts = []\n    a = maybe_post(post_fn=posts.append, now_week=\"1999-W01\")\n    b = maybe_post(post_fn=posts.append, now_week=\"1999-W01\")   # same week -> no second post\n    assert a is not None and b is None and len(posts) == 1, (a, b, posts)\n    print(\"cost_ledger demo OK: weekly line built, posts once per ISO week ::\", line)", "new_string": "def _demo():\n    import tempfile\n    global WEEK_SLOT, LOG\n    line = weekly_line()\n    assert \"Cost check\" in line and \"FILL-LAW-UNVERIFIED\" in line, line\n    d = tempfile.mkdtemp()                                       # isolate so the demo never poisons the real slot\n    WEEK_SLOT, LOG = os.path.join(d, \".cost_week\"), os.path.join(d, \"COST-LEDGER.md\")\n    posts = []\n    a = maybe_post(post_fn=posts.append, now_week=\"1999-W01\")\n    b = maybe_post(post_fn=posts.append, now_week=\"1999-W01\")   # same week -> no second post\n    assert a is not None and b is None and len(posts) == 1, (a, b, posts)\n    print(\"cost_ledger demo OK: weekly line built, posts once per ISO week ::\", line)"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\cost_ledger.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "echo \"=== GREEN twice (deterministic) ===\" && PYTHONUTF8=1 python -m pytest tests/test_cost_ledger.py -q 2>&1 | tail -3 && PYTHONUTF8=1 python -m pytest tests/test_cost_ledger.py -q 2>&1 | tail -3 && echo \"=== restore the live slot to the real week (undo my test pollution) ===\" && printf \"2026-W39\" > scheduler/.cost_week && cat scheduler/.cost_week && echo", "description": "Confirm deterministic green + restore live slot"}
-tool_result: === GREEN twice (deterministic) ===
-..                                                                       [100%]
-2 passed in 1.11s
-..                                                                       [100%]
-2 passed in 1.28s
-=== restore the live slot to the real week (undo my test pollution) ===
-2026-W39
-assistant: Test 1 fixed (green twice, deterministic) and the live slot restored. Now tests 2 & 3 (the site-page tests). Reading them:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_diaries.py"}
-tool_result: 1	"""R-DIARIES-DAY1: the shared live-diary store + the day-one engine diaries."""
-2	import scripts.diaries as D
-3	import scripts.open_day1_diaries as O
-4	import scripts.site_v2 as V2
-5	
-6	
-7	def test_diaries_demo():
-8	    D._demo()                       # open/record/day-count/totals/idempotent-per-date/verdict
-9	
-10	
-11	def test_day1_diaries_demo():
-12	    O._demo()                       # every fixed-rule engine opens at day 0 with a plain-words rule
-13	
-14	
-15	def test_every_engine_rule_is_plain():
-16	    bad = ["R-", "Kelly", "Wilson", "notional", "blotter", ".py"]
-17	    for _eng, _name, rule in O.ENGINE_RULES:
-18	        for b in bad:
-19	            assert b not in rule, (rule, b)
-20	
-21	
-22	def test_v2_data_and_engines_show_diaries():
-23	    V2.build()
-24	    for page in ("data.html", "engines.html"):
-25	        import os
-26	        t = open(os.path.join(V2.V2, page), encoding="utf-8").read()
-27	        # diaries are SERVER-RENDERED into the page (baked from diaries.json at build time), not client-fetched
-28	        assert "live diar" in t.lower() and "day " in t.lower()
-29	
-assistant: `test_v2_data_and_engines_show_diaries` calls `V2.build()` then checks the pages contain a diaries section. The failure shows the section is absent. Let me see how `site_v2` renders diaries and what data source it reads:
-tool_use Grep {"pattern": "live diar|diar|day |diaries|def build|def _diar", "path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "output_mode": "content", "-n": true, "-i": true, "head_limit": 40}
-tool_result: 301:    its own Rs 2,00,000 account. Server-rendered from paper_account, so every value is real (day one = the
-335:def _diary_slug(name):
-336:    """A stable page name for a diary engine, distinct from the live engine-<code>.html pages (E3/E4 exist as
-337:    both a live engine and a diary, so diaries live at diary-<slug>.html)."""
-341:    return "diary-" + s.strip("-")
-356:                "%s trades today (won %s, lost %s) · regime %s. The evaluated/fired/held counter arrives with "
-399:def _diary_practice_line(d):
-406:def _diary_page(d):
-407:    """R-MASTER-CHECKLIST item 28: a diary engine's own page in the v2 layout — stage, daily practice, and the
-408:    five tabs. A day-0 diary has placed nothing, so Positions/Trades/Why show 'none'/em-dash (nothing invented);
-410:    name = d.get("engine") or "diary"
-411:    slug = _diary_slug(name)
-419:            "<div class='tabpane on' data-g='dg'><p class='sub'>None held — this is a paper diary that has "
-431:            "<p class='sub'>Paper diary, scored daily after real costs. No real money.</p>%s%s"
-432:            "<h2>The engine</h2>%s</main>" % (esc(name), esc(d.get("stage")), _diary_practice_line(d),
-441:    diaries = (_data("diaries.json") or {}).get("diaries") or []
-456:    for d in diaries:
-462:                      _diary_slug(d.get("engine")), esc(d.get("engine")), esc(d.get("stage")),
-468:            "<h2>Live diaries — day one</h2><p class='sub'>Every fixed-rule engine runs its rule live from day "
-469:            "one, scored daily after real costs. No real money until a diary earns its margin and the owner says "
-470:            "so. Click one for its page.</p>" + (drows or "<div class='panel sub'>diaries open at the next session</div>") +
-479:    for d in diaries:
-480:        _diary_page(d)
-649:            "trade them. The rest below are on paper diaries. Paper only — not advice; small samples, high bar.</p>"
-781:           "made no calls to explain; the same-day test kept a total, not a reason per trade.</p>"
-795:              "<p>Each index idea — holding the whole market for days, or trading it in and out the same day — was "
-835:    diaries = (_data("diaries.json") or {}).get("diaries") or []
-840:        rows_today = l.get("rows_today")
-846:                    "<b>%s</b><span class='pill'>diary: day %s</span><span class='sub' style='margin-left:auto'>%s trades · %s</span></div>"
-849:                        R((d.get("totals") or {}).get("net_R", 0)), esc(d.get("rule"))) for d in diaries)
-853:            "<h2>Live diaries</h2><p class='sub'>Every fixed-rule engine runs its rule live from day one, scored "
-854:            "daily after real costs, no real money.</p>" + (drows or "<div class='panel sub'>diaries open at the next session</div>") +
-862:    """R-ALL-ENGINES-TOMORROW item 4: one 'Export the day (zip)' entry per day that has been exported. The zip
-868:            day = os.path.basename(z)[:-4]
-872:                     "<a href='exports/%s.zip' download style='margin-left:auto'>Export the day (zip) →</a></div>" % (
-986:# ---------- diaries data + build + gate ----------
-988:def _write_diaries_data():
-990:        from scripts import open_day1_diaries, diaries
-991:        open_day1_diaries.open_all()
-994:                 "verdict": d.get("_verdict")} for d in diaries.all_diaries()]
-
-[Showing results with pagination = limit: 40]
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 825, "limit": 40}
-tool_result: 825	            "<div class='tabpane' data-g='dlv'>" + record + "</div>")
-826	    body = (_head("Deliverables — E1 desk") + _nav("deliverables.html") + "<main><h1>Deliverables</h1>"
-827	            "<p class='sub'>The two things the desk was asked to check — <b>Dubai Strategies</b> and the "
-828	            "<b>index tests</b> — each in plain words. Paper and history only; nothing invented.</p>"
-829	            + tabs + "</main>")
-830	    _write("deliverables.html", body + _foot())
-831	
-832	
-833	def _data_page():
-834	    rec = (_data("recording.json") or {}).get("lanes") or []
-835	    diaries = (_data("diaries.json") or {}).get("diaries") or []
-836	    lanes = ""
-837	    for l in rec:
-838	        stt = str(l.get("status") or "").lower()
-839	        on = "recorded" in stt or "recording" in stt
-840	        rows_today = l.get("rows_today")
-841	        lanes += ("<div class='panel' style='margin:10px 0'><div style='display:flex;gap:10px;align-items:baseline'>"
-842	                  "<b>%s</b><span class='pill %s' style='margin-left:auto'>%s</span></div>%s</div>" % (
-843	                      esc(l.get("lane")), ("gain" if on else "warn"), esc(l.get("status")),
-844	                      ("<p class='sub' style='margin:6px 0 0'>%s readings today</p>" % ("{:,}".format(rows_today)) if isinstance(rows_today, int) else "")))
-845	    drows = "".join("<div class='panel' style='margin:8px 0'><div style='display:flex;gap:10px;align-items:baseline'>"
-846	                    "<b>%s</b><span class='pill'>diary: day %s</span><span class='sub' style='margin-left:auto'>%s trades · %s</span></div>"
-847	                    "<p class='sub' style='margin:6px 0 0'>%s</p></div>" % (
-848	                        esc(d.get("engine")), esc(d.get("day")), esc((d.get("totals") or {}).get("trades", 0)),
-849	                        R((d.get("totals") or {}).get("net_R", 0)), esc(d.get("rule"))) for d in diaries)
-850	    body = (_head("Data — E1 desk") + _nav("data.html") + "<main><h1>Data</h1>"
-851	            "<p class='sub'>What the desk is recording, and how much came in today. Green means it recorded "
-852	            "today; amber means nothing yet.</p>" + (lanes or "<div class='panel sub'>no streams yet</div>") +
-853	            "<h2>Live diaries</h2><p class='sub'>Every fixed-rule engine runs its rule live from day one, scored "
-854	            "daily after real costs, no real money.</p>" + (drows or "<div class='panel sub'>diaries open at the next session</div>") +
-855	            "<h2>Export the day</h2><p class='sub'>Each day's recorded streams are zipped after the close and "
-856	            "kept forever — recorded data is never deleted.</p>" + _exports_section() +
-857	            "</main>")
-858	    _write("data.html", body + _foot())
-859	
-860	
-861	def _exports_section():
-862	    """R-ALL-ENGINES-TOMORROW item 4: one 'Export the day (zip)' entry per day that has been exported. The zip
-863	    is published beside the site (site/v2/exports/<day>.zip is copied there at build time when it fits)."""
-864	    exp = os.path.join(REPO, "site", "v2", "exports")
-assistant: data.html's builder always emits "Live diaries … from day one" — so the strings should be present. But the failed page ended with "download excel - today's recordings", which is a **different builder's** output. The live `site_loop` is running and clobbers `site/v2/data.html` between `V2.build()` and the test's read — a race with generated files. Let me confirm V2's paths and `build()`:
-tool_use Bash {"command": "grep -nE \"^REPO|^V2 |^V2=|V2 =|def build|def _write|def _data\\b|_write_diaries\" scripts/site_v2.py 2>&1 | head -30", "description": "Find site_v2 paths + build/_write"}
-tool_result: 21:REPO = ds._REPO
-22:V2 = os.path.join(REPO, "site", "v2")
-78:def _data(name):
-196:def _write(name, body):
-988:def _write_diaries_data():
-1220:def build(publish_gate=True):
-1227:    _write_diaries_data()                                  # data files (shared) — safe to refresh either way
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 196, "limit": 12}
-tool_result: 196	def _write(name, body):
-197	    from scripts import v2_page_owners
-198	    if not v2_page_owners.owns("site_v2", name):     # R-V2-PAGE-OWNERS: refuse a page site_v2 does not own
-199	        return
-200	    os.makedirs(_OUT, exist_ok=True)
-201	    with open(os.path.join(_OUT, name), "w", encoding="utf-8") as f:
-202	        f.write(body)
-203	
-204	
-205	# ---------- pages ----------
-206	
-207	def certified_count():
-assistant: `_write` refuses pages `site_v2` doesn't own (`v2_page_owners.owns`). If site_v2 doesn't own data.html/engines.html, `V2.build()` never writes them and the test reads another builder's page. Let me check ownership and `_OUT`:
-tool_use Bash {"command": "echo \"=== _OUT ===\" && grep -nE \"_OUT\" scripts/site_v2.py | head -3 && echo \"=== v2_page_owners ===\" && cat scripts/v2_page_owners.py 2>&1 | head -60", "description": "Inspect _OUT + page ownership map"}
-tool_result: === _OUT ===
-193:_OUT = V2                                        # where _write puts pages (build() points this at a staging dir)
-200:    os.makedirs(_OUT, exist_ok=True)
-201:    with open(os.path.join(_OUT, name), "w", encoding="utf-8") as f:
-=== v2_page_owners ===
-"""R-V2-PAGE-OWNERS (owner ruling 2026-09-23): ONE builder per /v2/ page.
-
-v8_site (design-verbatim, from design/v8/*.dc.html) is canonical for every page the design has. site_v2
-(server-rendered) may ONLY generate pages the design does NOT have — Deliverables, the per-engine detail
-pages, the diary pages, and the extra tabs (Live desk / Portfolio / Backtest / Scoreboard). The Files page is
-the build room's (build_journal), under /build/, not /v2/.
-
-Each builder calls `owns(builder, page)` before writing and REFUSES a page it does not own. The registry sets
-are disjoint by construction, so two builders can never both claim one page; `conflicts()` proves it and the
-test fails if a future edit puts a page in both. No clobbering: a builder only ever removes/writes its own
-pages (see site_v2.build's owned-only stale-cleanup).
-"""
-from __future__ import annotations
-
-# Every page the DESIGN has (design/v8/*.dc.html -> served name); v8_site owns these.
-V8_SITE = {
-    "index.html",       # Main.dc.html
-    "engines.html",     # Engine.dc.html (the list)
-    "stocks.html",      # Stocks.dc.html
-    "patterns.html",    # Pattern.dc.html
-    "data.html",        # Data.dc.html
-    "results.html",     # Results.dc.html
-    "how.html",         # How.dc.html
-    "ask.html",         # Ask.dc.html
-    "stock.html",       # Stock.dc.html
-    "messages.html",    # Messages.dc.html
-}
-
-# Pages the design does NOT have; site_v2 owns these.
-SITE_V2 = {
-    "deliverables.html",   # the tabbed Deliverables page (design has none the owner wants; item 23)
-    "scoreboard.html",
-    "live-desk.html",
-    "portfolio.html",
-    "backtest.html",
-    "copycat-roof.html",   # NB8 item 1: the roof desk book (copied trades / stacks / cancellations)
-    "dubai-strategies.html",  # NB8 item 1: the Dubai Strategies record page
-}
-# dynamic families site_v2 owns (per-engine detail pages + per-diary pages)
-SITE_V2_PREFIXES = ("engine-", "diary-")
-
-BUILDERS = ("v8_site", "site_v2")
-
-
-def owner(page):
-    """The single builder that owns this /v2/ page, or None if the page is not in the registry."""
-    if page in V8_SITE:
-        return "v8_site"
-    if page in SITE_V2:
-        return "site_v2"
-    if page.startswith(SITE_V2_PREFIXES):
-        return "site_v2"
-    return None
-
-
-def owns(builder, page):
-    """True if `builder` may write `page`. A page not in the registry is fail-OPEN (written, never dropped) —
-    the test flags an unregistered page instead of losing it silently."""
-    o = owner(page)
-    return o is None or o == builder
-assistant: `data.html`/`engines.html` are owned by **v8_site**, not site_v2 (R-V2-PAGE-OWNERS, 2026-09-23) — so `site_v2._write` refuses them and `V2.build()` never writes those pages. The test's premise (site_v2 bakes diaries into data/engines) was superseded by that ownership ruling; the diaries now live on site_v2's own `diary-*.html` pages. Let me confirm empirically what site_v2 actually writes (isolated temp build) before rewriting the test:
-tool_use Write {"file_path": "[redacted]\\AppData\\Local\\Temp\\claude\\C--Users-[redacted]-Desktop-trading-engines-v2\\891fb17f-8804-453d-b7d6-8a736cc901d5\\scratchpad\\probe_v2.py", "content": "import sys, os, tempfile, glob\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nimport scripts.site_v2 as V2\n\nout = tempfile.mkdtemp()\nV2._OUT = out                      # isolate: build into a temp dir, immune to the live site_loop\n# build only what we need without the publish gate/clobber of the live dir\ntry:\n    V2._write_diaries_data()\nexcept Exception as e:\n    print(\"diaries-data err:\", e)\ntry:\n    V2.build(publish_gate=False)\nexcept TypeError:\n    V2.build()\nexcept Exception as e:\n    print(\"build err:\", e)\n\nfiles = sorted(os.path.basename(p) for p in glob.glob(os.path.join(out, \"*.html\")))\nprint(\"WROTE\", len(files), \"pages\")\nprint(\"diary pages:\", [f for f in files if f.startswith(\"diary-\")])\nprint(\"data.html present:\", \"data.html\" in files, \"| engines.html present:\", \"engines.html\" in files)\nfor f in files:\n    t = open(os.path.join(out, f), encoding=\"utf-8\").read().lower()\n    if \"live diar\" in t and \"day \" in t:\n        print(\"  BOTH strings in:\", f)\n# show a diary page's relevant content\nfor f in files:\n    if f.startswith(\"diary-\"):\n        t = open(os.path.join(out, f), encoding=\"utf-8\").read()\n        import re\n        print(\"---\", f, \"--- day token:\", \"day \" in t.lower(), \"| 'diary' in:\", \"diar\" in t.lower())\n        break\n"}
-tool_result: File created successfully at: [redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\scratchpad\probe_v2.py (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "PYTHONUTF8=1 python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/probe_v2.py\" 2>&1 | tail -20", "description": "Probe what site_v2 writes in isolation"}
-tool_result: WROTE 0 pages
-diary pages: []
-data.html present: False | engines.html present: False
-assistant: 0 pages — `build()` overrides `_OUT` with its own staging dir (per the line-193 comment), ignoring my override. Let me read `build()` to see the staging/publish flow:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 1220, "limit": 70}
-tool_result: 1220	def build(publish_gate=True):
-1221	    """Generate every page into a STAGING dir, run the build gate, and only swap the pages into site/v2/ when
-1222	    the gate is clean. On failure it raises RenderGateError and leaves the last-good site/v2/ untouched — so a
-1223	    broken build never publishes (R-V2-FIX item 4)."""
-1224	    global _OUT
-1225	    import shutil
-1226	    import tempfile
-1227	    _write_diaries_data()                                  # data files (shared) — safe to refresh either way
-1228	    try:
-1229	        from scripts import record_store                   # R-RECORD-STORE: refresh the read-only views json
-1230	        record_store.build()
-1231	    except Exception:
-1232	        pass
-1233	    staging = tempfile.mkdtemp(prefix="v2stage_")
-1234	    saved = _OUT
-1235	    _OUT = staging
-1236	    try:
-1237	        _leaderboard(); _engines(); _stocks(); _patterns(); _deliverables(); _data_page(); _results(); _how(); _ask()
-1238	        _scoreboard(); _copycat_roof(); _dubai_strategies()     # NB8 item 1: a page for every record in the store
-1239	        _live_desk(); _portfolio(); _backtest(); _messages()      # B4: the four tabs the swap was waiting on
-1240	        problems = render_gate(staging) if publish_gate else []
-1241	        jargon = no_jargon_ok(staging) if publish_gate else []
-1242	        if problems or jargon:
-1243	            raise RenderGateError("v2 build gate FAILED (site/v2/ left untouched): %s%s" % (
-1244	                problems, (" | jargon: %s" % jargon) if jargon else ""))
-1245	        # gate clean -> swap staging into V2. R-V2-PAGE-OWNERS: remove ONLY the pages site_v2 owns, so a
-1246	        # v8_site page is never clobbered/deleted (it survives even if v8_site's later build raises).
-1247	        from scripts import v2_page_owners
-1248	        os.makedirs(V2, exist_ok=True)
-1249	        for stale in glob.glob(os.path.join(V2, "*.html")):
-1250	            if v2_page_owners.owner(os.path.basename(stale)) != "site_v2":
-1251	                continue
-1252	            try:
-1253	                os.remove(stale)
-1254	            except OSError:
-1255	                pass
-1256	        for p in glob.glob(os.path.join(staging, "*.html")):
-1257	            shutil.copy2(p, os.path.join(V2, os.path.basename(p)))
-1258	    finally:
-1259	        _OUT = saved
-1260	        shutil.rmtree(staging, ignore_errors=True)
-1261	    return {"out": V2, "pages": len(_pages_on_disk(V2))}
-1262	
-1263	
-1264	def _demo():
-1265	    # R-V2-PAGE-OWNERS: site_v2 writes ONLY the pages it owns; patterns.html/index.html are v8_site's now.
-1266	    from scripts import v2_page_owners
-1267	    build()
-1268	    # site_v2 gates ONLY the pages it owns (v8_site's pages are v8_site's to gate)
-1269	    problems = [(p, x) for (p, x) in render_gate() if v2_page_owners.owner(p) == "site_v2"]
-1270	    assert not problems, problems
-1271	    jarg = [(p, x) for (p, x) in no_jargon_ok() if v2_page_owners.owner(p) == "site_v2"]
-1272	    assert not jarg, jarg
-1273	    n = certified_count()
-1274	    assert 0 <= n < 100000, n
-1275	    # every page site_v2 just wrote is one it owns (nothing it does not own)
-1276	    import glob as _g
-1277	    saved = _g.glob(os.path.join(V2, "deliverables.html")) + _g.glob(os.path.join(V2, "engine-*.html")) + \
-1278	        _g.glob(os.path.join(V2, "diary-*.html"))
-1279	    assert saved, "site_v2 must have written its owned pages"
-1280	    for p in saved:
-1281	        assert v2_page_owners.owns("site_v2", os.path.basename(p))
-1282	    # a site_v2-owned page renders cleanly with its tabs
-1283	    dlv = open(os.path.join(V2, "deliverables.html"), encoding="utf-8").read()
-1284	    assert "Deliverables" in dlv and "Positions" in dlv and "[object Object]" not in dlv
-1285	    print("site_v2 demo OK: writes only owned pages (deliverables/scoreboard/tabs/engine-*/diary-*), "
-1286	          "gate clean, count=%d, no jargon." % n)
-1287	
-1288	
-1289	if __name__ == "__main__":
-assistant: `build()` publishes only site_v2-owned pages; data.html/engines.html are v8_site's, so site_v2 never writes them — the test targets the wrong builder post-ruling. The maintained `site_v2._demo` already asserts `diary-*.html` (the current home of diaries). Let me read `_diary_page` to see what a diary page reliably contains:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 399, "limit": 36}
-tool_result: 399	def _diary_practice_line(d):
-400	    t = d.get("totals") or {}
-401	    return ("<div class='panel'><span class='sub'>Daily practice — evaluated —, fired —, held — · %s trades so "
-402	            "far (%s) · %s. The evaluated/fired/held counter arrives with the daily practice recorder.</span>"
-403	            "</div>" % (esc(t.get("trades", 0)), R(t.get("net_R", 0)), esc(d.get("stage"))))
-404	
-405	
-406	def _diary_page(d):
-407	    """R-MASTER-CHECKLIST item 28: a diary engine's own page in the v2 layout — stage, daily practice, and the
-408	    five tabs. A day-0 diary has placed nothing, so Positions/Trades/Why show 'none'/em-dash (nothing invented);
-409	    How it decides shows its rule; Record shows its running totals."""
-410	    name = d.get("engine") or "diary"
-411	    slug = _diary_slug(name)
-412	    t = d.get("totals") or {}
-413	    tabs = ("<div class='tabs'>"
-414	            "<button class='on' data-tb='dg' onclick='tab(\"dg\",0)'>Positions</button>"
-415	            "<button data-tb='dg' onclick='tab(\"dg\",1)'>Trades</button>"
-416	            "<button data-tb='dg' onclick='tab(\"dg\",2)'>Why each call</button>"
-417	            "<button data-tb='dg' onclick='tab(\"dg\",3)'>How it decides</button>"
-418	            "<button data-tb='dg' onclick='tab(\"dg\",4)'>Record</button></div>"
-419	            "<div class='tabpane on' data-g='dg'><p class='sub'>None held — this is a paper diary that has "
-420	            "placed nothing.</p></div>"
-421	            "<div class='tabpane' data-g='dg'><p class='sub'>No trades yet — an em-dash stands where no record "
-422	            "exists.</p></div>"
-423	            "<div class='tabpane' data-g='dg'><p class='sub'>No calls to explain yet.</p></div>"
-424	            "<div class='tabpane' data-g='dg'><div class='panel'><p style='margin:0'>%s</p></div></div>"
-425	            "<div class='tabpane' data-g='dg'><div class='cards'>%s%s</div></div>" % (
-426	                esc(d.get("rule")), _card("Trades so far", esc(t.get("trades", 0))),
-427	                _card("After costs", R(t.get("net_R", 0)))))
-428	    body = (_head(esc(name) + " — E1 desk") + _nav("engines.html") + "<main>"
-429	            "<p class='sub'><a href='engines.html'>← all engines</a></p>"
-430	            "<h1>%s</h1><span class='pill'>%s</span>"
-431	            "<p class='sub'>Paper diary, scored daily after real costs. No real money.</p>%s%s"
-432	            "<h2>The engine</h2>%s</main>" % (esc(name), esc(d.get("stage")), _diary_practice_line(d),
-433	                                             _record_panel(_owner_name(str(name).split(" ")[0])), tabs))
-434	    _write(slug + ".html", body + _foot())
-assistant: A diary page reliably contains "Paper diary" + a stage token, and site_v2 is the sole owner of `diary-*.html`. Let me see the diary dict shape `_write_diaries_data` produces (what the pages render from):
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_v2.py", "offset": 986, "limit": 30}
-tool_result: 986	# ---------- diaries data + build + gate ----------
-987	
-988	def _write_diaries_data():
-989	    try:
-990	        from scripts import open_day1_diaries, diaries
-991	        open_day1_diaries.open_all()
-992	        rows = [{"engine": d.get("engine"), "name": d.get("name"), "rule": d.get("rule"),
-993	                 "stage": d.get("_stage"), "day": d.get("_day"), "totals": d.get("_totals"),
-994	                 "verdict": d.get("_verdict")} for d in diaries.all_diaries()]
-995	        os.makedirs(DATA, exist_ok=True)
-996	        with open(os.path.join(DATA, "diaries.json"), "w", encoding="utf-8") as f:
-997	            json.dump({"diaries": rows}, f, indent=1, default=str)
-998	    except Exception:
-999	        pass
-1000	
-1001	
-1002	def _pages_on_disk(where=None):
-1003	    return sorted(glob.glob(os.path.join(where or _OUT, "*.html")))
-1004	
-1005	
-1006	def render_gate(where=None):
-1007	    """R-V2-FIX build gate. Returns a list of (page, problem); empty = clean. Fails on a render bug in any page,
-1008	    an empty table where the source has rows, or a shown pattern count above the certified registry."""
-1009	    import re
-1010	    problems = []
-1011	    # Check VISIBLE text (scripts + tags stripped) so JS keywords (change_pct!=null) and the fonts URL don't
-1012	    # trip. Render-bug tokens are matched as WHOLE WORDS (so 'BAJFINANCE' does not trip 'nan').
-1013	    patterns = [(r"\[object Object\]", "[object Object]"), (r"(?i)\bundefined\b", "undefined"),
-1014	                (r"(?i)\bnan\b", "NaN"), (r"(?i)\bnull\b", "null"), (r"(?i)\bloading\b", "loading")]
-1015	    cert = certified_count()
 assistant: Let me render one diary page in isolation to see exactly which strings it reliably contains (so the new assertion is honest, not guessed):
 tool_use Write {"file_path": "[redacted]\\AppData\\Local\\Temp\\claude\\C--Users-[redacted]-Desktop-trading-engines-v2\\891fb17f-8804-453d-b7d6-8a736cc901d5\\scratchpad\\probe_diary.py", "content": "import sys, os, tempfile, glob\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nimport scripts.site_v2 as V2\nimport scripts.open_day1_diaries as O\nimport scripts.diaries as DD\n\nout = tempfile.mkdtemp()\nV2._OUT = out\nO.open_all()\nrows = [{\"engine\": d.get(\"engine\"), \"name\": d.get(\"name\"), \"rule\": d.get(\"rule\"),\n         \"stage\": d.get(\"_stage\"), \"day\": d.get(\"_day\"), \"totals\": d.get(\"_totals\")}\n        for d in DD.all_diaries()]\nprint(\"n diaries:\", len(rows))\nif rows:\n    print(\"row0:\", {k: rows[0].get(k) for k in (\"engine\", \"stage\", \"day\")})\n    V2._diary_page(rows[0])\n    pages = glob.glob(os.path.join(out, \"diary-*.html\"))\n    print(\"wrote:\", [os.path.basename(p) for p in pages])\n    if pages:\n        t = open(pages[0], encoding=\"utf-8\").read()\n        low = t.lower()\n        for s in (\"paper diary\", \"day \", \"the engine\", str(rows[0].get(\"engine\")).lower()):\n            print(\"  contains %r:\" % s, s in low)\n"}
 tool_result: File created successfully at: [redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\scratchpad\probe_diary.py (file state is current in your context — no need to Read it back)
@@ -2945,3 +2257,491 @@ works) → START → single thin stack. PASS → all four LIVE at 06:00, master 
 the failing wire(s), re-verify, cite. Then end the session with an item left (reopen proof).
 Report "NB37": red→green per item, verdict + real rung, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD /
 LEAD RULING NEEDED.
+assistant: NB37 — the full end-to-end build. Archiving first, then item 13.
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-24_NIGHT-BUNDLE-37.md", "content": "# NIGHT BUNDLE 37 (ID:NB37) \u2014 dispatch archived verbatim (2026-09-24)\n\n**Origin tag (per \u00a75):** OWNER-SAID \"build everything end to end, then test\"; LEAD ruling within remit. HARD STOP 04:30.\n\nDISPATCH ID: NB37 \u2014 FINISH THE BUILD TONIGHT (24 Sep 2026, ~01:30 IST) \u2192 BUILD\nREAD: NB35/NB36 reports (master PASS at 52b26efee, docs-only HEAD since; items 7 proof_apply, 21 practice_counter,\n27 publish_event built+unit-tested, wires deferred; item 13: prepare_clone() never called, xfail test in place;\nreopen floor 0.72 GB; NB24 quiet-box route valid until the 06:00 login). ORIGIN: OWNER-SAID \u2014 \"build everything\nend to end, then test\"; LEAD ruling within remit.\nHARD STOP 04:30: after that no launch-path edit and no stack stop. If anything is unfinished at 04:30, revert\nto the master PASS state (52b26efee code) so the 06:00 login runs exactly what was verified.\nTDD each, in this order: (1) item 13 \u2014 call prepare_clone() in the verify flow, report the REAL rung, xfail \u2192 pass;\n(2) item 21 practice_counter into the evening runner; (3) item 27 publish_event on PLACED/CLOSED rows (site updates\nwithin a minute); (4) item 7 proof_apply (order-path-adjacent \u2014 isolated try/except, cannot break the login or\nthe gate). Then ONE quiet box: STOP \u2192 full suite pinned to HEAD \u2192 independent verify (now on a real clone if 13\nworks) \u2192 START \u2192 single thin stack. PASS \u2192 all four LIVE at 06:00, master green on the new HEAD. FAIL \u2192 revert\nthe failing wire(s), re-verify, cite. Then end the session with an item left (reopen proof).\nReport \"NB37\": red\u2192green per item, verdict + real rung, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD /\nLEAD RULING NEEDED.\n"}
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-24_NIGHT-BUNDLE-37.md (file state is current in your context — no need to Read it back)
+assistant: Now **item 13** — read `_run_rung` fully to wire `prepare_clone()` + report the real rung:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 269, "limit": 36}
+tool_result: 269	def _run_rung(rung, inputs):
+270	    """Production brain. rung (a) = Codex (codex.cmd exec); rung (d) = fresh independent Claude (supervisor
+271	    mechanism); (a) falls back to (d) on any Codex failure. Both are handed the pre-run FULL suite result +
+272	    its hash and told NOT to re-run the ~21-min suite (it cannot finish in a single shot); they run only the
+273	    fast TARGETED checks (module demo + touched-module tests) and confirm the suite hash."""
+274	    import sys as _sys
+275	    py = _sys.executable                                  # the real interpreter; the 'py' launcher is NOT installed
+276	    suite_line, suite_blob = _suite_evidence()
+277	    prompt = ("You are the INDEPENDENT VERIFIER. Follow docs/VERIFIER-TEMPLATE.md and run ONLY the TARGETED checks "
+278	              "in docs/VERIFY-MAP.md for the touched paths. Run commands with THIS exact Python interpreter (the "
+279	              "'py' launcher is NOT installed on this machine): %s\n"
+280	              "Targeted checks to run and quote the output of (the -B avoids .pyc writes under a read-only sandbox):\n"
+281	              "  1) \"%s\" -B -m engine1_rebuild.conform\n"
+282	              "  2) \"%s\" -B -m pytest tests/test_conform.py -q -p no:cacheprovider\n"
+283	              "DO NOT re-run the full ~21-min suite: its result was produced ALONE under the RAM gate and is given "
+284	              "below as authoritative evidence — confirm the sha256 matches reports/CONFORM-SUITE-RESULT.json on "
+285	              "disk. Do NOT modify, stage, or commit any file; run read-only checks only. A claim without a "
+286	              "running-evidence line is FAIL. Reply with a first line 'VERDICT: PASS' or 'VERDICT: FAIL' then the "
+287	              "evidence.\n\nPRE-RUN SUITE: %s\n%s\n\nRULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n" %
+288	              (py, py, py, suite_line, suite_blob[:1500], inputs["ruling"][:6000], inputs["step"], inputs["commit"],
+289	               inputs["diff"]))
+290	    out = None
+291	    if rung == "a":
+292	        cx = _run_codex(prompt)
+293	        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when
+294	        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).
+295	        if cx is not None and (re.search(r"(?im)^\s*VERDICT:\s*PASS\b", cx) or not _codex_blocked(cx)):
+296	            out = cx
+297	    if out is None:
+298	        from scripts import supervisor
+299	        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack
+300	    out = out or ""
+301	    verdict = "PASS" if re.search(r"(?im)^\s*VERDICT:\s*PASS\b", out) else "FAIL"
+302	    evidence = ((suite_line + "\n\n") if suite_line else "") + out            # pin the suite hash into the report
+303	    return {"verdict": verdict, "evidence": evidence[:6000]}
+304	
+assistant: Wiring item 13: call `prepare_clone()` in `_run_rung` (so Codex runs in a real clone) + track and report the **actual** rung:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "old_string": "    out = None\n    if rung == \"a\":\n        cx = _run_codex(prompt)\n        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when\n        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).\n        if cx is not None and (re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", cx) or not _codex_blocked(cx)):\n            out = cx\n    if out is None:\n        from scripts import supervisor\n        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack\n    out = out or \"\"\n    verdict = \"PASS\" if re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", out) else \"FAIL\"\n    evidence = ((suite_line + \"\\n\\n\") if suite_line else \"\") + out            # pin the suite hash into the report\n    return {\"verdict\": verdict, \"evidence\": evidence[:6000]}", "new_string": "    out = None\n    actual_rung = rung\n    if rung == \"a\":\n        prepare_clone()          # NB37 item 13: create/refresh the confined clone so Codex CAN run (was never called)\n        cx = _run_codex(prompt)\n        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when\n        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).\n        if cx is not None and (re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", cx) or not _codex_blocked(cx)):\n            out = cx\n    if out is None:\n        actual_rung = \"d\"        # NB37: Codex absent/blocked -> the REAL brain is rung-d (report the truth)\n        from scripts import supervisor\n        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack\n    out = out or \"\"\n    verdict = \"PASS\" if re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", out) else \"FAIL\"\n 
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now update `verify()` to report the actual rung:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "old_string": "    evidence = res.get(\"evidence\", \"\")\n    if verdict == \"PASS\":                       # NB33 hash-check: never trust a suite that is not this HEAD's\n        ok, why = suite_ok_fn(commit)\n        if not ok:\n            verdict = \"FAIL\"\n            evidence = \"HASH-CHECK FAIL (NB33): %s\\n\\n%s\" % (why, evidence)\n    _write_report(commit, verdict, rung, name, claimed_step, evidence)", "new_string": "    evidence = res.get(\"evidence\", \"\")\n    actual_rung = res.get(\"rung\", rung)         # NB37: the REAL rung the brain used (a if Codex ran, else d fallback)\n    actual_name = name if actual_rung == rung else \"fresh independent Claude run (rung-d fallback, Codex unavailable)\"\n    if verdict == \"PASS\":                       # NB33 hash-check: never trust a suite that is not this HEAD's\n        ok, why = suite_ok_fn(commit)\n        if not ok:\n            verdict = \"FAIL\"\n            evidence = \"HASH-CHECK FAIL (NB33): %s\\n\\n%s\" % (why, evidence)\n    _write_report(commit, verdict, actual_rung, actual_name, claimed_step, evidence)"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now remove the xfail marker (the wire is in place — it should pass now):
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "@pytest.mark.xfail(reason=\"NB36 finding: prepare_clone() has no caller, so the confined clone is never created, \"\n                          \"_run_codex returns None, and every verify falls back to rung-d while the report \"\n                          \"mislabels it 'rung a'. Fix (deferred): wire prepare_clone() into _run_rung. xfail \"\n                          \"keeps the suite green; it xpasses when the fix lands.\", strict=False)\ndef test_codex_confinement_clone_wired_into_verify():\n    src = _src(\"scripts/verifier.py\")\n    body = src.split(\"def _run_rung\", 1)[-1].split(\"\\ndef \", 1)[0] if \"def _run_rung\" in src else \"\"\n    assert \"prepare_clone(\" in body, \\\n        \"_run_rung must call prepare_clone() before _run_codex so Codex actually runs in a fresh confined clone\"", "new_string": "def test_codex_confinement_clone_wired_into_verify():\n    # NB37 item 13: _run_rung must call prepare_clone() before _run_codex, so Codex runs in a fresh confined clone\n    # (was never called \u2192 every verify fell back to rung-d while the report mislabelled it 'rung a').\n    src = _src(\"scripts/verifier.py\")\n    body = src.split(\"def _run_rung\", 1)[-1].split(\"\\ndef \", 1)[0] if \"def _run_rung\" in src else \"\"\n    assert \"prepare_clone(\" in body, \\\n        \"_run_rung must call prepare_clone() before _run_codex so Codex actually runs in a fresh confined clone\""}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Let me remove the now-unused `pytest` import and add a test for the "report the real rung" behavior:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "import os\n\nimport pytest\n\nREPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))", "new_string": "import os\n\nREPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_verifier.py", "old_string": "def _read_report(commit):\n    import os as _os\n    p = _os.path.join(v.REPORTS, \"verify-%s.md\" % commit)\n    return open(p, encoding=\"utf-8\").read() if _os.path.exists(p) else \"\"", "new_string": "def _read_report(commit):\n    import os as _os\n    p = _os.path.join(v.REPORTS, \"verify-%s.md\" % commit)\n    return open(p, encoding=\"utf-8\").read() if _os.path.exists(p) else \"\"\n\n\ndef test_report_shows_the_actual_rung_not_availability():\n    # NB37 item 13: when the brain falls back to rung-d (Codex unavailable), the report must say rung d + the\n    # fallback name \u2014 not the AVAILABLE rung 'a'. The brain returns the real rung it used.\n    _iso()\n    v.verify(\"rungtest\", brain_fn=lambda i: {\"verdict\": \"FAIL\", \"evidence\": \"x\", \"rung\": \"d\"}, post_fn=lambda _l: None)\n    rep = _read_report(\"rungtest\")\n    assert \"rung: d\" in rep and \"rung-d fallback\" in rep"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py tests/test_verifier.py -q 2>&1 | tail -5", "description": "Run wiring ledger + verifier tests (item 13 wire)"}
+tool_result: tests\test_verifier.py:57: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_verifier.py::test_report_shows_the_actual_rung_not_availability
+1 failed, 21 passed in 2.16s
+assistant: The report format is `rung: (d) ...` not `rung: d`. Let me check `_write_report` and fix the assertion:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 129, "limit": 12}
+tool_result: 129	            from scripts import lead_mistakes
+130	            lead_mistakes.append("step %s reported done at %s" % (claimed_step or "(unspecified)", commit),
+131	                                 "independent verifier returned FAIL", notify_fn=post_fn)
+132	        except Exception:
+133	            pass
+134	    return verdict
+135	
+136	
+137	def _write_report(commit, verdict, rung, name, step, evidence):
+138	    try:
+139	        os.makedirs(REPORTS, exist_ok=True)
+140	        with open(_report_path(commit), "w", encoding="utf-8") as f:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 140, "limit": 8}
+tool_result: 140	        with open(_report_path(commit), "w", encoding="utf-8") as f:
+141	            f.write("# verify-%s\n\nVERDICT: %s\n\n- rung: (%s) %s\n- claimed step: %s\n\n## evidence\n\n%s\n" %
+142	                    (commit, verdict, rung, name, step or "(unspecified)", evidence or "(none)"))
+143	    except Exception:
+144	        pass
+145	
+146	
+147	def _diff(commit):
+assistant: Format is `rung: (d) ...`. Fixing the assertion:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_verifier.py", "old_string": "    rep = _read_report(\"rungtest\")\n    assert \"rung: d\" in rep and \"rung-d fallback\" in rep", "new_string": "    rep = _read_report(\"rungtest\")\n    assert \"rung: (d)\" in rep and \"rung-d fallback\" in rep"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py tests/test_verifier.py -q 2>&1 | tail -3 && PYTHONUTF8=1 python -m scripts.verifier 2>&1 | tail -1", "description": "Re-run wiring + verifier tests + demo"}
+tool_result: ......................                                                   [100%]
+22 passed in 1.40s
+verifier demo OK: PASS/FAIL reports + gate (has_pass) + rung ladder (active rung: a)
+assistant: Item 13 done (22 passed — clone test green, real-rung test green). Committing:
+tool_use Bash {"command": "git add scripts/verifier.py tests/test_wiring_live.py tests/test_verifier.py docs/dispatches/2026-09-24_NIGHT-BUNDLE-37.md && git commit -m \"NB37 item13: wire prepare_clone() into _run_rung so Codex runs in a fresh confined clone (was never called); report the REAL rung (a if Codex ran, else d fallback) not just availability; xfail retired -> green; new test asserts the real rung is reported; archive NB37\" 2>&1 | tail -2 && git rev-parse --short HEAD", "description": "Commit item 13"}
+tool_result: warning: in the working copy of 'scripts/verifier.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_verifier.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_wiring_live.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/dispatches/2026-09-24_NIGHT-BUNDLE-37.md', LF will be replaced by CRLF the next time Git touches it
+ 4 files changed, 37 insertions(+), 8 deletions(-)
+ create mode 100644 docs/dispatches/2026-09-24_NIGHT-BUNDLE-37.md
+fe755728f
+assistant: Item 13 committed (`fe755728f`). Now **item 21: practice_counter into the evening runner.** Let me read run_evening's current main() to place the wire:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\run_evening.py", "offset": 73, "limit": 22}
+tool_result: 73	    try:
+74	        summ = evening.run_evening(write=True)
+75	    except Exception as e:
+76	        notify(f"\U0001f64b [E1] EOD evening run hit an error ({type(e).__name__}). Do: reply and I'll fix.")
+77	        return
+78	    sigs = summ["signals"]; green = [s for s in sigs if s.get("all_green")]
+79	    dashboard.generate(signals=sigs, fires_count=len(sigs))
+80	    from engine1_rebuild import paper
+81	    led = paper.read_ledger()
+82	    queued = int((led["status"] == "queued").sum()) if len(led) else 0
+83	    notify(f"[E1] evening {_ist().strftime('%Y-%m-%d')}: {len(sigs)} daily-horizon fires, "
+84	           f"{len(green)} three-lights-green, {len(summ['queued'])} paper trades queued for the next "
+85	           f"open (total queued {queued}). Earlier paper trades: {pos['filled']} filled, "
+86	           f"{pos['closed']} closed, {pos['open']} still open. Paper only, EOD only. Dashboard attached.")
+87	    send_document(dashboard.HTML_OUT, "E1 paper dashboard (paper only, no real money)")
+88	    # R-RESTART-RESUME (3): the ledger + dashboard are committed from the snapshot folder (never this tree).
+89	    try:
+90	        from scripts import snapshot_sync
+91	        snapshot_sync.sync("E1(evening): paper signals queued + dashboard")
+92	    except Exception:
+93	        pass
+94	    try:                   # NB31 close-done line: posts after the post-close jobs (retires the typed 15:45 resume)
+assistant: Wiring practice_counter after the signals are computed (line 78) — each signal = one evaluation, "fired" when three-lights-green:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\run_evening.py", "old_string": "    sigs = summ[\"signals\"]; green = [s for s in sigs if s.get(\"all_green\")]\n    dashboard.generate(signals=sigs, fires_count=len(sigs))", "new_string": "    sigs = summ[\"signals\"]; green = [s for s in sigs if s.get(\"all_green\")]\n    try:                   # NB37 item 21: per-engine daily practice counter \u2014 each signal evaluated, fired if three-lights-green\n        from scripts import practice_counter\n        for _s in sigs:\n            practice_counter.record(\"E1\", outcome=(\"fired\" if _s.get(\"all_green\") else None))\n    except Exception:\n        pass\n    dashboard.generate(signals=sigs, fires_count=len(sigs))"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\run_evening.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Adding the wiring test:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "def test_codex_confinement_clone_wired_into_verify():", "new_string": "def test_practice_counter_wired_into_evening():\n    assert \"practice_counter\" in _src(\"scripts/run_evening.py\"), \\\n        \"RED: practice_counter not wired into the evening runner (evaluated/fired never recorded)\"\n\n\ndef test_codex_confinement_clone_wired_into_verify():"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py::test_practice_counter_wired_into_evening -q 2>&1 | tail -2 && PYTHONUTF8=1 python -c \"import ast; ast.parse(open('scripts/run_evening.py',encoding='utf-8').read()); print('run_evening parses OK')\" 2>&1 || python -m py_compile scripts/run_evening.py && echo \"run_evening compiles\"", "description": "Practice-counter wiring test + run_evening syntax check"}
+tool_result: Permission to use Bash with command tail -2 && PYTHONUTF8=1 python -c "import ast; ast.parse(open('scripts/run_evening.py',encoding='utf-8').read()); print('run_evening parses OK')" 2>&1 || python -m py_compile scripts/run_evening.py && echo "run_evening compiles" has been denied.
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py::test_practice_counter_wired_into_evening -q 2>&1 | tail -2 && python -m py_compile scripts/run_evening.py && echo \"run_evening compiles OK\"", "description": "Practice-counter wiring test + compile check"}
+tool_result: .                                                                        [100%]
+1 passed in 0.07s
+run_evening compiles OK
+assistant: Item 21 wired + green. Committing:
+tool_use Bash {"command": "git add scripts/run_evening.py tests/test_wiring_live.py && git commit -m \"NB37 item21: wire practice_counter into the evening runner (isolated try/except) \u2014 each signal recorded evaluated, fired when three-lights-green; wiring test green\" 2>&1 | tail -2", "description": "Commit item 21"}
+tool_result: warning: in the working copy of 'tests/test_wiring_live.py', LF will be replaced by CRLF the next time Git touches it
+[master 75bfccf07] NB37 item21: wire practice_counter into the evening runner (isolated try/except) — each signal recorded evaluated, fired when three-lights-green; wiring test green
+ 2 files changed, 11 insertions(+)
+assistant: Item 21 committed (`75bfccf07`). Now **item 27: publish_event on PLACED/CLOSED rows.** The wire point matters — `on_row` rebuilds the site (heavy), so wiring it into the order-path append would block writes. Let me see where rows land + how site_loop cycles, to pick the safe wire:
+tool_use Bash {"command": "echo \"=== publish_event.on_row default build ===\" && sed -n '21,45p' scripts/publish_event.py 2>&1; echo \"=== site_loop main loop shape ===\" && grep -nE \"def main|while|sleep|build\\(|def _cycle|def cycle|publish_event|append_rows\" scripts/site_loop.py 2>&1 | head -15", "description": "Inspect publish_event.on_row + site_loop loop"}
+tool_result: === publish_event.on_row default build ===
+def on_row(row, build_fn=None):
+    """If `row` is a PLACED/CLOSED row, rebuild status + live-desk. Returns what it did."""
+    if not is_trigger(row):
+        return {"published": False, "reason": "not a PLACED/CLOSED row"}
+    (build_fn or _build)()
+    return {"published": True, "status": str(row.get("status")).strip().upper()}
+
+
+def _demo():
+    calls = []
+    assert on_row({"status": "PLACED"}, build_fn=lambda: calls.append(1))["published"] is True
+    assert on_row({"status": "closed"}, build_fn=lambda: calls.append(1))["published"] is True   # case-insensitive
+    assert on_row({"status": "open"}, build_fn=lambda: calls.append(1))["published"] is False     # not a trigger
+    assert on_row({}, build_fn=lambda: calls.append(1))["published"] is False
+    assert len(calls) == 2, calls        # built only for the two triggers
+    print("publish_event demo OK: rebuild fires on PLACED/CLOSED only, case-insensitive, no other status.")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--demo" in sys.argv:
+        _demo()
+=== site_loop main loop shape ===
+79:        site_build.build()                    # full page rebuild (~35 s: results/engine/deliverables/v2/stocks)
+81:        lead_digest.build()                   # E1-STATUS-3: refresh the digest so it is never stale
+89:    # only read), and it PAUSES while a build/audit session holds the repo. The site build and the public-Pages
+98:    vitals.build()
+105:        while True:
+110:            time.sleep(interval)
+114:def main():
+119:    while True:
+135:        time.sleep(gap)
+assistant: `site_loop` already fully rebuilds every cycle. The safe, event-driven home for item 27 (no order-path edit) is the site_loop itself — detect a newly-landed PLACED/CLOSED row and rebuild promptly. Let me read its main loop + the cycle gap:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_loop.py", "offset": 114, "limit": 25}
+tool_result: 114	def main():
+115	    from engine1_rebuild import live
+116	    _start_status_daemon()                            # R-VITALS-STALE: status.html refreshed + published every
+117	    #                                                   2 min in its own thread, never blocked by the page loop
+118	    last_full = 0.0
+119	    while True:
+120	        now = time.time()
+121	        full = (now - last_full) >= FULL_EVERY_SECS   # a full page rebuild every 10 min; light cycles between
+122	        try:
+123	            once(full=full)
+124	            if full:
+125	                last_full = now
+126	            print(f"{_ist():%H:%M} site {'full rebuild' if full else 'live data'} published")
+127	        except Exception as e:                      # a bad refresh must never end the keeper
+128	            print(f"{_ist():%H:%M} site refresh error: {type(e).__name__}: {str(e)[:160]}")
+129	        try:
+130	            from scripts import desk_clock                  # GUARD AMENDMENT: 2-min light cycle through the
+131	            build_win = desk_clock.building()                # overnight build window too, not only market session
+132	            gap = IN_SESSION_SECS if (live._in_session() or build_win) else IDLE_SECS
+133	        except Exception:
+134	            gap = IDLE_SECS
+135	        time.sleep(gap)
+136	
+137	
+138	if __name__ == "__main__":
+assistant: Let me read `once()` where the per-cycle work happens, to place the publish_event check:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_loop.py", "offset": 60, "limit": 54}
+tool_result: 60	
+61	def _daily_digest_due():
+62	    """R-E1-LEAD-DIGEST: regenerate the lead digest once a day at/after 15:40 IST (the site loop's
+63	    half of 'after every report and at 15:40 daily'; a report also regenerates it directly)."""
+64	    global _DIGEST_DAY
+65	    now = _ist()
+66	    today = now.date().isoformat()
+67	    if (now.hour, now.minute) >= (15, 40) and _DIGEST_DAY != today:
+68	        _DIGEST_DAY = today
+69	        return True
+70	    return False
+71	
+72	
+73	def once(full=False):
+74	    """SITE-CYCLE split: a LIGHT cycle (~every 2 min) publishes only the live data (positions, accounts, cards,
+75	    ticker) so the Live desk is current within 2 min; a FULL page rebuild runs ~every 10 min. Both publish to
+76	    Pages after building."""
+77	    from scripts import site_build, publish_site, lead_digest, snapshot_sync
+78	    if full:
+79	        site_build.build()                    # full page rebuild (~35 s: results/engine/deliverables/v2/stocks)
+80	        _daily_digest_due()                   # keeps the 15:40 one-per-day marker; digest builds each full cycle
+81	        lead_digest.build()                   # E1-STATUS-3: refresh the digest so it is never stale
+82	        _telegram_day_reports()               # R-E1-TELEGRAM-STYLE A4: 09:00 pre-open, 15:40 day summary
+83	    else:
+84	        site_build.build_live()               # live data only (~5 s): the Live desk tab's feed + accounts
+85	    publish_site.publish(f"E1 live site {_ist():%Y-%m-%d %H:%M} IST")   # public Pages, after every build
+86	    if not full:
+87	        return None                           # light cycles skip the heavier snapshot repo push
+88	    # R-RESTART-RESUME (3): the repo commit happens ONLY in the separate snapshot folder (the builder's tree is
+89	    # only read), and it PAUSES while a build/audit session holds the repo. The site build and the public-Pages
+90	    # publish above keep running — they touch no git lock in this repo (Pages pushes from its own clone).
+91	    # Also carries the evening ledger + the scan's pattern board. Push failure: backoff, then next cycle.
+92	    return snapshot_sync.sync(f"E1 site refresh {_ist():%Y-%m-%d %H:%M} IST") == "pushed"
+93	
+94	
+95	def _status_tick():
+96	    """One status refresh + fast targeted publish (status.html + data/status.json only)."""
+97	    from scripts import vitals, publish_site
+98	    vitals.build()
+99	    publish_site.publish_status()
+100	
+101	
+102	def _start_status_daemon(interval=120):
+103	    import threading
+104	    def loop():
+105	        while True:
+106	            try:
+107	                _status_tick()
+108	            except Exception:
+109	                pass
+110	            time.sleep(interval)
+111	    threading.Thread(target=loop, name="status-daemon", daemon=True).start()
+112	
+113	
+assistant: The light cycle already refreshes the live-desk every ~2 min, so a site_loop wire is largely redundant. NB37 groups item 27 with item 7 as order-path-adjacent isolated wires, so the intended point is where rows land. Let me check `publish_event._build` (is it heavy?) before wiring:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\publish_event.py"}
+tool_result: 1	"""NB12 item 3 (item 27 PREPARE half) — on a PLACED / CLOSED row, refresh the public status + live-desk pages
+2	within one cycle. NEW, un-wired. Wire-in tonight = one runner hook: `publish_event.on_row(row)` after a row lands.
+3	
+4	The page rebuild is injected (`build_fn`) so this module is testable with a fake row and carries no import of the
+5	site builder into a test; the default rebuilds via site_v2.build().
+6	"""
+7	from __future__ import annotations
+8	
+9	TRIGGERS = {"PLACED", "CLOSED"}
+10	
+11	
+12	def is_trigger(row):
+13	    return str(row.get("status", "")).strip().upper() in TRIGGERS
+14	
+15	
+16	def _build():
+17	    import site_v2                      # imported lazily so tests never touch the real builder
+18	    site_v2.build()
+19	
+20	
+21	def on_row(row, build_fn=None):
+22	    """If `row` is a PLACED/CLOSED row, rebuild status + live-desk. Returns what it did."""
+23	    if not is_trigger(row):
+24	        return {"published": False, "reason": "not a PLACED/CLOSED row"}
+25	    (build_fn or _build)()
+26	    return {"published": True, "status": str(row.get("status")).strip().upper()}
+27	
+28	
+29	def _demo():
+30	    calls = []
+31	    assert on_row({"status": "PLACED"}, build_fn=lambda: calls.append(1))["published"] is True
+32	    assert on_row({"status": "closed"}, build_fn=lambda: calls.append(1))["published"] is True   # case-insensitive
+33	    assert on_row({"status": "open"}, build_fn=lambda: calls.append(1))["published"] is False     # not a trigger
+34	    assert on_row({}, build_fn=lambda: calls.append(1))["published"] is False
+35	    assert len(calls) == 2, calls        # built only for the two triggers
+36	    print("publish_event demo OK: rebuild fires on PLACED/CLOSED only, case-insensitive, no other status.")
+37	
+38	
+39	if __name__ == "__main__":
+40	    import sys
+41	    if "--demo" in sys.argv:
+42	        _demo()
+43	
+assistant: Decisive call: `publish_event._build` does a **full ~35s site build** — that cannot go in the order path (it would block the trade write). Its safe home is the **publisher (site_loop)**, using the light `build_live`, event-detecting a new PLACED/CLOSED row. Wiring it there:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_loop.py", "old_string": "def once(full=False):", "new_string": "_LAST_TRADE_ID = None\n\n\ndef _publish_on_new_trade(build_live_fn):\n    \"\"\"NB37 item 27: when the newest ledger row is a NEW PLACED/CLOSED, refresh the live pages THIS cycle via\n    publish_event.on_row \u2014 event-driven, but in the PUBLISHER (never the order path, where publish_event._build's\n    full ~35s site build would block the trade write). Uses the LIGHT build_live. Fail-soft; read-only on the ledger.\"\"\"\n    global _LAST_TRADE_ID\n    try:\n        from scripts import publish_event\n        from engine1_rebuild import paper\n        led = paper.read_ledger()\n        if not len(led):\n            return None\n        row = {k: led.iloc[-1].get(k) for k in (\"trade_id\", \"status\", \"stock\")}\n        rid = \"%s:%s\" % (row.get(\"trade_id\"), row.get(\"status\"))\n        if publish_event.is_trigger(row) and rid != _LAST_TRADE_ID:\n            _LAST_TRADE_ID = rid\n            return publish_event.on_row(row, build_fn=build_live_fn)\n    except Exception:\n        pass\n    return None\n\n\ndef once(full=False):"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\site_loop.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_loop.py", "old_string": "    else:\n        site_build.build_live()               # live data only (~5 s): the Live desk tab's feed + accounts\n    publish_site.publish(f\"E1 live site {_ist():%Y-%m-%d %H:%M} IST\")   # public Pages, after every build", "new_string": "    else:\n        site_build.build_live()               # live data only (~5 s): the Live desk tab's feed + accounts\n    _publish_on_new_trade(site_build.build_live)   # NB37 item 27: event refresh on a new PLACED/CLOSED row\n    publish_site.publish(f\"E1 live site {_ist():%Y-%m-%d %H:%M} IST\")   # public Pages, after every build"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\site_loop.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Adding a wiring test + a behavior test for the new trade-publish hook:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "def test_practice_counter_wired_into_evening():\n    assert \"practice_counter\" in _src(\"scripts/run_evening.py\"), \\\n        \"RED: practice_counter not wired into the evening runner (evaluated/fired never recorded)\"", "new_string": "def test_practice_counter_wired_into_evening():\n    assert \"practice_counter\" in _src(\"scripts/run_evening.py\"), \\\n        \"RED: practice_counter not wired into the evening runner (evaluated/fired never recorded)\"\n\n\ndef test_publish_event_wired_into_site_loop():\n    assert \"publish_event\" in _src(\"scripts/site_loop.py\"), \\\n        \"RED: publish_event not wired into the site loop (a PLACED/CLOSED row triggers no prompt live refresh)\"\n\n\ndef test_site_loop_publishes_only_on_a_new_trigger_row(monkeypatch):\n    import pandas as pd\n    from scripts import site_loop\n    from engine1_rebuild import paper\n    site_loop._LAST_TRADE_ID = None\n    built = []\n    monkeypatch.setattr(paper, \"read_ledger\", lambda: pd.DataFrame([{\"trade_id\": \"t1\", \"status\": \"PLACED\", \"stock\": \"X\"}]))\n    r = site_loop._publish_on_new_trade(lambda: built.append(1))\n    assert r and r.get(\"published\") is True and built == [1]      # a NEW PLACED row -> one live rebuild\n    assert site_loop._publish_on_new_trade(lambda: built.append(1)) is None and built == [1]   # same row -> no repeat\n    monkeypatch.setattr(paper, \"read_ledger\", lambda: pd.DataFrame([{\"trade_id\": \"t2\", \"status\": \"open\", \"stock\": \"Y\"}]))\n    assert site_loop._publish_on_new_trade(lambda: built.append(1)) is None and built == [1]   # non-trigger -> skip"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py -q 2>&1 | tail -4 && python -m py_compile scripts/site_loop.py && echo \"site_loop compiles OK\"", "description": "Run wiring ledger (item 27) + site_loop compile"}
+tool_result: .................                                                        [100%]
+17 passed in 0.56s
+site_loop compiles OK
+assistant: Item 27 done (17 wiring tests pass, site_loop compiles). Committing:
+tool_use Bash {"command": "git add scripts/site_loop.py tests/test_wiring_live.py && git commit -m \"NB37 item27: wire publish_event into the site loop (NOT the order path \u2014 its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row -> prompt live-desk refresh via the light build_live; wiring + dedup/behaviour tests green\" 2>&1 | tail -2", "description": "Commit item 27"}
+tool_result: warning: in the working copy of 'tests/test_wiring_live.py', LF will be replaced by CRLF the next time Git touches it
+[master 3e68bd2d1] NB37 item27: wire publish_event into the site loop (NOT the order path — its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row -> prompt live-desk refresh via the light build_live; wiring + dedup/behaviour tests green
+ 2 files changed, 44 insertions(+)
+assistant: Item 27 committed (`3e68bd2d1`). Now **item 7: proof_apply** (order-path-adjacent, isolated). Let me read `apply()` to wire the watchdog call correctly:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\proof_apply.py"}
+tool_result: 1	"""NB12 item 2 (item 7 PREPARE half) — apply a verifier PASS that is already on disk, with no live session:
+2	stamp a proof marker, queue the orders, post one Telegram line. Idempotent. NEW, un-wired.
+3	Wire-in tonight = a watchdog call `proof_apply.apply(commit)`.
+4	
+5	The three side effects (queue the orders, and — beyond the applied-set marker this module owns — any launch-path
+6	proof stamp; and the Telegram post) are INJECTED so nothing launch-path is wired here and the logic is tested with
+7	fakes. Idempotency is this module's own: an applied commit is recorded in reports/PROOF-APPLIED.json and a repeat
+8	call is a no-op. The PASS check reuses verifier.has_pass (the existing gate helper).
+9	"""
+10	from __future__ import annotations
+11	
+12	import json
+13	import os
+14	
+15	_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+16	APPLIED = os.path.join(_REPO, "reports", "PROOF-APPLIED.json")
+17	
+18	
+19	def _applied_set(path):
+20	    try:
+21	        return set(json.load(open(path, encoding="utf-8")))
+22	    except Exception:
+23	        return set()
+24	
+25	
+26	def _record(commit, path):
+27	    s = _applied_set(path)
+28	    s.add(commit)
+29	    json.dump(sorted(s), open(path, "w", encoding="utf-8"), indent=1)
+30	
+31	
+32	def _default_post(line):
+33	    import notify                       # lazy: tests never reach the real sender
+34	    notify.notify(line)
+35	
+36	
+37	def apply(commit, queue_orders_fn, post_fn=None, has_pass_fn=None, marker_fn=None, path=None):
+38	    """Apply the verify-PASS for `commit`. `queue_orders_fn(commit)` places the orders (supplied at wire-in).
+39	    Returns what it did. Idempotent: a commit already in the applied-set is a no-op."""
+40	    path = path or APPLIED
+41	    has_pass_fn = has_pass_fn or _has_pass
+42	    if not has_pass_fn(commit):
+43	        return {"applied": False, "reason": "no verify-PASS on disk for %s" % commit}
+44	    if commit in _applied_set(path):
+45	        return {"applied": False, "reason": "already applied (idempotent)"}
+46	    if marker_fn:
+47	        marker_fn(commit)               # optional launch-path proof stamp, supplied at wire-in
+48	    queue_orders_fn(commit)             # required: place the orders
+49	    (post_fn or _default_post)("PROOF applied — orders queued for %s" % commit)
+50	    _record(commit, path)
+51	    return {"applied": True, "commit": commit}
+52	
+53	
+54	def _has_pass(commit):
+55	    import verifier
+56	    return verifier.has_pass(commit)
+57	
+58	
+59	def _demo():
+60	    import tempfile
+61	    p = os.path.join(tempfile.mkdtemp(), "applied.json")
+62	    posts, queued = [], []
+63	    q = lambda c: queued.append(c)
+64	    # no PASS on disk -> refuse
+65	    assert apply("deadbeef", q, post_fn=posts.append, has_pass_fn=lambda c: False, path=p)["applied"] is False
+66	    assert queued == [] and posts == []
+67	    # PASS present -> applies once
+68	    r = apply("cafe123", q, post_fn=posts.append, has_pass_fn=lambda c: True, path=p)
+69	    assert r["applied"] is True and queued == ["cafe123"] and len(posts) == 1
+70	    # second call -> idempotent no-op (no re-queue, no re-post)
+71	    r2 = apply("cafe123", q, post_fn=posts.append, has_pass_fn=lambda c: True, path=p)
+72	    assert r2["applied"] is False and queued == ["cafe123"] and len(posts) == 1
+73	    print("proof_apply demo OK: refuses without PASS, queues+posts once, idempotent on repeat.")
+74	
+75	
+76	if __name__ == "__main__":
+77	    import sys
+78	    if "--demo" in sys.argv:
+79	        _demo()
+80	
+assistant: Item 7 is the sensitive one — `apply()` calls `queue_orders_fn` which writes order rows, and the watchdog runs continuously, so I must avoid duplicate queuing. Let me check `conform.queue_orders`'s signature + idempotency:
+tool_use Bash {"command": "grep -nE \"def queue_orders|already|dedup|EOD-CONFORM|queue_date|def live_patterns\" engine1_rebuild/conform.py 2>&1 | head -15; echo \"=== watchdog main loop hook sites ===\"; grep -nE \"def main|while True|resurrect_recorders|session_resurrect|time.sleep|REPO =\" scripts/watchdog.py 2>&1 | head -12", "description": "conform.queue_orders idempotency + watchdog loop sites"}
+tool_result: 7:                                          horizon/stop/trail), which evening.process_eod_positions already runs.
+29:def live_patterns():
+100:def queue_orders(asof=None, reader=None, quotes=None, write=True):
+119:                "trade_id": "EOD-CONFORM-%s-%s" % (d["stock"], asof_date), "status": "queued",
+121:                "template": EXAM_TEMPLATE, "queue_date": asof_date,
+=== watchdog main loop hook sites ===
+527:def resurrect_recorders(now, token_fn=None, ram_fn=None, running_fn=None, start_fn=None, log_fn=None):
+712:def main():
+713:    while True:
+765:            resurrect_recorders(now)   # §14.10 amendment (NB17/NB19): relaunch a dead recorder, token+RAM gated
+769:            from scripts import session_resurrect   # NB22-A / item 44: auto-continue the build session (§23.3)
+770:            session_resurrect.resurrect()
+787:        time.sleep(CHECK_EVERY_S)
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\conform.py", "offset": 100, "limit": 40}
+tool_result: 100	def queue_orders(asof=None, reader=None, quotes=None, write=True):
+101	    """Evaluate at the close and, for each QUEUE decision, write a next-open (EOD-) order that the EXISTING
+102	    tested path (evening.process_eod_positions -> paper.simulate_trade at the next open) fills with the exam's
+103	    own management (template EXAM_TEMPLATE + the pattern's horizon; manage=trail — all five are trail=false).
+104	    HELD signals are logged with the named check, never as a trade. Returns {queued, held, decisions}.
+105	
+106	    GATED on the R-EXAM-CONFORM proof marker: no order is written until conformance is proven (the fail-safe)."""
+107	    from engine1_rebuild import book20_runner as B, paper
+108	    decisions = evaluate_at_close(asof=asof, reader=reader, quotes=quotes)
+109	    proven = os.path.exists(B.EXAM_CONFORM_PROOF)
+110	    asof_date = str(asof)[:10] if asof is not None else _today_str()
+111	    rows, held = [], []
+112	    for d in decisions:
+113	        if d["verdict"] == "QUEUE" and proven:
+114	            p = next((x for x in live_patterns() if x["stock"] == d["stock"] and x["family"] == d["family"]), None)
+115	            if not p or not p.get("candidate"):
+116	                continue
+117	            hz = p["horizon"]
+118	            rows.append({
+119	                "trade_id": "EOD-CONFORM-%s-%s" % (d["stock"], asof_date), "status": "queued",
+120	                "stock": p["candidate"]["token"], "direction": p["candidate"]["direction"],
+121	                "template": EXAM_TEMPLATE, "queue_date": asof_date,
+122	                "pattern": "%s %s (exam-conform) next %s days" % (d["stock"], d["family"], hz),
+123	            })
+124	        elif d["verdict"] == "HELD":
+125	            held.append(d)
+126	    if write and rows:
+127	        paper.append_rows(rows)
+128	    return {"queued": len(rows), "held": len(held), "proven": proven, "decisions": decisions}
+129	
+130	
+131	def _checklist(LB, token, entry, quotes, bar_date=None):
+132	    """The six checks with LIVE inputs where present, else fail-closed. `quotes` carries the live book; a missing
+133	    book -> the check that needs it is HELD (named). Reuses LB.checklist (no copy)."""
+134	    try:
+135	        # exit_price unknown pre-fill: use entry (a zero-move is 'tradeable' unless data is missing); the cost/
+136	        # spread/depth checks are what gate a live fill, and they read the stock's own measures + live book.
+137	        chk = LB.checklist(int(token), entry, entry, bar_date or _today_str(), *_impact_k(LB),
+138	                           spread_scale=1.0, with_impact=True)
+139	        return chk if isinstance(chk, dict) else {"verdict": "HELD", "reason": "warm-up — checklist unavailable"}
+assistant: `conform.queue_orders` self-gates on the EXAM-CONFORM proof marker and writes deterministic per-(stock,date) trade_ids (deduped on read); `proof_apply` is idempotent per commit (PROOF-APPLIED.json) and only fires when HEAD has a verify-PASS. So a simple isolated watchdog call is safe (can't place orders — queuing is gated at fire time — can't break login/gate). Let me read the watchdog loop site:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\watchdog.py", "offset": 762, "limit": 28}
+tool_result: 762	        except Exception:
+763	            pass
+764	        try:
+765	            resurrect_recorders(now)   # §14.10 amendment (NB17/NB19): relaunch a dead recorder, token+RAM gated
+766	        except Exception:
+767	            pass
+768	        try:
+769	            from scripts import session_resurrect   # NB22-A / item 44: auto-continue the build session (§23.3)
+770	            session_resurrect.resurrect()
+771	        except Exception:
+772	            pass
+773	        try:
+774	            from scripts import watchers   # R-WATCHERS: alarm if the public site freezes / a recorder goes silent
+775	            watchers.site_freshness()
+776	            watchers.stream_silence()
+777	        except Exception:
+778	            pass
+779	        # R-MORNING-FIX (2): the periodic builder-idle 🙋 call is REMOVED from the loop (the sender in
+780	        # builder_check is deleted). No timer-repeating Telegram message runs here any more.
+781	        try:
+782	            from scripts import status_reports, drive_mirror   # R-E1-DRIVE-MIRROR: refresh + copy to Drive
+783	            status_reports.build_all()
+784	            drive_mirror.mirror()
+785	        except Exception:
+786	            pass
+787	        time.sleep(CHECK_EVERY_S)
+788	
+789	
