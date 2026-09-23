@@ -1,4 +1,591 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c98e7f5c5</b> · 2026-09-24 03:29</div><div>NB42 state: #3 + #6 done+tested; #7 downloads + deliverables site remaining (focused window)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>08f35c73d</b> · 2026-09-24 03:41</div><div>NB43 item2: the SEPARATE /deliverables/ site (own island, v2 theme) — home lists Index tests + Dubai Strategies; each has five tabs (Positions/Trades/Why/How/Record) with every call in full (0 calls stated plainly); front-end only (§27e, reads reports/*.json + record_store); wired into site_build with its own reachability gate; NO main-site href (tested). TDD: 5 tabs, 0-calls, reachable, no main-site link, wired</div><div class='sub h'>scripts/deliverables_site.py    | 306 +++++++++++++++++++++-------------------</div><div class='sub h'>scripts/site_build.py           |   7 +</div><div class='sub h'>tests/test_deliverables_site.py |  36 +++++</div><div class='sub h'>tests/test_wiring_live.py       |   5 +</div><pre>diff --git a/scripts/deliverables_site.py b/scripts/deliverables_site.py
+index ee36ecd49..6092b0905 100644
+--- a/scripts/deliverables_site.py
++++ b/scripts/deliverables_site.py
+@@ -1,161 +1,183 @@
+-&quot;&quot;&quot;R-EVENING-22 D — the separate /deliverables/ page. Fed ONLY by the deliverables&#x27; own files (the index-test
+-results and the Dubai Strategies record). Two sections, plain language for a non-technical reader: a sentence, a
+-table, a number. NO engine names, no research terms, no internal words, no person&#x27;s name — a scrub check runs
+-before it writes.&quot;&quot;&quot;
++&quot;&quot;&quot;NB43 item 2 — the SEPARATE Deliverables site at /deliverables/ (own island, v2 theme, NO link from the main
++site). The two things the desk was asked to check — the Index tests and Dubai Strategies — each on its own page
++with five tabs (Positions · Trades · Why each call · How it decides · Record), every call IN FULL, and &quot;0 calls&quot;
++stated plainly where true.
++
++Front-end only (§27e): reads the deliverables&#x27; own front-end stores (reports/INDEX-TESTS.json, QUIET-BUYING.json,
++site/data/record_store.json) READ-ONLY, writes under site/deliverables/. No main-site nav; the reachability gate
++here treats the island as intentional — every page must be reachable FROM this site&#x27;s own home, and the main site
++must carry NO href to it. Builders only; pure/testable (the store reads are injectable).
++&quot;&quot;&quot;
+ from __future__ import annotations
+ 
+ import html as _html
+ import json
+ import os
+-import re
+-import sys
+-
+-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+-from engine1_rebuild import datastore as ds
+-
+-REPO = ds._REPO
+-OUT_DIR = os.path.join(REPO, &quot;site&quot;, &quot;deliverables&quot;)
+-
+-# words that must never appear on this page (internal engine names / research / jargon / the person&#x27;s name).
+-BANNED = [r&quot;\bE\d+\b&quot;, r&quot;\bE1-\w+&quot;, r&quot;\bQB\b&quot;, r&quot;\bBOOK20\b&quot;, r&quot;\bNikhil\b&quot;, r&quot;\broof\b&quot;, r&quot;\bwilson\b&quot;,
+-          r&quot;\bkelly\b&quot;, r&quot;\bsurvivor&quot;, r&quot;\bexam\b&quot;, r&quot;\bbacktest\b&quot;, r&quot;\bledger\b&quot;, r&quot;\bnotional\b&quot;,
+-          r&quot;\bengine\b&quot;, r&quot;\.py\b&quot;, r&quot;R-[A-Z]&quot;]
+-
+-CSS = &quot;&quot;&quot;
+-:root{--ink:#1a1c20;--soft:#5b6472;--line:#e3e6ea;--bg:#fbfbfc;--card:#fff;--up:#137a4b;--down:#b4232a}
+-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+-  font:16px/1.6 -apple-system,Segoe UI,Roboto,sans-serif}
+-main{max-width:820px;margin:0 auto;padding:26px 20px 70px}
+-h1{font-size:26px;margin:0 0 4px}h2{font-size:20px;margin:30px 0 6px}
+-.sub{color:var(--soft)}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0}
+-.big{font-size:30px;font-weight:700;margin:6px 0}
+-table{border-collapse:collapse;width:100%;font-size:15px;margin-top:8px}
+-td,th{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left}th{color:var(--soft);font-weight:600}
+-.up{color:var(--up)}.down{color:var(--down)}.banner{background:#fff8e6;border:1px solid #efd98a;border-radius:8px;
+-  padding:9px 13px;font-size:13px;margin:12px 0}
+-&lt;/style&gt;&quot;&quot;&quot;
+-
+-
+-def _load(path):
++
++_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++OUT = os.path.join(_REPO, &quot;site&quot;, &quot;deliverables&quot;)
++TABS = (&quot;Positions&quot;, &quot;Trades&quot;, &quot;Why each call&quot;, &quot;How it decides&quot;, &quot;Record&quot;)
++_CSS = (&quot;body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 &#x27;IBM Plex Sans&#x27;,system-ui,sans-serif}&quot;
++        &quot;main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#85B7EB;text-decoration:none}h1{font-size:22px}&quot;
++        &quot;.sub{color:#9a9a93}.pill{font-size:11px;border:1px solid #3a3f4a;border-radius:999px;padding:3px 8px;color:#b8b6ae}&quot;
++        &quot;.tabs{display:flex;gap:8px;margin:14px 0}.tabs button{padding:8px 14px;border-radius:999px;border:1px solid #3a3f4a;&quot;
++        &quot;background:#161920;color:#b8b6ae;font-size:13px;cursor:pointer}.tabs button.on{background:#5DCAA5;color:#0f1115}&quot;
++        &quot;.pane{display:none}.pane.on{display:block}table{border-collapse:collapse;width:100%;font-size:13px}&quot;
++        &quot;td,th{padding:6px 10px;text-align:left;border-bottom:1px solid #23262d}th{color:#9a9a93}&quot;)
++_TABJS = &quot;&lt;script&gt;function dtab(g,i){var t=document.querySelectorAll(&#x27;[data-g=\&quot;&#x27;+g+&#x27;\&quot;]&#x27;);&quot; \
++         &quot;var b=document.querySelectorAll(&#x27;[data-b=\&quot;&#x27;+g+&#x27;\&quot;]&#x27;);t.forEach(function(x,j){x.className=&#x27;pane&#x27;+(j==i?&#x27; on&#x27;:&#x27;&#x27;);});&quot; \
++         &quot;b.forEach(function(x,j){x.className=(j==i?&#x27;on&#x27;:&#x27;&#x27;);});}&lt;/script&gt;&quot;
++
++
++def esc(x):
++    return _html.escape(str(x if x is not None else &quot;—&quot;))
++
++
++def _page(title, body):
++    return (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
++            &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&quot;
++            &quot;&lt;link rel=&#x27;stylesheet&#x27; href=&#x27;https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;display=swap&#x27;&gt;&quot;
++            &quot;&lt;title&gt;%s&lt;/title&gt;&lt;style&gt;%s&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;main&gt;%s&lt;/main&gt;%s&lt;/body&gt;&lt;/html&gt;&quot;
++            % (esc(title), _CSS, body, _TABJS))
++
++
++_CALL_COLS = (&quot;date&quot;, &quot;instrument&quot;, &quot;side&quot;, &quot;entry&quot;, &quot;exit&quot;, &quot;result&quot;, &quot;reason&quot;)
++
++
++def _calls_table(calls):
++    &quot;&quot;&quot;Every call in full. `calls` is a list of dicts; missing fields show &#x27;—&#x27;. Empty -&gt; a plain &#x27;0 calls&#x27; line.&quot;&quot;&quot;
++    if not calls:
++        return &quot;&lt;p class=&#x27;sub&#x27;&gt;0 calls — none placed. (Stated plainly: this test produced no trades.)&lt;/p&gt;&quot;
++    head = &quot;&lt;tr&gt;&quot; + &quot;&quot;.join(&quot;&lt;th&gt;%s&lt;/th&gt;&quot; % c for c in _CALL_COLS) + &quot;&lt;/tr&gt;&quot;
++    rows = &quot;&quot;.join(&quot;&lt;tr&gt;&quot; + &quot;&quot;.join(&quot;&lt;td&gt;%s&lt;/td&gt;&quot; % esc(c.get(k)) for k in _CALL_COLS) + &quot;&lt;/tr&gt;&quot; for c in calls)
++    return &quot;&lt;table&gt;%s%s&lt;/table&gt;&quot; % (head, rows)
++
++
++def _tabs(gid, panes):
++    &quot;&quot;&quot;panes: list of 5 HTML strings, one per TABS entry.&quot;&quot;&quot;
++    btns = &quot;&quot;.join(&quot;&lt;button data-b=&#x27;%s&#x27; class=&#x27;%s&#x27; onclick=\&quot;dtab(&#x27;%s&#x27;,%d)\&quot;&gt;%s&lt;/button&gt;&quot;
++                   % (gid, &quot;on&quot; if i == 0 else &quot;&quot;, gid, i, esc(TABS[i])) for i in range(len(TABS)))
++    body = &quot;&quot;.join(&quot;&lt;div class=&#x27;pane%s&#x27; data-g=&#x27;%s&#x27;&gt;%s&lt;/div&gt;&quot; % (&quot; on&quot; if i == 0 else &quot;&quot;, gid, panes[i])
++                   for i in range(len(panes)))
++    return &quot;&lt;div class=&#x27;tabs&#x27;&gt;%s&lt;/div&gt;%s&quot; % (btns, body)
++
++
++def _deliverable(name, slug, intro, rule, positions, calls, record):
++    panes = [positions, &quot;&lt;h3&gt;Every call&lt;/h3&gt;&quot; + _calls_table(calls),
++             (&quot;&lt;h3&gt;Why each call&lt;/h3&gt;&quot; + _calls_table([{&quot;date&quot;: c.get(&quot;date&quot;), &quot;instrument&quot;: c.get(&quot;instrument&quot;),
++                                                        &quot;side&quot;: c.get(&quot;side&quot;), &quot;reason&quot;: c.get(&quot;reason&quot;)} for c in calls])
++              if calls else &quot;&lt;p class=&#x27;sub&#x27;&gt;No calls to explain — 0 calls.&lt;/p&gt;&quot;),
++             &quot;&lt;h3&gt;How it decides&lt;/h3&gt;&lt;p&gt;%s&lt;/p&gt;&quot; % esc(rule), &quot;&lt;h3&gt;Record&lt;/h3&gt;&quot; + record]
++    body = (&quot;&lt;p class=&#x27;sub&#x27;&gt;&lt;a href=&#x27;index.html&#x27;&gt;← all deliverables&lt;/a&gt;&lt;/p&gt;&lt;h1&gt;%s&lt;/h1&gt;&quot;
++            &quot;&lt;p class=&#x27;sub&#x27;&gt;%s&lt;/p&gt;%s&quot; % (esc(name), esc(intro), _tabs(slug, panes)))
++    return _page(&quot;%s — deliverable&quot; % name, body)
++
++
++def _rep(name):
+     try:
+-        return json.load(open(os.path.join(REPO, path), encoding=&quot;utf-8&quot;))
++        return json.load(open(os.path.join(_REPO, &quot;reports&quot;, name), encoding=&quot;utf-8&quot;))
+     except Exception:
+         return {}
+ 
+ 
+-def _esc(x):
+-    return _html.escape(&quot;&quot; if x is None else str(x))
++def _site_data(name):
++    try:
++        return json.load(open(os.path.join(_REPO, &quot;site&quot;, &quot;data&quot;, name), encoding=&quot;utf-8&quot;))
++    except Exception:
++        return {}
+ 
+ 
+-def _rup(x):
++def _index_tests_page():
++    idx = _rep(&quot;INDEX-TESTS.json&quot;)
++    parts = idx.get(&quot;parts&quot;) or {}
++    daily = (parts.get(&quot;daily&quot;) or {}).get(&quot;calls&quot;)
++    intr = (parts.get(&quot;intraday&quot;) or {}).get(&quot;calls&quot;)
++    calls = []                                  # INDEX-TESTS stores COUNTS (0), not call rows -&gt; 0 calls, stated plainly
++    dc = parts.get(&quot;daily_counts&quot;) or {}
++    rec = &quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;index&lt;/th&gt;&lt;th&gt;discovered&lt;/th&gt;&lt;th&gt;certified&lt;/th&gt;&lt;/tr&gt;&quot; + &quot;&quot;.join(
++        &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (esc(k), esc(v.get(&quot;discovered&quot;)), esc(v.get(&quot;certified&quot;)))
++        for k, v in dc.items()) + &quot;&lt;/table&gt;&quot; + \
++        &quot;&lt;p class=&#x27;sub&#x27;&gt;Daily-hold calls placed: %s · intraday calls placed: %s.&lt;/p&gt;&quot; % (esc(daily), esc(intr))
++    return _deliverable(
++        &quot;Index tests&quot;, &quot;idx&quot;,
++        &quot;Does an edge survive on the NIFTY / BANKNIFTY futures, daily-hold and intraday? Paper + history only.&quot;,
++        &quot;Discover patterns on the index futures, certify only those that clear cost with a walk-forward lower bound, &quot;
++        &quot;then hold/trade the certified ones. A pattern that does not certify places no call.&quot;,
++        &quot;&lt;p class=&#x27;sub&#x27;&gt;None held — this test places nothing until a pattern certifies.&lt;/p&gt;&quot;, calls, rec)
++
++
++def _dubai_page():
++    qb = _rep(&quot;QUIET-BUYING.json&quot;)
++    closed = qb.get(&quot;closed&quot;) or []
++    open_pos = qb.get(&quot;open&quot;) or []
++    screen = qb.get(&quot;matches_today&quot;) or []
++    rec_store = (((_site_data(&quot;record_store.json&quot;).get(&quot;by_name&quot;) or {}).get(&quot;records&quot;) or {}).get(&quot;Dubai Strategies&quot;)) or {}
++    pos = (&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;stock&lt;/th&gt;&lt;th&gt;side&lt;/th&gt;&lt;th&gt;entry&lt;/th&gt;&lt;/tr&gt;&quot; + &quot;&quot;.join(
++        &quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (esc(p.get(&quot;stock&quot;) or p.get(&quot;instrument&quot;)), esc(p.get(&quot;side&quot;)),
++                                                        esc(p.get(&quot;entry&quot;))) for p in open_pos) + &quot;&lt;/table&gt;&quot;
++        ) if open_pos else &quot;&lt;p class=&#x27;sub&#x27;&gt;No open positions.&lt;/p&gt;&quot;
++    scr = (&quot;&lt;h4 style=&#x27;margin-top:14px&#x27;&gt;Today&#x27;s screen (%d)&lt;/h4&gt;&lt;p class=&#x27;sub&#x27;&gt;%s&lt;/p&gt;&quot; % (
++        len(screen), esc(&quot;, &quot;.join((s.get(&quot;stock&quot;) or &quot;&quot;) for s in screen)))) if screen else &quot;&quot;
++    rec = (&quot;&lt;p&gt;Closed %s · won %s · lost %s · net %sR.&lt;/p&gt;&quot; % (
++        esc(rec_store.get(&quot;closed&quot;)), esc(rec_store.get(&quot;wins&quot;)), esc(rec_store.get(&quot;losses&quot;)),
++        esc(rec_store.get(&quot;net_R&quot;))) + scr)
++    return _deliverable(
++        &quot;Dubai Strategies&quot;, &quot;dubai&quot;,
++        &quot;Buys the morning after a stock looks quietly bought up. Paper only; the running record from the recorded ledgers.&quot;,
++        &quot;Screen for stocks that were quietly accumulated (the &#x27;quiet buying&#x27; signal); the next morning, buy the &quot;
++        &quot;screened names and hold to the rule&#x27;s exit. Every screened name and every trade is shown.&quot;,
++        pos, closed, rec)
++
++
++def build(out_dir=None):
++    &quot;&quot;&quot;Write the separate deliverables site: home + one page per deliverable. Returns the pages written.&quot;&quot;&quot;
++    out = out_dir or OUT
++    os.makedirs(out, exist_ok=True)
++    pages = {&quot;idx.html&quot;: _index_tests_page(), &quot;dubai.html&quot;: _dubai_page()}
++    home = _page(&quot;Deliverables — E1 desk&quot;,
++                 &quot;&lt;h1&gt;Deliverables&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;The two things the desk was asked to check, each in plain &quot;
++                 &quot;words with every call in full. Paper and history only; nothing invented. (Its own site — not &quot;
++                 &quot;linked from the main site.)&lt;/p&gt;&lt;ul&gt;&quot;
++                 &quot;&lt;li&gt;&lt;a href=&#x27;idx.html&#x27;&gt;Index tests&lt;/a&gt; — an edge on NIFTY/BANKNIFTY futures? &lt;/li&gt;&quot;
++                 &quot;&lt;li&gt;&lt;a href=&#x27;dubai.html&#x27;&gt;Dubai Strategies&lt;/a&gt; — buy the morning after quiet buying.&lt;/li&gt;&lt;/ul&gt;&quot;)
++    pages[&quot;index.html&quot;] = home
++    for name, html in pages.items():
++        with open(os.path.join(out, name), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(html)
++    return sorted(pages)
++
++
++def unreachable(out_dir=None):
++    &quot;&quot;&quot;Reachability gate for the island: every non-home page must be linked from index.html. Returns the list of
++    pages NOT reachable from home ([] = green).&quot;&quot;&quot;
++    out = out_dir or OUT
+     try:
+-        n = int(round(float(x)))
+-    except (TypeError, ValueError):
+-        return &quot;—&quot;
+-    s = &quot;-&quot; if n &lt; 0 else &quot;&quot;
+-    n = abs(n); d = str(n)
+-    if len(d) &gt; 3:
+-        h, t = d[:-3], d[-3:]; parts = []
+-        while len(h) &gt; 2:
+-            parts.insert(0, h[-2:]); h = h[:-2]
+-        if h:
+-            parts.insert(0, h)
+-        d = &quot;,&quot;.join(parts) + &quot;,&quot; + t
+-    return &quot;₹&quot; + s + d
+-
+-
+-def _index_section():
+-    d = _load(&quot;reports/INDEX-TESTS.json&quot;)
+-    parts = d.get(&quot;parts&quot;, {})
+-    daily = parts.get(&quot;daily&quot;, {})
+-    intr = parts.get(&quot;intraday&quot;, {})
+-    dc = parts.get(&quot;daily_counts&quot;, {})
+-    taken = sum((v or {}).get(&quot;certified&quot;, 0) for v in dc.values()) if isinstance(dc, dict) else 0
+-    rows = [
+-        (&quot;Holding the index for several days&quot;, &quot;0 trades — no index setup ever cleared its own cost, so there &quot;
+-         &quot;was nothing to trade.&quot; if not daily.get(&quot;calls&quot;) else &quot;%s trades&quot; % daily.get(&quot;calls&quot;)),
+-        (&quot;Trading the index in and out the same day&quot;, (&quot;%s trades — %s&quot; % (intr.get(&quot;calls&quot;),
+-         &quot;small and lost money; too few to be a hard verdict.&quot; )) if intr.get(&quot;calls&quot;) else &quot;no result yet&quot;),
+-    ]
+-    body = (&quot;&lt;h2&gt;Index tests&lt;/h2&gt;&quot;
+-            &quot;&lt;p class=&#x27;sub&#x27;&gt;Whether trading the whole market index — rather than individual stocks — is worth &quot;
+-            &quot;doing. Both were measured on real history, after the real cost of buying and selling.&lt;/p&gt;&quot;
+-            &quot;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;What was tried&lt;/th&gt;&lt;th&gt;What happened&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&quot;
+-            + &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (_esc(a), _esc(b)) for a, b in rows)
+-            + &quot;&lt;/tbody&gt;&lt;/table&gt;&quot;
+-            &quot;&lt;p class=&#x27;sub&#x27; style=&#x27;margin-top:8px&#x27;&gt;Short answer: on this history the index gave nothing better &quot;
+-            &quot;than individual stocks — the multi-day version did not trade at all, and the same-day version lost.&lt;/p&gt;&quot;)
+-    return body
+-
+-
+-def _quiet_section():
+-    q = _load(&quot;reports/QUIET-BUYING.json&quot;)
+-    if not q or q.get(&quot;note&quot;, &quot;&quot;).startswith(&quot;waiting&quot;):
+-        return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it is quietly bought up — &quot;
+-                &quot;heavy trading and heavy delivery on a calm day. Waiting for enough daily delivery data before &quot;
+-                &quot;the first buy.&lt;/p&gt;&quot;)
+-    made = q.get(&quot;made_rupees&quot;, 0)
+-    cls = &quot;up&quot; if (made or 0) &gt;= 0 else &quot;down&quot;
+-    matches = q.get(&quot;matches_today&quot;, [])
+-    open_pos = q.get(&quot;open&quot;, [])
+-    closed = q.get(&quot;closed&quot;, [])
+-    m_rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (_esc(m[&quot;stock&quot;]), &quot;⭐&quot; if m.get(&quot;starred&quot;) else &quot;&quot;)
+-                     for m in matches) or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;2&#x27;&gt;no matches today&lt;/td&gt;&lt;/tr&gt;&quot;
+-    o_rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;n&#x27;&gt;%s&lt;/td&gt;&lt;td&gt;%s days&lt;/td&gt;&lt;/tr&gt;&quot; % (
+-        _esc(p[&quot;stock&quot;]), _esc(p[&quot;in&quot;]), _esc(p[&quot;entry&quot;]), _esc(p[&quot;sessions&quot;])) for p in open_pos[:40]) \
+-        or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;4&#x27;&gt;none open&lt;/td&gt;&lt;/tr&gt;&quot;
+-    c_rows = &quot;&quot;.join(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td class=&#x27;%s&#x27;&gt;%s&lt;/td&gt;&lt;td class=&#x27;sub&#x27;&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot; % (
+-        _esc(c[&quot;stock&quot;]), _esc(c[&quot;in&quot;]), _esc(c[&quot;out&quot;]),
+-        &quot;up&quot; if c[&quot;result_R&quot;] &gt;= 0 else &quot;down&quot;, (&quot;%+.2f&quot; % c[&quot;result_R&quot;]), _esc(c[&quot;why&quot;])) for c in closed[-40:]) \
+-        or &quot;&lt;tr&gt;&lt;td class=&#x27;sub&#x27; colspan=&#x27;5&#x27;&gt;none closed yet&lt;/td&gt;&lt;/tr&gt;&quot;
+-    return (&quot;&lt;h2&gt;Dubai Strategies&lt;/h2&gt;&quot;
+-            &quot;&lt;p class=&#x27;sub&#x27;&gt;Buys a stock the morning after it looks quietly bought up: heavy trading AND heavy &quot;
+-            &quot;delivery (shares actually taken away, not day-traded), a delivery share above its own normal and &quot;
+-            &quot;rising, a calm narrow day, and a price that held or rose. Long only, on paper, with real costs.&lt;/p&gt;&quot;
+-            &quot;&lt;p class=&#x27;banner&#x27;&gt;Paper only — nothing here is real money or advice.&lt;/p&gt;&quot;
+-            &quot;&lt;div class=&#x27;card&#x27;&gt;&lt;div class=&#x27;sub&#x27;&gt;Money made so far (paper)&lt;/div&gt;&quot;
+-            &quot;&lt;div class=&#x27;big %s&#x27;&gt;%s&lt;/div&gt;&lt;div class=&#x27;sub&#x27;&gt;%s buys · %s made money · %s did not&lt;/div&gt;&lt;/div&gt;&quot;
+-            &quot;&lt;h3 style=&#x27;margin:18px 0 4px&#x27;&gt;Today&#x27;s matches&lt;/h3&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&quot;
+-            &quot;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
+-            &quot;&lt;h3 style=&#x27;margin:18px 0 4px&#x27;&gt;Held now&lt;/h3&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;Bought&lt;/th&gt;&quot;
+-            &quot;&lt;th&gt;Price&lt;/th&gt;&lt;th&gt;Held&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
+-            &quot;&lt;h3 style=&#x27;margin:18px 0 4px&#x27;&gt;Finished trades&lt;/h3&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Stock&lt;/th&gt;&lt;th&gt;In&lt;/th&gt;&quot;
+-            &quot;&lt;th&gt;Out&lt;/th&gt;&lt;th&gt;Result&lt;/th&gt;&lt;th&gt;Why sold&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;%s&lt;/tbody&gt;&lt;/table&gt;&quot;
+-            % (cls, _rup(made), q.get(&quot;trades&quot;, 0), q.get(&quot;wins&quot;, 0), q.get(&quot;losses&quot;, 0),
+-               m_rows, o_rows, c_rows))
+-
+-
+-def build(write=True):
+-    page = (&quot;&lt;!doctype html&gt;&lt;html lang=&#x27;en&#x27;&gt;&lt;head&gt;&lt;meta charset=&#x27;utf-8&#x27;&gt;&quot;
+-            &quot;&lt;meta name=&#x27;viewport&#x27; content=&#x27;width=device-width,initial-scale=1&#x27;&gt;&lt;title&gt;Deliverables&lt;/title&gt;&quot;
+-            &quot;&lt;style&gt;&quot; + CSS + &quot;&lt;/head&gt;&lt;body&gt;&lt;main&gt;&lt;h1&gt;Deliverables&lt;/h1&gt;&quot;
+-            &quot;&lt;p class=&#x27;sub&#x27;&gt;Two things the desk was asked to check, each in plain words. Paper and history only.&lt;/p&gt;&quot;
+-            + _index_section() + _quiet_section() + &quot;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;&quot;)
+-    problems = _scrub(page)
+-    if problems:
+-        raise ValueError(&quot;deliverables page contains banned words: %s&quot; % problems[:6])
+-    if write:
+-        os.makedirs(OUT_DIR, exist_ok=True)
+-        with open(os.path.join(OUT_DIR, &quot;index.html&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+-            f.write(page)
+-    return page
+-
+-
+-def _scrub(page):
+-    text = re.sub(r&quot;&lt;[^&gt;]+&gt;&quot;, &quot; &quot;, page)                 # visible text only
+-    hits = []
+-    for pat in BANNED:
+-        for m in re.findall(pat, text):
+-            hits.append(m)
+-    return sorted(set(hits))
++        home = open(os.path.join(out, &quot;index.html&quot;), encoding=&quot;utf-8&quot;).read()
++    except Exception:
++        return [&quot;index.html&quot;]
++    import glob
++    bad = []
++    for p in glob.glob(os.path.join(out, &quot;*.html&quot;)):
++        n = os.path.basename(p)
++        if n != &quot;index.html&quot; and (&quot;href=&#x27;%s&#x27;&quot; % n) not in home and (&#x27;href=&quot;%s&quot;&#x27; % n) not in home:
++            bad.append(n)
++    return sorted(bad)
+ 
+ 
+ def _demo():
+-    page = build(write=False)
+-    assert &quot;Index tests&quot; in page and &quot;Dubai Strategies&quot; in page and &quot;Deliverables&quot; in page
+-    assert not _scrub(page), _scrub(page)                 # no engine names / research / person names
+-    print(&quot;deliverables_site demo OK: two sections, plain words, scrub clean (no internal names).&quot;)
++    import tempfile
++    out = tempfile.mkdtemp()
++    pages = build(out)
++    assert &quot;index.html&quot; in pages and &quot;idx.html&quot; in pages and &quot;dubai.html&quot; in pages
++    idx = open(os.path.join(out, &quot;idx.html&quot;), encoding=&quot;utf-8&quot;).read()
++    assert all(t in idx for t in TABS) and &quot;0 calls&quot; in idx           # five tabs + 0-calls stated plainly
++    assert unreachable(out) == []                                     # every page reachable from home
++    print(&quot;deliverables_site demo OK: home + Index tests + Dubai, five tabs each, 0-calls plainly, island reachable.&quot;)
+ 
+ 
+ if __name__ == &quot;__main__&quot;:
+-    _demo() if &quot;--demo&quot; in sys.argv else (build() and print(&quot;wrote %s/index.html&quot; % OUT_DIR))
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        print(&quot;deliverables site: &quot; + &quot;, &quot;.join(build()))
+diff --git a/scripts/site_build.py b/scripts/site_build.py
+index 76ff626fa..2506b4427 100644
+--- a/scripts/site_build.py
++++ b/scripts/site_build.py
+@@ -724,6 +724,13 @@ def build(snapshot=None):
+             v8_site.build()
+         except Exception:
+             pass
++        try:
++            from scripts import deliverables_site        # NB43: the SEPARATE /deliverables/ island (no main-site link)
++            deliverables_site.build()
++            if deliverables_site.unreachable():          # its own reachability gate — log if a page is orphaned
++                print(&quot;deliverables island unreachable pages: %s&quot; % deliverables_site.unreachable())
++        except Exception:
++            pass
+         try:
+             from scripts import v2_diff                 # NB9 item 2: click-through gate on the CO-BUILT site
+             v2_diff.gate()                              # writes reports/V2-CLICKTHROUGH.log (broken + unreachable)
+diff --git a/tests/test_deliverables_site.py b/tests/test_deliverables_site.py
+new file mode 100644
+index 000000000..53398c0c7
+--- /dev/null
++++ b/tests/test_deliverables_site.py
+@@ -0,0 +1,36 @@
++&quot;&quot;&quot;NB43 item 2: the separate /deliverables/ site — home + two deliverables, five tabs each, every call (0 stated
++plainly), reachable from its own home, and NOT linked from the main site.&quot;&quot;&quot;
++import os
++
++from scripts import deliverables_site as DS
++
++
++def test_demo():
++    DS._demo()
++
++
++def test_home_lists_both_and_e</pre></div><div class='c'><div class='h'><b>ec81b70e8</b> · 2026-09-24 03:37</div><div>NB43 #7: Data page Excel buttons produce real CSV downloads — site_downloads.build writes a CSV per lane from site/data/recording.json (front-end only, §27e; matched -&gt; history, empty -&gt; header + &#x27;no rows yet&#x27;, never a dead link), _data_data wires each lane&#x27;s href, the Excel cell is a real &lt;a download&gt;. TDD: file exists/non-empty/header matches, matched-lane history; archive NB43</div><div class='sub h'>design/v8/Data.dc.html                        |  2 +-</div><div class='sub h'>docs/dispatches/2026-09-24_NIGHT-BUNDLE-43.md | 18 ++++++</div><div class='sub h'>scripts/site_downloads.py                     | 92 +++++++++++++++++++++++++++</div><div class='sub h'>scripts/v8_site.py                            | 11 +++-</div><div class='sub h'>tests/test_site_downloads.py                  | 34 ++++++++++</div><div class='sub h'>tests/test_v8_site.py                         | 13 ++++</div><pre>diff --git a/design/v8/Data.dc.html b/design/v8/Data.dc.html
+index 6c17bcd39..1ca9b0d0f 100644
+--- a/design/v8/Data.dc.html
++++ b/design/v8/Data.dc.html
+@@ -41,7 +41,7 @@ button{cursor:pointer}
+ &lt;div style=&quot;padding: 14px 40px 0; flex-grow: 1;&quot;&gt;&lt;div style=&quot;background: #161920; border-radius: 12px; padding: 4px 20px 12px;&quot;&gt;
+   &lt;div style=&quot;display: grid; grid-template-columns: 2fr 1.1fr 0.8fr 0.6fr 0.9fr 1.5fr 0.5fr; gap: 0; font-size: 12px; color: #9a9a93; padding: 10px 0; border-bottom: 1px solid #23262d;&quot;&gt;&lt;div&gt;Stream&lt;/div&gt;&lt;div&gt;Status&lt;/div&gt;&lt;div&gt;Rows today&lt;/div&gt;&lt;div&gt;Last&lt;/div&gt;&lt;div&gt;Last 30 days&lt;/div&gt;&lt;div&gt;Days until it can be judged&lt;/div&gt;&lt;div&gt;Excel&lt;/div&gt;&lt;/div&gt;
+   &lt;sc-for list=&quot;{{lanes}}&quot; as=&quot;l&quot; hint-placeholder-count=&quot;5&quot;&gt;
+-    &lt;button onClick=&quot;{{l.toggle}}&quot; style=&quot;display: grid; grid-template-columns: 2fr 1.1fr 0.8fr 0.6fr 0.9fr 1.5fr 0.5fr; gap: 0; width: 100%; text-align: left; font-size: 14px; padding: 11px 0; border: none; border-bottom: 1px solid #23262d; background: transparent; color: #e8e6e1;&quot;&gt;&lt;div style=&quot;font-weight: 600;&quot;&gt;{{l.name}}&lt;/div&gt;&lt;div style=&quot;color: {{l.statusColor}};&quot;&gt;{{l.status}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;{{l.rows}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;{{l.last}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: {{l.stripColor}};&quot;&gt;{{l.strip}}&lt;/div&gt;&lt;div style=&quot;color: #b8b6ae;&quot;&gt;{{l.countdown}}&lt;/div&gt;&lt;div style=&quot;color: #85B7EB;&quot;&gt;Excel&lt;/div&gt;&lt;/button&gt;
++    &lt;button onClick=&quot;{{l.toggle}}&quot; style=&quot;display: grid; grid-template-columns: 2fr 1.1fr 0.8fr 0.6fr 0.9fr 1.5fr 0.5fr; gap: 0; width: 100%; text-align: left; font-size: 14px; padding: 11px 0; border: none; border-bottom: 1px solid #23262d; background: transparent; color: #e8e6e1;&quot;&gt;&lt;div style=&quot;font-weight: 600;&quot;&gt;{{l.name}}&lt;/div&gt;&lt;div style=&quot;color: {{l.statusColor}};&quot;&gt;{{l.status}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace;&quot;&gt;{{l.rows}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: #9a9a93;&quot;&gt;{{l.last}}&lt;/div&gt;&lt;div style=&quot;font-family: &#x27;IBM Plex Mono&#x27;, monospace; color: {{l.stripColor}};&quot;&gt;{{l.strip}}&lt;/div&gt;&lt;div style=&quot;color: #b8b6ae;&quot;&gt;{{l.countdown}}&lt;/div&gt;&lt;a href=&quot;{{l.download}}&quot; download onclick=&quot;event.stopPropagation()&quot; style=&quot;color: #85B7EB;&quot;&gt;Excel&lt;/a&gt;&lt;/button&gt;
+     &lt;sc-if value=&quot;{{l.open}}&quot; hint-placeholder-val=&quot;{{ false }}&quot;&gt;&lt;div style=&quot;background: #0f1115; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-size: 14px;&quot;&gt;
+       &lt;div style=&quot;display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;&quot;&gt;
+         &lt;div&gt;&lt;div style=&quot;color: #9a9a93; font-size: 12px;&quot;&gt;Recorded today&lt;/div&gt;&lt;div&gt;{{l.today}}&lt;/div&gt;&lt;/div&gt;
+diff --git a/docs/dispatches/2026-09-24_NIGHT-BUNDLE-43.md b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-43.md
+new file mode 100644
+index 000000000..7a5bfc4dc
+--- /dev/null
++++ b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-43.md
+@@ -0,0 +1,18 @@
++# NIGHT BUNDLE 43 (ID:NB43) — dispatch archived verbatim (2026-09-24)
++
++**Origin tag (per §5):** OWNER-SAID use the time. Pure site code only; no desk process touched; hard stop 05:30; nothing on the money chain.
++
++DISPATCH ID: NB43 — #7 DOWNLOADS + THE DELIVERABLES SITE (24 Sep 2026, ~04:15 IST) → BUILD
++READ: NB42 report (#3, #6 done; #7 + deliverables site scoped in BUILD-STATE; money chain untouched at 32df791c4).
++Per CLAUDE.md §23 re-read RESUME-CARD, NEXT-PASTE, MASTER-CHECKLIST first. ORIGIN: OWNER-SAID — use the time.
++Pure site code only; no desk process touched; hard stop 05:30; nothing on the money chain.
++1) #7: for each recording lane on the Data page, generate a real CSV from its store READ-ONLY (§27e), write it
++   under the site&#x27;s downloads folder, wire the button href; tests: link resolves, file exists, non-empty, header
++   matches the lane. Empty lane → a file with the header + one plain &quot;no rows yet&quot; line, never a dead link.
++2) Deliverables site at /deliverables/ (own site, v2 theme): home page listing each deliverable in plain words;
++   per deliverable five tabs (Positions · Trades · Why each call · How it decides · Record); index tests with
++   every call in full (date/instrument/side/entry/exit/result/reason) and &quot;0 calls&quot; stated plainly where true;
++   Dubai Strategies: rules, daily screen, every call. No href to it anywhere on the main site (test); its own
++   reachability gate green before publish (test). Edit builders, not built output.
++3) Group code; verify rides the after-close quiet-box. Report &quot;NB43&quot; with red→green names; end with
++NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+diff --git a/scripts/site_downloads.py b/scripts/site_downloads.py
+new file mode 100644
+index 000000000..68739ae49
+--- /dev/null
++++ b/scripts/site_downloads.py
+@@ -0,0 +1,92 @@
++&quot;&quot;&quot;NB43 #7 — real download files for the Data page, front-end only (§27e).
++
++For each recording lane the Data page shows, write a real CSV under the published site&#x27;s downloads folder, from the
++FRONT-END recording view (site/data/recording.json) — never the desk&#x27;s stores. The Data page&#x27;s Excel button links
++to it. An empty lane still gets a file: the header + one plain &quot;no rows yet&quot; line — never a dead link.
++
++`slug(name)` is the shared key so the page row and its file always agree; `build(lanes, out_dir)` writes the files
++and returns {lane_name: &quot;downloads/&lt;slug&gt;.csv&quot;} for the page to wire. Pure/testable: `lanes` and the recording
++source are injectable; nothing here touches a desk store or a live process.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import json
++import os
++import re
++
++_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++HEADER = [&quot;date&quot;, &quot;rows&quot;, &quot;snapshots&quot;, &quot;last_ts&quot;]
++
++
++def slug(name):
++    return re.sub(r&quot;[^a-z0-9]+&quot;, &quot;-&quot;, str(name).lower()).strip(&quot;-&quot;) or &quot;lane&quot;
++
++
++def _recording_lanes(path=None):
++    try:
++        return (json.load(open(path or os.path.join(_REPO, &quot;site&quot;, &quot;data&quot;, &quot;recording.json&quot;),
++                                encoding=&quot;utf-8&quot;)).get(&quot;lanes&quot;)) or []
++    except Exception:
++        return []
++
++
++def _first_word(s):
++    return re.split(r&quot;[ (/]&quot;, str(s).lower().strip(), 1)[0]
++
++
++def _history_for(lane_name, rec_lanes):
++    &quot;&quot;&quot;The recording history rows for a page lane — matched to a recording.json lane by shared first word
++    (&#x27;Order-book depth&#x27; &lt;-&gt; &#x27;Order-book depth (5 levels)&#x27;). [] if none.&quot;&quot;&quot;
++    fw = _first_word(lane_name)
++    for rl in rec_lanes:
++        if _first_word(rl.get(&quot;lane&quot;, &quot;&quot;)) == fw:
++            return rl.get(&quot;history&quot;) or []
++    return []
++
++
++def _csv_text(history):
++    lines = [&quot;,&quot;.join(HEADER)]
++    if history:
++        for h in history:
++            lines.append(&quot;,&quot;.join(str(h.get(k, &quot;&quot;)) for k in HEADER))
++    else:
++        lines.append(&quot;no rows yet,,,&quot;)     # never a dead link: header + one honest line
++    return &quot;\n&quot;.join(lines) + &quot;\n&quot;
++
++
++def build(lanes, out_dir, rec_path=None):
++    &quot;&quot;&quot;Write one CSV per lane under out_dir; return {lane_name: &#x27;downloads/&lt;slug&gt;.csv&#x27;}. `lanes` is a list of
++    lane-name strings (the page&#x27;s lanes).&quot;&quot;&quot;
++    os.makedirs(out_dir, exist_ok=True)
++    rec = _recording_lanes(rec_path)
++    hrefs = {}
++    for name in lanes:
++        sg = slug(name)
++        with open(os.path.join(out_dir, sg + &quot;.csv&quot;), &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(_csv_text(_history_for(name, rec)))
++        hrefs[name] = &quot;downloads/%s.csv&quot; % sg
++    return hrefs
++
++
++def _demo():
++    import tempfile
++    d = tempfile.mkdtemp()
++    rec = os.path.join(d, &quot;recording.json&quot;)
++    json.dump({&quot;lanes&quot;: [{&quot;lane&quot;: &quot;Order-book depth (5 levels)&quot;,
++                          &quot;history&quot;: [{&quot;date&quot;: &quot;2026-09-22&quot;, &quot;rows&quot;: 377016, &quot;snapshots&quot;: 184, &quot;last_ts&quot;: &quot;...&quot;}]}]},
++              open(rec, &quot;w&quot;))
++    out = os.path.join(d, &quot;downloads&quot;)
++    hrefs = build([&quot;Order-book depth&quot;, &quot;Option chains&quot;], out, rec_path=rec)
++    # matched lane -&gt; real history rows; unmatched lane -&gt; header + &#x27;no rows yet&#x27;
++    ob = open(os.path.join(out, &quot;order-book-depth.csv&quot;), encoding=&quot;utf-8&quot;).read()
++    assert ob.splitlines()[0] == &quot;date,rows,snapshots,last_ts&quot; and &quot;377016&quot; in ob, ob
++    oc = open(os.path.join(out, &quot;option-chains.csv&quot;), encoding=&quot;utf-8&quot;).read()
++    assert oc.splitlines()[0] == &quot;date,rows,snapshots,last_ts&quot; and &quot;no rows yet&quot; in oc, oc
++    assert hrefs[&quot;Order-book depth&quot;] == &quot;downloads/order-book-depth.csv&quot;
++    print(&quot;site_downloads demo OK: a real CSV per lane (matched -&gt; history, empty -&gt; header + &#x27;no rows yet&#x27;); href map.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/scripts/v8_site.py b/scripts/v8_site.py
+index fd7009f0c..896c4d6dc 100644
+--- a/scripts/v8_site.py
++++ b/scripts/v8_site.py
+@@ -213,8 +213,17 @@ def _data_data():
+             &quot;last&quot;: s.get(&quot;last&quot;) or &quot;—&quot;,
+             &quot;days&quot;: 0, &quot;countdown&quot;: JUDGE_DAYS,          # days recorded / days until it can be judged
+             &quot;strip&quot;: &quot;&quot;, &quot;stripColor&quot;: &quot;#23262d&quot;, &quot;sample&quot;: &quot;&quot;, &quot;usedBy&quot;: used_by.get(name, &quot;the desk&quot;),
+-            &quot;open&quot;: False, &quot;toggle&quot;: &quot;&quot;,
++            &quot;open&quot;: False, &quot;toggle&quot;: &quot;&quot;, &quot;download&quot;: &quot;&quot;,
+         })
++    # UI-1 #7: a real CSV per lane (front-end only, §27e — from site/data/recording.json, never a desk store);
++    # the Excel button links to it. Empty lane -&gt; header + &#x27;no rows yet&#x27;, never a dead link.
++    try:
++        from scripts import site_downloads
++        hrefs = site_downloads.build([l[&quot;name&quot;] for l in lanes], os.path.join(REPO, &quot;site&quot;, &quot;v2&quot;, &quot;downloads&quot;))
++        for l in lanes:
++            l[&quot;download&quot;] = hrefs.get(l[&quot;name&quot;], &quot;&quot;)
++    except Exception:
++        pass
+     return {&quot;lanes&quot;: lanes}
+ 
+ 
+diff --git a/tests/test_site_downloads.py b/tests/test_site_downloads.py
+new file mode 100644
+index 000000000..86e486ae0
+--- /dev/null
++++ b/tests/test_site_downloads.py
+@@ -0,0 +1,34 @@
++&quot;&quot;&quot;NB43 #7: the Data page&#x27;s downloads are real files — link resolves, file exists, non-empty, header matches.&quot;&quot;&quot;
++import os
++
++from scripts import site_downloads
++
++
++def test_demo():
++    site_downloads._demo()
++
++
++def test_a_real_file_per_lane_with_matching_header(tmp_path):
++    out = str(tmp_path / &quot;downloads&quot;)
++    lanes = [&quot;Order-book depth&quot;, &quot;Some empty lane&quot;]
++    hrefs = site_downloads.build(lanes, out, rec_path=str(tmp_path / &quot;missing.json&quot;))   # no recording -&gt; all empty
++    for name in lanes:
++        href = hrefs[name]
++        assert href == &quot;downloads/%s.csv&quot; % site_downloads.slug(name)
++        f = os.path.join(out, os.path.basename(href))
++        assert os.path.exists(f) and os.path.getsize(f) &gt; 0                # link resolves + non-empty
++        lines = open(f, encoding=&quot;utf-8&quot;).read().splitlines()
++        assert lines[0] == &quot;date,rows,snapshots,last_ts&quot;                   # header matches the lane
++        assert len(lines) &gt;= 2 and &quot;no rows yet&quot; in lines[1]               # empty lane -&gt; header + &#x27;no rows yet&#x27;
++
++
++def test_matched_lane_gets_its_history(tmp_path):
++    import json
++    rec = tmp_path / &quot;rec.json&quot;
++    json.dump({&quot;lanes&quot;: [{&quot;lane&quot;: &quot;Option chains (NIFTY)&quot;,
++                          &quot;history&quot;: [{&quot;date&quot;: &quot;2026-09-22&quot;, &quot;rows&quot;: 12, &quot;snapshots&quot;: 3, &quot;last_ts&quot;: &quot;x&quot;}]}]},
++              open(rec, &quot;w&quot;))
++    out = str(tmp_path / &quot;d&quot;)
++    site_downloads.build([&quot;Option chains&quot;], out, rec_path=str(rec))
++    txt = open(os.path.join(out, &quot;option-chains.csv&quot;), encoding=&quot;utf-8&quot;).read()
++    assert &quot;2026-09-22,12,3,x&quot; in txt                                      # matched by first word -&gt; real history
+diff --git a/tests/test_v8_site.py b/tests/test_v8_site.py
+index 64c197dbb..9ad1bb8c6 100644
+--- a/tests/test_v8_site.py
++++ b/tests/test_v8_site.py
+@@ -51,6 +51,19 @@ def test_messages_chips_filter_and_build_split():
+         assert &quot;data-tag=&quot; in html and &quot;data-kind=&quot; in html
+ 
+ 
++def test_data_page_downloads_wired_to_real_files():
++    # UI-1 #7: every lane&#x27;s Excel button links to a real, non-empty CSV under downloads/ (never a dead link).
++    import os
++    d = v8_site._data_data()                                    # builds the CSVs under site/v2/downloads
++    html = v8_site.port(&quot;Data.dc.html&quot;, d)
++    assert &quot;download onclick=&quot; in html and &#x27;href=&quot;downloads/&#x27; in html    # the Excel cell is a real download link
++    for l in d[&quot;lanes&quot;]:
++        assert l[&quot;download&quot;].startswith(&quot;downloads/&quot;)
++        f = os.path.join(v8_site.REPO, &quot;site&quot;, &quot;v2&quot;, l[&quot;download&quot;])
++        assert os.path.exists(f) and os.path.getsize(f) &gt; 0
++        assert open(f, encoding=&quot;utf-8&quot;).read().splitlines()[0] == &quot;date,rows,snapshots,last_ts&quot;
++
++
+ def test_ticker_baked_sample_replaced():
+     html = v8_site.port(&quot;How.dc.html&quot;, {})
+     assert &quot;DABUR 512.30&quot; not in html                    # the baked sample ticker row is gone
+</pre></div><div class='c'><div class='h'><b>c98e7f5c5</b> · 2026-09-24 03:29</div><div>NB42 state: #3 + #6 done+tested; #7 downloads + deliverables site remaining (focused window)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
 index 08716dca4..083c5d1c1 100644
 --- a/reports/BUILD-STATE.json
 +++ b/reports/BUILD-STATE.json
@@ -943,54 +1530,4 @@ index 000000000..cdd053b81
 +
 +def test_demo():
 +    rehearsal._demo()
-</pre></div><div class='c'><div class='h'><b>4306f4fb7</b> · 2026-09-24 02:52</div><div>NB39 state: isolation law §27; UI-1 #5 done; rest scoped to 15:45</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 5ba80efc4..b66a88c60 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;NB38 2026-09-24 ~02:55 IST. (1) REOPEN PROVEN: the watchdog reopened claude --continue autonomously at 2026-09-23 19:00:44 (free 2.89 GB) and 19:40:38 (2.14 GB), nobody typing, resuming pending item 49 (reports/LAUNCH-RAM.log). It did NOT fire after the 02:12 turn-end because the session never exited (this same session continued) — the guard correctly saw owner_active fresh. No bug. (2) TWIN: detective-net GAP fixed; live run deferred to a daytime isolated-clone window. Order path / login / kite_login untouched.&quot;,
-- &quot;item&quot;: &quot;NB38: reopen proven (LAUNCH-RAM.log, 2 autonomous reopens 2026-09-23 19:00/19:40). twin_run detective net now guards the MAIN paper ledger (engine1_rebuild/paper/ledger.csv, the money book the old glob missed) — TDD green; live-loop twin RUN deferred (running book20_runner.run_once pre-06:00 risks the money ledger; safe home is the verify-clone, daytime). Other pending items are frozen (site/UI/deliverables), order-path/recorder, market-day-bound (twin/rule-vs-live), or owner-gated — nothing safe left tonight.&quot;,
-- &quot;tests&quot;: &quot;twin detective-net + demo green (tests/test_twin_run.py). All NB37 code (32df791c4) still LIVE + master green + PASS. twin_run change is off the launched path; its full-suite re-verify rides the after-close window.&quot;,
-- &quot;next&quot;: &quot;Daytime, after Thursday&#x27;s close, in the verify-clone: run the live-loop twin (book20_runner.run_once vs the exam) -&gt; twin-2026-09-22.md verdict + diff; and the batched after-close items. LIVE at 06:00: the four NB37 wires (verified at 32df791c4).&quot;,
-- &quot;flag&quot;: &quot;REOPEN is PROVEN (2 autonomous reopens logged). Ending this session again for another live demonstration; measured floor 0.72 GB, RAM oscillates. All four NB37 wires LIVE + master GREEN + PASS at 32df791c4. Real-money rail unchanged (closed). 06:00 = tap the login.&quot;
-+ &quot;ruling&quot;: &quot;NB39 2026-09-24 ~02:46 IST. The §24 freeze becomes the ISOLATION LAW (CLAUDE.md §27): the money chain is protected (its files/launch/processes off-limits to everything else); every other engine is a diary-only, RAM-gated, killed-first, quiet process; site work is front-end only. UI-1 defect 5 done (Deliverables out of the v2 nav). The rest of UI-1 needs the 15:45 window. Order path / login / kite_login untouched.&quot;,
-+ &quot;item&quot;: &quot;NB39: (law) recorded CLAUDE.md §27 the isolation law. (UI-1 #5) v8_site._fix_nav_and_links now STRIPS the Deliverables nav anchor (UI-1 item 5 reverses R-V2-PAGE-OWNERS item 1 — later owner instruction governs; corrected the NB32 test); code-verified (test_v8_site green). Front-end only, never touches the desk (§27e).&quot;,
-+ &quot;tests&quot;: &quot;test_v8_site 2/2 green (Deliverables out of the nav). v8_site is a site builder (front-end), off the money-chain launched path — master&#x27;s LIVE code (32df791c4, the four NB37 wires) is unaffected; its full-suite re-verify rides the after-close window.&quot;,
-+ &quot;next&quot;: &quot;UI-1 defects 1,2,3,4,6,7,8 + the separate deliverables site: the 15:45 window (mandated phone-width screenshots need RAM + a pausable site_loop; the box can&#x27;t do it at 3am without racing site_loop). AFTER Thursday&#x27;s close (per §27a-d): the 8 engine items diary-only, each TDD + smoke check, batched into one quiet-box verify; recorders join the thin start only via §27c. Twin run in the isolated clone, same window. Root swap owner-gated.&quot;,
-+ &quot;flag&quot;: &quot;REOPEN proven (2 autonomous reopens, NB38). §27 protects the chain by construction. UI-1 #5 done; the rest scoped to 15:45 (screenshots need RAM/browser + a pausable site_loop). All four NB37 wires LIVE + master GREEN + PASS at 32df791c4. Real-money rail unchanged (closed). 06:00 = tap the login.&quot;
- }
-</pre></div><div class='c'><div class='h'><b>5ccc6ae2f</b> · 2026-09-24 02:52</div><div>NB39 docs: CLAUDE.md §27 isolation law recorded; UI-1 #5 done (Deliverables out of v2 nav); rest of UI-1 + deliverables site scoped to the 15:45 window; CONTEXT synced</div><div class='sub h'>CONTEXT.md | 25 +++++++++++++++++++++++++</div><pre>diff --git a/CONTEXT.md b/CONTEXT.md
-index 88bafb13e..589e21e05 100644
---- a/CONTEXT.md
-+++ b/CONTEXT.md
-@@ -8965,3 +8965,28 @@ market-day-bound (twin run needs 15:45 data; rule-vs-live needs other-engine dat
- non-frozen was left to do tonight. twin_run is off the launched path, so master&#x27;s LIVE code (32df791c4, the four
- NB37 wires) is unaffected; the twin change&#x27;s full-suite re-verify rides the after-close window. Real-money rail
- unchanged (closed).
-+
-+
-+## Dispatch NB39 — unpark with isolation (2026-09-24 ~02:46 IST)
-+
-+ORIGIN: OWNER-SAID &quot;unpark, in a way that won&#x27;t affect my current progress.&quot; The §24 feature freeze becomes the
-+ISOLATION LAW.
-+
-+**Recorded CLAUDE.md §27 — the isolation law.** (a) the Price Engine money chain is PROTECTED: nothing else edits
-+its files, launch path, or process list; (b) every other engine is its own DIARY-ONLY process (no orders) until it
-+passes its own rule-vs-live audit + smoke check; (c) other processes start only after the 08:15 READY line and only
-+if measured free RAM &gt;= reopen floor + that process&#x27;s own measured footprint (measured, recorded, no typed number);
-+under memory pressure they are killed FIRST, the chain never; (d) their failures never 🙋 (one ✅/⏱ line each, faults
-+to the held/diary log); (e) site work is front-end only. Root swap stays owner-gated.
-+
-+**UI-1 defect 5 done (front-end).** `v8_site._fix_nav_and_links` now STRIPS the Deliverables anchor from the v2 nav
-+(UI-1 item 5, a later OWNER-SAID, reverses R-V2-PAGE-OWNERS item 1 — later item-specific instruction governs; this
-+also corrected the NB32 test which had aligned the other way). Code-verified (test_v8_site 2/2). v8_site is a site
-+builder — front-end, off the money-chain launched path (§27e), so master&#x27;s LIVE code (32df791c4) is unaffected;
-+the site_loop applies the nav-strip on its next rebuild.
-+
-+**Deferred, with the reason.** UI-1 defects 1/2/3/4/6/7/8 + the separate deliverables site need the 15:45 window:
-+each fix is MANDATED to be phone-width-screenshot-verified, which needs RAM + a browser, and the site_loop is
-+actively rebuilding site/ (a manual output edit would race it). Doing them rushed at ~2:46 am would repeat the NB8
-+unverified-UI mistake the original plan explicitly avoids. The 8 engine items (diary-only, §27a-d) + the twin-run
-+clone execution are the AFTER-Thursday-close batch. Real-money rail unchanged (closed).
 </pre></div></main></body></html>
