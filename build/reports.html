@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 07:11 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-23 17:15 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
 
 _Measured this run, no model called. The Opus rule-extraction is GATED until the owner has seen these numbers (the whole library is NOT read yet)._
 
@@ -289,6 +289,95 @@ restart, trades correctness for a deadline the fail-safe already covers safely.
    Wednesday is a HELD day (safe, by the fail-safe).
 2. Confirm you want the full order-path re-architecture attempted overnight vs. built and proven in a focused
    next session — the fail-safe means Wednesday is safe either way.
+</pre><h3>2026-09-23-074841-audit.md</h3><pre># Audit 2026-09-23-074841
+
+_Fresh independent audit (→ AUDIT). Reason: → AUDIT read-only, line-cited: yesterday at 15:00 the status page showed option chains, NSE/BSE two-exchange and retail positioning with NO rows in the last 10 minutes while order-book depth had 2,100_
+
+**Verdict: FAIL — option chains (E4) and NSE/BSE (E12) recorded 0 minutes today and are not running because they were armed pre-market at 06:02 and self-exit when the market is closed with no 09:15 relaunch (chain_recorder.py:206, xchange_recorder.py:130, kite_login.py:302-320), while retail positioning (E14) records nothing by design (positioning_recorder.py:24).**
+
+## Full reply
+
+I&#x27;ll audit this read-only, gathering receipts. Let me start by finding the recorders, the status page data, and their logs.
+Now let me look at the recording status data and find the recorders.
+Pre-market snapshot (07:38 IST today) shows all lanes idle, which is expected before 09:15 open. The real question is yesterday (09-22). Let me find the recorder scripts and their logs.
+Stores live outside the repo at `~/Desktop/E1-DESK/stores/`. Let me inspect the actual manifests and store directories, plus find recorder logs.
+Now the SESSION-STARTS.csv files (all written today 06:02) are the key evidence for today. And positioning_store has **no MANIFEST.csv** and only quarantined fabrication folders. Let me read the session-start logs.
+All four logged a session-start today at 06:02. Retail positioning explicitly says **&quot;parser not validated — recording nothing&quot;** with token absent. Now I need the recorder logs to explain yesterday&#x27;s 15:00 stall and today&#x27;s state. Let me read the logs.
+All three (depth/chain/NSE) printed &quot;recorded 0 minutes&quot; today; positioning printed nothing. Let me check whether the recorder processes are actually alive now, and read the recorder source to see if &quot;recorded 0 minutes&quot; means it exited.
+Critical: depth (E13), chain (E4), and NSE/BSE (E12) recorders are **NOT in the process list** — they ran at 06:02, printed &quot;recorded 0 minutes&quot;, and exited. Only `positioning_recorder --record-loop` (PID 27172) is still alive. Let me read the recorder source and launcher to understand the exit and how/when they&#x27;re (re)started.
+Now the mechanism is clear: chain (E4) and xchange (E12) loop `while _market_open() and have_login` — launched at 06:02 pre-market, `_market_open()` is False, so they exit instantly with &quot;recorded 0 minutes&quot;. Let me confirm the depth loop (no market_open gate), how token_ping arms/relaunches recorders, and the positioning &quot;records nothing&quot; design.
+Confirmed: all three (depth/chain/xchange) self-exit pre-market (`break`/loop-condition false at 06:02) → &quot;recorded 0 minutes&quot; → process gone. Positioning runs but records nothing by design. The decisive question for &quot;today&quot; is whether anything **relaunches** them at 09:15. Let me read token_ping (the arming entrypoint) and watchdog.
+The catcher (kite_catcher.py, running since 06:00) is what &quot;starts the recorders&quot; per token_ping&#x27;s docstring, and token_ping mentions &quot;session starts itself at 09:15&quot;. Let me read the catcher&#x27;s recorder-launch logic — this decides whether today self-heals at 09:15.
+Let me find where recorders are actually launched (`post_login` / the `--record-loop` Popen targets) and whether that re-runs at market open.
+`launch_e1.py` holds the recorder launch list; `post_login` arms them once. The decisive question is whether the running **watchdog** relaunches dead recorders during market hours. Let me read it.
+Watchdog only relaunches the re-scan checkpoint, not the market recorders. Let me confirm the &quot;09:15 self-start&quot; claim and whether post_login re-launches recorders at open — reading token_ping main, launch_e1, and preopen_gate.
+`launch_e1.py` is the one launcher (&quot;a job already running is never started twice&quot;). The question is whether it re-runs after 09:15 to revive the dead recorders. Let me check its callers, whether it loops, and the START bat.
+The arming path is `kite_login.post_login → _arm_recorder` (one-time at login landing). Let me confirm `_arm_recorder` doesn&#x27;t schedule a market-open (re)start — the last piece deciding whether today self-heals at 09:15.
+Decisive: `_arm_recorder` (kite_login.py:302-320) is a **one-shot at login landing**; its docstring assumes recorders &quot;self-gate on market hours,&quot; but the loops actually **exit** (not wait) when launched pre-market. Let me do one final check for any market-open (09:15) relaunch trigger and whether the supervisor/preopen_gate revives recorders.
+No 09:15 relaunch exists anywhere — portfolio_card only *counts* recorders (line 46), preopen_gate doesn&#x27;t launch them. Let me confirm the retail-positioning &quot;records nothing / parser not validated&quot; design and check the quarantined-fabrication folder (relevant to §4 no-fabrication law).
+I have all the receipts. Writing the audit.
+
+---
+
+# AUDIT — are option chains, NSE/BSE, and retail positioning recording today (2026-09-23)?
+
+**Read-only.** Repo `HEAD d413ed978`; wall clock at audit `Wed Sep 23 07:40 IST` (`date`, `TZ=Asia/Kolkata date`) — **pre-market** (NSE opens 09:15). Stores live outside the repo at `~/Desktop/E1-DESK/stores/` (path proven at `scripts/recording_page.py:20-22`).
+
+## Direct answer: none of the three is writing today. Two are dead, one records nothing by design.
+
+### Live process list (`Get-CimInstance Win32_Process` for python/pythonw)
+Running now: `token_ping` (PID 27804), `watchdog` (12180), `site_loop` (13236), `supervisor` (21516), `kite_catcher --auto` (21580, since 06:00), **`positioning_recorder --record-loop` (27172, since 06:02)**, `book20_runner` (18980), `http.server 8777`.
+**Absent from the list: `chain_recorder` (E4), `xchange_recorder` (E12), `e13_depth` (E13).**
+
+### 1. Option chains (E4) — NOT running, exited at 06:02
+- `~/Desktop/E1-DESK/logs/chain_recorder__E4_.out` = `recorded 0 minutes`; `.err` = empty (0 bytes, `ls -la`).
+- `…/live_chains/SESSION-STARTS.csv`: `2026-09-23,E4 option chains,2026-09-23 06:02:09,present,0,` (token present, 0 units).
+- **Why:** `engine4_options/chain_recorder.py:206` loops `while _market_open() and have_login(...)`. `_market_open()` (`chain_recorder.py:46-51`) is `09:15 ≤ hm ≤ 15:30`; at 06:02 it is `False`, so the loop body never runs, `run_market_loop` returns `0` (`:213`), and the process **exits immediately** (`:320`, `print(&quot;recorded %d minutes&quot; % run_market_loop())`).
+- **Category: started (pre-market) then self-exited.** Not wrong-path, not source-blocked, not an exception (`.err` empty).
+
+### 2. NSE/BSE two-exchange (E12) — NOT running, exited at 06:02
+- `…/logs/NSE_BSE_recorder__E12_.out` = `recorded 0 minutes`; `.err` empty.
+- `…/xchange/SESSION-STARTS.csv`: `2026-09-23,E12 NSE/BSE,2026-09-23 06:02:09,present,0,`.
+- **Why:** identical shape — `engine12_xchange/xchange_recorder.py:130` `while _market_open() and have_login(...)`, `_market_open` at `:37`. Pre-market → 0 → exit (`:161`).
+
+### 3. Retail positioning (E14) — process alive, but records NOTHING by design (fail-closed, §4)
+- Process 27172 is up, but `…/positioning_recorder__E14_.out` and `.err` are both **empty** — it wrote nothing.
+- `…/e1_positioning_store/SESSION-STARTS.csv`: `2026-09-23,E14 retail positioning,2026-09-23 06:02:09,absent,0,parser not validated — recording nothing`.
+- **Why:** `scripts/positioning_recorder.py:24` `PARSER_VALIDATED = False`; `record_once` returns `0` at `:31-32` when the parser is unvalidated. This is a deliberate **§4.4/§4.5 fail-closed stub** (`:6`, `:23`) — &quot;records NOTHING (never fabricates a ranking).&quot;
+- There is **no `MANIFEST.csv`** in `e1_positioning_store` (`cat` → empty, exit 1); the only dated file is a 12-byte header-only `2026-09-18.csv` (`rank,symbol`). The earlier real-store write was a demo fabrication, correctly **quarantined**: `_QUARANTINED_demo_fabrication_2026-09-18/WHY.txt` — &quot;written by positioning_recorder._demo() (fake HTML: reliance, tcs) into the REAL store… the demo now uses a temp store.&quot; **§4.4 upheld.**
+
+## The systemic root cause (this is the real defect)
+Recorders are armed **once, at login landing**: `kite_login.post_login()` → `_arm_recorder()` (`scripts/kite_login.py:244`, defn `:302-320`), itself invoked by the catcher on token exchange (`scripts/kite_catcher.py:106`, `:237`). Today the auto-login landed ~06:02 (session-starts + `06:00` `kite_catcher --auto`), so `_arm_recorder` started the recorders **pre-market**, and they self-exited as shown above.
+
+`_arm_recorder`&#x27;s docstring **claims** each recorder &quot;self-gates on market hours + a fresh token&quot; (`kite_login.py:305-306`) — but the loops **exit** instead of **waiting** for the 09:15 open. Nothing re-arms them at open:
+- `scripts/launch_e1.py:main()` (`:97-116`) starts essentials **once**, then only waits on HEAVY jobs — no revive loop for dead recorders.
+- `scripts/watchdog.py` relaunches only the **re-scan** checkpoint (`:51-52` `RESCAN_*`), never the market recorders.
+- `scripts/portfolio_card.py:46` only **counts** recorders; `scripts/preopen_gate.py` never launches them (grep for `launch_e1|_arm|Popen|record` → none).
+
+**Consequence:** on a normal 06:00 auto-login day, depth/chain/xchange die pre-market and record nothing all day. They only record when the stack/login lands **inside** market hours — which is exactly what happened **yesterday**: `depth5/SESSION-STARTS.csv` and the others show `2026-09-22 12:26:00`, and the 09-22 manifests are a partial day from 12:26 (below).
+
+## Yesterday (09-22) manifests — what is on disk
+`cat …/MANIFEST.csv`:
+- Depth: `2026-09-22,184,377016,…15:30:31` → 377016/184 ≈ **2,049 rows/snapshot**, matching the owner&#x27;s &quot;≈2,100&quot; for the last window.
+- Chains: `2026-09-22,114,3106956,216,…15:31:30` → only **114** snapshots over ~184 min (heavy ~27k-row snapshots, ~1 per 1.6 min), so a &quot;last-10-min&quot; panel can legitimately show few completed chain rows while depth (1/min) looks healthy.
+- Xchange: `2026-09-22,184,15272,…15:30:30`.
+- Retail: **no manifest row** → the &quot;no rows&quot; the owner saw is correct and permanent-until-validated.
+
+**UNCHECKABLE:** the exact live status-page state *at 15:00 yesterday* cannot be reconstructed — the recorder logs are truncated/recreated at each session start (all `…/logs/*recorder*.out|err` are dated `Sep 23 06:02`), and no 15:00 status snapshot is stored on disk. I fail closed on the precise xchange-gap-at-15:00 cell rather than bank it as a pass; the manifest end-of-day totals above are all that survives.
+
+## Standing-law checks (§3, §4, §13, §20)
+- **§4.4 no fabricated data — PASS.** Retail fails closed (`positioning_recorder.py:31-48`); the one prior fabrication is quarantined with a receipt (`WHY.txt`).
+- **§4.1 no naked numbers — PASS.** The `09:15/15:30` window (`chain_recorder.py:46-51`) is the NSE session calendar, not a tuned wall.
+- **No live/orders — PASS.** book20 is HELD (`kite_login.py:288-292` gate), recorders are read-only quote/depth (`chain_recorder.py:2-4`).
+- **Side observation (not blocking):** `…/logs/token_ping.err` = `notify: send failed (URLError)` ×3 — outbound Telegram is currently failing, so §16 state-change lines (incl. &quot;recorders N/5 running&quot;) are not reaching the owner. Not a fabrication; worth a look.
+- **Secret sweep:** scoped to these recorders&#x27; stores/logs — none seen; I did **not** run a full mirror-page secret sweep (out of this question&#x27;s scope).
+
+## What needs deciding
+The fix is a **paper-side code change**, which §21 delegates to the lead (no owner signature). But *which* fix is a design judgment the lead must rule on:
+
+**LEAD RULING NEEDED:** (1) how to stop the pre-market recorder death — options: recorders **block until 09:15** instead of exiting (change the loops in `chain_recorder.py:206`, `xchange_recorder.py:130`, `e13_depth.py:174-177`), OR **re-fire `_arm_recorder` at the 09:15 open**, OR have `launch_e1`/`watchdog` **supervise &amp; revive** dead recorders during market hours; (2) confirm the free-source **retail-positioning parser validation** (`positioning_recorder.py:24 PARSER_VALIDATED=False`) is intended to stay off (it records nothing until flipped). Both are delegated builds, not owner signatures — nothing here needs the owner&#x27;s hands.
+
+AUDIT-VERDICT: FAIL — option chains (E4) and NSE/BSE (E12) recorded 0 minutes today and are not running because they were armed pre-market at 06:02 and self-exit when the market is closed with no 09:15 relaunch (chain_recorder.py:206, xchange_recorder.py:130, kite_login.py:302-320), while retail positioning (E14) records nothing by design (positioning_recorder.py:24).
 </pre><h3>2026-09-23-065428-audit.md</h3><pre># Audit 2026-09-23-065428
 
 _Fresh independent audit (→ AUDIT). Reason: → AUDIT read-only, line-cited: does the exam&#x27;s per-trade cost include the FIXED per-order brokerage (₹20/order with cap), STT, exchange fees and GST at each trade&#x27;s real notional, or only a proportion_
