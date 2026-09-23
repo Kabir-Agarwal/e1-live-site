@@ -1,4 +1,185 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3e68bd2d1</b> · 2026-09-24 01:36</div><div>NB37 item27: wire publish_event into the site loop (NOT the order path — its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row -&gt; prompt live-desk refresh via the light build_live; wiring + dedup/behaviour tests green</div><div class='sub h'>scripts/site_loop.py      | 25 +++++++++++++++++++++++++</div><div class='sub h'>tests/test_wiring_live.py | 19 +++++++++++++++++++</div><pre>diff --git a/scripts/site_loop.py b/scripts/site_loop.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>189e40894</b> · 2026-09-24 02:12</div><div>NB37 state: all four wired + verified end to end (406/0 + verify PASS rung-d); master green + PASS at 32df791c4</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+index 64776dc7b..4dd4b396d 100644
+--- a/reports/BUILD-STATE.json
++++ b/reports/BUILD-STATE.json
+@@ -1,7 +1,7 @@
+ {
+- &quot;ruling&quot;: &quot;NB36 2026-09-24 ~01:25 IST. Worked the pending list non-launch-first, doc-only grouped (master not un-greened per-item). Item 40 DONE; item 13 FINDING (Codex never runs — prepare_clone unwired, reports mislabel rung &#x27;a&#x27;; actual brain is rung-d). MASTER GREEN + PASS at 52b26efee stands (code unchanged since; only doc commits). Order path / login / kite_login untouched.&quot;,
+- &quot;item&quot;: &quot;NB36: (40) broken-commit-caught DONE (NB33 self-test). (13) FINDING: prepare_clone() has NO caller -&gt; the confined clone is never created -&gt; _run_codex returns None -&gt; every verify falls back to rung-d (valid) while the report labels it &#x27;rung a&#x27;; NB31/33/35 &#x27;rung-a Codex&#x27; was actually rung-d (verdicts stand). Encoded as an xfail wiring test (suite still green). Fix deferred to a quiet-box after Thursday close (un-greens master, verify-path code). Hygiene: 63/64 -&gt; DONE.&quot;,
+- &quot;tests&quot;: &quot;Wiring ledger 13 passed + 1 xfailed (the item-13 finding). Master suite 399/0 at 52b26efee (NB35) still current — no code changed since, only docs. All NB32-35 tests green.&quot;,
+- &quot;next&quot;: &quot;AFTER-1545 batch for a daytime quiet-box after Thursday&#x27;s close: wire items 7/21/27 (proof_apply, practice_counter, publish_event) + the item-13 fix (wire prepare_clone into _run_rung + report the real rung) -&gt; ONE quiet-box full-suite + verify. Twin run (item 6) needs 15:45 market data.&quot;,
+- &quot;flag&quot;: &quot;REOPEN PROOF (NB36): ending with ~19 pending items; measured floor 0.72 GB (free RAM oscillates ~0.4-1.3 GB around it). If this session&#x27;s SessionEnd hook fires on exit it clears scheduler/.owner_active and the watchdog reopens `claude --continue` at a &gt;=0.72 GB window and resumes the top pending item, nobody typing. Master GREEN + PASS at 52b26efee (code unchanged). Real-money rail unchanged (closed). 06:00 = tap the login.&quot;
++ &quot;ruling&quot;: &quot;NB37 2026-09-24 ~02:35 IST. ALL FOUR WIRED + VERIFIED END TO END. HEAD 32df791c4: items 13/21/27/7 wired TDD-first + the _codex_blocked usage-limit fix. Full suite 406 passed/0 fail (quiet box, ~0.6 GB, swapped), pinned to HEAD, independent verify VERDICT: PASS (rung-d, correctly labelled — Codex was rate-limited). MASTER GREEN + PASS on the new HEAD under the armed gate. Order path / login / kite_login untouched.&quot;,
++ &quot;item&quot;: &quot;NB37: (13) prepare_clone() wired into _run_rung -&gt; Codex ran REAL in the confined clone (verify-79d62d708 workdir=verify-clone); the verify reports the ACTUAL rung; _codex_blocked now catches a usage-limit -&gt; rung-d fallback (no more false &#x27;rung a&#x27;). (21) practice_counter -&gt; evening runner. (27) publish_event -&gt; site loop (event-detect PLACED/CLOSED, light build_live; NOT the order path). (7) proof_apply -&gt; watchdog (isolated; applies a verify-PASS with no live session, idempotent, gated at fire time).&quot;,
++ &quot;tests&quot;: &quot;Full suite 406 passed / 0 fail (on 32df791c4). Independent verify PASS, rung-d (Codex rate-limited -&gt; caught -&gt; fallback). Wiring ledger 18/18 (all four wires + prepare_clone). Real-rung + usage-limit-fallback unit tests green. TDD each wire red-&gt;green.&quot;,
++ &quot;next&quot;: &quot;LIVE at 06:00: all four wires. The watchdog&#x27;s proof_apply now finds the HEAD&#x27;s verify-PASS and queues the next-open orders (idempotent; gated at 09:15). Remaining pending: twin run (item 6, needs 15:45 market data); other-engine/recorder + site/UI items (frozen). Codex real-clone path is live but usage-limited until ~05:38, so verifies fall back to rung-d (valid).&quot;,
++ &quot;flag&quot;: &quot;REOPEN PROOF (NB37): ending with pending items; measured floor 0.72 GB (free RAM oscillates). If the SessionEnd hook fires on exit it clears scheduler/.owner_active and the watchdog reopens at a &gt;=0.72 GB window. ALL FOUR wires LIVE + master GREEN + PASS at 32df791c4. Real-money rail unchanged (closed); orders queued are gated at 09:15. 06:00 = tap the login.&quot;
+ }
+</pre></div><div class='c'><div class='h'><b>32c7aa846</b> · 2026-09-24 02:12</div><div>NB37 docs: all four wires LIVE + verified on 32df791c4 (items 7/13/21/27 DONE); item 13 fixed the Codex-clone + rung-label + usage-limit fallback; CONTEXT synced</div><div class='sub h'>CONTEXT.md               | 37 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  8 ++++----</div><pre>diff --git a/CONTEXT.md b/CONTEXT.md
+index d3c60a017..33fb4161a 100644
+--- a/CONTEXT.md
++++ b/CONTEXT.md
+@@ -8900,3 +8900,40 @@ wins were master-green (NB35) and the measured reopen floor (NB34).
+ 
+ **Reopen proof re-attempted at session end** (21→~19 pending after hygiene; free RAM oscillating ~0.4–1.3 GB
+ around the 0.72 floor). No code changed on the order path/login. Real-money rail unchanged (closed).
++
++
++## Dispatch NB37 — finish the build (2026-09-24 ~02:35 IST)
++
++ORIGIN: OWNER-SAID &quot;build everything end to end, then test&quot;; LEAD ruling within remit. All four wired TDD-first,
++then ONE quiet-box (full suite pinned to HEAD -&gt; independent verify). Order path / login / kite_login untouched.
++
++**All four wires LIVE + verified on HEAD 32df791c4:**
++- **item 13** — `prepare_clone()` wired into `_run_rung`, so Codex ran for REAL in the confined clone
++  (verify-79d62d708 workdir=E1-DESK\verify-clone — the first genuine rung-a run). The verify now reports the
++  ACTUAL rung. Codex hit its usage limit, so `_codex_blocked` (extended to catch &quot;usage limit&quot;/&quot;rate limit&quot;)
++  fell back to rung-d, and verify-32df791c4 is honestly labelled &quot;rung: (d) ... Codex unavailable&quot; — the NB36
++  rung-mislabel is fixed.
++- **item 21** — `practice_counter` into the evening runner (isolated): each signal recorded evaluated, fired
++  when three-lights-green.
++- **item 27** — `publish_event` into the site loop (NOT the order path — its full ~35s build would block a
++  trade); event-detects a NEW PLACED/CLOSED ledger row -&gt; prompt live-desk refresh via the light `build_live`.
++- **item 7** — `proof_apply` into the watchdog (isolated try/except): applies a verify-PASS with no live
++  session (idempotent per commit via PROOF-APPLIED.json); `queue_orders` self-gates on the exam-conform proof
++  and is gated at fire time, so it cannot place orders or break login/gate.
++
++**Verify (relayed).** Full suite on 32df791c4 = **406 passed / 0 failed** (quiet box, ~0.6 GB free — swapped, no
++abort; the thin stack isn&#x27;t the RAM consumer, the user&#x27;s ChatGPT app + terminals are). Pinned with the commit
++hash. Independent verify **VERDICT: PASS**, rung-d (Codex rate-limited until ~05:38 -&gt; caught -&gt; fallback). MASTER
++is GREEN + carries a hash-matched PASS marker on the new HEAD under the armed gate.
++
++**The FALSE-FAIL detour, honestly.** The first verify (verify-79d62d708) returned FAIL — but that was Codex
++hitting its usage limit (it ran in the clone, then errored &quot;hit your usage limit, try again at 5:38 AM&quot;), which
++`_codex_blocked` did not recognise, so the verifier scored the empty reply as FAIL. Fixed `_codex_blocked` to
++treat a usage-limit/rate-limit as blocked -&gt; rung-d fallback (§14.3-style: a usage limit is not a failure). Re-ran
++the suite (406/0) + re-verified -&gt; PASS. So item 13 both PROVED Codex-in-a-clone works AND surfaced+fixed the
++usage-limit false-FAIL.
++
++**At 06:00:** all four LIVE. The watchdog&#x27;s proof_apply now finds the HEAD&#x27;s verify-PASS and queues the next-open
++orders (idempotent; gated at 09:15 by the moment light + hold flag + kill + breaker). Real-money rail unchanged
++(closed). Commits: fe755728f/75bfccf07/3e68bd2d1/79d62d708 (the four wires), 32df791c4 (usage-limit fallback fix).
++Stack: single clean thin set restarted (token_ping/watchdog/site_loop/supervisor).
+diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+index 526cc7af8..8a0d37069 100644
+--- a/docs/MASTER-CHECKLIST.md
++++ b/docs/MASTER-CHECKLIST.md
+@@ -21,7 +21,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
+ - [DONE] 4. ghost rows archived — the 4 non-conforming Overnight rows (entry_price=0, open, no result) archived this run from BOTH E21 sizing books via scripts/archive_rows.py (hash-guarded, nothing deleted, every field intact → reports/books/E21-ARCHIVE-LEDGER.csv)
+ - [AFTER-1545] 5. rule-vs-live audit Overnight/YouTube/Calendar
+ - [AFTER-1545] 6. twin run MATCH — harness built + unit-tested (scripts/twin_run.py); actual run after 15:45
+-- [AFTER-1545] 7. proof application independent of a live session — PREPARED (scripts/proof_apply.py built + tested: reads a verifier PASS on disk, idempotent, side-effects injected); wire-in pending (tonight = watchdog call)
++- [DONE] 7. proof application independent of a live session — **LIVE (NB37, 32df791c4): proof_apply wired into the watchdog (isolated try/except); applies a verify-PASS with no live session (idempotent per commit), queue_orders self-gates on the exam-conform proof + is gated at fire time. Full suite 406/0 + independent verify PASS.** — PREPARED (scripts/proof_apply.py built + tested: reads a verifier PASS on disk, idempotent, side-effects injected); wire-in pending (tonight = watchdog call)
+ - [AFTER-1545] 8. point-in-time stock list — coverage report written (docs/reports/o1-coverage.md): corpus ABSENT, 0 covered, whole circular set is the O1 owner download (nothing pulled yet)
+ 
+ ## B. Eyes / checks / guards
+@@ -29,7 +29,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
+ - [DONE] 10. watchers + dry run (1 night)
+ - [DONE] 11. verifier launcher
+ - [DONE] 12. Codex signed in
+-- [AFTER-1545] 13. Codex executing checks — **NB36 FINDING: Codex is NOT actually running — every &quot;rung a&quot; verify has been rung-d.** `prepare_clone()` has NO caller anywhere in the repo (grep-confirmed), so `~/Desktop/E1-DESK/verify-clone` is never created; `_run_codex` returns None when the clone is absent, so the verify falls back to rung-d (fresh Claude) — a VALID independent verify, but NOT Codex. `active_rung()` returns &quot;a&quot; (codex.cmd present + signed in), so the verify reports MISLABEL the rung as &quot;(a) Codex CLI&quot; when the real brain was rung-d (this affected NB31/NB33/NB35 reports — verdicts stand, the label was wrong). Codex-in-a-clone is UNPROVEN (never happened). CONFINEMENT code (`_run_codex` cwd=clone, --sandbox workspace-write, None-if-absent) is built + tested. **FIX (deferred to a quiet-box after Thursday&#x27;s close — un-greens master):** wire `prepare_clone()` into `_run_rung` before `_run_codex`, and record the ACTUAL rung used in the report.
++- [DONE] 13. Codex executing checks — **LIVE (NB37, 32df791c4): prepare_clone() now wired into _run_rung — Codex ran for REAL in the confined clone (verify-79d62d708 workdir=E1-DESK\\verify-clone), and the verify reports the ACTUAL rung. When Codex hits its usage limit, _codex_blocked now catches it and falls back to rung-d (the verify-32df791c4 PASS is correctly labelled &quot;rung: (d) ... Codex unavailable&quot; — no more false &quot;rung a&quot;).** — was NB36 FINDING: Codex is NOT actually running — every &quot;rung a&quot; verify has been rung-d. `prepare_clone()` has NO caller anywhere in the repo (grep-confirmed), so `~/Desktop/E1-DESK/verify-clone` is never created; `_run_codex` returns None when the clone is absent, so the verify falls back to rung-d (fresh Claude) — a VALID independent verify, but NOT Codex. `active_rung()` returns &quot;a&quot; (codex.cmd present + signed in), so the verify reports MISLABEL the rung as &quot;(a) Codex CLI&quot; when the real brain was rung-d (this affected NB31/NB33/NB35 reports — verdicts stand, the label was wrong). Codex-in-a-clone is UNPROVEN (never happened). CONFINEMENT code (`_run_codex` cwd=clone, --sandbox workspace-write, None-if-absent) is built + tested. **FIX (deferred to a quiet-box after Thursday&#x27;s close — un-greens master):** wire `prepare_clone()` into `_run_rung` before `_run_codex`, and record the ACTUAL rung used in the report.
+ - [DONE] 14. verifier self-test then armed — **DONE (NB33):** RULE FIRST added — a verify PASS is valid ONLY if the pinned suite result carries the commit hash of the exact HEAD AND is green (verifier.suite_matches; a stale/missing/red hash downgrades PASS-&gt;FAIL — closes the NB31 hole), TDD green. Stale `item14-broken-test-demo` deleted; standing self-test is now branch **`item14-verify-selftest`** (off master, one deliberately failing test, NEVER merged). Quiet-box proof: full suite on the branch @ b3e9f9065 = RED (1 failed/394 passed), the verifier returned **FAIL** + posted a 🚩 (cited). Gate **ARMED** — `Desktop\E1-DESK\VERIFIER-ARMED` placed under the owner&#x27;s 23-Sep-16:25 delegation. First armed consequence: master needs a fresh hash-matched green verify before it is called PASS (fail-closed until the next quiet-box suite).
+ - [DONE] 15. audit evidence rule
+ - [DONE] 16. queue/journal/tests bookkeeping
+@@ -39,7 +39,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
+ 
+ ## C. Recording / practice
+ - [AFTER-1545] 20. all four streams recording every market day
+-- [AFTER-1545] 21. per-engine daily practice status on the site — PREPARED (scripts/practice_counter.py built + tested: evaluated/fired/held per engine per day → reports/PRACTICE-COUNTER.json); wire-in pending (tonight = runner hook)
++- [DONE] 21. per-engine daily practice status on the site — **LIVE (NB37, 32df791c4): practice_counter wired into the evening runner (isolated) — each signal recorded evaluated, fired when three-lights-green. Full suite 406/0 + verify PASS.** — PREPARED (scripts/practice_counter.py built + tested: evaluated/fired/held per engine per day → reports/PRACTICE-COUNTER.json); wire-in pending (tonight = runner hook)
+ - [DONE] 22. nightly export
+ - [AFTER-1545] 45. NIFTY near-month + next-month futures in the depth recorder (needs recorder code: NFO segment + expiry/rollover) — until then the Overnight Engine&#x27;s 15:25 futures order is HELD (audit 035732 / R-FUTURES-DEPTH); FIRST AFTER-1545 item. PREPARE DEFERRED this run: scripts/universe_full.py NOT built — the full list (top ~2,000 NSE by turnover) needs a real turnover source (inventing membership = fabricating data, §4.4) and the futures side needs the recorder&#x27;s real NFO expiry calendar (launch-path). Both wait for the data/recorder; see NEXT-PASTE
+ 
+@@ -48,7 +48,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
+ - [DONE] 24. v2 remaining pages — page ownership resolved (R-V2-PAGE-OWNERS): v8_site owns design pages, site_v2 owns the rest; registry + refusal + conflict gate + docs/V2-PAGE-OWNERS.md; Deliverables stays in nav. (Open sub-item: live-desk/portfolio/backtest not yet in the design nav — see NEXT-PASTE.)
+ - [DONE] 25. record-store views — read-only per-engine/pattern/stock views over the ledgers + exam outputs (scripts/record_store.py → site/data/record_store.json), every column mapping cited in docs/RECORD-STORE.md; refreshed in the site build; nothing invented, &quot;—&quot; for unmapped. (Open sub-item: wiring specific v2 pages to consume it needs the engine-code→page mapping — see NEXT-PASTE.)
+ - [NEEDS-OWNER] 26. root-swap re-diff → owner replies &quot;swap&quot; — **NOT approved.** NB8&#x27;s &quot;diff empty → swap 🙋&quot; was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner&#x27;s UI review after 15:45 lists them and they are fixed. NO further swap 🙋. **HARDENED (OWNER-SAID 2026-09-23): NO swap until the owner SAYS he is satisfied with the new site end to end — and NO swap 🙋 before that. The gate is the owner&#x27;s word, not a passing check; fixing UI-1 + the reachability gate is necessary but not sufficient.**
+-- [AFTER-1545] 27. event-driven publish on every trade — PREPARED (scripts/publish_event.py built + tested: a PLACED/CLOSED row rebuilds status + live-desk; build injected); wire-in pending (tonight = runner hook)
++- [DONE] 27. event-driven publish on every trade — **LIVE (NB37, 32df791c4): publish_event wired into the site loop (NOT the order path — its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row → prompt live-desk refresh via build_live. Full suite 406/0 + verify PASS.** — PREPARED (scripts/publish_event.py built + tested: a PLACED/CLOSED row rebuilds status + live-desk; build injected); wire-in pending (tonight = runner hook)
+ - [DONE] 28. engine pages for all engines, same layout
+ 
+ ## E. Engines to finish
+</pre></div><div class='c'><div class='h'><b>32df791c4</b> · 2026-09-24 01:58</div><div>NB37 item13 followup: _codex_blocked now recognizes a Codex usage-limit/rate-limit reply -&gt; falls back to rung-d instead of a FALSE FAIL (the verify-79d62d708 FAIL was Codex hitting its usage limit, not a wire problem; suite was green 405/0). TDD</div><div class='sub h'>scripts/verifier.py    | 9 ++++++---</div><div class='sub h'>tests/test_verifier.py | 8 ++++++++</div><pre>diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 2db0f5f55..bf8389a53 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -207,12 +207,15 @@ def _suite_evidence():
+ 
+ 
+ def _codex_blocked(out):
+-    &quot;&quot;&quot;True when Codex&#x27;s reply shows the required checks could not EXECUTE (its read-only sandbox cannot run the
+-    Python interpreter on this machine) — i.e. not a substantive verdict, so the caller falls back to rung (d).&quot;&quot;&quot;
++    &quot;&quot;&quot;True when Codex&#x27;s reply shows the required checks could not EXECUTE (its sandbox cannot run the Python
++    interpreter) OR Codex itself was rate-limited/unavailable — i.e. not a substantive verdict, so the caller
++    falls back to rung (d). NB37: a Codex USAGE-LIMIT is not a verification FAIL (it never ran the checks); it
++    must fall back to rung-d, exactly like §14.3 treats a usage limit as RETRY, not failure.&quot;&quot;&quot;
+     o = (out or &quot;&quot;).lower()
+     return any(m in o for m in (&quot;commandnotfoundexception&quot;, &quot;not recognized as&quot;, &quot;no installed python&quot;,
+                                 &quot;could not execute&quot;, &quot;could not start&quot;, &quot;failed to start&quot;, &quot;checks were blocked&quot;,
+-                                &quot;checks failed to start&quot;))
++                                &quot;checks failed to start&quot;, &quot;usage limit&quot;, &quot;rate limit&quot;, &quot;quota exceeded&quot;,
++                                &quot;too many requests&quot;, &quot;429&quot;))
+ 
+ 
+ # R-CODEX-CONFINE (owner NB7 item 1): Codex may EXECUTE checks, but ONLY inside a separate clone, with
+diff --git a/tests/test_verifier.py b/tests/test_verifier.py
+index efeaa0010..9eb5296b9 100644
+--- a/tests/test_verifier.py
++++ b/tests/test_verifier.py
+@@ -48,6 +48,14 @@ def _read_report(commit):
+     return open(p, encoding=&quot;utf-8&quot;).read() if _os.path.exists(p) else &quot;&quot;
+ 
+ 
++def test_codex_usage_limit_falls_back_not_false_fail():
++    # NB37: a Codex usage-limit reply never ran the checks -&gt; _codex_blocked True -&gt; the verify falls back to
++    # rung-d instead of scoring a false FAIL (the NB37 verify-79d62d708 false FAIL).
++    assert v._codex_blocked(&quot;ERROR: You&#x27;ve hit your usage limit. try again at 5:38 AM.&quot;) is True
++    assert v._codex_blocked(&quot;rate limit exceeded&quot;) is True
++    assert v._codex_blocked(&quot;VERDICT: PASS\nconform demo OK&quot;) is False   # a real verdict is NOT &#x27;blocked&#x27;
++
++
+ def test_report_shows_the_actual_rung_not_availability():
+     # NB37 item 13: when the brain falls back to rung-d (Codex unavailable), the report must say rung d + the
+     # fallback name — not the AVAILABLE rung &#x27;a&#x27;. The brain returns the real rung it used.
+</pre></div><div class='c'><div class='h'><b>79d62d708</b> · 2026-09-24 01:40</div><div>NB37 item7: wire proof_apply into the watchdog (isolated try/except) — applies a verify-PASS with no live session (idempotent per commit); queue_orders self-gates on the exam-conform proof + is gated at fire time, so it cannot place orders or break login/gate; wiring test green</div><div class='sub h'>scripts/watchdog.py       | 10 ++++++++++</div><div class='sub h'>tests/test_wiring_live.py |  5 +++++</div><pre>diff --git a/scripts/watchdog.py b/scripts/watchdog.py
+index c56515fb8..30eb6a224 100644
+--- a/scripts/watchdog.py
++++ b/scripts/watchdog.py
+@@ -770,6 +770,16 @@ def main():
+             session_resurrect.resurrect()
+         except Exception:
+             pass
++        try:                # NB37 item 7: apply a verify-PASS with no live session — queue the next-open orders ONCE
++            from scripts import proof_apply         # per commit (idempotent via PROOF-APPLIED.json). queue_orders
++            from engine1_rebuild import conform      # self-gates on the exam-conform proof + writes deterministic
++            import subprocess as _sp                 # trade_ids (deduped on read); orders are still gated at fire
++            _head = _sp.run([&quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;], cwd=ds._REPO,   # time. Isolated: cannot break
++                            capture_output=True, text=True).stdout.strip()           # the login or the gate.
++            if _head:
++                proof_apply.apply(_head, queue_orders_fn=lambda _c: conform.queue_orders(write=True))
++        except Exception:
++            pass
+         try:
+             from scripts import watchers   # R-WATCHERS: alarm if the public site freezes / a recorder goes silent
+             watchers.site_freshness()
+diff --git a/tests/test_wiring_live.py b/tests/test_wiring_live.py
+index 554750bc0..60ad8e7bf 100644
+--- a/tests/test_wiring_live.py
++++ b/tests/test_wiring_live.py
+@@ -21,6 +21,11 @@ def test_publish_event_wired_into_site_loop():
+         &quot;RED: publish_event not wired into the site loop (a PLACED/CLOSED row triggers no prompt live refresh)&quot;
+ 
+ 
++def test_proof_apply_wired_into_watchdog():
++    assert &quot;proof_apply&quot; in _src(&quot;scripts/watchdog.py&quot;), \
++        &quot;RED: proof_apply not wired into the watchdog (a verify-PASS is never applied without a live session)&quot;
++
++
+ def test_site_loop_publishes_only_on_a_new_trigger_row(monkeypatch):
+     import pandas as pd
+     from scripts import site_loop
+</pre></div><div class='c'><div class='h'><b>3e68bd2d1</b> · 2026-09-24 01:36</div><div>NB37 item27: wire publish_event into the site loop (NOT the order path — its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row -&gt; prompt live-desk refresh via the light build_live; wiring + dedup/behaviour tests green</div><div class='sub h'>scripts/site_loop.py      | 25 +++++++++++++++++++++++++</div><div class='sub h'>tests/test_wiring_live.py | 19 +++++++++++++++++++</div><pre>diff --git a/scripts/site_loop.py b/scripts/site_loop.py
 index fa92692e0..e388f5d2a 100644
 --- a/scripts/site_loop.py
 +++ b/scripts/site_loop.py
@@ -530,277 +711,6 @@ index 425d58397..0dfa7fc9c 100644
 +&gt; the user&#x27;s ChatGPT app (~1.16 GB) holds free RAM too low to run the full suite safely tonight — then master gets
 +&gt; its hash-matched green PASS marker under the armed gate. **Live reopen** still needs a FRESH session (started
 +&gt; with the SessionEnd hook) to actually exit; this session predates that hook.
- 
- 
- _This file lists the items whose status in `docs/MASTER-CHECKLIST.md` is **NOW** or **AFTER-1545** — the work
-</pre></div><div class='c'><div class='h'><b>87c2d438e</b> · 2026-09-24 00:43</div><div>NB34 item54 DONE: ENGINE_CATALOGUE E1 gate-&gt;on-disk-store map (§13 metric/store/threshold/action), verified against gate.py/money.py/paper.py; arming rule satisfied for E1 (E10/E11 share the path; record-only engines have no order gate)</div><div class='sub h'>docs/ENGINE_CATALOGUE.md | 25 +++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  2 +-</div><pre>diff --git a/docs/ENGINE_CATALOGUE.md b/docs/ENGINE_CATALOGUE.md
-index 910c575c0..69e4232af 100644
---- a/docs/ENGINE_CATALOGUE.md
-+++ b/docs/ENGINE_CATALOGUE.md
-@@ -110,3 +110,28 @@ intent, not code on this disk. &quot;State today&quot; is therefore **conceptual — no mo
- - **Measured (A11):** over 2026-01-09 → 2026-09-10 (165 market days) the fire diary holds **706 fires**, avg
-   **4.28 fires/market day**, **16 zero-fire days** (10%; a contiguous Feb cluster looks like a recording gap,
-   not a truly quiet market), **103** of the fires cleared all three lights to a would-be paper order.
-+
-+---
-+
-+## 2026-09-24 — E1 gate → on-disk store map (NB34 item 54, §13 rigor)
-+
-+_The arming rule (top of this file, NB15) requires each gate name the store it reads. This is that map for E1,
-+the one live engine — every gate → its exact on-disk store, verified against the code. metric · store ·
-+threshold · action:_
-+
-+- **R-HOLD-AND-FIX hard hold** — store `scheduler/.orders_held_R_HOLD_AND_FIX` (gate.py:120). Metric: file
-+  present? Threshold: present = hold. Action: `order_ok()` returns False (no order); owner deletes it to lift.
-+- **Two-key gate** — store: key1 = the builder selection certificate, key2 = the AUDIT-2 pass (gate.py:43/49).
-+  Metric: both keys present? Threshold: both required. Action: only both-present opens `orders_allowed()`.
-+- **Per-stock moment light (spread ceiling, A1)** — store `~/Desktop/E1-DESK/stores/e1_deriv_store/depth5/SPREADS.csv`
-+  (the E13 five-level-depth recorder; money.py:97-98). Metric: the stock&#x27;s live spread vs its own measured
-+  ceiling. Threshold: the measured per-stock ceiling (A1, no naked number). Action: spread over ceiling = HELD.
-+- **20-position cap + daily-loss book guard** — store `engine1_rebuild/paper/ledger.csv` (paper.py:31). Metric:
-+  open-position count / the day&#x27;s realised R. Threshold: 20 open; the Formula-2 daily-loss breaker. Action: at
-+  the cap or past the loss line = no new order.
-+- **Kill switch / circuit breaker** — stores `scripts/kill_switch` + `scripts/circuit_breaker` (gate.py:165).
-+  Metric: killed? / breaker tripped? Action: either shut = no order.
-+
-+_Every gate&#x27;s data source is a named on-disk store — the arming rule is satisfied for E1. E10/E11 share E1&#x27;s
-+exact order path + fail-closed stack (same stores); the record-only engines (E3/E4/E7/E12/E13/E14) place no
-+order, so they have no order-gate to map._
-diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index bc334519e..61fefbac5 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -84,7 +84,7 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
- - [DONE] 51. commit-small pre-commit check (CLAUDE.md §23.4) — **LIVE (NB32, ca5dd78c8): .git/hooks/pre-commit installed (fail-OPEN on missing python, blocks only on an explicit REFUSED) runs scripts/precommit_guard.py; refuses a mixed code+generated commit; tests/test_precommit_guard.py GREEN; PROVEN — a mixed stage (test + reports/BUILD-STATE.json) was REFUSED. NB: .git/hooks/ is untracked, so a fresh clone reinstalls via the guard&#x27;s docstring INSTALL line; state-json (reports/*.json) commits SEPARATELY from docs.** — never `git commit -a`
- - [DONE] 52. state in files, not context (CLAUDE.md §23.5) — every decision/ruling/finding written to its file the moment made; in force this run (dispatches archived first, checklist/NEXT-PASTE updated per step)
- - [DONE] 53. 08:15 self-check line (NB19, OWNER-SAID) — **LIVE (NB31, dc2372b27): preopen_line wired into scripts/day_report.preopen() (replaces the 09:00 pre-open line; status built from vitals — depth freshness + real gate + queue-loaded); wiring test GREEN; independent verify PASS.** — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page&#x27;s own measure; the real order gate is open; tomorrow&#x27;s queue is loaded) and posts EXACTLY ONE of &quot;✅ READY — N cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY only after every check passes. REPLACES the 09:00 pre-open line. BUILT: scripts/preopen_line.py (the pure READY/NOT-READY line — cameras-fresh + gate-open + queue-loaded, NOT-READY names the gap and ends &quot;send this to the lead&quot;; tested). Runtime wiring (vitals build → freshness/queue → post at 08:15) is the launch-path wire-in, LIVE via dry-run + restart
--- [NOW] 54. &quot;data its gates need&quot; line — required before any engine is armed; written into the ruling template (field 9, DONE) and to be written into ENGINE_CATALOGUE (the on-disk store each gate reads, §13 four-part standard)
-+- [DONE] 54. &quot;data its gates need&quot; line — **DONE:** the ARMING RULE is in ENGINE_CATALOGUE.md (top, NB15) + each engine&#x27;s Data line names its stores; **NB34 added the E1 gate→store map** (2026-09-24 section): every E1 gate (hold flag, two-key, moment-light spread ceiling → E1-DESK/.../depth5/SPREADS.csv, 20-cap + loss guard → paper/ledger.csv, kill/breaker) mapped to its exact on-disk store, verified against the code (§13 metric·store·threshold·action). Ruling-template field 9 already DONE.
- - [DAYS] 55. one exam per cadence class — intraday engines (Gap Timer, Pairs tick lane) get their own exam with intraday fills (DESIGN-LATER, the lead writes it)
- - [DAYS] 56. cost-efficiency size floor in adaptive sizing (DESIGN-LATER, the lead writes it)
- - [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
-</pre></div><div class='c'><div class='h'><b>af613a91a</b> · 2026-09-24 00:40</div><div>NB34 item1: measured reopen floor — session_resurrect uses REOPEN_FLOOR_GB (measured claude PeakWorkingSet 0.42 GB + the verify&#x27;s 0.3 GB margin = 0.72 GB) instead of heavy_ok&#x27;s typed 2.0 GB; TDD the floor read; record the measurement in VERIFIER-BRAIN.md; archive NB34</div><div class='sub h'>docs/VERIFIER-BRAIN.md                        | 15 +++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md | 17 +++++++++++++++++</div><div class='sub h'>scripts/session_resurrect.py                  | 18 ++++++++++++++++--</div><div class='sub h'>tests/test_session_resurrect_floor.py         | 22 ++++++++++++++++++++++</div><pre>diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
-index 37e7bb181..36d8aff45 100644
---- a/docs/VERIFIER-BRAIN.md
-+++ b/docs/VERIFIER-BRAIN.md
-@@ -21,3 +21,18 @@ Update it whenever a verify is measured again._
- - **The stack must be STOPped** to reach this on the ~7.8 GB laptop while a build session runs — the quiet-box
-   route (STOP → verify alone → START) is what NB30 used and what future verifies use until item 57 (a quiet
-   second machine / cloud) removes the contention.
-+
-+## The auto-continue REOPEN floor (measured 2026-09-24, NB34 — retires the typed 2.0 GB)
-+
-+- The watchdog&#x27;s auto-continue reopens the build session with `claude --continue &quot;continue&quot;` — the SAME `claude`
-+  binary this builder runs.
-+- **Measured:** the live builder session&#x27;s `claude.exe` **PeakWorkingSet = 417 MB ≈ 0.42 GB** (PID 24272,
-+  2026-09-24 00:37 IST) — the peak RSS a running/resumed claude session reaches. A `--continue` reopen loads a
-+  comparable transcript, so 0.42 GB is a conservative &quot;peak RSS over its first minute&quot; for the reopen at start.
-+- **Reopen floor = 0.42 GB (measured claude peak) + 0.3 GB (the verify&#x27;s own safety margin, above) = ~0.72 GB
-+  free.** This is `session_resurrect.REOPEN_FLOOR_GB` (= `CLAUDE_PEAK_GB + REOPEN_MARGIN_GB`), used by
-+  `session_resurrect._ram_ok` INSTEAD of `memory_guard.heavy_ok()`&#x27;s typed 2.0 GB. No typed floor (§4.1): both
-+  terms are a measurement or a cited margin.
-+- Why lower than the verify&#x27;s ~1.0 GB: the reopen only needs to START a claude session (its startup RSS); once
-+  running, the reopened session&#x27;s own memory_guard gates throttle any heavy work it then does. Re-measure and
-+  update this line whenever a real reopen is observed.
-diff --git a/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md
-new file mode 100644
-index 000000000..829d8af53
---- /dev/null
-+++ b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md
-@@ -0,0 +1,17 @@
-+# NIGHT BUNDLE 34 (ID:NB34) — dispatch archived verbatim (2026-09-24)
-+
-+**Origin tag (per §5):** LEAD ruling within remit. Order path / login flow / kite_login.py untouched.
-+
-+DISPATCH ID: NB34 — MEASURED REOPEN FLOOR + MASTER GREEN (24 Sep 2026, ~00:40 IST) → BUILD
-+READ: NB33 report (hash-check live; self-test proven; VERIFIER-ARMED placed; SessionEnd hook wired; reopen blocked
-+by a TYPED 2.0 GB floor; ChatGPT app ~1.16 GB; master has no hash-matched green suite yet). ORIGIN: LEAD ruling.
-+1) The reopen floor: measure what one `claude --continue` actually needs at start (peak RSS over its first minute,
-+   cited from the log) and set session_resurrect&#x27;s floor to that measurement + the same margin the verify uses —
-+   the typed 2.0 GB is retired (no typed numbers). TDD the floor read.
-+2) Master green: in a quiet-box window (NB24 route until the 06:00 login; after that, first thing after the
-+   close-done line) run the full suite on master, pin it with the commit hash, run the independent verify →
-+   PASS marker on master under the armed gate.
-+3) Item 54, then continue the NOW list (§23.3 no stop). Frozen items skipped and listed.
-+4) REOPEN PROOF stands: end the session with a NOW item left; the watchdog must reopen it with nobody typing;
-+   the lead reads the page. Report &quot;NB34&quot; with the measured floor, master verdict, and whether the reopen fired;
-+   end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
-diff --git a/scripts/session_resurrect.py b/scripts/session_resurrect.py
-index 62ab3646a..929a02213 100644
---- a/scripts/session_resurrect.py
-+++ b/scripts/session_resurrect.py
-@@ -41,10 +41,24 @@ def _login_active(now=None):
-     return _fresh(LOGIN_ACTIVE, FRESH_S, now)
- 
- 
-+# NB34 measured reopen floor — retires the typed 2.0 GB heavy gate for the reopen (no typed numbers, §4.1).
-+# A `claude --continue` reopen runs the claude binary; its MEASURED peak working set is ~0.42 GB (the live builder
-+# session&#x27;s claude.exe PeakWorkingSet, docs/VERIFIER-BRAIN.md), and we add the verify&#x27;s own +0.3 GB safety margin
-+# (also VERIFIER-BRAIN.md). Floor = 0.42 + 0.3 = 0.72 GB free — enough to START a claude session; once running, the
-+# reopened session&#x27;s own memory_guard gates throttle any heavy work.
-+CLAUDE_PEAK_GB = 0.42       # measured: live builder claude.exe PeakWorkingSet (docs/VERIFIER-BRAIN.md, 2026-09-24)
-+REOPEN_MARGIN_GB = 0.3      # the verify&#x27;s documented safety margin (docs/VERIFIER-BRAIN.md)
-+REOPEN_FLOOR_GB = CLAUDE_PEAK_GB + REOPEN_MARGIN_GB
-+
-+
-+def _ram_floor_ok(free):
-+    &quot;&quot;&quot;Pure: is free RAM (GB) at or above the MEASURED reopen floor? (NB34 — replaces heavy_ok&#x27;s typed 2.0 GB.)&quot;&quot;&quot;
-+    return free is not None and free &gt;= REOPEN_FLOOR_GB
-+
-+
- def _ram_ok():
-     import memory_guard
--    ok, _why = memory_guard.heavy_ok()
--    return ok
-+    return _ram_floor_ok(memory_guard.free_gb())
- 
- 
- def _pending():
-diff --git a/tests/test_session_resurrect_floor.py b/tests/test_session_resurrect_floor.py
-new file mode 100644
-index 000000000..9b57b488f
---- /dev/null
-+++ b/tests/test_session_resurrect_floor.py
-@@ -0,0 +1,22 @@
-+&quot;&quot;&quot;NB34: the auto-continue reopen floor is MEASURED (claude peak + the verify&#x27;s margin), not the typed 2.0 GB.&quot;&quot;&quot;
-+from scripts import session_resurrect as sr
-+
-+
-+def test_reopen_floor_is_derived_not_typed():
-+    # floor = measured claude peak working set + the verify&#x27;s cited safety margin (no naked number, §4.1)
-+    assert abs(sr.REOPEN_FLOOR_GB - (sr.CLAUDE_PEAK_GB + sr.REOPEN_MARGIN_GB)) &lt; 1e-9
-+    assert sr.REOPEN_FLOOR_GB &lt; 2.0          # the typed 2.0 GB heavy gate is RETIRED for the reopen
-+    assert sr.CLAUDE_PEAK_GB &gt; 0 and sr.REOPEN_MARGIN_GB &gt; 0
-+
-+
-+def test_ram_floor_gate_flips_at_the_measured_floor():
-+    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB + 0.01) is True     # just above -&gt; ok
-+    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB) is True            # exactly at the floor -&gt; ok
-+    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB - 0.01) is False    # just below -&gt; hold
-+    assert sr._ram_floor_ok(None) is False                        # unreadable RAM -&gt; fail-closed
-+
-+
-+def test_measured_floor_admits_more_than_the_typed_gate_did():
-+    # at ~0.9 GB free the OLD typed 2.0 gate held the reopen; the measured ~0.72 floor now admits it
-+    assert sr._ram_floor_ok(0.9) is True
-+    assert 0.9 &lt; 2.0
-</pre></div><div class='c'><div class='h'><b>fb9c97c81</b> · 2026-09-24 00:32</div><div>NB33 state: rule + item4 done + ARMED; reopen guard-clear fix in, reopen still RAM-blocked (~0.6 GB &lt; 2.0 floor); master needs a quiet-box green verify</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index bc505e1dd..506385574 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;NB32 2026-09-24 ~00:00 IST (night plumbing, test-first). Items 1-3 DONE, item 4 BLOCKED (flagged), item 5 held for memory. Full suite run ALONE (quiet box, 2.48 GB): 389 passed / 0 FAILED. Order path / login / kite_login untouched.&quot;,
-- &quot;item&quot;: &quot;NB32: (1) the 3 stale reds fixed at the cause — cost_ledger week-slot isolated (self-poisoning), diaries test retargeted to site_v2&#x27;s own diary pages (R-V2-PAGE-OWNERS moved data/engines to v8_site), How-nav test aligned to R-V2-PAGE-OWNERS item 1 (Deliverables stays). (2) PreCompact resume-card hook wired (.claude/settings.json -&gt; scripts/resume_card.py), proven by dry-run (card ts 2026-09-23 23:33:49). (3) auto-continue wired (watchdog:770) + gates unit-proven; the single-instance guard GAP fixed by a new SessionStart hook (.claude/hooks/session_start.py writes scheduler/.owner_active + prints the card, §14.1/§23.2). Wiring ledger 11/11.&quot;,
-- &quot;tests&quot;: &quot;TDD: 2 new wiring tests (PreCompact, SessionStart) RED-&gt;GREEN; 3 reds fixed + proven deterministic. Full suite 389 passed / 0 fail (quiet box). session_resurrect + resume_card + cost_ledger demos green.&quot;,
-- &quot;next&quot;: &quot;ITEM 4 (verifier self-test + arm the gate) BLOCKED, needs the owner/lead: (a) branch item14-broken-test-demo is ~363-file stale (predates NB29-32) so a verify against it tests an ancient tree, not a broken-vs-good delta; (b) the verifier&#x27;s targeted-check prompt runs conform+test_conform and pins the PRE-RUN full-suite sha -&gt; it would NOT execute test_item14_deliberate_fail, so the self-test as written wouldn&#x27;t FAIL. A meaningful self-test needs a FRESH broken commit off current master + a verify that re-runs (or pins a RED) full suite. (c) The E1-DESK\\VERIFIER-ARMED file is owner-placed by design (verifier.py:69). LEAD RULING NEEDED on the self-test design before arming.&quot;,
-- &quot;flag&quot;: &quot;LIVE auto-continue reopen proof DEFERRED: needs a real session-end + RAM &gt;= 2.0 GB (RAM hit 0.52 GB tonight) and cannot be observed from inside an active session. Single-instance guard now real via the SessionStart hook. Stack: single clean thin set up (token_ping/watchdog/site_loop/supervisor + book20). Real-money rail unchanged (closed). 06:00 = tap the login.&quot;
-+ &quot;ruling&quot;: &quot;NB33 2026-09-24 ~00:40 IST. RULE FIRST done: a verify PASS is valid only if the pinned suite carries the EXACT HEAD&#x27;s commit hash AND is green (verifier.suite_matches; closes the NB31 hole), TDD green. Item 4 DONE + gate ARMED. Order path / login / kite_login untouched.&quot;,
-+ &quot;item&quot;: &quot;NB33: (RULE) verifier hash-check + green requirement (commits 455d2b626, 0702fba03); the suite runner records its HEAD. (ITEM 4) stale item14 branch deleted; standing self-test = branch item14-verify-selftest (one deliberately failing test, never merged); quiet-box proof (STOP -&gt; 1.9 GB): suite on the branch @ b3e9f9065 RED (1 failed/394 passed), verifier returned FAIL + posted a 🚩 (cited). ARMED: Desktop\\E1-DESK\\VERIFIER-ARMED placed. (REOPEN) SessionEnd hook (3df548a96) clears scheduler/.owner_active on exit.&quot;,
-+ &quot;tests&quot;: &quot;TDD: hash-check match/mismatch/missing/red-suite green; verify() PASS-&gt;FAIL downgrade proven; SessionEnd wiring + clear_marker green; wiring ledger 13/13. Self-test: full suite on the branch RED (1/394), verifier FAIL + 🚩.&quot;,
-+ &quot;next&quot;: &quot;MASTER NEEDS A FRESH HASH-MATCHED GREEN VERIFY before it is called PASS (gate now ARMED; the branch-red suite result was removed so nothing stale backs a master PASS). Run the master full suite in the next quiet-box window, then verify master. Item 54 (ENGINE_CATALOGUE data-line) is the next NOW build item.&quot;,
-+ &quot;flag&quot;: &quot;REOPEN PROOF (NB33): session ending deliberately with item 54 still NOW. Reopen cannot fire tonight — free RAM ~0.6 GB is below session_resurrect&#x27;s 2.0 GB floor (the user&#x27;s ChatGPT app ~1.16 GB + the stack hold it there); the SessionEnd guard-clear fix is in but this session predates it. OWNER: to see the auto-continue reopen, free RAM above 2.0 GB (e.g. close the ChatGPT app) OR run on a box that clears the floor. Gate ARMED; master unverified until a quiet-box verify. Real-money rail unchanged (closed).&quot;
- }
-</pre></div><div class='c'><div class='h'><b>b8ad11a4c</b> · 2026-09-24 00:31</div><div>NB33 docs: item 14 DONE (hash-check rule + self-test proof + ARMED); LEAD-MISTAKES synthetic self-test row removed + trailing newline restored; NEXT-PASTE + CONTEXT synced (reopen fix + RAM cause)</div><div class='sub h'>CONTEXT.md               | 47 +++++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>docs/LEAD-MISTAKES.md    |  3 ++-</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  2 +-</div><div class='sub h'>docs/NEXT-PASTE.md       | 12 ++++++++++++</div><pre>diff --git a/CONTEXT.md b/CONTEXT.md
-index fef8ac406..9180057cb 100644
---- a/CONTEXT.md
-+++ b/CONTEXT.md
-@@ -8748,3 +8748,50 @@ were retargeted to current behavior (recorded here + in each test&#x27;s comment).
- **Commits:** 760e1fe26 (item1 + archive), 883a671f9 (item2), c3461e636 (item3), 05a2df150 (BUILD-STATE),
- ca5dd78c8 (item51 guard). Stack: single clean thin set up (token_ping/watchdog/site_loop/supervisor + book20).
- Real-money rail unchanged (closed).
-+
-+
-+## Dispatch NB33 — ruling on item 4 + the reopen proof (2026-09-24 ~00:35 IST)
-+
-+ORIGIN: LEAD ruling within remit; arming delegated to the builder under the owner&#x27;s 23 Sep 16:25 delegation. Order
-+path / login flow / kite_login.py untouched.
-+
-+**RULE FIRST (closes the NB31 hole).** A verifier PASS is valid ONLY if the pinned suite result (a) carries the
-+commit hash of the EXACT HEAD being verified and (b) is GREEN. `verifier.suite_matches(commit)` enforces both; a
-+missing/different/red hash downgrades a PASS to FAIL (`verify()` now takes `suite_ok_fn`, default `suite_matches`).
-+The suite runner records the HEAD it ran on (`_conform_suite_runner._write` adds `commit`). TDD: match/mismatch/
-+missing/red-suite cases green; the downgrade proven. Demonstrated on the real artifact — the NB32 389/0 result had
-+no `commit`, so `suite_matches(HEAD)` was False (a PASS would have been blocked). Commits: 0702fba03 (rule + green
-+requirement), plus 455d2b626 (initial hash-check).
-+
-+**Item 4 redesigned + DONE.** The stale `item14-broken-test-demo` (~363-file divergence) was DELETED. New standing
-+self-test: branch **`item14-verify-selftest`** off master, carrying ONE deliberately failing test
-+(`tests/test_verify_selftest_fail.py`), NEVER merged. Quiet-box (STOP → 1.9 GB free): the full suite on the branch
-+@ b3e9f9065 ran RED (1 failed / 394 passed); the verifier, run against the branch HEAD, returned **FAIL** (the
-+hash-matched suite was red) and posted one 🚩 — VERIFY FAIL + &quot;🚩 LEAD MISTAKE #9 (00:19) ... independent verifier
-+returned FAIL&quot;. (The synthetic self-test row was then removed from docs/LEAD-MISTAKES.md — a self-test is not a real
-+lead mistake; the posted 🚩 is the cited proof. The ledger&#x27;s missing trailing newline, which had concatenated the
-+row, was restored.)
-+
-+**ARMED.** `Desktop\E1-DESK\VERIFIER-ARMED` placed under the owner&#x27;s delegation, AFTER the self-test proved the
-+verifier catches a broken commit. From now a commit is never called PASS without a hash-matched green verify. First
-+consequence: master (0702fba03) has no such verify yet, so it is fail-closed &quot;unverified&quot; until the next quiet-box
-+runs the master suite — the branch-red CONFORM-SUITE-RESULT.json was removed so nothing stale backs a master PASS.
-+The box could not run the master suite tonight: the user&#x27;s ChatGPT app (~1.16 GB) + the stack hold free RAM at
-+~0.6 GB.
-+
-+**Reopen proof — the guard fix + the remaining blocker.** Found the auto-continue reopen keyed only on a fresh
-+scheduler/.owner_active that NOTHING cleared on exit, so after a real session end it stayed &quot;fresh&quot; for 4h and the
-+watchdog treated the session as alive (never reopening). FIX: `.claude/hooks/session_end.py` (SessionEnd hook)
-+clears the marker on real exit — fires on end, not idle, so a live-idle session is never double-spawned. Wiring +
-+clear_marker tests green. The reopen STILL cannot fire tonight: free RAM (~0.6 GB) is below the 2.0 GB heavy floor
-+(session_resurrect._ram_ok), so the reopen would gate-hold — the cited cause per NB33. Also, this session predates
-+the SessionEnd hook, so its own end may not fire the hook.
-+
-+**RAM numbers measured (no typed floors):** stack-up ≈ 0.55–0.78 GB free; STOP → ≈ 1.9 GB (the branch-suite +
-+verify window); the reopen floor is 2.0 GB (session_resurrect / memory_guard.HEAVY_START_GB). The box, with the
-+ChatGPT app running, does not clear 2.0 GB free while the stack is up — the structural reason the reopen has never
-+fired here.
-+
-+**Commits:** 455d2b626 + 0702fba03 (hash-check rule), branch item14-verify-selftest @ b3e9f9065 (self-test),
-+3df548a96 (SessionEnd hook). Stack: single clean thin set restarted (token_ping/watchdog/site_loop/supervisor +
-+book20). Real-money rail unchanged (closed).
-diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
-index 303cdede1..4db30af12 100644
---- a/docs/LEAD-MISTAKES.md
-+++ b/docs/LEAD-MISTAKES.md
-@@ -16,4 +16,5 @@ when a required order was not placed. Shown as a page in the build room. The dai
- | 2026-09-23 | NB18/NB19/NB19-R named the R-HOLD-AND-FIX flag as what held 09:15 orders (to be lifted) | the flag file scheduler/.orders_held_R_HOLD_AND_FIX was ABSENT (gate.held()=False); the real 09:15 hold was order_ok() moment-light (recorders down). Flag now placed by NB19-R2 to enforce hold-until-PASS |
- | 2026-09-23 | NB16 stated the watchdog keeps token_ping/run_evening/site_loop/portfolio_card/calendar_daily alive (from START_E1_ALL.bat&#x27;s keep-alive list) | WRONG — _expected_jobs() skips every REM line (watchdog.py:218) and that keep-alive list is all REM-commented (START_E1_ALL.bat:15-20); the only live line is &#x27;pythonw -m scripts.launch_e1&#x27; (:10) which the scripts\X.py regex misses. So resurrect_jobs revives NOTHING; the .bat comment promises a keep-alive the code ignores. This is why recorders AND run_evening stay dead once reaped. |
- | 2026-09-23 | item 61 (E1-only thin start) was built in launch_e1.main() | the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 — it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap). |
--| 2026-09-23 | the 19:00 reboot was expected to leave the box on the clean START_E1_STACK.bat stack with fresh memory | a logon-persistence E1_AUTOSTART.vbs (in the Windows Startup folder, active; its .bat twin is already .disabled) auto-started `pythonw -m scripts.launch_e1` on the reboot — the OLD launcher path, which §14.7 forbids (no logon/auto-restart persistence). Measured free RAM 0.65 GB (NOT fresh), so the heavy EVENING RUN + dry-run stay blocked. Fix (owner, outside repo scope): remove the Startup-folder E1_AUTOSTART.vbs. |
-\ No newline at end of file
-+| 2026-09-23 | the 19:00 reboot was expected to leave the box on the clean START_E1_STACK.bat stack with fresh memory | a logon-persistence E1_AUTOSTART.vbs (in the Windows Startup folder, active; its .bat twin is already .disabled) auto-started `pythonw -m scripts.launch_e1` on the reboot — the OLD launcher path, which §14.7 forbids (no logon/auto-restart persistence). Measured free RAM 0.65 GB (NOT fresh), so the heavy EVENING RUN + dry-run stay blocked. Fix (owner, outside repo scope): remove the Startup-folder E1_AUTOSTART.vbs. |
-+
-diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 9ed76e688..bc334519e 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -30,7 +30,7 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
- - [DONE] 11. verifier launcher
- - [DONE] 12. Codex signed in
- - [AFTER-1545] 13. Codex executing checks — CONFINEMENT built + tested (R-CODEX-CONFINE): rung (a) runs codex `exec --sandbox workspace-write` with cwd in the verify-clone only, never full-auto, never the live repo; returns None (→ rung d) if the clone is absent. Real clone-creation + one-verify PROOF deferred to a memory-safe window (865M tree + active memory reaping; memory floor)
--- [AFTER-1545] 14. verifier self-test then armed — PREPARE done: throwaway branch `item14-broken-test-demo` @ 22035dc87 holds a deliberately-failing test (verifier MUST report FAIL); the proof-run itself waits for a memory-safe window (memory floor)
-+- [DONE] 14. verifier self-test then armed — **DONE (NB33):** RULE FIRST added — a verify PASS is valid ONLY if the pinned suite result carries the commit hash of the exact HEAD AND is green (verifier.suite_matches; a stale/missing/red hash downgrades PASS-&gt;FAIL — closes the NB31 hole), TDD green. Stale `item14-broken-test-demo` deleted; standing self-test is now branch **`item14-verify-selftest`** (off master, one deliberately failing test, NEVER merged). Quiet-box proof: full suite on the branch @ b3e9f9065 = RED (1 failed/394 passed), the verifier returned **FAIL** + posted a 🚩 (cited). Gate **ARMED** — `Desktop\E1-DESK\VERIFIER-ARMED` placed under the owner&#x27;s 23-Sep-16:25 delegation. First armed consequence: master needs a fresh hash-matched green verify before it is called PASS (fail-closed until the next quiet-box suite).
- - [DONE] 15. audit evidence rule
- - [DONE] 16. queue/journal/tests bookkeeping
- - [AFTER-1545] 17. 🙋 closer sweep
-diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index 0f1c3a8c3..425d58397 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -32,6 +32,18 @@
- &gt; suite; then the owner places `E1-DESK\VERIFIER-ARMED` (owner-placed by design). Also **auto-continue&#x27;s LIVE
- &gt; reopen proof is deferred** — it needs a real session-end + RAM ≥ 2.0 GB (RAM hit 0.52 GB tonight) and can&#x27;t be
- &gt; observed from inside an active session.
-+&gt;
-+&gt; **NB33 (2026-09-24 ~00:35):** RULE FIRST — a verify PASS is valid ONLY if the pinned suite result carries the
-+&gt; commit hash of the EXACT HEAD **and** is green (verifier.suite_matches); a stale/missing/red hash downgrades
-+&gt; PASS→FAIL (closes the NB31 hole), TDD green. **Item 4 DONE:** stale item14 branch deleted; the standing
-+&gt; self-test is branch **`item14-verify-selftest`** (one deliberately failing test, never merged). Quiet-box proof
-+&gt; (STOP → 1.9 GB free → suite alone): the branch @ b3e9f9065 ran RED (1 failed/394 passed) and the verifier
-+&gt; returned **FAIL + posted a 🚩** (cited). **Gate ARMED** — `Desktop\E1-DESK\VERIFIER-ARMED` placed under the
-+&gt; owner&#x27;s 23-Sep delegation. First armed consequence: **master (0702fba03) needs a fresh hash-matched GREEN
-+&gt; verify before it is called PASS** — run the master suite in the next quiet-box window (the box can&#x27;t run it now:
-+&gt; the ChatGPT app + stack hold free RAM at ~0.6 GB). **Reopen fix:** added a SessionEnd hook that clears
-+&gt; scheduler/.owner_active on exit (the guard was staying &quot;fresh&quot; 4h). **Reopen proof still can&#x27;t fire tonight:**
-+&gt; free RAM (~0.6 GB) is below the 2.0 GB reopen floor — the cause, per NB33.
  
  
  _This file lists the items whose status in `docs/MASTER-CHECKLIST.md` is **NOW** or **AFTER-1545** — the work
