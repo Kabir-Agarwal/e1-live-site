@@ -1,4 +1,155 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>fb9c97c81</b> · 2026-09-24 00:32</div><div>NB33 state: rule + item4 done + ARMED; reopen guard-clear fix in, reopen still RAM-blocked (~0.6 GB &lt; 2.0 floor); master needs a quiet-box green verify</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>87c2d438e</b> · 2026-09-24 00:43</div><div>NB34 item54 DONE: ENGINE_CATALOGUE E1 gate-&gt;on-disk-store map (§13 metric/store/threshold/action), verified against gate.py/money.py/paper.py; arming rule satisfied for E1 (E10/E11 share the path; record-only engines have no order gate)</div><div class='sub h'>docs/ENGINE_CATALOGUE.md | 25 +++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  2 +-</div><pre>diff --git a/docs/ENGINE_CATALOGUE.md b/docs/ENGINE_CATALOGUE.md
+index 910c575c0..69e4232af 100644
+--- a/docs/ENGINE_CATALOGUE.md
++++ b/docs/ENGINE_CATALOGUE.md
+@@ -110,3 +110,28 @@ intent, not code on this disk. &quot;State today&quot; is therefore **conceptual — no mo
+ - **Measured (A11):** over 2026-01-09 → 2026-09-10 (165 market days) the fire diary holds **706 fires**, avg
+   **4.28 fires/market day**, **16 zero-fire days** (10%; a contiguous Feb cluster looks like a recording gap,
+   not a truly quiet market), **103** of the fires cleared all three lights to a would-be paper order.
++
++---
++
++## 2026-09-24 — E1 gate → on-disk store map (NB34 item 54, §13 rigor)
++
++_The arming rule (top of this file, NB15) requires each gate name the store it reads. This is that map for E1,
++the one live engine — every gate → its exact on-disk store, verified against the code. metric · store ·
++threshold · action:_
++
++- **R-HOLD-AND-FIX hard hold** — store `scheduler/.orders_held_R_HOLD_AND_FIX` (gate.py:120). Metric: file
++  present? Threshold: present = hold. Action: `order_ok()` returns False (no order); owner deletes it to lift.
++- **Two-key gate** — store: key1 = the builder selection certificate, key2 = the AUDIT-2 pass (gate.py:43/49).
++  Metric: both keys present? Threshold: both required. Action: only both-present opens `orders_allowed()`.
++- **Per-stock moment light (spread ceiling, A1)** — store `~/Desktop/E1-DESK/stores/e1_deriv_store/depth5/SPREADS.csv`
++  (the E13 five-level-depth recorder; money.py:97-98). Metric: the stock&#x27;s live spread vs its own measured
++  ceiling. Threshold: the measured per-stock ceiling (A1, no naked number). Action: spread over ceiling = HELD.
++- **20-position cap + daily-loss book guard** — store `engine1_rebuild/paper/ledger.csv` (paper.py:31). Metric:
++  open-position count / the day&#x27;s realised R. Threshold: 20 open; the Formula-2 daily-loss breaker. Action: at
++  the cap or past the loss line = no new order.
++- **Kill switch / circuit breaker** — stores `scripts/kill_switch` + `scripts/circuit_breaker` (gate.py:165).
++  Metric: killed? / breaker tripped? Action: either shut = no order.
++
++_Every gate&#x27;s data source is a named on-disk store — the arming rule is satisfied for E1. E10/E11 share E1&#x27;s
++exact order path + fail-closed stack (same stores); the record-only engines (E3/E4/E7/E12/E13/E14) place no
++order, so they have no order-gate to map._
+diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+index bc334519e..61fefbac5 100644
+--- a/docs/MASTER-CHECKLIST.md
++++ b/docs/MASTER-CHECKLIST.md
+@@ -84,7 +84,7 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
+ - [DONE] 51. commit-small pre-commit check (CLAUDE.md §23.4) — **LIVE (NB32, ca5dd78c8): .git/hooks/pre-commit installed (fail-OPEN on missing python, blocks only on an explicit REFUSED) runs scripts/precommit_guard.py; refuses a mixed code+generated commit; tests/test_precommit_guard.py GREEN; PROVEN — a mixed stage (test + reports/BUILD-STATE.json) was REFUSED. NB: .git/hooks/ is untracked, so a fresh clone reinstalls via the guard&#x27;s docstring INSTALL line; state-json (reports/*.json) commits SEPARATELY from docs.** — never `git commit -a`
+ - [DONE] 52. state in files, not context (CLAUDE.md §23.5) — every decision/ruling/finding written to its file the moment made; in force this run (dispatches archived first, checklist/NEXT-PASTE updated per step)
+ - [DONE] 53. 08:15 self-check line (NB19, OWNER-SAID) — **LIVE (NB31, dc2372b27): preopen_line wired into scripts/day_report.preopen() (replaces the 09:00 pre-open line; status built from vitals — depth freshness + real gate + queue-loaded); wiring test GREEN; independent verify PASS.** — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page&#x27;s own measure; the real order gate is open; tomorrow&#x27;s queue is loaded) and posts EXACTLY ONE of &quot;✅ READY — N cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY only after every check passes. REPLACES the 09:00 pre-open line. BUILT: scripts/preopen_line.py (the pure READY/NOT-READY line — cameras-fresh + gate-open + queue-loaded, NOT-READY names the gap and ends &quot;send this to the lead&quot;; tested). Runtime wiring (vitals build → freshness/queue → post at 08:15) is the launch-path wire-in, LIVE via dry-run + restart
+-- [NOW] 54. &quot;data its gates need&quot; line — required before any engine is armed; written into the ruling template (field 9, DONE) and to be written into ENGINE_CATALOGUE (the on-disk store each gate reads, §13 four-part standard)
++- [DONE] 54. &quot;data its gates need&quot; line — **DONE:** the ARMING RULE is in ENGINE_CATALOGUE.md (top, NB15) + each engine&#x27;s Data line names its stores; **NB34 added the E1 gate→store map** (2026-09-24 section): every E1 gate (hold flag, two-key, moment-light spread ceiling → E1-DESK/.../depth5/SPREADS.csv, 20-cap + loss guard → paper/ledger.csv, kill/breaker) mapped to its exact on-disk store, verified against the code (§13 metric·store·threshold·action). Ruling-template field 9 already DONE.
+ - [DAYS] 55. one exam per cadence class — intraday engines (Gap Timer, Pairs tick lane) get their own exam with intraday fills (DESIGN-LATER, the lead writes it)
+ - [DAYS] 56. cost-efficiency size floor in adaptive sizing (DESIGN-LATER, the lead writes it)
+ - [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
+</pre></div><div class='c'><div class='h'><b>af613a91a</b> · 2026-09-24 00:40</div><div>NB34 item1: measured reopen floor — session_resurrect uses REOPEN_FLOOR_GB (measured claude PeakWorkingSet 0.42 GB + the verify&#x27;s 0.3 GB margin = 0.72 GB) instead of heavy_ok&#x27;s typed 2.0 GB; TDD the floor read; record the measurement in VERIFIER-BRAIN.md; archive NB34</div><div class='sub h'>docs/VERIFIER-BRAIN.md                        | 15 +++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md | 17 +++++++++++++++++</div><div class='sub h'>scripts/session_resurrect.py                  | 18 ++++++++++++++++--</div><div class='sub h'>tests/test_session_resurrect_floor.py         | 22 ++++++++++++++++++++++</div><pre>diff --git a/docs/VERIFIER-BRAIN.md b/docs/VERIFIER-BRAIN.md
+index 37e7bb181..36d8aff45 100644
+--- a/docs/VERIFIER-BRAIN.md
++++ b/docs/VERIFIER-BRAIN.md
+@@ -21,3 +21,18 @@ Update it whenever a verify is measured again._
+ - **The stack must be STOPped** to reach this on the ~7.8 GB laptop while a build session runs — the quiet-box
+   route (STOP → verify alone → START) is what NB30 used and what future verifies use until item 57 (a quiet
+   second machine / cloud) removes the contention.
++
++## The auto-continue REOPEN floor (measured 2026-09-24, NB34 — retires the typed 2.0 GB)
++
++- The watchdog&#x27;s auto-continue reopens the build session with `claude --continue &quot;continue&quot;` — the SAME `claude`
++  binary this builder runs.
++- **Measured:** the live builder session&#x27;s `claude.exe` **PeakWorkingSet = 417 MB ≈ 0.42 GB** (PID 24272,
++  2026-09-24 00:37 IST) — the peak RSS a running/resumed claude session reaches. A `--continue` reopen loads a
++  comparable transcript, so 0.42 GB is a conservative &quot;peak RSS over its first minute&quot; for the reopen at start.
++- **Reopen floor = 0.42 GB (measured claude peak) + 0.3 GB (the verify&#x27;s own safety margin, above) = ~0.72 GB
++  free.** This is `session_resurrect.REOPEN_FLOOR_GB` (= `CLAUDE_PEAK_GB + REOPEN_MARGIN_GB`), used by
++  `session_resurrect._ram_ok` INSTEAD of `memory_guard.heavy_ok()`&#x27;s typed 2.0 GB. No typed floor (§4.1): both
++  terms are a measurement or a cited margin.
++- Why lower than the verify&#x27;s ~1.0 GB: the reopen only needs to START a claude session (its startup RSS); once
++  running, the reopened session&#x27;s own memory_guard gates throttle any heavy work it then does. Re-measure and
++  update this line whenever a real reopen is observed.
+diff --git a/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md
+new file mode 100644
+index 000000000..829d8af53
+--- /dev/null
++++ b/docs/dispatches/2026-09-24_NIGHT-BUNDLE-34.md
+@@ -0,0 +1,17 @@
++# NIGHT BUNDLE 34 (ID:NB34) — dispatch archived verbatim (2026-09-24)
++
++**Origin tag (per §5):** LEAD ruling within remit. Order path / login flow / kite_login.py untouched.
++
++DISPATCH ID: NB34 — MEASURED REOPEN FLOOR + MASTER GREEN (24 Sep 2026, ~00:40 IST) → BUILD
++READ: NB33 report (hash-check live; self-test proven; VERIFIER-ARMED placed; SessionEnd hook wired; reopen blocked
++by a TYPED 2.0 GB floor; ChatGPT app ~1.16 GB; master has no hash-matched green suite yet). ORIGIN: LEAD ruling.
++1) The reopen floor: measure what one `claude --continue` actually needs at start (peak RSS over its first minute,
++   cited from the log) and set session_resurrect&#x27;s floor to that measurement + the same margin the verify uses —
++   the typed 2.0 GB is retired (no typed numbers). TDD the floor read.
++2) Master green: in a quiet-box window (NB24 route until the 06:00 login; after that, first thing after the
++   close-done line) run the full suite on master, pin it with the commit hash, run the independent verify →
++   PASS marker on master under the armed gate.
++3) Item 54, then continue the NOW list (§23.3 no stop). Frozen items skipped and listed.
++4) REOPEN PROOF stands: end the session with a NOW item left; the watchdog must reopen it with nobody typing;
++   the lead reads the page. Report &quot;NB34&quot; with the measured floor, master verdict, and whether the reopen fired;
++   end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+diff --git a/scripts/session_resurrect.py b/scripts/session_resurrect.py
+index 62ab3646a..929a02213 100644
+--- a/scripts/session_resurrect.py
++++ b/scripts/session_resurrect.py
+@@ -41,10 +41,24 @@ def _login_active(now=None):
+     return _fresh(LOGIN_ACTIVE, FRESH_S, now)
+ 
+ 
++# NB34 measured reopen floor — retires the typed 2.0 GB heavy gate for the reopen (no typed numbers, §4.1).
++# A `claude --continue` reopen runs the claude binary; its MEASURED peak working set is ~0.42 GB (the live builder
++# session&#x27;s claude.exe PeakWorkingSet, docs/VERIFIER-BRAIN.md), and we add the verify&#x27;s own +0.3 GB safety margin
++# (also VERIFIER-BRAIN.md). Floor = 0.42 + 0.3 = 0.72 GB free — enough to START a claude session; once running, the
++# reopened session&#x27;s own memory_guard gates throttle any heavy work.
++CLAUDE_PEAK_GB = 0.42       # measured: live builder claude.exe PeakWorkingSet (docs/VERIFIER-BRAIN.md, 2026-09-24)
++REOPEN_MARGIN_GB = 0.3      # the verify&#x27;s documented safety margin (docs/VERIFIER-BRAIN.md)
++REOPEN_FLOOR_GB = CLAUDE_PEAK_GB + REOPEN_MARGIN_GB
++
++
++def _ram_floor_ok(free):
++    &quot;&quot;&quot;Pure: is free RAM (GB) at or above the MEASURED reopen floor? (NB34 — replaces heavy_ok&#x27;s typed 2.0 GB.)&quot;&quot;&quot;
++    return free is not None and free &gt;= REOPEN_FLOOR_GB
++
++
+ def _ram_ok():
+     import memory_guard
+-    ok, _why = memory_guard.heavy_ok()
+-    return ok
++    return _ram_floor_ok(memory_guard.free_gb())
+ 
+ 
+ def _pending():
+diff --git a/tests/test_session_resurrect_floor.py b/tests/test_session_resurrect_floor.py
+new file mode 100644
+index 000000000..9b57b488f
+--- /dev/null
++++ b/tests/test_session_resurrect_floor.py
+@@ -0,0 +1,22 @@
++&quot;&quot;&quot;NB34: the auto-continue reopen floor is MEASURED (claude peak + the verify&#x27;s margin), not the typed 2.0 GB.&quot;&quot;&quot;
++from scripts import session_resurrect as sr
++
++
++def test_reopen_floor_is_derived_not_typed():
++    # floor = measured claude peak working set + the verify&#x27;s cited safety margin (no naked number, §4.1)
++    assert abs(sr.REOPEN_FLOOR_GB - (sr.CLAUDE_PEAK_GB + sr.REOPEN_MARGIN_GB)) &lt; 1e-9
++    assert sr.REOPEN_FLOOR_GB &lt; 2.0          # the typed 2.0 GB heavy gate is RETIRED for the reopen
++    assert sr.CLAUDE_PEAK_GB &gt; 0 and sr.REOPEN_MARGIN_GB &gt; 0
++
++
++def test_ram_floor_gate_flips_at_the_measured_floor():
++    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB + 0.01) is True     # just above -&gt; ok
++    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB) is True            # exactly at the floor -&gt; ok
++    assert sr._ram_floor_ok(sr.REOPEN_FLOOR_GB - 0.01) is False    # just below -&gt; hold
++    assert sr._ram_floor_ok(None) is False                        # unreadable RAM -&gt; fail-closed
++
++
++def test_measured_floor_admits_more_than_the_typed_gate_did():
++    # at ~0.9 GB free the OLD typed 2.0 gate held the reopen; the measured ~0.72 floor now admits it
++    assert sr._ram_floor_ok(0.9) is True
++    assert 0.9 &lt; 2.0
+</pre></div><div class='c'><div class='h'><b>fb9c97c81</b> · 2026-09-24 00:32</div><div>NB33 state: rule + item4 done + ARMED; reopen guard-clear fix in, reopen still RAM-blocked (~0.6 GB &lt; 2.0 floor); master needs a quiet-box green verify</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
 index bc505e1dd..506385574 100644
 --- a/reports/BUILD-STATE.json
 +++ b/reports/BUILD-STATE.json
