@@ -1,6 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 20:22 SUPERVISOR: halted — R-BACKLOG is run-authored scope (§20.6): the run seeded its own "owner-curated" backlog and built a self-continuation engine that overrides §12's empty-queue exit; it does not trace to the ruling in force (four v2 tabs, already done).
-2026-09-22 20:51 checked 20:51 — on course
-2026-09-22 20:54 checked 20:54 — on course
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 20:54 checked 20:54 — on course
 2026-09-22 20:57 checked 20:57 — on course
 2026-09-22 20:59 checked 20:59 — on course
 2026-09-22 21:06 checked 21:06 — on course
@@ -117,18 +115,19 @@
 2026-09-23 23:26 checked 23:26 — on course
 2026-09-23 23:33 checked 23:33 — on course
 2026-09-23 23:35 checked 23:35 — on course
-2026-09-23 23:39 checked 23:39 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the ruling in force (NB31/NB32), the transcript, the single commit c3461e636, its diff, and STATUS.json against the seven checks.
+2026-09-23 23:39 checked 23:39 — on course
+2026-09-23 23:53 checked 23:53 — on course
+2026-09-23 23:55 checked 23:55 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed the two commits since last check against the eight supervisor checks.
 
-**Provenance (check 0):** The change adds a SessionStart hook that writes `scheduler/.owner_active` + prints the resume card. This is not run-authored scope — CLAUDE.md §14.1 explicitly names it (".owner_active, written by the SessionStart hook in .claude/settings.json") and §23.2 requires a SessionStart hook to read the resume card. Both are owner rulebook. NB32 (NIGHT-BUNDLE-32) is archived. The builder found the guard was carried only by the RAM gate + cooldown because the documented hook never existed (marker 5.4d stale), and closed that gap.
+- **Provenance (0):** NB32 is owner-scoped — archived at `docs/dispatches/2026-09-23_NIGHT-BUNDLE-32.md`. Item 51 traces to CLAUDE.md §23.4; items 49/51 live on the owner-dispatched MASTER-CHECKLIST. No run-authored scope.
+- **Scope (1):** `ca5dd78c8` adds the commit-small pre-commit guard test; `ae78fda6d` marks 49/51 DONE and syncs NEXT-PASTE/CONTEXT. All within NB32.
+- **No self-audit (2):** item 4 (verifier self-test + arm gate) is correctly held BLOCKED with a LEAD RULING NEEDED flag — the builder did not self-verify or self-arm.
+- **No typed numbers (3):** guard logic + test use path strings only; no naked constants.
+- **Demos inert (4):** `test_precommit_guard.py` is pure logic — no ledger write, no Telegram.
+- **Trading-path (5):** order path / login / kite_login untouched, as stated and consistent with the diffs.
+- **Secrets (6):** diffs are docs + a test; no keys/tokens/paths leaked (the Claude-Session URL is a session link, not a secret).
+- **Ordering (7):** nothing next-before-X was skipped; item 4 is parked, not started ahead of anything.
 
-1. **SCOPE** — session_start.py, the settings.json SessionStart entry, and the wiring test all trace to §14.1/§23.2 and the NB32 auto-continue item. In scope.
-2. **NO SELF-AUDIT** — TDD (RED→GREEN) on a wiring assertion; builder honestly defers the LIVE reopen proof to a real session-end + RAM≥floor, and does not claim an independent verify it didn't run.
-3. **NO TYPED NUMBERS** — new file has no naked constants; `timeout: 15` is an operational hook timeout, not a strategy number. Pre-existing `FRESH_S`/`COOLDOWN` are §14.1-derived and unchanged this cycle.
-4. **DEMOS INERT** — gate tests use stubs (`# NEVER call the real _launch`); no live ledger written, no real Telegram. The one real hook run wrote only `.owner_active` (its actual job), not a ledger or message.
-5. **TRADING-PATH** — untouched; session-management only. STATUS.json unchanged (orders_written_today 0).
-6. **NO SECRETS** — the absolute repo path appears only in a source-code fallback (matching the existing PreCompact hook), not on a published page.
-7. **ORDERING** — no next-before-X item was jumped.
-
-Feature freeze (§24) respected: this fixes a wiring gap the rulebook already required, not a new surface.
+Note (not a violation): the pre-commit hook lives in untracked `.git/hooks/`; reinstall is documented in the guard's docstring — a §7.1-flavored record consideration at most, not grounds to halt.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
