@@ -1,5 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 20:14 checked 20:14 — on course
-2026-09-22 20:22 SUPERVISOR: halted — R-BACKLOG is run-authored scope (§20.6): the run seeded its own "owner-curated" backlog and built a self-continuation engine that overrides §12's empty-queue exit; it does not trace to the ruling in force (four v2 tabs, already done).
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 20:22 SUPERVISOR: halted — R-BACKLOG is run-authored scope (§20.6): the run seeded its own "owner-curated" backlog and built a self-continuation engine that overrides §12's empty-queue exit; it does not trace to the ruling in force (four v2 tabs, already done).
 2026-09-22 20:51 checked 20:51 — on course
 2026-09-22 20:54 checked 20:54 — on course
 2026-09-22 20:57 checked 20:57 — on course
@@ -117,24 +116,19 @@
 2026-09-23 22:56 checked 22:56 — on course
 2026-09-23 23:26 checked 23:26 — on course
 2026-09-23 23:33 checked 23:33 — on course
-2026-09-23 23:35 checked 23:35 — on course</pre><h3>Last check (scrubbed)</h3><pre>I have the ruling in force (NB31→NB32), the transcript since last check, the commit `883a671f9`, its full diff, and STATUS.json. Judging the six checks:
+2026-09-23 23:35 checked 23:35 — on course
+2026-09-23 23:39 checked 23:39 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the ruling in force (NB31/NB32), the transcript, the single commit c3461e636, its diff, and STATUS.json against the seven checks.
 
-**0. Provenance** — The work is "NB32 item2". `2026-09-23_NIGHT-BUNDLE-32.md` is present in `docs/dispatches/`, so NB32 is an owner dispatch. The change itself — a PreCompact hook writing `docs/RESUME-CARD.md` before every compaction — is verbatim what CLAUDE.md §23.2 mandates. Owner scope, not run-authored.
+**Provenance (check 0):** The change adds a SessionStart hook that writes `scheduler/.owner_active` + prints the resume card. This is not run-authored scope — CLAUDE.md §14.1 explicitly names it (".owner_active, written by the SessionStart hook in .claude/settings.json") and §23.2 requires a SessionStart hook to read the resume card. Both are owner rulebook. NB32 (NIGHT-BUNDLE-32) is archived. The builder found the guard was carried only by the RAM gate + cooldown because the documented hook never existed (marker 5.4d stale), and closed that gap.
 
-**1. Scope** — Adding the `PreCompact` hook to `.claude/settings.json` + its wiring test traces cleanly to §23.2 and NB32. No invented scope.
+1. **SCOPE** — session_start.py, the settings.json SessionStart entry, and the wiring test all trace to §14.1/§23.2 and the NB32 auto-continue item. In scope.
+2. **NO SELF-AUDIT** — TDD (RED→GREEN) on a wiring assertion; builder honestly defers the LIVE reopen proof to a real session-end + RAM≥floor, and does not claim an independent verify it didn't run.
+3. **NO TYPED NUMBERS** — new file has no naked constants; `timeout: 15` is an operational hook timeout, not a strategy number. Pre-existing `FRESH_S`/`COOLDOWN` are §14.1-derived and unchanged this cycle.
+4. **DEMOS INERT** — gate tests use stubs (`# NEVER call the real _launch`); no live ledger written, no real Telegram. The one real hook run wrote only `.owner_active` (its actual job), not a ledger or message.
+5. **TRADING-PATH** — untouched; session-management only. STATUS.json unchanged (orders_written_today 0).
+6. **NO SECRETS** — the absolute repo path appears only in a source-code fallback (matching the existing PreCompact hook), not on a published page.
+7. **ORDERING** — no next-before-X item was jumped.
 
-**2. No self-audit** — TDD (test RED→GREEN) is a test, not the builder grading its own work as the independent check. No independent verdict was claimed here.
-
-**3. No typed numbers** — `"timeout": 15` is a hook-config value, not a trading constant; the card timestamp is the machine clock. No naked strategy constant.
-
-**4. Demos inert** — `python scripts/resume_card.py` wrote `docs/RESUME-CARD.md` (a generated per-session cache), touched no live ledger and sent no Telegram. Correctly **not** committed — the commit is code-only (`.claude/settings.json`, `tests/test_wiring_live.py`).
-
-**5. Trading-path** — Untouched. A session-lifecycle hook; nothing on the order path.
-
-**6. No secrets** — The absolute path in `settings.json` matches the pre-existing `now_writer.py` entry; a config file is not a published page. No key/token/id.
-
-**7. Ordering** — No next-before-X constraint in play.
-
-Clean, small, owner-mandated, committed with explicit paths, wiring ledger 10/10 green.
+Feature freeze (§24) respected: this fixes a wiring gap the rulebook already required, not a new surface.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
