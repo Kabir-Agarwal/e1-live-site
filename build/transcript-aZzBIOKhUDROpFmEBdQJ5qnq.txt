@@ -1,206 +1,3 @@
-assistant: The stack is up but E4/E12 recorders aren't. Before anything else I need to confirm which scripts they are, whether the watchdog even watches them, where the STREAM-SILENT watcher lives, and why they died ~06:02 — all read-only:
-tool_use Bash {"command": "echo \"=== recorder_manifest: what recorders exist ===\" && grep -niE \"option|chain|exchange|e4|e12|two|nse|bse|RECORDERS|=|def \" scripts/recorder_manifest.py 2>/dev/null | head -30; echo \"=== START_E1_ALL / watched job list source ===\" && grep -niE \"START_E1_ALL|START_E1|def _jobs|_watched|jobs\\b\" scripts/watchdog.py | head; echo \"=== STREAM SILENT watcher location ===\" && grep -rlniE \"stream.?silent|STREAM-SILENT|stream_silent\" scripts/*.py | head", "description": "Identify recorders, watchdog job list, stream-silent watcher"}
-tool_result: === recorder_manifest: what recorders exist ===
-2:status, units=0, reason — so a lane that is NOT recording is visible on disk, never silent. Written to
-8:IST = timezone(timedelta(hours=5, minutes=30))
-9:COLS = ["date", "lane", "started_at", "token", "units", "reason"]
-12:def session_start(store_dir, lane, *, logged_in, today=None, reason=""):
-15:        day = (today or _date.today())
-16:        day = day.isoformat() if hasattr(day, "isoformat") else str(day)
-17:        os.makedirs(store_dir, exist_ok=True)
-18:        path = os.path.join(store_dir, "SESSION-STARTS.csv")
-19:        new = not os.path.exists(path)
-20:        with open(path, "a", newline="", encoding="utf-8") as f:
-21:            w = csv.DictWriter(f, fieldnames=COLS)
-26:                        "token": "[redacted]" if logged_in else "absent",
-34:def _demo():
-36:    d = tempfile.mkdtemp()
-37:    p = session_start(d, "E4 chains", logged_in=False)
-38:    rows = list(csv.DictReader(open(p, encoding="utf-8")))
-39:    assert rows and rows[0]["units"] == "0" and rows[0]["token"] == "absent" and rows[0]["reason"]
-40:    p = session_start(d, "E4 chains", logged_in=True)
-41:    rows = list(csv.DictReader(open(p, encoding="utf-8")))
-42:    assert len(rows) == 2 and rows[1]["token"] == "present"
-46:if __name__ == "__main__":
-=== START_E1_ALL / watched job list source ===
-10:Run detached:  pythonw scripts\watchdog.py      (or START_E1_WATCHDOG.bat)
-64:    "4) On the laptop, set a USER env var HEALTHCHECKS_URL to that URL, then restart START_E1_ALL. "
-75:                          "double-click START_E1_ALL.bat when you can — it resumes from the checkpoint, "
-129:    # R-E1-RESURRECT: report any just-restarted jobs on this ⏱, then clear the flag.
-192:                              "stays frozen, double-click START_E1_ALL.bat.")
-197:START_BAT = os.path.join(ds._REPO, "START_E1_ALL.bat")
-211:def _expected_jobs():
-212:    """Parse START_E1_ALL.bat for the `pythonw scripts\\X.py [args]` jobs it launches. Skips REM-commented
-215:    jobs = []
-222:                jobs.append((os.path.basename(m.group(1).strip()), m.group(1).strip(), m.group(2).strip()))
-=== STREAM SILENT watcher location ===
-scripts/watchers.py
-assistant: Now the crux — is the watchdog even set to watch these recorders? It resurrects only jobs listed in `START_E1_ALL.bat`. Reading that, the STREAM-SILENT watcher, and the recorder session log:
-tool_use Bash {"command": "echo \"=== START_E1_ALL.bat (the watchdog's watched set) ===\" && cat START_E1_ALL.bat 2>/dev/null | grep -niE \"pythonw|python |REM|option|chain|exchange|e4|e12|two|broker|recorder|arb\" | head -40", "description": "Read START_E1_ALL.bat job list"}
-tool_result: === START_E1_ALL.bat (the watchdog's watched set) ===
-2:REM E1 — start everything that does not need a human (R-E1-CALENDAR+AUTOSTART; R-RESTART-RESUME).
-3:REM Launched hidden at Windows logon by scheduler\E1_AUTOSTART.vbs (Startup folder); safe to double-click.
-4:REM USER SCOPE ONLY: no scheduled task, no elevation. PAPER ONLY — no order-placing code anywhere.
-5:REM ONE launcher (scripts\launch_e1.py): reads free RAM first, starts ONLY the essentials hidden (watchdog,
-6:REM recorders, site publisher + digest, and the scan/login ask it must not disturb), never starts a job
-7:REM twice, and HOLDS the re-scan / pair sweep / ingest / backtests until free RAM > 2 GB AND the market is
-8:REM closed. Every decision is logged with free RAM in reports\LAUNCH-RAM.log.
-10:start "" /b pythonw -m scripts.launch_e1
-12:REM WATCHDOG KEEP-ALIVE LIST (R-E1-RESURRECT). The watchdog parses the lines below and restarts any of these
-13:REM that dies; the launcher above is what starts them. Heavy jobs are deliberately NOT listed: only the
-14:REM launcher starts them, and only past the RAM + market-closed gate.
-15:REM   pythonw scripts\token_ping.py
-16:REM   (run_live RETIRED — R-AUDIT-DAY1-FIX; the order path is book20_runner, launched at login)
-17:REM   pythonw scripts\run_evening.py
-18:REM   pythonw scripts\site_loop.py
-19:REM   pythonw scripts\portfolio_card.py
-20:REM   pythonw scripts\calendar_daily.py
-assistant: Root cause emerging: the watchdog's keep-alive list (the REM lines it parses) is token_ping, run_evening, site_loop, portfolio_card, calendar_daily — **the E4/E12 recorders are not in it**, so the watchdog never watches or relaunches them. Confirming via `launch_e1`, the session log, and the STREAM-SILENT watcher:
-tool_use Bash {"command": "echo \"=== launch_e1: which recorders it starts (E4 option-chain / E12 two-exchange) ===\" && grep -niE \"option|chain|exchange|e4|e12|two|broker|recorder|arb_eight|positioning|_RECORDERS|def \" scripts/launch_e1.py 2>/dev/null | head -30; echo \"=== SESSION-STARTS.csv (recorder lanes today) ===\"; find . reports -iname \"SESSION-STARTS.csv\" 2>/dev/null | head; echo \"=== stream-silent watcher: armed? called by watchdog? ===\"; grep -niE \"def |stream|silent|SILENT|arm\" scripts/watchers.py | head -20", "description": "Find E4/E12 recorder scripts, session log, stream-silent watcher"}
-tool_result: === launch_e1: which recorders it starts (E4 option-chain / E12 two-exchange) ===
-5:Essentials (the ruling's list): watchdog; recorders — chains, ticks, NSE/BSE, depth, positioning; site
-8:and the morning login ask the recorders depend on.
-9:Heavy (held): the re-scan, the cross-stock pair sweep, the AmiBroker ingest, the E4/E7 backtests.
-26:# R-E7-STUB (2026-09-22): the Gap Timer (E7) tick socket is NOT BUILT — engine7_parity.tick_recorder.run_session
-28:# recorder: the launcher never starts it, recorders_running() counts 4, and no roster line claims it records.
-31:    ("tick recorder (E7 — Gap Timer)", ["-m", "engine7_parity.tick_recorder", "--record-loop"],
-34:RECORDERS = [
-35:    ("chain recorder (E4)", ["-m", "engine4_options.chain_recorder", "--record-loop"]),
-36:    ("NSE/BSE recorder (E12)", ["-m", "engine12_xchange.xchange_recorder", "--record-loop"]),
-37:    ("depth recorder (E13)", ["-m", "scripts.e13_depth", "--record-loop"]),
-38:    ("positioning recorder (E14)", ["-m", "scripts.positioning_recorder", "--record-loop"]),
-51:] + RECORDERS
-55:    ("AmiBroker ingest", ["scripts/ingest_amibroker.py"]),
-56:    ("E4/E7 backtests", ["scripts/run_backtests.py"]),
-60:def pythonw():
-65:def running_cmdlines():
-79:def _key(args):
-85:def is_running(args, cmdlines):
-90:def start(label, args, cmdlines=None, _popen=subprocess.Popen):
-103:def _desk_logs(label):
-112:def recorders_running(cmdlines=None):
-113:    """R-DAY1-BUNDLE A2: how many of the 5 recording lanes (E4/E7/E12/E13/E14) are actually up now, and the
-118:    for label, args in RECORDERS:
-123:    return up, len(RECORDERS), down
-126:def main(poll=300):
-146:def _demo():
-=== SESSION-STARTS.csv (recorder lanes today) ===
-=== stream-silent watcher: armed? called by watchdog? ===
-4:and stream_silence(now) each cycle. Every alarm is ONE plain line; the dedup ("once, then hourly") is the
-5:existing notify rate-limit, because a frozen page keeps the SAME written time so the alarm text is identical
-11:  • STREAM SILENT — market hours only; a recorder stream whose last row is older than STREAM_STALE_S.
-25:STREAM_STALE_S = 15 * 60                    # a recorder row older than 15 min in-session = silent (declared)
-28:def _ist_now():
-32:def _parse_iso(s):
-39:def _fetch_json(url, timeout=15):
-45:def _in_session(now=None):
-53:def site_freshness(now=None, fetch_fn=None, post_fn=None):
-54:    """Fetch the PUBLIC status page's written time; if older than STALE_AFTER_S, alarm once-then-hourly.
-55:    A fetch failure returns None (no false FROZEN). Returns the alarm line if posted, else None."""
-77:def stream_silence(now=None, status=None, post_fn=None):
-78:    """In market hours, a recorder stream whose last row is older than STREAM_STALE_S -> ONE line. Uses the
-79:    LOCAL status.json (reports/STATUS.json) so it needs no network. Returns the list of alarm lines posted."""
-90:    for name, s in (status.get("streams") or {}).items():
-94:        if (now - last).total_seconds() > STREAM_STALE_S:
-95:            line = "STREAM SILENT %s since %s" % (name, last.strftime("%H:%M"))
-108:def public_eye(now=None, fetch_fn=None):
-135:def eye_prefix(now=None, fetch_fn=None):
-142:def _notify(msg):
-assistant: E4 = `engine4_options.chain_recorder`, E12 = `engine12_xchange.xchange_recorder` — both started by `launch_e1` but **absent from the watchdog's keep-alive list**, so nothing resurrects them if they die. Confirming the STREAM-SILENT wiring in the running watchdog and finding the death evidence (~06:02):
-tool_use Bash {"command": "echo \"=== watchdog calls stream_silence? (item 3 armed) ===\" && grep -niE \"watchers|stream_silence|site_freshness|import watchers\" scripts/watchdog.py | head; echo \"=== SESSION-STARTS.csv location + today's E4/E12 rows ===\" && find [redacted]/Desktop -maxdepth 4 -iname \"SESSION-STARTS.csv\" 2>/dev/null | head; echo \"=== LAUNCH-RAM.log tail (reaping / start decisions) ===\"; tail -15 reports/LAUNCH-RAM.log 2>/dev/null", "description": "Confirm stream_silence wiring, find session log and RAM log"}
-tool_result: === watchdog calls stream_silence? (item 3 armed) ===
-721:            from scripts import watchers   # R-WATCHERS: alarm if the public site freezes / a recorder goes silent
-722:            watchers.site_freshness()
-723:            watchers.stream_silence()
-=== SESSION-STARTS.csv location + today's E4/E12 rows ===
-[redacted]/Desktop/E1-DESK/stores/e1_positioning_store/SESSION-STARTS.csv
-=== LAUNCH-RAM.log tail (reaping / start decisions) ===
-2026-09-21 15:05:27 | free 0.5 GB | run_live.py | watchdog RESURRECT (hidden, pythonw)
-2026-09-21 15:15:38 | free 1.22 GB | run_live.py | watchdog RESURRECT (hidden, pythonw)
-2026-09-21 15:39:15 | free 0.35 GB | index tests | HELD at checkpoint (free RAM 0.36 GB <= 2.0 GB)
-2026-09-21 15:46:30 | free 1.03 GB | run_evening.py | watchdog RESURRECT (hidden, pythonw)
-2026-09-21 17:27:56 | free 0.52 GB | index tests | HELD at checkpoint (free RAM 0.52 GB <= 2.0 GB)
-2026-09-22 12:25:57 | free 0.71 GB | chain recorder (E4) | START (hidden, pythonw)
-2026-09-22 12:25:57 | free 0.71 GB | tick recorder (E7) | START (hidden, pythonw)
-2026-09-22 12:25:57 | free 0.7 GB | NSE/BSE recorder (E12) | START (hidden, pythonw)
-2026-09-22 12:25:57 | free 0.7 GB | depth recorder (E13) | START (hidden, pythonw)
-2026-09-22 12:25:57 | free 0.7 GB | positioning recorder (E14) | START (hidden, pythonw)
-2026-09-22 12:48:24 | free 1.53 GB | tick recorder (E7) | START (hidden, pythonw)
-2026-09-23 06:02:08 | free 0.95 GB | chain recorder (E4) | START (hidden, pythonw)
-2026-09-23 06:02:08 | free 0.95 GB | NSE/BSE recorder (E12) | START (hidden, pythonw)
-2026-09-23 06:02:08 | free 0.95 GB | depth recorder (E13) | START (hidden, pythonw)
-2026-09-23 06:02:08 | free 0.94 GB | positioning recorder (E14) | START (hidden, pythonw)
-assistant: STREAM-SILENT watcher **is armed** in the running watchdog (`watchdog.py:721-723` calls `watchers.stream_silence()` each cycle). And the death is now evidenced: `LAUNCH-RAM.log` shows E4/E12/E13/E14 were started at **06:02:08 with only ~0.95 GB free**, and now only E14 survives. Checking the token status at that start (does a relaunch even record?):
-tool_use Bash {"command": "cd [redacted]/Desktop/E1-DESK/stores/e1_positioning_store && tail -8 SESSION-STARTS.csv 2>/dev/null; echo \"=== confirm E4/E12 truly absent from running set ===\"; cd [redacted]/Desktop/trading-engines-v2 && powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | Where-Object { \\$_.CommandLine -match 'chain_recorder|xchange_recorder' } | Select-Object ProcessId,CommandLine | Format-List\" 2>/dev/null; echo \"(empty above = E4/E12 not running)\"", "description": "Read session-start token status and confirm E4/E12 absent"}
-tool_result: date,lane,started_at,token,units,reason
-2026-09-22,E14 retail positioning,2026-09-22 12:25:59,absent,0,parser not validated — recording nothing
-2026-09-23,E14 retail positioning,2026-09-23 06:02:09,absent,0,parser not validated — recording nothing
-=== confirm E4/E12 truly absent from running set ===
-(empty above = E4/E12 not running)
-assistant: Confirmed: E4/E12 are dead, and at the 06:02 start the **Kite token was absent** (SESSION-STARTS shows `token,absent`) with only ~0.95 GB free. I now have the full picture — and a hard conflict I must surface before acting.
-
-**I cannot do item 1's relaunch myself.** §14.10 (R-NIGHT-CLOSE, your decree 2026-09-21) is explicit: *"NOTHING but the owner's two double-click files starts or stops the trading-engines-v2 python stack… a session… never relaunches the stack."* The recorders are stack processes. The only compliant ways to start them are your double-click (`START_E1_STACK.bat` / `START_E1_ALL.bat`) or a launch-path edit to the watchdog — and this dispatch itself says "no file edits, no restart_stack." So I'll do everything read-only + the doc fix, and hand you the exact relaunch step. Writing the root-cause fix to NEXT-PASTE (item 2):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\NEXT-PASTE.md", "old_string": "## Tonight, in order (NB15 #3)", "new_string": "## \ud83d\udea8 NB16 EMERGENCY (2026-09-23 ~07:54) \u2014 E4/E12 recorders down, root-cause fix for tonight (launch-path)\n\n**What happened.** `launch_e1` started the E4 chain recorder (`engine4_options.chain_recorder`) and the E12\nNSE/BSE recorder (`engine12_xchange.xchange_recorder`) at **06:02:08 with only ~0.95 GB free RAM and the Kite\ntoken ABSENT** (SESSION-STARTS.csv: `token,absent`; LAUNCH-RAM.log). They are not running now (process list\nchecked). So they died sometime after 06:02 \u2014 the two candidate causes, both present at 06:02, are (a) the\nnight's sustained memory pressure (~0.95 GB free reaps background processes \u2014 it reaped others repeatedly) and\n(b) starting before the login/token landed, so a token-needing stream had nothing to authenticate with.\n\n**Why the watchdog did NOT relaunch them (the real defect).** The watchdog only resurrects jobs in its\nkeep-alive list \u2014 the REM lines in `START_E1_ALL.bat` (`_expected_jobs()` in watchdog.py), which are ONLY\ntoken_ping, run_evening, site_loop, portfolio_card, calendar_daily. **The recorders are started by `launch_e1`\nbut are absent from that keep-alive list**, so `resurrect_jobs` never watches them; a dead recorder stays dead.\n\n**Fix for tonight (launch-path \u2014 NOT done this run):**\n1. Make the watchdog keep the 5 recorder lanes alive: add each `-m <pkg>.<recorder> --record-loop` (E4/E7/E12/\n   E13/E14) to the watchdog's watched set, with the SAME gates the launcher uses \u2014 **relaunch only when the Kite\n   token is present AND free RAM clears the recorder floor** (never spin a token-less recorder in a crash loop).\n2. Order the 06:00 landing so recorders start **after** the token lands, not before (the 06:02 start had no token).\n3. Keep it inside \u00a714.10: the watchdog (an owner-started stack proce
-tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\NEXT-PASTE.md has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Committing the NEXT-PASTE fix and archiving the NB16 dispatch (§7.1 — I owe the verbatim archive):
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-23_NIGHT-BUNDLE-16.md", "content": "# NIGHT BUNDLE 16 (ID:NB16) \u2014 dispatch archived verbatim (2026-09-23)\n\n**Origin tag (per \u00a75):** OWNER-SAID.\n\n\u2192 BUILD  ID:NB16  (EMERGENCY, before 08:30 by the clock \u2014 no file edits, no restart_stack) 1. Relaunch the option-chain (E4) and NSE/BSE two-exchange (E12) recorders through the watchdog's own resurrect path, hidden windows, single instance; confirm with the process list and one row written after 09:15 (post a \u23f1 line then). 2. Cite in one line why they died after 06:02 and why the watchdog did not relaunch them; add the root-cause fix to NEXT-PASTE for tonight (launch-path). 3. The STREAM SILENT watcher must catch this at 09:30 if it happens again today \u2014 confirm it is armed in the running watchdog. Self-flag line.\n\n## Outcome (this session)\nItem 1 RELAUNCH **not performed** \u2014 it conflicts with \u00a714.10 (R-NIGHT-CLOSE): a session never starts the\ntrading-engines-v2 stack; only the owner's double-click does. No compliant path exists (\"no file edits, no\nrestart_stack\" rules out both the watchdog edit and running launch_e1). Owner action handed over instead.\nItem 2 root cause diagnosed + written to NEXT-PASTE (recorders absent from the watchdog keep-alive list).\nItem 3 STREAM SILENT watcher CONFIRMED armed (watchdog.py:721-723 calls watchers.stream_silence each cycle).\n"}
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-23_NIGHT-BUNDLE-16.md (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "git add docs/NEXT-PASTE.md docs/dispatches/2026-09-23_NIGHT-BUNDLE-16.md && python scripts/precommit_guard.py && echo \"guard: clean (docs only)\" && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB16 emergency: E4/E12 recorder-down root cause + tonight fix in NEXT-PASTE; archive NB16\n\nRoot cause: recorders started 06:02 (0.95GB free, token absent) then died; watchdog keep-alive list omits\nrecorders so resurrect_jobs never relaunches them. Relaunch itself is owner-only (14.10) \u2014 not performed.\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h %s\" && date \"+CLOCK: %H:%M IST\"", "description": "Commit NB16 diagnosis and archive"}
-tool_result: warning: in the working copy of 'docs/NEXT-PASTE.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/dispatches/2026-09-23_NIGHT-BUNDLE-16.md', LF will be replaced by CRLF the next time Git touches it
-guard: clean (docs only)
-d7f9463d4 NB16 emergency: E4/E12 recorder-down root cause + tonight fix in NEXT-PASTE; archive NB16
-CLOCK: 07:57 IST
-assistant: All read-only diagnosis and the doc fix are committed (`d7f9463d4`, 07:57 IST). Here is the emergency report — the one thing that needs your hands is at the top, because the market opens at 09:15.
-
-```
-NB16 EMERGENCY — E4/E12 recorders down (report, 2026-09-23 07:57 IST)
-
-⚠️ NEEDS YOUR HANDS BEFORE 09:15 — I could not do this myself (see item 1 below):
-   1) Make sure you are logged in to Kite (the token was ABSENT at 06:02, so a relaunch won't stream without it).
-   2) Double-click START_E1_STACK.bat (or START_E1_ALL.bat). token_ping / launch_e1 will re-arm the recorders.
-   3) It's up when the process list shows pythonw ... engine4_options.chain_recorder  AND  ...engine12_xchange.
-      xchange_recorder, and a row appears in each stream after 09:15.
-
-Item 1 — RELAUNCH: NOT performed, and why. Relaunching the recorders means starting live-stack processes, and
-   §14.10 (your R-NIGHT-CLOSE decree, 21 Sep) says a session NEVER starts the stack — only your double-click
-   files do. This dispatch also says "no file edits, no restart_stack", which rules out the only two automated
-   routes (editing the watchdog, or running launch_e1). So there is no compliant way for me to start them; the
-   safe move is to hand it to you (above). I did NOT post a 09:15 ⏱ line — there is no relaunch of mine to
-   confirm, and I won't post a confirmation for something that didn't happen.
-
-Item 2 — WHY (one line, evidenced): the recorders were started at 06:02:08 with only ~0.95 GB free and the Kite
-   token absent (LAUNCH-RAM.log; SESSION-STARTS.csv), then died — and the watchdog never relaunched them because
-   the recorders are NOT in its keep-alive list (START_E1_ALL.bat's REM lines are only token_ping / run_evening /
-   site_loop / portfolio_card / calendar_daily), so resurrect_jobs never watches a recorder. Root-cause fix for
-   tonight (launch-path) written to NEXT-PASTE: add the 5 recorder lanes to the watchdog's watched set, gated on
-   token-present + RAM-floor, and start recorders only AFTER the token lands.
-
-Item 3 — STREAM SILENT watcher: CONFIRMED armed in the RUNNING watchdog (watchdog.py:721-723 imports watchers
-   and calls watchers.stream_silence() every cycle). In market hours it posts "STREAM SILENT <name>" when a
-   stream's last row is older than 15 min — so it will catch a repeat at ~09:30. One caveat worth a tonight
-   check: it reads the stream list from reports/STATUS.json, so it only alarms for streams that appear there;
-   if E4/E12 are missing from STATUS.json's "streams" while down, add them so silence is never invisible.
-
-Committed (docs only, guard-checked): d7f9463d4 — NEXT-PASTE fix + NB16 archive.
-
-SELF-FLAG: the one thing I did NOT do is the relaunch itself (item 1) — deliberately, because it is owner-only
-under §14.10 and the dispatch's own "no file edits / no restart_stack" fence leaves no compliant path. If you'd
-rather I (or the watchdog) be allowed to resurrect recorders automatically, that's a launch-path change + a
-one-line amendment to §14.10 — say the word and I'll draft it. Everything else asked (root cause, the tonight
-fix, the watcher confirmation) is done and committed. Clock 07:57 IST, before the 08:30 stop.
-```
-
-Done - see block above.
-queue-operation: → BUILD  ID:NB17  (docs only; stop at 08:30 by the clock) 1. Record in CLAUDE.md §14.10 the one amendment (OWNER-SAID 23 Sep 08:05, on the lead's recommendation): the watchdog may relaunch a DEAD RECORDER by itself at any time when the login token is present and memory is above the floor — recorders only, never the stack, never a session; log each relaunch. 2. Add to NEXT-PASTE tonight's wire-in: recorders start only AFTER the token lands; all five recorder lanes in the watchdog's keep-alive set; E4/E12 always listed in STATUS.json "streams" even when down so STREAM SILENT can never be blind. 3. Update MASTER-CHECKLIST; self-flag line.
-user: → BUILD  ID:NB17  (docs only; stop at 08:30 by the clock) 1. Record in CLAUDE.md §14.10 the one amendment (OWNER-SAID 23 Sep 08:05, on the lead's recommendation): the watchdog may relaunch a DEAD RECORDER by itself at any time when the login token is present and memory is above the floor — recorders only, never the stack, never a session; log each relaunch. 2. Add to NEXT-PASTE tonight's wire-in: recorders start only AFTER the token lands; all five recorder lanes in the watchdog's keep-alive set; E4/E12 always listed in STATUS.json "streams" even when down so STREAM SILENT can never be blind. 3. Update MASTER-CHECKLIST; self-flag line.
-assistant: NB17 is docs-only and records the amendment I recommended in NB16. Archiving it first (§7.1) and locating the §14.10 end to append the amendment:
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-23_NIGHT-BUNDLE-17.md", "content": "# NIGHT BUNDLE 17 (ID:NB17) \u2014 dispatch archived verbatim (2026-09-23)\n\n**Origin tag (per \u00a75):** OWNER-SAID (on the lead's recommendation).\n\n\u2192 BUILD  ID:NB17  (docs only; stop at 08:30 by the clock) 1. Record in CLAUDE.md \u00a714.10 the one amendment (OWNER-SAID 23 Sep 08:05, on the lead's recommendation): the watchdog may relaunch a DEAD RECORDER by itself at any time when the login token is present and memory is above the floor \u2014 recorders only, never the stack, never a session; log each relaunch. 2. Add to NEXT-PASTE tonight's wire-in: recorders start only AFTER the token lands; all five recorder lanes in the watchdog's keep-alive set; E4/E12 always listed in STATUS.json \"streams\" even when down so STREAM SILENT can never be blind. 3. Update MASTER-CHECKLIST; self-flag line.\n"}
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-23_NIGHT-BUNDLE-17.md (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "grep -n \"proving exactly the intended set is up\\|## 15. The never-block\" CLAUDE.md", "description": "Find \u00a714.10 end line"}
-tool_result: 520:proving exactly the intended set is up (one of each, no run_live).
-522:## 15. The never-block law (owner decree 2026-07-31)
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\CLAUDE.md", "offset": 518, "limit": 4}
 tool_result: 518	(this extends §14.7's restart-is-human rule from the build chain to the live stack). **Every start is
 519	followed by a read-only process listing** — every python process with its interpreter path and command line,
 520	proving exactly the intended set is up (one of each, no run_live).
@@ -3273,3 +3070,201 @@ Nothing to do here, and I won't re-run START (memory is still tight, and the sta
 State is unchanged from the NB24 report: single clean stack live, heavy queue (EVENING RUN, item-4 dry-run) still deferred on the memory floor (0.89 GB < floor), no PASS marker tonight → flag stays → safe no-trade Thursday. The recorders (thin, depth-only) arm on the 06:00 login.
 
 NOTHING NEEDS THE LEAD.
+queue-operation: continue — fresh session after a Windows restart. Per CLAUDE.md §23 re-read docs/RESUME-CARD.md, docs/NEXT-PASTE.md and docs/MASTER-CHECKLIST.md before acting. NB24 is done (clean stack on new code, lock placed, laptop rebooted ~19:00, memory fresh). Run the queue in order: EVENING RUN (write=True → Thursday's queue) → item-4 full-chain dry-run + independent verify → the 06:00 🙋 ("lift the flag only if the PASS marker exists, then tap the login"). Silence the Google Drive mirror 🙋 (not part of the chain). Report with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+user: continue — fresh session after a Windows restart. Per CLAUDE.md §23 re-read docs/RESUME-CARD.md, docs/NEXT-PASTE.md and docs/MASTER-CHECKLIST.md before acting. NB24 is done (clean stack on new code, lock placed, laptop rebooted ~19:00, memory fresh). Run the queue in order: EVENING RUN (write=True → Thursday's queue) → item-4 full-chain dry-run + independent verify → the 06:00 🙋 ("lift the flag only if the PASS marker exists, then tap the login"). Silence the Google Drive mirror 🙋 (not part of the chain). Report with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+assistant: Fresh session after a Windows reboot — per §23 I re-read the machine clock, NEXT-PASTE, MASTER-CHECKLIST and BUILD-STATE.json before acting. Checking those plus memory and what survived the reboot:
+tool_use Bash {"command": "date \"+CLOCK: %Y-%m-%d %H:%M:%S %Z\" && echo \"=== free RAM (owner says fresh post-reboot) ===\" && python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/mem.py\" 2>&1 | head -1; echo \"=== BUILD-STATE.json ===\" && cat reports/BUILD-STATE.json 2>/dev/null | head -20; echo \"=== running pythonw (post-reboot) ===\" && powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | Select-Object -ExpandProperty CommandLine\" 2>/dev/null | sed 's#.*Python310.pythonw.exe##' | sort | uniq", "description": "Resume re-read: clock, memory, BUILD-STATE, processes"}
+tool_result: CLOCK: 2026-09-23 19:10:00 IST
+=== free RAM (owner says fresh post-reboot) ===
+free_gb: 0.65 | LOW_FREE_GB: 1.2 | HEAVY_START_GB: 2.0
+=== BUILD-STATE.json ===
+{
+ "ruling": "NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57",
+ "item": "NB12-15 done. New un-wired modules built + tested; nothing launch-path touched; commits per sub-step with explicit paths (no git commit -a)",
+ "tests": "each new module --demo green (universe_full, archive_rows, practice_counter, publish_event, proof_apply, session_resurrect, precommit_guard, resume_card); build_beat 6, record_store 6; no heavy suite (RAM floor)",
+ "next": "TONIGHT in order (NB15 #3): wire-ins (7,21,27,44,45,hold-rule) -> one restart -> proofs when memory allows (twin run, verifier self-test on branch item14-broken-test-demo, confined Codex) -> arm 46 on lead's word -> owner UI list after 15:45 -> swap only after 47+48. NOW leftovers: hook wiring for 49/51, ENGINE_CATALOGUE per-engine check.",
+ "flag": "universe_full FAIL-CLOSED: Kite dump not on disk, fetch is launch-path -> returns current 210 until wired. Resume-card + pre-commit HOOKS not wired live (scripts built+tested; wiring in .claude/settings.json/.git/hooks deferred to avoid disrupting a live session). NO swap before owner UI review + items 47/48. No restart before 15:45."
+}
+=== running pythonw (post-reboot) ===
+ scripts/run_evening.py
+"  scripts\site_loop.py
+"  scripts\supervisor.py
+"  scripts\token_ping.py
+"  scripts\watchdog.py
+pythonw  -m scripts.launch_e1
+assistant: Two things stand out at 19:10 IST: **free RAM is 0.65 GB, not "fresh"** (below the floor), and the reboot brought the stack up via **`pythonw -m scripts.launch_e1`** — the OLD launcher path (logon-autostart), not the R-NIGHT-CLOSE `START_E1_STACK.bat`. Before I conclude the heavy proof is blocked, let me check what `free_gb` actually measures (Windows "free" undercounts available/cached) and the real available memory:
+tool_use Bash {"command": "grep -n \"def free_gb\\|FreePhysical\\|Available\\|MemoryStatus\\|GlobalMemory\\|psutil\\|virtual_memory\" scripts/memory_guard.py | head; echo \"=== Windows free vs AVAILABLE ===\"; powershell.exe -NoProfile -Command \"$os=Get-CimInstance Win32_OperatingSystem; '{0:N2} GB free (FreePhysicalMemory)' -f ($os.FreePhysicalMemory/1MB); try { $a=(Get-Counter '\\Memory\\Available MBytes' -ErrorAction Stop).CounterSamples[0].CookedValue; '{0:N2} GB available (reclaimable+free)' -f ($a/1024) } catch { 'available counter n/a' }\" 2>/dev/null", "description": "Check free_gb source and true available memory"}
+tool_result: 126:def free_gb():
+141:        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):
+=== Windows free vs AVAILABLE ===
+available counter n/a
+assistant: `free_gb` uses `GlobalMemoryStatusEx.ullAvailPhys` (the true available figure), so 0.65 GB available is real — the heavy EVENING RUN + dry-run stay blocked (§25 floor). Let me find the Google Drive 🙋 to silence, confirm the autostart, and see what's eating RAM:
+tool_use Bash {"command": "echo \"=== Google Drive mirror \ud83d\ude4b source ===\" && grep -rniE \"google drive|gdrive|drive mirror|mirror.*drive|rclone|drive_\" scripts/*.py 2>/dev/null | head; echo \"=== E1_AUTOSTART logon persistence ===\" && ls -la scheduler/E1_AUTOSTART.vbs \"[redacted]/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/\" 2>/dev/null | head; echo \"=== top RAM consumers (MB) ===\" && powershell.exe -NoProfile -Command \"Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 8 Name,@{N='MB';E={[int]($_.WorkingSet64/1MB)}} | Format-Table -AutoSize\" 2>/dev/null", "description": "Find GDrive \ud83d\ude4b, autostart VBS, top RAM consumers"}
+tool_result: === Google Drive mirror 🙋 source ===
+scripts/drive_mirror.py:1:"""R-E1-DRIVE-MIRROR: copy the owner's status bundle into the Google Drive for desktop folder
+scripts/drive_mirror.py:2:"E1-REPORTS" (read-only mirror). Located under the Drive mount; the path is printed. If the folder does
+scripts/drive_mirror.py:22:STATE = os.path.join(ds._EXTERNAL, "drive_mirror_state.json")
+scripts/drive_mirror.py:33:    "\U0001f64b [E1] The Google Drive mirror has nowhere to write yet. One-time setup (5 min):\n"
+scripts/drive_mirror.py:34:    "1) Install Google Drive for desktop (google.com/drive/download) and sign in.\n"
+scripts/drive_mirror.py:41:    """Where a Google Drive 'My Drive' (and thus E1-REPORTS) can live on Windows."""
+scripts/drive_mirror.py:48:    roots += [os.path.join(home, "My Drive"), os.path.join(home, "Google Drive"),
+scripts/watchdog.py:782:            from scripts import status_reports, drive_mirror   # R-E1-DRIVE-MIRROR: refresh + copy to Drive
+scripts/watchdog.py:784:            drive_mirror.mirror()
+=== E1_AUTOSTART logon persistence ===
+-rw-r--r-- 1 [redacted] 197121 519 Sep 18 14:07 scheduler/E1_AUTOSTART.vbs
+
+[redacted]/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/:
+total 28
+drwxr-xr-x 1 [redacted] 197121    0 Sep 23 19:03 .
+drwxr-xr-x 1 [redacted] 197121    0 Sep 23 19:07 ..
+-rw-r--r-- 1 [redacted] 197121  421 Sep 13 00:41 E1_AUTOSTART.bat.disabled
+-rw-r--r-- 1 [redacted] 197121  519 Sep 18 14:07 E1_AUTOSTART.vbs
+-rw-r--r-- 1 [redacted] 197121  901 Mar 22  2026 NSE_Monitor.lnk.disabled
+-rwxr-xr-x 1 [redacted] 197121 2108 Aug 11  2025 Ollama.lnk
+=== top RAM consumers (MB) ===
+
+Name                    MB
+----                    --
+claude                    
+MsMpEng                   
+Wispr Flow                
+explorer                  
+chrome                    
+StartMenuExperienceHost   
+SearchHost                
+WindowsTerminal
+assistant: The Google Drive 🙋 is `scripts/drive_mirror.py` (fires when the Drive folder is absent; called by watchdog.py:784). And a real finding: **`E1_AUTOSTART.vbs` is active in the Windows Startup folder** — a logon-persistence that fired `launch_e1` on the reboot, which §14.7 forbids (the `.bat` twin is already `.disabled`). Top RAM consumers are non-stack (claude, MsMpEng/Defender, Wispr Flow, chrome). Let me read drive_mirror to silence its 🙋:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\drive_mirror.py"}
+tool_result: 1	"""R-E1-DRIVE-MIRROR: copy the owner's status bundle into the Google Drive for desktop folder
+2	"E1-REPORTS" (read-only mirror). Located under the Drive mount; the path is printed. If the folder does
+3	not exist yet, 🙋 ONCE with the exact install step and retry every 5 minutes (the watchdog calls mirror()
+4	each loop). Never raises. Windowless.
+5	
+6	Mirrored files: reports/LEDGER.md, reports/CONFORMANCE.md, reports/E1-ETA.md, STATUS.md, the lead digest
+7	(site/lead-digest.txt), reports/ALERTS.md.
+8	"""
+9	import glob
+10	import os
+11	import shutil
+12	import string
+13	import sys
+14	import time
+15	
+16	sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+17	
+18	from engine1_rebuild import datastore as ds
+19	
+20	REPO = ds._REPO
+21	FOLDER = "E1-REPORTS"
+22	STATE = os.path.join(ds._EXTERNAL, "drive_mirror_state.json")
+23	REMIND_HOURS = 12.0
+24	
+25	FILES = [os.path.join(REPO, "reports", "LEDGER.md"),
+26	         os.path.join(REPO, "reports", "CONFORMANCE.md"),
+27	         os.path.join(REPO, "reports", "E1-ETA.md"),
+28	         os.path.join(REPO, "STATUS.md"),
+29	         os.path.join(REPO, "site", "lead-digest.txt"),
+30	         os.path.join(REPO, "reports", "ALERTS.md")]
+31	
+32	INSTALL = (
+33	    "\U0001f64b [E1] The Google Drive mirror has nowhere to write yet. One-time setup (5 min):\n"
+34	    "1) Install Google Drive for desktop (google.com/drive/download) and sign in.\n"
+35	    "2) Let it mount — a new drive appears (e.g. G:\\My Drive), or 'My Drive' under your user folder.\n"
+36	    "3) In 'My Drive', create a folder named EXACTLY: E1-REPORTS\n"
+37	    "Then it auto-fills within 5 minutes — no need to tell me. (Read-only mirror; nothing is deleted.)")
+38	
+39	
+40	def _candidate_roots():
+41	    """Where a Google Drive 'My Drive' (and thus E1-REPORTS) can live on Windows."""
+42	    roots = []
+43	    for letter in string.ascii_uppercase[3:]:          # D: .. Z:
+44	        d = letter + ":\\"
+45	        if os.path.isdir(d):
+46	            roots += [d, os.path.join(d, "My Drive"), os.path.join(d, "Shared drives")]
+47	    home = os.path.expanduser("~")
+48	    roots += [os.path.join(home, "My Drive"), os.path.join(home, "Google Drive"),
+49	              os.path.join(home, "GoogleDrive")]
+50	    return roots
+51	
+52	
+53	def find_e1_reports():
+54	    """Return the path to the E1-REPORTS folder under the Drive mount, or None if not present yet."""
+55	    for r in _candidate_roots():
+56	        cand = os.path.join(r, FOLDER)
+57	        if os.path.isdir(cand):
+58	            return cand
+59	    # last resort: a shallow glob for the folder name on any mounted drive
+60	    for letter in string.ascii_uppercase[3:]:
+61	        for hit in glob.glob(letter + ":\\**\\" + FOLDER, recursive=False):
+62	            if os.path.isdir(hit):
+63	                return hit
+64	    return None
+65	
+66	
+67	def _read_state():
+68	    import json
+69	    try:
+70	        return json.load(open(STATE, encoding="utf-8"))
+71	    except Exception:
+72	        return {}
+73	
+74	
+75	def _write_state(d):
+76	    import json
+77	    try:
+78	        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+79	        json.dump(d, open(STATE, "w", encoding="utf-8"))
+80	    except Exception:
+81	        pass
+82	
+83	
+84	def mirror(notify_fn=None):
+85	    """Copy the status bundle into E1-REPORTS. Returns (copied_count, dest_path) or (None, None) if the
+86	    folder is not there yet (in which case it 🙋's the install step at most once per REMIND_HOURS)."""
+87	    dest = find_e1_reports()
+88	    if dest is None:
+89	        st = _read_state()
+90	        now = time.time()
+91	        if (now - st.get("last_remind_ts", 0)) / 3600.0 >= REMIND_HOURS:
+92	            (notify_fn or _notify)(INSTALL)
+93	            st["last_remind_ts"] = now
+94	            _write_state(st)
+95	        return None, None
+96	    copied = 0
+97	    for src in FILES:
+98	        try:
+99	            if os.path.exists(src):
+100	                shutil.copy2(src, os.path.join(dest, os.path.basename(src)))
+101	                copied += 1
+102	        except Exception:
+103	            continue
+104	    return copied, dest
+105	
+106	
+107	def _notify(msg):
+108	    try:
+109	        from scripts.notify import notify
+110	        notify(msg)
+111	    except Exception:
+112	        pass
+113	
+114	
+115	if __name__ == "__main__":
+116	    from scripts import status_reports
+117	    status_reports.build_all()                         # freshen the three generated artifacts first
+118	    c, d = mirror()
+119	    if d:
+120	        print("MIRRORED %d files -> %s" % (c, d))
+121	    else:
+122	        print("E1-REPORTS folder NOT found under any Drive mount — 🙋 install step sent (retries every 5 min).")
+123	        print("Searched:", ", ".join(_candidate_roots()[:6]), "...")
+124	
+assistant: The GDrive 🙋 fires from `drive_mirror.mirror()` (12h cadence) when the Drive folder is absent. To silence it (owner: not part of the chain), I'll add a silence-marker check, create the marker, and bump the state so the currently-running watchdog stays quiet too. Editing:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\drive_mirror.py", "old_string": "REPO = ds._REPO\nFOLDER = \"E1-REPORTS\"\nSTATE = os.path.join(ds._EXTERNAL, \"drive_mirror_state.json\")\nREMIND_HOURS = 12.0", "new_string": "REPO = ds._REPO\nFOLDER = \"E1-REPORTS\"\nSTATE = os.path.join(ds._EXTERNAL, \"drive_mirror_state.json\")\nSILENCE = os.path.join(REPO, \"scheduler\", \".drive_mirror_silent\")   # owner-requested: no \ud83d\ude4b (not part of the chain)\nREMIND_HOURS = 12.0"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\drive_mirror.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\drive_mirror.py", "old_string": "    dest = find_e1_reports()\n    if dest is None:\n        st = _read_state()\n        now = time.time()\n        if (now - st.get(\"last_remind_ts\", 0)) / 3600.0 >= REMIND_HOURS:\n            (notify_fn or _notify)(INSTALL)\n            st[\"last_remind_ts\"] = now\n            _write_state(st)\n        return None, None", "new_string": "    dest = find_e1_reports()\n    if dest is None:\n        if os.path.exists(SILENCE):          # owner silenced the \ud83d\ude4b (drive mirror is not part of the chain)\n            return None, None                # quiet: no nag, still mirrors if the folder ever appears\n        st = _read_state()\n        now = time.time()\n        if (now - st.get(\"last_remind_ts\", 0)) / 3600.0 >= REMIND_HOURS:\n            (notify_fn or _notify)(INSTALL)\n            st[\"last_remind_ts\"] = now\n            _write_state(st)\n        return None, None"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\drive_mirror.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Adding a focused test for the silence:
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_drive_mirror_silence.py", "content": "\"\"\"The Google Drive mirror \ud83d\ude4b can be silenced by a marker (owner request \u2014 not part of the core chain).\"\"\"\nimport sys, os\nsys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), \"scripts\"))\nimport drive_mirror as D\n\n\ndef test_silence_marker_suppresses_the_nag(tmp_path, monkeypatch):\n    monkeypatch.setattr(D, \"find_e1_reports\", lambda: None)          # no Drive folder (the box's real state)\n    monkeypatch.setattr(D, \"STATE\", str(tmp_path / \"state.json\"))\n    monkeypatch.setattr(D, \"SILENCE\", str(tmp_path / \".drive_mirror_silent\"))\n    # not silenced -> the install \ud83d\ude4b is sent once\n    posts = []\n    D.mirror(notify_fn=posts.append)\n    assert len(posts) == 1\n    # silenced -> quiet, never nags\n    open(D.SILENCE, \"w\").write(\"x\")\n    posts2 = []\n    D.mirror(notify_fn=posts2.append)\n    assert posts2 == []\n"}
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\tests\test_drive_mirror_silence.py (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python -m pytest tests/test_drive_mirror_silence.py -q 2>&1 | tail -3 && echo \"=== create the silence marker + bump state so the RUNNING watchdog stays quiet ===\" && printf 'silenced by owner (NB post-reboot): Google Drive mirror \ud83d\ude4b is not part of the chain\\n' > scheduler/.drive_mirror_silent && echo \"marker written\" && ls -la scheduler/.drive_mirror_silent", "description": "Test silence and create the marker"}
