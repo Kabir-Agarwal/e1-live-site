@@ -1,4 +1,59 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>4dbe7c0de</b> · 2026-09-23 19:31</div><div>NB24-proof: RAM freed (2.23 GB) + Startup VBS deleted; but proof BLOCKED-ON-DATA (Wed bar not ingested -&gt; EVENING RUN re-queued expired Tue signals, removed); clean stack restarted; flag stays -&gt; no-trade Thursday</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>7b2c6eef2</b> · 2026-09-23 19:39</div><div>NB25 item 3: evening_precheck.py — ✅/🙋 gate before the evaluator (today&#x27;s bar in store + depth rows today + RAM ok); the lesson from the stale-bar night; tested. Runtime wire is launch-path</div><div class='sub h'>scripts/evening_precheck.py | 49 +++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/evening_precheck.py b/scripts/evening_precheck.py
+new file mode 100644
+index 000000000..5ce8e087b
+--- /dev/null
++++ b/scripts/evening_precheck.py
+@@ -0,0 +1,49 @@
++&quot;&quot;&quot;NB25 item 3 — the EVENING PRE-CHECK. Before the evaluator runs each evening, one light line:
++  ✅ evening — today&#x27;s bar in store, depth rows today N, RAM ok
++  🙋 evening — &lt;gap, plain words&gt; — send this to the lead
++
++The lesson from 2026-09-23: the evaluator ran on a STALE bar (store latest was Tuesday; Wednesday never ingested)
++and re-produced already-expired signals. This gate stops that: it passes ONLY when today&#x27;s bar is actually in the
++store, the depth recorder has rows today, and RAM is above the floor. Pure over a status dict (testable, no heavy
++import); the runtime fills it from the store + the depth stream + memory_guard, and posts line() with the machine
++clock. 🙋 ends with the sanctioned closer; ✅ never asks the owner to do anything.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++CLOSER = &quot;send this to the lead&quot;
++
++
++def line(status):
++    &quot;&quot;&quot;status: {bar_date, today, depth_rows_today:int, ram_ok:bool}. ✅ only if every check passes.&quot;&quot;&quot;
++    bar_date = str(status.get(&quot;bar_date&quot;) or &quot;&quot;)
++    today = str(status.get(&quot;today&quot;) or &quot;&quot;)
++    depth = int(status.get(&quot;depth_rows_today&quot;) or 0)
++    ram_ok = bool(status.get(&quot;ram_ok&quot;))
++    problems = []
++    if bar_date != today:
++        problems.append(&quot;today&#x27;s bar (%s) not in store — latest is %s&quot; % (today or &quot;?&quot;, bar_date or &quot;none&quot;))
++    if depth &lt;= 0:
++        problems.append(&quot;no depth rows recorded today&quot;)
++    if not ram_ok:
++        problems.append(&quot;free RAM below the floor&quot;)
++    if problems:
++        return &quot;🙋 evening — %s — %s&quot; % (&quot;; &quot;.join(problems), CLOSER)
++    return &quot;✅ evening — today&#x27;s bar in store, depth rows today %d, RAM ok&quot; % depth
++
++
++def _demo():
++    ok = {&quot;bar_date&quot;: &quot;2026-09-24&quot;, &quot;today&quot;: &quot;2026-09-24&quot;, &quot;depth_rows_today&quot;: 5000, &quot;ram_ok&quot;: True}
++    assert line(ok) == &quot;✅ evening — today&#x27;s bar in store, depth rows today 5000, RAM ok&quot;, line(ok)
++    # tonight&#x27;s exact failure: store latest is Tuesday, evaluator asked to run on Wednesday
++    stale = {&quot;bar_date&quot;: &quot;2026-09-22&quot;, &quot;today&quot;: &quot;2026-09-23&quot;, &quot;depth_rows_today&quot;: 0, &quot;ram_ok&quot;: True}
++    r = line(stale)
++    assert r.startswith(&quot;🙋 evening —&quot;) and &quot;not in store&quot; in r and &quot;no depth rows&quot; in r and r.endswith(CLOSER), r
++    lowram = {&quot;bar_date&quot;: &quot;2026-09-24&quot;, &quot;today&quot;: &quot;2026-09-24&quot;, &quot;depth_rows_today&quot;: 10, &quot;ram_ok&quot;: False}
++    assert &quot;RAM below the floor&quot; in line(lowram)
++    print(&quot;evening_precheck demo OK: ✅ only when today&#x27;s bar + depth rows + RAM; 🙋 names the gap (the Wed lesson).&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+</pre></div><div class='c'><div class='h'><b>4dbe7c0de</b> · 2026-09-23 19:31</div><div>NB24-proof: RAM freed (2.23 GB) + Startup VBS deleted; but proof BLOCKED-ON-DATA (Wed bar not ingested -&gt; EVENING RUN re-queued expired Tue signals, removed); clean stack restarted; flag stays -&gt; no-trade Thursday</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
 index 4c9f59a11..541901702 100644
 --- a/reports/BUILD-STATE.json
 +++ b/reports/BUILD-STATE.json
@@ -493,82 +548,4 @@ index 00cc7537b..34d6befa7 100644
 -EOD-CONFORM-ETERNAL-2026-09-23,queued,1304833,ETERNAL rsi (exam-conform) next 60 days,direct,stop1_tgt1.5,2026-09-23,,,,,,,,,,,,,,,,,
 +EOD-CONFORM-AUBANK-2026-09-23,expired,5436929,AUBANK vwap (exam-conform) next 40 days,direct,stop1_tgt1.5,2026-09-23,,,,,2026-09-23,,expired - missed next open (recorders down + hold flag),,,,,,,,,,
 +EOD-CONFORM-ETERNAL-2026-09-23,expired,1304833,ETERNAL rsi (exam-conform) next 60 days,direct,stop1_tgt1.5,2026-09-23,,,,,2026-09-23,,expired - missed next open (recorders down + hold flag),,,,,,,,,,
-</pre></div><div class='c'><div class='h'><b>5d845e735</b> · 2026-09-23 16:43</div><div>NB22-B item 61: E1-only thin start — launch_e1 starts only the Price Engine chain (depth-only recorder; the six checks read depth, conform.py:132) until one clean trade; plan()/e1_only() tested; ON/OFF listed</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  1 +</div><div class='sub h'>scripts/launch_e1.py     | 42 +++++++++++++++++++++++++++++++++++++++---</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 91a56ce0c..bc4c63021 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -90,4 +90,5 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
- - [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
- - [AFTER-1545] 58. recorder keep-alive (NB16/NB17, §14.10 amendment) — the watchdog relaunches a DEAD recorder itself (token present + RAM above floor, logged); all 5 lanes (E4/E7/E12/E13/E14) in the watchdog keep-alive set; recorders start only AFTER the token lands; E4/E12 always in STATUS.json &quot;streams&quot; even when down so STREAM SILENT is never blind. Root cause: NB16 found E4/E12 dead since 06:02 with nothing to resurrect them. Launch-path wire-in tonight
- - [NOW] 59. lead-mistake ledger (NB19, OWNER-SAID) — BUILT this session: docs/LEAD-MISTAKES.md (seeded with 5 rows for 2026-09-23) + scripts/lead_mistakes.py (machine-append + count_today, tested). Appended by the builder on an uncited-name refusal (CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed; daily close line ends &quot;Lead mistakes today: N&quot;. Build-room page + the verifier/close append CALLS are the AFTER-1545 wire-in
-+- [AFTER-1545] 61. E1-only thin start (NB22-B) — BUILT: launch_e1 starts ONLY the Price Engine chain until one clean paper trade is on record (reports/CLEAN-TRADE-ON-RECORD). ON = watchdog · login ask (token_ping) · evening scan (run_evening) · site publisher · depth recorder (E13, the only lane the six checks read — conform.py:132) [+ book20_runner via login]. OFF = portfolio_card · calendar_daily · chain recorder (E4) · NSE/BSE (E12) · positioning (E14) · all heavy. plan()/e1_only() tested (--demo). Free RAM measured 0.36 GB before — this is the fix. LIVE via dry-run + restart (RAM measured after on the next start)
- - [AFTER-1545] 60. 🚩 lead-mistake signal (NB21) — BUILT non-launch (scripts/lead_mistakes.py: flag_line, is_read_only guard, backfill_lines, append(notify_fn=), tested; docs/FLAG-BACKFILL-2026-09-23.md ready). WIRE-IN (launch-path, tonight&#x27;s dry-run): pass notify.notify as append&#x27;s notify_fn so every mistake posts one read-only 🚩 line; the notify guard rejects an action-carrying 🚩; close line ends &quot;🚩 today: N&quot;, 08:15 line carries &quot;🚩 yesterday: N&quot;; post the 7 backfill lines
-diff --git a/scripts/launch_e1.py b/scripts/launch_e1.py
-index d0110f9d1..46b280211 100644
---- a/scripts/launch_e1.py
-+++ b/scripts/launch_e1.py
-@@ -56,6 +56,33 @@ HEAVY = [
-     (&quot;E4/E7 backtests&quot;, [&quot;scripts/run_backtests.py&quot;]),
- ]
- 
-+# NB22-B E1-ONLY THIN START: until one clean paper trade is on record, start ONLY the Price Engine chain, to
-+# leave the ~1 GB box its RAM. The six checks read DEPTH only (engine1_rebuild/conform.py:132 — `quotes` = the
-+# live book; positioning/option-chains/NSE-BSE are for other engines, so their recorders stay OFF). book20_runner
-+# is launched at login (kite_login._arm_book20), not here. The Telegram poster is the notify library (scripts/
-+# notify.py) used by the ON processes — no separate poster process. calendar_daily is OFF: run_evening imports the
-+# trading_calendar LIBRARY (run_evening.py:13), not the calendar_daily process&#x27;s output.
-+_REPO2 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+CLEAN_TRADE_MARKER = os.path.join(_REPO2, &quot;reports&quot;, &quot;CLEAN-TRADE-ON-RECORD&quot;)  # written when one clean trade lands
-+_E1_LABELS = (&quot;watchdog&quot;, &quot;login ask&quot;, &quot;evening scan&quot;, &quot;site publisher + digest&quot;, &quot;depth recorder (E13)&quot;)
-+E1_ESSENTIAL = [x for x in ESSENTIAL if x[0] in _E1_LABELS]
-+
-+
-+def e1_only():
-+    &quot;&quot;&quot;True until one clean paper trade is on record (the feature-freeze / thin-start condition).&quot;&quot;&quot;
-+    return not os.path.exists(CLEAN_TRADE_MARKER)
-+
-+
-+def _essential():
-+    return E1_ESSENTIAL if e1_only() else ESSENTIAL
-+
-+
-+def plan():
-+    &quot;&quot;&quot;(on, off) labels for the current start — the report&#x27;s ON/OFF lists, machine-derived (never typed).&quot;&quot;&quot;
-+    on = [x[0] for x in _essential()]
-+    off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]
-+    return on, off
-+
- 
- def pythonw():
-     cand = os.path.join(os.path.dirname(sys.executable), &quot;pythonw.exe&quot;)
-@@ -124,9 +151,9 @@ def recorders_running(cmdlines=None):
- 
- 
- def main(poll=300):
--    MG.log_launch(&quot;launcher&quot;, &quot;BEGIN - free RAM read before anything starts&quot;)
-+    MG.log_launch(&quot;launcher&quot;, &quot;BEGIN - free RAM read before anything starts (E1-only=%s)&quot; % e1_only())
-     procs = running_cmdlines()
--    for label, args in ESSENTIAL:
-+    for label, args in _essential():          # NB22-B: thin E1 chain until one clean paper trade is on record
-         start(label, args, procs)
-     pending = list(HEAVY)
-     while pending:                                    # ponytail: one waiter process, polls every 5 min
-@@ -157,7 +184,16 @@ def _demo():
-     names = {l for l, _ in ESSENTIAL}
-     assert not names &amp; {l for l, _ in HEAVY}
-     assert not any(&quot;sweep&quot; in l or &quot;backtest&quot; in l or &quot;shape&quot; in l for l in names)
--    print(&quot;launch_e1 demo OK: hidden pythonw starts, no double start, heavy jobs never in the essential set&quot;)
-+    # NB22-B: the thin E1 chain keeps depth (the six checks&#x27; only lane) and drops the other engines&#x27; plumbing
-+    on, off = plan()
-+    if e1_only():
-+        assert &quot;depth recorder (E13)&quot; in on, on
-+        for gone in (&quot;chain recorder (E4)&quot;, &quot;NSE/BSE recorder (E12)&quot;, &quot;positioning recorder (E14)&quot;,
-+                     &quot;30-min portfolio card&quot;, &quot;E3 calendar puller&quot;):
-+            assert gone in off and gone not in on, gone
-+    assert all(l in names for l in on)                     # thin ON is always a subset of the full essentials
-+    assert isinstance(e1_only(), bool)
-+    print(&quot;launch_e1 demo OK: hidden pythonw starts, no double start, heavy jobs never essential; thin E1 plan ok&quot;)
- 
- 
- if __name__ == &quot;__main__&quot;:
 </pre></div></main></body></html>
