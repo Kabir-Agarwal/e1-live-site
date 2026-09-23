@@ -1,5 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 17:50 checked 17:50 — on course
-2026-09-22 17:58 checked 17:58 — on course
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 17:58 checked 17:58 — on course
 2026-09-22 18:06 checked 18:06 — on course
 2026-09-22 18:15 checked 18:15 — on course
 2026-09-22 18:18 checked 18:18 — on course
@@ -117,24 +116,25 @@
 2026-09-23 20:28 checked 20:28 — on course
 2026-09-23 20:59 checked 20:59 — on course
 2026-09-23 21:17 checked 21:17 — on course
-2026-09-23 21:22 checked 21:22 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the ruling in force (NB27), the NB28 wire-in commit `d587466ba`, its diff, the transcript since the last check, and STATUS.json.
+2026-09-23 21:22 checked 21:22 — on course
+2026-09-23 21:28 checked 21:28 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed the ruling (NB28), the two commits since last check, their diffs, the transcript, and STATUS.json against the seven checks.
 
-**Provenance (check 0):** The change is the launch-path wire-in batch named explicitly in NB27's "next" steps and archived as `docs/dispatches/2026-09-23_NIGHT-BUNDLE-28.md`. Owner scope, not run-authored.
+**Provenance** — NB28 and NB19-R2 are both archived owner dispatches (`docs/dispatches/2026-09-23_NIGHT-BUNDLE-28.md`, `2026-09-23_NB19-R2.md`). The flag-lift and the morning_bar wire both trace to owner scope; nothing here is run-authored.
 
-**Scope (1):** morning_bar → `post_login` catch-up (fetch yesterday's bar if missing, evaluate today's next-open queue, idempotent). Traces to the NB28/NB27 wire-in batch. In scope.
+**What happened since last check:**
+- Builder launched an *independent* verifier on the morning_bar → `post_login` wire. It returned `SKIPPED-LOW-MEM` (free RAM 0.57 GB < floor) — it never self-graded.
+- Per NB28's own verify gate ("PASS → live; else the 06:00 login must be safe"), the builder reverted `kite_login.py` to the last independently-verified state `b47580206` (confirmed: `morning_bar` count = 0, compiles). Commit `3f0c92561`.
+- Bookkeeping only in `e4f545619`: NEXT-PASTE 06:00 note + BUILD-STATE.json, both honestly recording the revert → no-trade Thursday.
 
-**No self-audit (2):** Builder launched an INDEPENDENT verifier (rung d, fresh session) on the wire; did not grade its own work. Correct independence.
+**Seven checks:**
+1. Scope — revert + bookkeeping follow NB28's verify gate. ✓
+2. No self-audit — verifier was a separate session; when it couldn't run, builder reverted rather than passing itself. ✓
+3. No typed numbers — diffs are docs/JSON; 0.57 GB is a measured reading, not a code constant. ✓
+4. Demos inert — `orders_written_today: 0`, `cards_sent_today: 0`. ✓
+5. Trading-path — the order-path-adjacent wire was **reverted** because unverified; every order still gated by moment light + six checks + kill + breaker; real-money rail unchanged. Fail-closed. ✓
+6. No secrets — none in the diffs. ✓
+7. Ordering — no next-before-X item jumped. ✓
 
-**No typed numbers (3):** Diff uses `CAL.previous_session`, `conform.queue_orders`, ledger reads — no naked constants.
-
-**Demos inert (4):** Verification is `py_compile` + `morning_bar.py --demo` (read-only/compile). The `write=True` queue call only fires inside a real `post_login`, wrapped in an isolated try/except that never breaks the login.
-
-**Trading-path (5):** Touches the login flow, but within the wire-in scope; the order gate is unchanged — flag present → HELD (R-HOLD-AND-FIX), idempotency guard prevents duplicate rows, real-money rail untouched.
-
-**No secrets (6):** No key/token/path on a published page in the diff.
-
-**Ordering (7):** §25 prefers batching launch-path items into one dry-run + one verify; the builder is verifying morning_bar individually first. That is more conservative, not less, and nothing is declared "live" — the full batched dry-run and market-day capture remain pending. No rail broken.
-
-One note, not a violation: the independent verify completed (exit 0) but the builder has not yet read/relayed its verdict — the commit landed with an explicit revert point (`b47580206`) if it FAILs. That is the builder's stated workflow, mid-step.
+The builder hit an unverifiable launch-path change and chose the conservative, fail-closed path — revert to last-verified state, no-trade Thursday — exactly what the ruling requires.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
