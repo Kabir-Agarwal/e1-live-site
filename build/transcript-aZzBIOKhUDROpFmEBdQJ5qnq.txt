@@ -1,11 +1,3 @@
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\NEXT-PASTE.md", "offset": 62, "limit": 6}
-tool_result: 62	- **45 / item 1 (`scripts/universe_full.py`) — PREPARE DEFERRED, not built.** The full instrument list (top
-63	  ~2,000 NSE by turnover) needs a real turnover source — inventing the membership would be fabricating data
-64	  (§4.4) — and the futures side needs the recorder's real NFO expiry calendar (launch-path). Build + wire both
-65	  wait for the turnover feed / recorder code; nothing was stubbed to look done.
-66	
-67	## FIRST after 15:45 — futures depth (audit 035732 / R-FUTURES-DEPTH)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\NEXT-PASTE.md", "old_string": "- **45 / item 1 (`scripts/universe_full.py`) \u2014 PREPARE DEFERRED, not built.** The full instrument list (top\n  ~2,000 NSE by turnover) needs a real turnover source \u2014 inventing the membership would be fabricating data\n  (\u00a74.4) \u2014 and the futures side needs the recorder's real NFO expiry calendar (launch-path). Build + wire both\n  wait for the turnover feed / recorder code; nothing was stubbed to look done.", "new_string": "- **45 / item 1 (`scripts/universe_full.py`) \u2014 BUILT + fixture-tested (NB13 ruling).** The list = every NSE\n  equity (EQ) in Kite's dump + NIFTY/BANKNIFTY near+next futures with expiry rollover, a measured-limit switch\n  (turnover trims only AFTER day one), and a diff vs the current 210. **FAIL-CLOSED: the Kite dump is not on disk,\n  so `universe()` returns the current 210 unchanged today.** Wire-in tonight = fetch the real dump (launch-path /\n  Kite token) + one import in the recorder. No names invented \u2014 the self-test uses a synthetic fixture."}
 tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\NEXT-PASTE.md has been updated successfully. (file state is current in your context — no need to Read it back)
 assistant: Committing NEXT-PASTE, then building the remaining NOW items (54 catalogue line, 51 pre-commit guard, 49 resume-card writer):
 tool_use Bash {"command": "git add docs/NEXT-PASTE.md && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB15: NEXT-PASTE \u2014 tonight's ordered block (wire-ins->restart->proofs->arm 46->UI list->swap), NOW items, universe_full built\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && echo \"=== ENGINE_CATALOGUE location ===\" && find . -path ./.git -prune -o -iname \"*ENGINE_CATALOGUE*\" -print 2>/dev/null | head", "description": "Commit NEXT-PASTE and locate ENGINE_CATALOGUE"}
@@ -3279,3 +3271,44 @@ tool_result: ProcessId CreationDate         CommandLine
                                scripts\site_loop.py                                                                    
     16868 9/23/2026 6:22:25 PM "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"                   
                                scripts\supervisor.py
+assistant: **Critical finding.** The restart did NOT replace the stack — it **duplicated** it. There are now TWO copies each of token_ping/watchdog/site_loop/supervisor: the old set (PIDs 27804/12180/13236/21516, started 1:22 AM) is **still running**, and START added a new set (18044/28784/7612/16868, 6:22 PM) — plus the old positioning (27172) + book20 (18980). So `STOP_E1_STACK.bat` did **not** kill the old processes, and free RAM **dropped** to 0.37 GB (more processes, not fewer). Two watchdogs is dangerous. Reading STOP to give you a precise fix:
+tool_use Bash {"command": "cd [redacted]/Desktop && grep -niE \"taskkill|Stop-Process|wmic|Get-CimInstance|Get-Process|pythonw|/F|/IM|/PID|where|filter\" \"E1-DESK/STOP_E1_STACK.bat\" 2>/dev/null | head -25", "description": "Read STOP_E1_STACK.bat kill mechanism"}
+tool_result: 12:powershell -NoProfile -Command "$pat='scripts|engine1_rebuild|engine4_options|engine7_parity|engine9|engine12_xchange|engine21_overnight|engine_youtube|book20_runner|run_live'; $ps=Get-CimInstance Win32_Process -Filter \"Name like 'python%%'\" | Where-Object { $_.CommandLine -match $pat -and $_.CommandLine -notmatch 'windows-mcp|serve' }; if(-not $ps){ Write-Output 'nothing to stop.' } else { $ps | ForEach-Object { Write-Output ('  killed PID {0}: {1}' -f $_.ProcessId, ($_.CommandLine).Trim()); Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }"
+Shell cwd was reset to [redacted]\Desktop\trading-engines-v2
+assistant: `STOP_E1_STACK.bat` kills every python matching `scripts|engine1_rebuild|…book20_runner` — so it *would* have killed the old set **if it had run**. The evidence says it didn't: the 1:22 AM processes survived and START just added a second set. Most likely START was double-clicked without STOP finishing first. Here's the report + the exact fix.
+
+```
+NB23 (post-"restarted") — the restart DID NOT take cleanly: the stack is now DOUBLED. 18:24 IST.
+
+WHAT I MEASURED (process creation times, read-only):
+  OLD set, still running (started 1:22 AM):  token_ping 27804 · watchdog 12180 · site_loop 13236 · supervisor 21516
+  NEW set, added by START (started 6:22 PM):  token_ping 18044 · watchdog 28784 · site_loop 7612 · supervisor 16868
+  plus the morning: positioning_recorder 27172 (6:02 AM) · book20_runner 18980 (6:03 AM)
+  → TWO watchdogs, TWO token_pings, TWO site_loops, TWO supervisors. Free RAM DROPPED 0.7 → 0.37 GB (more
+    processes, not fewer). No new LAUNCH-RAM entry at the restart (recorders arm on login, not launch_e1).
+
+WHY: START_E1_STACK.bat ran (the 6:22 PM copies) but STOP_E1_STACK.bat did NOT clear the old set first — its
+  kill pattern DOES match those processes (they run "scripts\…"), so it would have killed them had it run and
+  finished. Most likely START was double-clicked without STOP completing first.
+
+I am NOT proceeding with the heavy queue (EVENING RUN, dry-run): free RAM 0.37 GB is far below the floor, and two
+  watchdogs is an unstable base. (Good news: my new watchdog's auto-continue and recorder-relaunch are both RAM-
+  gated, so at 0.37 GB neither fires — no double-spawn risk while we clean this up.) The R-HOLD-AND-FIX hold is
+  still placed; no orders.
+
+🙋 CLEAN RESTART — run STOP FIRST this time: double-click Desktop\E1-DESK\STOP_E1_STACK.bat and WAIT until its
+  window lists "killed PID …" lines and finishes (it kills BOTH the old and new sets — everything matching
+  scripts/engine1_rebuild/book20). Confirm no pythonw remains except the two windows-mcp "serve" helpers, THEN
+  double-click Desktop\E1-DESK\START_E1_STACK.bat once. That gives a single clean 4-process stack on my new code;
+  on login it arms only the depth recorder (thin). Then reply "restarted" again and I'll re-confirm · send this to
+  the lead.
+
+After a clean single stack + free RAM back above the floor, I resume the queue in NB23's order: confirm thin stack
+  + RAM → EVENING RUN (write=True → Thursday's queue) → item-4 dry-run + independent verify → the 06:00 flag-lift
+  🙋 (only if the PASS marker exists). CLOSE-DONE and HELD LOG are already built this session.
+
+NOTHING NEEDS THE LEAD. (One owner action: the clean STOP-then-START above. Nothing else is decided until the
+stack is single and RAM is above the floor — the heavy steps stay held, correctly, until then.)
+```
+
+Done - see block above.
