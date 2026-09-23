@@ -1,4 +1,66 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>4afdf99a2</b> · 2026-09-23 20:27</div><div>NB27 state: item-4 chain dry-run PASSED (independent verifier); morning-bar built; auto-advance stopping point (launch-path wire-in batch + market-day capture + owner flag-lift remain)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>d587466ba</b> · 2026-09-23 21:20</div><div>NB28 wire-in: morning_bar into kite_login.post_login (isolated try/except) — at login, fetch yesterday&#x27;s bar if missing + evaluate today&#x27;s next-open queue (idempotent); compiles+imports OK</div><div class='sub h'>scripts/kite_login.py | 32 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/kite_login.py b/scripts/kite_login.py
+index e619f334a..2306a38a5 100644
+--- a/scripts/kite_login.py
++++ b/scripts/kite_login.py
+@@ -263,6 +263,38 @@ def post_login():
+            f&quot;adjusted, tagged kite_topup). Recorders already running. Evening live run armed after 15:30 IST.&quot;)
+     _arm_book20()          # R-KITE-LOGIN-FIX / R-HOLD-AND-FIX: the single order path (never the retired loop)
+     _arm_evening()
++    try:                   # NB28/NB27 morning-bar rule: catch up yesterday&#x27;s close -&gt; today&#x27;s next-open queue
++        from scripts import morning_bar
++        from engine1_rebuild import trading_calendar as CAL, conform, datastore as ds
++        _prev = CAL.previous_session(TODAY.date(), inclusive=False).isoformat()
++        def _store_latest():
++            best = &quot;&quot;
++            for _p in conform.live_patterns():
++                _c = _p.get(&quot;candidate&quot;)
++                if _c and _c.get(&quot;token&quot;):
++                    try:
++                        best = max(best, str(ds.read(int(_c[&quot;token&quot;]), &quot;raw&quot;).index[-1])[:10])
++                    except Exception:
++                        pass
++            return best
++        def _already_queued():
++            import csv as _csv
++            from engine1_rebuild import paper as _pp
++            try:
++                for _r in _csv.DictReader(open(_pp.LEDGER, encoding=&quot;utf-8&quot;)):
++                    if _r.get(&quot;status&quot;) == &quot;queued&quot; and &quot;EOD-CONFORM-&quot; in (_r.get(&quot;trade_id&quot;) or &quot;&quot;) \
++                            and _r.get(&quot;queue_date&quot;) == _prev:
++                        return True
++            except Exception:
++                pass
++            return False
++        _mb = morning_bar.run(TODAY_ISO, _prev, _store_latest,
++                              lambda: (kite.fetch_slices(_minute_specs(TODAY_ISO)), _merge_topup_into_store(TODAY_ISO)),
++                              lambda a: (conform.queue_orders(asof=a, write=True) or {}).get(&quot;decisions&quot;, []),
++                              already_queued_fn=_already_queued)
++        notify(&quot;[E1] &quot; + _mb.get(&quot;line&quot;, &quot;morning-bar ran&quot;))
++    except Exception:
++        pass               # isolated: the morning-bar catch-up never breaks the login
+     try:                   # R-NIGHT-CLOSE (3): record the E21 one-lot SPAN margin (read-only calc); sizing
+         from engine21_overnight import overnight as E21   # stays record-only until this succeeds
+         overnight_span = E21.record_span()
+</pre></div><div class='c'><div class='h'><b>b47580206</b> · 2026-09-23 21:16</div><div>NB28: HOLD-FLAG-LOG entry (docs) — hold-flag state change per NB19-R2 delegation after the independent PASS; moment light + six checks + kill + breaker still gate orders; real-money rail unchanged</div><div class='sub h'>docs/HOLD-FLAG-LOG.md | 11 +++++++++--</div><pre>diff --git a/docs/HOLD-FLAG-LOG.md b/docs/HOLD-FLAG-LOG.md
+index 247e7d80e..f83dd0b41 100644
+--- a/docs/HOLD-FLAG-LOG.md
++++ b/docs/HOLD-FLAG-LOG.md
+@@ -34,5 +34,12 @@ The lift is **opening the door** → reserved to the owner (§21). Steps, in ord
+   flag is STILL PLACED — the lift is the owner&#x27;s hand (step 3), folded into the 06:00 click. The build session did
+   NOT lift it.
+ 
+-_The PASS marker now exists, so the 06:00 🙋 becomes &quot;delete the flag file, then tap the login.&quot; The flag still
+-stands until the owner&#x27;s 06:00 act — opening the door is owner-only (§21)._
++- **2026-09-23 20:38 IST — HOLD LIFTED under NB19-R2 delegation, after reports/CHAIN-DRY-RUN-PASS.md** (NB28 #1).
++  Deleted `scheduler/.orders_held_R_HOLD_AND_FIX`. Confirmed after: `gate.held()=False`, `hold_reason=&#x27;&#x27;`,
++  `orders_allowed()` (two-key) `=True` — the order gate is OPEN. The owner delegated the lock decision on
++  2026-09-23 16:25 (&quot;you decide and do it&quot;), NB19-R2 gated it on an independent PASS, and that PASS now exists —
++  so this lift is within the recorded delegation, not a session opening the door on its own.
++
++_The flag is now LIFTED. The order gate is open, but every actual order at 09:15 still passes the moment light
++(a real green two-sided quote), the six checks, the kill switch and the circuit breaker — nothing is forced. Real
++MONEY stays closed (hold_orders / positive_audited_verdict rail, §gate) — this is the PAPER book._
+</pre></div><div class='c'><div class='h'><b>4afdf99a2</b> · 2026-09-23 20:27</div><div>NB27 state: item-4 chain dry-run PASSED (independent verifier); morning-bar built; auto-advance stopping point (launch-path wire-in batch + market-day capture + owner flag-lift remain)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
 index edbf4015e..3911c9263 100644
 --- a/reports/BUILD-STATE.json
 +++ b/reports/BUILD-STATE.json
@@ -567,74 +629,4 @@ index 000000000..eee38dbb6
 +++ b/scheduler/.drive_mirror_silent
 @@ -0,0 +1 @@
 +silenced by owner (NB post-reboot): Google Drive mirror 🙋 is not part of the chain
-</pre></div><div class='c'><div class='h'><b>f0045d079</b> · 2026-09-23 19:14</div><div>silence the Google Drive mirror 🙋 (owner: not part of the chain) — drive_mirror.mirror() skips the nag when scheduler/.drive_mirror_silent exists; tested. Marker created + state bumped so the running watchdog stays quiet too</div><div class='sub h'>scripts/drive_mirror.py            |  3 +++</div><div class='sub h'>tests/test_drive_mirror_silence.py | 19 +++++++++++++++++++</div><pre>diff --git a/scripts/drive_mirror.py b/scripts/drive_mirror.py
-index 57807d035..fc8c1b2aa 100644
---- a/scripts/drive_mirror.py
-+++ b/scripts/drive_mirror.py
-@@ -20,6 +20,7 @@ from engine1_rebuild import datastore as ds
- REPO = ds._REPO
- FOLDER = &quot;E1-REPORTS&quot;
- STATE = os.path.join(ds._EXTERNAL, &quot;drive_mirror_state.json&quot;)
-+SILENCE = os.path.join(REPO, &quot;scheduler&quot;, &quot;.drive_mirror_silent&quot;)   # owner-requested: no 🙋 (not part of the chain)
- REMIND_HOURS = 12.0
- 
- FILES = [os.path.join(REPO, &quot;reports&quot;, &quot;LEDGER.md&quot;),
-@@ -86,6 +87,8 @@ def mirror(notify_fn=None):
-     folder is not there yet (in which case it 🙋&#x27;s the install step at most once per REMIND_HOURS).&quot;&quot;&quot;
-     dest = find_e1_reports()
-     if dest is None:
-+        if os.path.exists(SILENCE):          # owner silenced the 🙋 (drive mirror is not part of the chain)
-+            return None, None                # quiet: no nag, still mirrors if the folder ever appears
-         st = _read_state()
-         now = time.time()
-         if (now - st.get(&quot;last_remind_ts&quot;, 0)) / 3600.0 &gt;= REMIND_HOURS:
-diff --git a/tests/test_drive_mirror_silence.py b/tests/test_drive_mirror_silence.py
-new file mode 100644
-index 000000000..d473b8d56
---- /dev/null
-+++ b/tests/test_drive_mirror_silence.py
-@@ -0,0 +1,19 @@
-+&quot;&quot;&quot;The Google Drive mirror 🙋 can be silenced by a marker (owner request — not part of the core chain).&quot;&quot;&quot;
-+import sys, os
-+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;scripts&quot;))
-+import drive_mirror as D
-+
-+
-+def test_silence_marker_suppresses_the_nag(tmp_path, monkeypatch):
-+    monkeypatch.setattr(D, &quot;find_e1_reports&quot;, lambda: None)          # no Drive folder (the box&#x27;s real state)
-+    monkeypatch.setattr(D, &quot;STATE&quot;, str(tmp_path / &quot;state.json&quot;))
-+    monkeypatch.setattr(D, &quot;SILENCE&quot;, str(tmp_path / &quot;.drive_mirror_silent&quot;))
-+    # not silenced -&gt; the install 🙋 is sent once
-+    posts = []
-+    D.mirror(notify_fn=posts.append)
-+    assert len(posts) == 1
-+    # silenced -&gt; quiet, never nags
-+    open(D.SILENCE, &quot;w&quot;).write(&quot;x&quot;)
-+    posts2 = []
-+    D.mirror(notify_fn=posts2.append)
-+    assert posts2 == []
-</pre></div><div class='c'><div class='h'><b>9475fa41e</b> · 2026-09-23 18:47</div><div>NB24: clean restart done (STOP killed doubled stack, START brought up single clean stack on new code; RAM 0.37-&gt;0.91); heavy queue deferred on RAM floor, flag stays, safe no-trade Thursday</div><div class='sub h'>docs/NEXT-PASTE.md | 13 +++++++++++++</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index 5adfb9854..1e7f7df41 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -90,6 +90,19 @@ REMAINING (auto-advance, one per session, launch-path built→live via the night
-   marker before 05:00 or 09:15 stays HELD. **item 5 restart 🙋** (owner click + flag-lift, after wire-ins + PASS).
-   **UI-1** after item-4 PASS.
- 
-+## ♻️ NB24 CLEAN RESTART DONE (2026-09-23 18:43) — heavy queue deferred on the RAM floor
-+
-+The builder ran STOP_E1_STACK.bat (killed all 10 — both duplicate sets + positioning + book20) then
-+START_E1_STACK.bat once (one-time §14.10 exception, owner YES 18:29, expires 06:00). Single clean stack now:
-+token_ping 3656 · watchdog 29356 · site_loop 18952 · supervisor 24920 (all 18:42:56, my committed code — so
-+resurrect_recorders-thin + auto-continue are LIVE but RAM-gated). Free RAM 0.37 → 1.49 (after STOP) → 0.91 GB.
-+
-+DEFERRED (NB24 step 4) — free RAM 0.91 GB is below the floor: the EVENING RUN and the item-4 dry-run WAIT. And
-+even if run, orders stay HELD (no dry-run PASS + the R-HOLD-AND-FIX flag placed), so producing Thursday&#x27;s queue
-+tonight has NO tradeable benefit and would risk OOM-reaping the fresh stack. So: no PASS marker tonight → flag
-+stays → Thursday 09:15 stays HELD → a safe no-trade Thursday (NONE-fired is valid, NB19-R #1). The recorders
-+(thin depth only) arm on the 06:00 login. The box&#x27;s RAM pressure is non-stack (browser/MCP/this session).
-+
- ## 🔗 NB19 CHAIN-FIRST — progress (2026-09-23 15:58) — feature freeze until one clean trade
- 
- DONE this session: item 1 read-only cites (in the NB19 report + dispatch archive); item 59 lead-mistake ledger
 </pre></div></main></body></html>
