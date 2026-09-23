@@ -70,20 +70,25 @@
 2026-09-23 05:10 checked 05:10 — on course
 2026-09-23 05:22 checked 05:22 — on course
 2026-09-23 05:23 checked 05:23 — on course
-2026-09-23 05:33 checked 05:33 — on course</pre><h3>Last check (scrubbed)</h3><pre>I reviewed the ruling in force, the transcript since the last check, commit 6beded5b8 with its full diff, the archived dispatch, and STATUS.json.
+2026-09-23 05:33 checked 05:33 — on course
+2026-09-23 05:38 checked 05:38 — on course</pre><h3>Last check (scrubbed)</h3><pre>Reviewed the two commits since last check (305afbea0, ad7a70993), their diffs, the transcript, journal, and STATUS.json against the seven checks.
 
-**Provenance.** The build session received a new owner dispatch, NB7, pasted verbatim in the transcript and archived as `docs/dispatches/2026-09-23_NIGHT-BUNDLE-7.md` (present in the archived-rulings list). Its item 3 — the engine code→name mapping with the owner's exact names (QB→Dubai, E21→Overnight, E1/BOOK20→Price Engine, etc.) — is OWNER SCOPE, not run-authored.
+**0. Provenance** — NB7 item 1 / R-CODEX-CONFINE traces to `docs/dispatches/2026-09-23_NIGHT-BUNDLE-7.md` (archived owner dispatch, present in the list). Commit body cites "Owner authorised Codex command-execution ONLY inside a separate clone." Owner scope, not run-authored.
 
-**The six checks against commit 6beded5b8:**
+**1. Scope** — three files touched (verifier.py, new test, MASTER-CHECKLIST item 13), all confining Codex execution to a separate clone. Squarely within NB7 item 1. The second commit is a one-char control-char cleanup on the same line. In scope.
 
-1. **Scope** — the only change is item 3: `record_store.NAME_MAP` uses the owner's names verbatim, wired into the v2 engine/diary pages. The one addition beyond the literal list — a `books` counter so two sizing books (QB-FLAT + QB-ADAPTIVE = 40 closed) aren't read as 40 distinct trades — is an accuracy detail serving the owner's "wire the record store" instruction, not new scope. Unmapped codes (E2, E8, E14, YouTube-seed) correctly stay "—" and are reported, exactly as the dispatch requires.
-2. **No self-audit** — pytest of touched modules is normal build testing, not the builder grading its own work as the independent check.
-3. **No typed numbers** — the mapping is names; the `books` value is a derived counter; page numbers come from the record store. No naked constants.
-4. **Demos inert** — `by_name` is a read-only view ("no ledger is written"); `site_v2 --demo` writes owned pages only; no live Telegram, no ledger write.
-5. **Trading-path** — untouched. Non-launch work, as the dispatch stated; STATUS.json shows 0 orders written.
-6. **No secrets** — published pages show engine records/prices only; no keys, tokens, or absolute user paths on any page.
-7. **Ordering** — the dispatch names no next-before-X constraint. Builder did the no-spend item 3 first, then moved to item 1 (Codex); reasonable, no ordering breach.
+**2. No self-audit** — builder built + tested the confinement; it did not run the verifier to grade its own work as an independent check.
 
-Clean, read-only, matches the owner's mapping exactly, tested, committed.
+**3. No typed numbers** — no new strategy constants. `0x08000000` (CREATE_NO_WINDOW), `--depth 1`, and the pre-existing RAM floors are operational, not performance-fit walls.
+
+**4. Demos inert** — the test uses a `_FakeRun` stub; no real Codex spawned, no ledger written, no Telegram. The heavy real-clone proof was explicitly deferred to a memory-safe window (865M tree + observed memory reaping), respecting the memory floor.
+
+**5. Trading-path** — untouched; this is verifier tooling only.
+
+**6. No secrets** — paths use `expanduser("~")`; no keys/tokens/ids on any published page.
+
+**7. Ordering** — item 13 carries `[AFTER-1545]`, but that is a time-window tag, not a next-before-X dependency, and only the heavy proof-run is time-sensitive — that was correctly deferred. Building the durable confinement code pre-market (05:37, recorder idle) disturbs nothing. No ordering breach.
+
+Confinement design is sound: `_run_codex` returns None (→ rung d) when the clone is absent, so Codex is never run against the live repo, and never `--full-auto`.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
