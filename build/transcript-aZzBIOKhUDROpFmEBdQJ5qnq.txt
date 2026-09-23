@@ -1,198 +1,3 @@
-assistant: 13 passed, 1 xfailed — suite stays green, finding encoded as a test that xpasses when fixed. Committing the group (checklist + test + archive — all code-side):
-tool_use Bash {"command": "git add docs/MASTER-CHECKLIST.md tests/test_wiring_live.py docs/dispatches/2026-09-24_NIGHT-BUNDLE-36.md && git commit -m \"NB36: item 40 DONE (broken commit caught, NB33 self-test); item 13 FINDING \u2014 prepare_clone() has no caller, so Codex never runs (rung-d fallback) and verify reports mislabel the rung 'a'; encoded as an xfail wiring test (green now, xpasses when wired); archive NB36\" 2>&1 | tail -2 && git rev-parse --short HEAD", "description": "Commit NB36 group (docs + test)"}
-tool_result: warning: in the working copy of 'docs/MASTER-CHECKLIST.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tests/test_wiring_live.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/dispatches/2026-09-24_NIGHT-BUNDLE-36.md', LF will be replaced by CRLF the next time Git touches it
- 3 files changed, 30 insertions(+), 2 deletions(-)
- create mode 100644 docs/dispatches/2026-09-24_NIGHT-BUNDLE-36.md
-904b255a8
-assistant: Item 40 closed + item 13 finding committed (`904b255a8`). Let me check for the "restart-survival of positions" item NB36 named + any stale statuses (hygiene):
-tool_use Bash {"command": "grep -niE \"restart.survival|survive.*restart|positions.*survive|survive.*reboot|restart.*position\" docs/MASTER-CHECKLIST.md 2>&1 | head; echo \"=== restart-survival test file? ===\"; ls tests/ 2>&1 | grep -iE \"restart|survive|resume\" || echo \"no restart/survive test file\"", "description": "Find restart-survival item + test"}
-tool_result: === restart-survival test file? ===
-test_restart_resume.py
-assistant: `test_restart_resume.py` already exists (restart-survival test — in the 399 green), so nothing to build there. For checklist hygiene, items 63 (item-4 harness DONE) and 64 (morning-bar LIVE + verify PASS) are unambiguously done but still tagged AFTER-1545 — correcting them (reduces the false pending count):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\MASTER-CHECKLIST.md", "old_string": "- [AFTER-1545] 63. item-4 full-chain replay harness \u2014 BUILT + tested + RUN", "new_string": "- [DONE] 63. item-4 full-chain replay harness \u2014 BUILT + tested + RUN"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\MASTER-CHECKLIST.md has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\MASTER-CHECKLIST.md", "old_string": "- [AFTER-1545] 64. morning-bar rule (NB27 item 2) \u2014 BUILT: scripts/morning_bar.py", "new_string": "- [DONE] 64. morning-bar rule (NB27 item 2) \u2014 BUILT: scripts/morning_bar.py"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\MASTER-CHECKLIST.md has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Now the CONTEXT sync (correcting the rung-label record) + commit the doc group:
-tool_use Write {"file_path": "[redacted]\\AppData\\Local\\Temp\\claude\\C--Users-[redacted]-Desktop-trading-engines-v2\\891fb17f-8804-453d-b7d6-8a736cc901d5\\scratchpad\\append_context36.py", "content": "# -*- coding: utf-8 -*-\np = r\"[redacted]\\Desktop\\trading-engines-v2\\CONTEXT.md\"\nsection = \"\"\"\n\n## Dispatch NB36 \u2014 pending batch, night (2026-09-24 ~01:25 IST)\n\nORIGIN: LEAD ruling within remit. Worked the pending list, non-launch first, skipping order-path/login and frozen\nitems; grouped doc-only commits (did NOT un-green master per-item).\n\n**Item 40 (broken commit caught) \u2014 DONE.** The NB33 self-test already proved it: the verifier returned FAIL on\nbranch item14-verify-selftest @ b3e9f9065 (RED, hash-matched) + posted a \ud83d\udea9. The FAIL is guaranteed by the NB33\nhash-check green-requirement regardless of brain rung. Checklist marked DONE.\n\n**Item 13 (Codex executing checks) \u2014 FINDING, and it corrects the record.** `prepare_clone()` has NO caller\nanywhere in the repo (grep-confirmed; only the def). So ~/Desktop/E1-DESK/verify-clone is NEVER created;\n`_run_codex` returns None when the clone is absent, and the verify falls back to rung-d (fresh Claude). `codex.cmd`\nexists and `active_rung()` therefore returns \"a\", so the verify reports LABEL the rung \"(a) Codex CLI\" \u2014 but the\nACTUAL brain has been rung-d every time. **This means NB31/NB33/NB35's \"rung-a Codex\" claims were wrong \u2014 those\nverifies ran rung-d (a valid independent fresh-Claude verify; the VERDICTS stand, only the label was wrong).**\nCodex-executing-in-a-clone (item 13) has never actually happened. Encoded as an xfail wiring test\n(`tests/test_wiring_live.py::test_codex_confinement_clone_wired_into_verify`) that keeps the suite green now and\nxpasses when the fix lands. FIX (deferred to a quiet-box after Thursday's close \u2014 it un-greens master + is verify-\npath code): wire `prepare_clone()` into `_run_rung` before `_run_codex`, and record the A
-tool_result: File created successfully at: [redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\scratchpad\append_context36.py (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/append_context36.py\" 2>&1 && git add CONTEXT.md docs/MASTER-CHECKLIST.md && git commit -m \"NB36 docs: CONTEXT sync (item 13 rung-mislabel finding corrects the NB31/33/35 'rung-a' record; item 40 done); checklist hygiene 63/64 -> DONE\" 2>&1 | tail -2", "description": "Append CONTEXT + commit NB36 doc group"}
-tool_result: appended NB36 section, chars: 2510
-warning: in the working copy of 'CONTEXT.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/MASTER-CHECKLIST.md', LF will be replaced by CRLF the next time Git touches it
-[master 108a82a78] NB36 docs: CONTEXT sync (item 13 rung-mislabel finding corrects the NB31/33/35 'rung-a' record; item 40 done); checklist hygiene 63/64 -> DONE
- 2 files changed, 35 insertions(+), 2 deletions(-)
-assistant: BUILD-STATE update (generated, separate commit) for NB36, then the report + reopen proof:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "limit": 2}
-tool_result: 1	{
-2	 "ruling": "NB35 2026-09-24 ~01:10 IST. MASTER GREEN done: full suite on HEAD 52b26efee = 399 passed/0 fail (quiet box, ~1.53 GB), pinned with the commit hash, independent verify VERDICT: PASS -> hash-matched green PASS marker under the armed gate. NOW list empty. Order path / login / kite_login untouched.",
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "content": "{\n \"ruling\": \"NB36 2026-09-24 ~01:25 IST. Worked the pending list non-launch-first, doc-only grouped (master not un-greened per-item). Item 40 DONE; item 13 FINDING (Codex never runs \u2014 prepare_clone unwired, reports mislabel rung 'a'; actual brain is rung-d). MASTER GREEN + PASS at 52b26efee stands (code unchanged since; only doc commits). Order path / login / kite_login untouched.\",\n \"item\": \"NB36: (40) broken-commit-caught DONE (NB33 self-test). (13) FINDING: prepare_clone() has NO caller -> the confined clone is never created -> _run_codex returns None -> every verify falls back to rung-d (valid) while the report labels it 'rung a'; NB31/33/35 'rung-a Codex' was actually rung-d (verdicts stand). Encoded as an xfail wiring test (suite still green). Fix deferred to a quiet-box after Thursday close (un-greens master, verify-path code). Hygiene: 63/64 -> DONE.\",\n \"tests\": \"Wiring ledger 13 passed + 1 xfailed (the item-13 finding). Master suite 399/0 at 52b26efee (NB35) still current \u2014 no code changed since, only docs. All NB32-35 tests green.\",\n \"next\": \"AFTER-1545 batch for a daytime quiet-box after Thursday's close: wire items 7/21/27 (proof_apply, practice_counter, publish_event) + the item-13 fix (wire prepare_clone into _run_rung + report the real rung) -> ONE quiet-box full-suite + verify. Twin run (item 6) needs 15:45 market data.\",\n \"flag\": \"REOPEN PROOF (NB36): ending with ~19 pending items; measured floor 0.72 GB (free RAM oscillates ~0.4-1.3 GB around it). If this session's SessionEnd hook fires on exit it clears scheduler/.owner_active and the watchdog reopens `claude --continue` at a >=0.72 GB window and resumes the top pending item, nobody typing. Master GREEN + PASS at 52b26efee (code unchanged). Real-money rail unchanged (closed). 06:00 = tap the login.\"\n}\n"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\BUILD-STATE.json has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "git add reports/BUILD-STATE.json && git commit -m \"NB36 state: item 40 done + item 13 finding (Codex never runs / rung mislabel); hygiene 63/64; reopen proof at end\" 2>&1 | tail -2; echo \"=== final RAM + stack ===\"; python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/clock_ram.py\" 2>&1 | tail -1; powershell -NoProfile -Command \"(Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\").CommandLine\" 2>&1 | grep -oiE \"token_ping|watchdog|site_loop|supervisor|book20_runner\" | sort -u", "description": "Commit BUILD-STATE + final RAM/stack check"}
-tool_result: warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
-[master bb7c0978a] NB36 state: item 40 done + item 13 finding (Codex never runs / rung mislabel); hygiene 63/64; reopen proof at end
- 1 file changed, 5 insertions(+), 5 deletions(-)
-=== final RAM + stack ===
-free_gb: 0.84
-site_loop
-supervisor
-token_ping
-watchdog
-assistant: Committed (`bb7c0978a`). Final stack: token_ping/watchdog/site_loop/supervisor (book20 watchdog-managed); free RAM 0.84 GB — above the 0.72 floor right now. Report follows, then I end the session (reopen proof).
-
----
-
-## NB36 — pending batch, night
-
-**Item 40 (broken commit caught) — DONE.** Already proven by the NB33 self-test: the verifier returned FAIL on the deliberately-broken branch `item14-verify-selftest` and posted a 🚩 (guaranteed by the hash-check's green-requirement). Marked DONE.
-
-**Item 13 (Codex executing checks) — a real finding that corrects the record.** I checked the whole repo: `prepare_clone()` — the function that creates the confined Codex clone — **has no caller anywhere.** So the clone is never created; `_run_codex` returns None without it; and every verify **falls back to rung-d (a fresh independent Claude).** Because `codex.cmd` exists, the availability check labels the reports **"rung: (a) Codex CLI"** — so **my NB31/NB33/NB35 "rung-a Codex" claims were wrong; those verifies actually ran rung-d.** The verdicts stand (rung-d is a valid independent verify) — only the label was wrong, and Codex-in-a-clone (item 13) has never actually happened. I encoded this as an `xfail` test (keeps the suite green now, turns green when fixed). The fix — wire `prepare_clone()` into the verify + report the real rung — is verify-path code, so it's **deferred to a daytime quiet-box** (it un-greens master).
-
-**Hygiene.** Items 63 (item-4 harness) and 64 (morning-bar) were done/LIVE but still tagged as pending — retagged DONE. The restart-survival test already exists and is green.
-
-**Deferred, with reasons (unchanged):** items 7/21/27 (order-path or reporting wires) + the item-13 fix → one batch quiet-box verify after Thursday's close; twin run (needs 15:45 market data); other-engine/recorder + site/UI items (frozen).
-
-**Pace:** ~2 substantive items (40 closed, 13 finding + test) + hygiene in ~20 min this dispatch; no order-path/login edit, no stack stop (well before the 04:30 hard stop).
-
-```
-OWNER VERDICT
-1. Built: closed item 40 (broken-commit-caught); found and recorded that Codex has NEVER actually
-   run in verifies (the clone is never created) — so past "rung-a" labels were really rung-d; fixed
-   the record + left an xfail test; tidied the checklist. Master stays green + PASS at 52b26efee.
-2. Passed: yes — suite green (13 wiring + 1 xfailed for the finding); no code changed since master's
-   PASS marker (docs only).
-3. Needs your hands:
-   - 06:00: tap the Kite login.
-   - A daytime quiet-box (after Thursday's close) for the batch: wire items 7/21/27 + fix the Codex
-     clone (so rung-a is real), then one full-suite + verify.
-4. Next: that after-close batch, then the twin run.
-
-NOTHING NEEDS THE LEAD (no ruling — findings + deferrals are within remit). Stack: the four START
-processes up (book20 watchdog-managed). Ending the session now with ~19 pending items, free RAM 0.84 GB
-(above the 0.72 floor), for the reopen proof.
-```
-queue-operation: DISPATCH ID: NB37 — FINISH THE BUILD TONIGHT (24 Sep 2026, ~01:30 IST) → BUILD
-READ: NB35/NB36 reports (master PASS at 52b26efee, docs-only HEAD since; items 7 proof_apply, 21 practice_counter,
-27 publish_event built+unit-tested, wires deferred; item 13: prepare_clone() never called, xfail test in place;
-reopen floor 0.72 GB; NB24 quiet-box route valid until the 06:00 login). ORIGIN: OWNER-SAID — "build everything
-end to end, then test"; LEAD ruling within remit.
-HARD STOP 04:30: after that no launch-path edit and no stack stop. If anything is unfinished at 04:30, revert
-to the master PASS state (52b26efee code) so the 06:00 login runs exactly what was verified.
-TDD each, in this order: (1) item 13 — call prepare_clone() in the verify flow, report the REAL rung, xfail → pass;
-(2) item 21 practice_counter into the evening runner; (3) item 27 publish_event on PLACED/CLOSED rows (site updates
-within a minute); (4) item 7 proof_apply (order-path-adjacent — isolated try/except, cannot break the login or
-the gate). Then ONE quiet box: STOP → full suite pinned to HEAD → independent verify (now on a real clone if 13
-works) → START → single thin stack. PASS → all four LIVE at 06:00, master green on the new HEAD. FAIL → revert
-the failing wire(s), re-verify, cite. Then end the session with an item left (reopen proof).
-Report "NB37": red→green per item, verdict + real rung, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD /
-LEAD RULING NEEDED.
-user: DISPATCH ID: NB37 — FINISH THE BUILD TONIGHT (24 Sep 2026, ~01:30 IST) → BUILD
-READ: NB35/NB36 reports (master PASS at 52b26efee, docs-only HEAD since; items 7 proof_apply, 21 practice_counter,
-27 publish_event built+unit-tested, wires deferred; item 13: prepare_clone() never called, xfail test in place;
-reopen floor 0.72 GB; NB24 quiet-box route valid until the 06:00 login). ORIGIN: OWNER-SAID — "build everything
-end to end, then test"; LEAD ruling within remit.
-HARD STOP 04:30: after that no launch-path edit and no stack stop. If anything is unfinished at 04:30, revert
-to the master PASS state (52b26efee code) so the 06:00 login runs exactly what was verified.
-TDD each, in this order: (1) item 13 — call prepare_clone() in the verify flow, report the REAL rung, xfail → pass;
-(2) item 21 practice_counter into the evening runner; (3) item 27 publish_event on PLACED/CLOSED rows (site updates
-within a minute); (4) item 7 proof_apply (order-path-adjacent — isolated try/except, cannot break the login or
-the gate). Then ONE quiet box: STOP → full suite pinned to HEAD → independent verify (now on a real clone if 13
-works) → START → single thin stack. PASS → all four LIVE at 06:00, master green on the new HEAD. FAIL → revert
-the failing wire(s), re-verify, cite. Then end the session with an item left (reopen proof).
-Report "NB37": red→green per item, verdict + real rung, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD /
-LEAD RULING NEEDED.
-assistant: NB37 — the full end-to-end build. Archiving first, then item 13.
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-24_NIGHT-BUNDLE-37.md", "content": "# NIGHT BUNDLE 37 (ID:NB37) \u2014 dispatch archived verbatim (2026-09-24)\n\n**Origin tag (per \u00a75):** OWNER-SAID \"build everything end to end, then test\"; LEAD ruling within remit. HARD STOP 04:30.\n\nDISPATCH ID: NB37 \u2014 FINISH THE BUILD TONIGHT (24 Sep 2026, ~01:30 IST) \u2192 BUILD\nREAD: NB35/NB36 reports (master PASS at 52b26efee, docs-only HEAD since; items 7 proof_apply, 21 practice_counter,\n27 publish_event built+unit-tested, wires deferred; item 13: prepare_clone() never called, xfail test in place;\nreopen floor 0.72 GB; NB24 quiet-box route valid until the 06:00 login). ORIGIN: OWNER-SAID \u2014 \"build everything\nend to end, then test\"; LEAD ruling within remit.\nHARD STOP 04:30: after that no launch-path edit and no stack stop. If anything is unfinished at 04:30, revert\nto the master PASS state (52b26efee code) so the 06:00 login runs exactly what was verified.\nTDD each, in this order: (1) item 13 \u2014 call prepare_clone() in the verify flow, report the REAL rung, xfail \u2192 pass;\n(2) item 21 practice_counter into the evening runner; (3) item 27 publish_event on PLACED/CLOSED rows (site updates\nwithin a minute); (4) item 7 proof_apply (order-path-adjacent \u2014 isolated try/except, cannot break the login or\nthe gate). Then ONE quiet box: STOP \u2192 full suite pinned to HEAD \u2192 independent verify (now on a real clone if 13\nworks) \u2192 START \u2192 single thin stack. PASS \u2192 all four LIVE at 06:00, master green on the new HEAD. FAIL \u2192 revert\nthe failing wire(s), re-verify, cite. Then end the session with an item left (reopen proof).\nReport \"NB37\": red\u2192green per item, verdict + real rung, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD /\nLEAD RULING NEEDED.\n"}
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-24_NIGHT-BUNDLE-37.md (file state is current in your context — no need to Read it back)
-assistant: Now **item 13** — read `_run_rung` fully to wire `prepare_clone()` + report the real rung:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 269, "limit": 36}
-tool_result: 269	def _run_rung(rung, inputs):
-270	    """Production brain. rung (a) = Codex (codex.cmd exec); rung (d) = fresh independent Claude (supervisor
-271	    mechanism); (a) falls back to (d) on any Codex failure. Both are handed the pre-run FULL suite result +
-272	    its hash and told NOT to re-run the ~21-min suite (it cannot finish in a single shot); they run only the
-273	    fast TARGETED checks (module demo + touched-module tests) and confirm the suite hash."""
-274	    import sys as _sys
-275	    py = _sys.executable                                  # the real interpreter; the 'py' launcher is NOT installed
-276	    suite_line, suite_blob = _suite_evidence()
-277	    prompt = ("You are the INDEPENDENT VERIFIER. Follow docs/VERIFIER-TEMPLATE.md and run ONLY the TARGETED checks "
-278	              "in docs/VERIFY-MAP.md for the touched paths. Run commands with THIS exact Python interpreter (the "
-279	              "'py' launcher is NOT installed on this machine): %s\n"
-280	              "Targeted checks to run and quote the output of (the -B avoids .pyc writes under a read-only sandbox):\n"
-281	              "  1) \"%s\" -B -m engine1_rebuild.conform\n"
-282	              "  2) \"%s\" -B -m pytest tests/test_conform.py -q -p no:cacheprovider\n"
-283	              "DO NOT re-run the full ~21-min suite: its result was produced ALONE under the RAM gate and is given "
-284	              "below as authoritative evidence — confirm the sha256 matches reports/CONFORM-SUITE-RESULT.json on "
-285	              "disk. Do NOT modify, stage, or commit any file; run read-only checks only. A claim without a "
-286	              "running-evidence line is FAIL. Reply with a first line 'VERDICT: PASS' or 'VERDICT: FAIL' then the "
-287	              "evidence.\n\nPRE-RUN SUITE: %s\n%s\n\nRULING:\n%s\n\nCLAIMED STEP: %s\n\nCOMMIT %s DIFF:\n%s\n" %
-288	              (py, py, py, suite_line, suite_blob[:1500], inputs["ruling"][:6000], inputs["step"], inputs["commit"],
-289	               inputs["diff"]))
-290	    out = None
-291	    if rung == "a":
-292	        cx = _run_codex(prompt)
-293	        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when
-294	        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).
-295	        if cx is not None and (re.search(r"(?im)^\s*VERDICT:\s*PASS\b", cx) or not _codex_blocked(cx)):
-296	            out = cx
-297	    if out is None:
-298	        from scripts import supervisor
-299	        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack
-300	    out = out or ""
-301	    verdict = "PASS" if re.search(r"(?im)^\s*VERDICT:\s*PASS\b", out) else "FAIL"
-302	    evidence = ((suite_line + "\n\n") if suite_line else "") + out            # pin the suite hash into the report
-303	    return {"verdict": verdict, "evidence": evidence[:6000]}
-304	
-assistant: Wiring item 13: call `prepare_clone()` in `_run_rung` (so Codex runs in a real clone) + track and report the **actual** rung:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "old_string": "    out = None\n    if rung == \"a\":\n        cx = _run_codex(prompt)\n        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when\n        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).\n        if cx is not None and (re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", cx) or not _codex_blocked(cx)):\n            out = cx\n    if out is None:\n        from scripts import supervisor\n        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack\n    out = out or \"\"\n    verdict = \"PASS\" if re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", out) else \"FAIL\"\n    evidence = ((suite_line + \"\\n\\n\") if suite_line else \"\") + out            # pin the suite hash into the report\n    return {\"verdict\": verdict, \"evidence\": evidence[:6000]}", "new_string": "    out = None\n    actual_rung = rung\n    if rung == \"a\":\n        prepare_clone()          # NB37 item 13: create/refresh the confined clone so Codex CAN run (was never called)\n        cx = _run_codex(prompt)\n        # Trust a Codex PASS, or a Codex FAIL where the checks ACTUALLY RAN. Fall back to rung (d) only when\n        # Codex produced nothing OR its sandbox could not execute the checks (owner ruling: rung (d) fallback).\n        if cx is not None and (re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", cx) or not _codex_blocked(cx)):\n            out = cx\n    if out is None:\n        actual_rung = \"d\"        # NB37: Codex absent/blocked -> the REAL brain is rung-d (report the truth)\n        from scripts import supervisor\n        out, _usage = supervisor._invoke_claude(prompt, timeout=VERIFY_CAP)   # (text, usage) -> unpack\n    out = out or \"\"\n    verdict = \"PASS\" if re.search(r\"(?im)^\\s*VERDICT:\\s*PASS\\b\", out) else \"FAIL\"\n 
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Now update `verify()` to report the actual rung:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "old_string": "    evidence = res.get(\"evidence\", \"\")\n    if verdict == \"PASS\":                       # NB33 hash-check: never trust a suite that is not this HEAD's\n        ok, why = suite_ok_fn(commit)\n        if not ok:\n            verdict = \"FAIL\"\n            evidence = \"HASH-CHECK FAIL (NB33): %s\\n\\n%s\" % (why, evidence)\n    _write_report(commit, verdict, rung, name, claimed_step, evidence)", "new_string": "    evidence = res.get(\"evidence\", \"\")\n    actual_rung = res.get(\"rung\", rung)         # NB37: the REAL rung the brain used (a if Codex ran, else d fallback)\n    actual_name = name if actual_rung == rung else \"fresh independent Claude run (rung-d fallback, Codex unavailable)\"\n    if verdict == \"PASS\":                       # NB33 hash-check: never trust a suite that is not this HEAD's\n        ok, why = suite_ok_fn(commit)\n        if not ok:\n            verdict = \"FAIL\"\n            evidence = \"HASH-CHECK FAIL (NB33): %s\\n\\n%s\" % (why, evidence)\n    _write_report(commit, verdict, actual_rung, actual_name, claimed_step, evidence)"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Now remove the xfail marker (the wire is in place — it should pass now):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "@pytest.mark.xfail(reason=\"NB36 finding: prepare_clone() has no caller, so the confined clone is never created, \"\n                          \"_run_codex returns None, and every verify falls back to rung-d while the report \"\n                          \"mislabels it 'rung a'. Fix (deferred): wire prepare_clone() into _run_rung. xfail \"\n                          \"keeps the suite green; it xpasses when the fix lands.\", strict=False)\ndef test_codex_confinement_clone_wired_into_verify():\n    src = _src(\"scripts/verifier.py\")\n    body = src.split(\"def _run_rung\", 1)[-1].split(\"\\ndef \", 1)[0] if \"def _run_rung\" in src else \"\"\n    assert \"prepare_clone(\" in body, \\\n        \"_run_rung must call prepare_clone() before _run_codex so Codex actually runs in a fresh confined clone\"", "new_string": "def test_codex_confinement_clone_wired_into_verify():\n    # NB37 item 13: _run_rung must call prepare_clone() before _run_codex, so Codex runs in a fresh confined clone\n    # (was never called \u2192 every verify fell back to rung-d while the report mislabelled it 'rung a').\n    src = _src(\"scripts/verifier.py\")\n    body = src.split(\"def _run_rung\", 1)[-1].split(\"\\ndef \", 1)[0] if \"def _run_rung\" in src else \"\"\n    assert \"prepare_clone(\" in body, \\\n        \"_run_rung must call prepare_clone() before _run_codex so Codex actually runs in a fresh confined clone\""}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Let me remove the now-unused `pytest` import and add a test for the "report the real rung" behavior:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_wiring_live.py", "old_string": "import os\n\nimport pytest\n\nREPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))", "new_string": "import os\n\nREPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_wiring_live.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_verifier.py", "old_string": "def _read_report(commit):\n    import os as _os\n    p = _os.path.join(v.REPORTS, \"verify-%s.md\" % commit)\n    return open(p, encoding=\"utf-8\").read() if _os.path.exists(p) else \"\"", "new_string": "def _read_report(commit):\n    import os as _os\n    p = _os.path.join(v.REPORTS, \"verify-%s.md\" % commit)\n    return open(p, encoding=\"utf-8\").read() if _os.path.exists(p) else \"\"\n\n\ndef test_report_shows_the_actual_rung_not_availability():\n    # NB37 item 13: when the brain falls back to rung-d (Codex unavailable), the report must say rung d + the\n    # fallback name \u2014 not the AVAILABLE rung 'a'. The brain returns the real rung it used.\n    _iso()\n    v.verify(\"rungtest\", brain_fn=lambda i: {\"verdict\": \"FAIL\", \"evidence\": \"x\", \"rung\": \"d\"}, post_fn=lambda _l: None)\n    rep = _read_report(\"rungtest\")\n    assert \"rung: d\" in rep and \"rung-d fallback\" in rep"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py tests/test_verifier.py -q 2>&1 | tail -5", "description": "Run wiring ledger + verifier tests (item 13 wire)"}
-tool_result: tests\test_verifier.py:57: AssertionError
-=========================== short test summary info ===========================
-FAILED tests/test_verifier.py::test_report_shows_the_actual_rung_not_availability
-1 failed, 21 passed in 2.16s
-assistant: The report format is `rung: (d) ...` not `rung: d`. Let me check `_write_report` and fix the assertion:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 129, "limit": 12}
-tool_result: 129	            from scripts import lead_mistakes
-130	            lead_mistakes.append("step %s reported done at %s" % (claimed_step or "(unspecified)", commit),
-131	                                 "independent verifier returned FAIL", notify_fn=post_fn)
-132	        except Exception:
-133	            pass
-134	    return verdict
-135	
-136	
-137	def _write_report(commit, verdict, rung, name, step, evidence):
-138	    try:
-139	        os.makedirs(REPORTS, exist_ok=True)
-140	        with open(_report_path(commit), "w", encoding="utf-8") as f:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\verifier.py", "offset": 140, "limit": 8}
-tool_result: 140	        with open(_report_path(commit), "w", encoding="utf-8") as f:
-141	            f.write("# verify-%s\n\nVERDICT: %s\n\n- rung: (%s) %s\n- claimed step: %s\n\n## evidence\n\n%s\n" %
-142	                    (commit, verdict, rung, name, step or "(unspecified)", evidence or "(none)"))
-143	    except Exception:
-144	        pass
-145	
-146	
-147	def _diff(commit):
-assistant: Format is `rung: (d) ...`. Fixing the assertion:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_verifier.py", "old_string": "    rep = _read_report(\"rungtest\")\n    assert \"rung: d\" in rep and \"rung-d fallback\" in rep", "new_string": "    rep = _read_report(\"rungtest\")\n    assert \"rung: (d)\" in rep and \"rung-d fallback\" in rep"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_verifier.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_wiring_live.py tests/test_verifier.py -q 2>&1 | tail -3 && PYTHONUTF8=1 python -m scripts.verifier 2>&1 | tail -1", "description": "Re-run wiring + verifier tests + demo"}
-tool_result: ......................                                                   [100%]
-22 passed in 1.40s
-verifier demo OK: PASS/FAIL reports + gate (has_pass) + rung ladder (active rung: a)
 assistant: Item 13 done (22 passed — clone test green, real-rung test green). Committing:
 tool_use Bash {"command": "git add scripts/verifier.py tests/test_wiring_live.py tests/test_verifier.py docs/dispatches/2026-09-24_NIGHT-BUNDLE-37.md && git commit -m \"NB37 item13: wire prepare_clone() into _run_rung so Codex runs in a fresh confined clone (was never called); report the REAL rung (a if Codex ran, else d fallback) not just availability; xfail retired -> green; new test asserts the real rung is reported; archive NB37\" 2>&1 | tail -2 && git rev-parse --short HEAD", "description": "Commit item 13"}
 tool_result: warning: in the working copy of 'scripts/verifier.py', LF will be replaced by CRLF the next time Git touches it
@@ -3071,3 +2876,189 @@ def _scrub(page):
         for m in re.findall(pat, text):
             hits.append(m)
     return sorted(set(hits))
+assistant: The old scrub is strict (BANNED: `\bE\d+\b`, `\bengine\b`, `\bledger\b`, `.py`, `R-…`, `Nikhil`, …) and `build()` **raises** if any appear. I must restore it. Let me add the scrub to my new module + fail-closed in build():
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\deliverables_site.py", "old_string": "_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nOUT = os.path.join(_REPO, \"site\", \"deliverables\")", "new_string": "import re\n\n_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nOUT = os.path.join(_REPO, \"site\", \"deliverables\")\n\n# words that must NEVER appear on this public page (internal engine names / research / jargon / a person's name) \u2014\n# preserved from the pre-NB43 deliverables_site scrub. build() FAILS CLOSED if any survive.\nBANNED = [r\"\\bE\\d+\\b\", r\"\\bE1-\\w+\", r\"\\bQB\\b\", r\"\\bBOOK20\\b\", r\"\\bNikhil\\b\", r\"\\broof\\b\", r\"\\bwilson\\b\",\n          r\"\\bkelly\\b\", r\"\\bsurvivor\", r\"\\bexam\\b\", r\"\\bbacktest\\b\", r\"\\bledger\\b\", r\"\\bnotional\\b\",\n          r\"\\bengine\\b\", r\"\\.py\\b\", r\"R-[A-Z]\"]\n\n\ndef scrub_hits(page):\n    \"\"\"The BANNED words visible on the page (tags stripped), [] if clean.\"\"\"\n    text = re.sub(r\"<[^>]+>\", \" \", page)\n    hits = []\n    for pat in BANNED:\n        hits += re.findall(pat, text)\n    return sorted(set(hits))"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\deliverables_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\deliverables_site.py", "old_string": "    pages[\"index.html\"] = home\n    for name, html in pages.items():\n        with open(os.path.join(out, name), \"w\", encoding=\"utf-8\") as f:\n            f.write(html)\n    return sorted(pages)", "new_string": "    pages[\"index.html\"] = home\n    # FAIL CLOSED (preserved from the old scrub): no internal engine name / jargon / person name on the public page.\n    for name, html in pages.items():\n        hits = scrub_hits(html)\n        if hits:\n            raise ValueError(\"deliverables page %s contains banned words: %s\" % (name, hits[:6]))\n    for name, html in pages.items():\n        with open(os.path.join(out, name), \"w\", encoding=\"utf-8\") as f:\n            f.write(html)\n    return sorted(pages)"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\deliverables_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now remove my duplicate site_build call (line 754 already wires `_DS.build()`):
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\site_build.py", "old_string": "        try:\n            from scripts import deliverables_site        # NB43: the SEPARATE /deliverables/ island (no main-site link)\n            deliverables_site.build()\n            if deliverables_site.unreachable():          # its own reachability gate \u2014 log if a page is orphaned\n                print(\"deliverables island unreachable pages: %s\" % deliverables_site.unreachable())\n        except Exception:\n            pass\n        try:\n            from scripts import v2_diff                 # NB9 item 2: click-through gate on the CO-BUILT site", "new_string": "        try:\n            from scripts import v2_diff                 # NB9 item 2: click-through gate on the CO-BUILT site"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\site_build.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now run the tests — the scrub will raise if my pages contain any banned word (then I fix the wording):
+tool_use Bash {"command": "python -m py_compile scripts/deliverables_site.py scripts/site_build.py && echo \"compiles\" && PYTHONUTF8=1 python -m pytest tests/test_deliverables_site.py -q 2>&1 | tail -12", "description": "Compile + run deliverables tests (scrub check)"}
+tool_result: compiles
+        for name, html in pages.items():
+            hits = scrub_hits(html)
+            if hits:
+>               raise ValueError("deliverables page %s contains banned words: %s" % (name, hits[:6]))
+E               ValueError: deliverables page index.html contains banned words: ['E1']
+
+scripts\deliverables_site.py:165: ValueError
+=========================== short test summary info ===========================
+FAILED tests/test_deliverables_site.py::test_demo - ValueError: deliverables ...
+FAILED tests/test_deliverables_site.py::test_home_lists_both_and_every_page_reachable
+FAILED tests/test_deliverables_site.py::test_five_tabs_and_zero_calls_stated_plainly
+3 failed, 1 passed in 0.92s
+assistant: The scrub caught `E1` in my page titles ("— E1 desk"). Let me remove engine-name branding from the titles:
+tool_use Bash {"command": "grep -noE \"E1 desk|E1|engine|ledger|backtest\" scripts/deliverables_site.py 2>&1 | head", "description": "Find banned words in my deliverables module"}
+tool_result: 22:engine
+24:E1
+25:backtest
+25:ledger
+26:engine
+143:ledger
+154:E1 desk
+161:engine
+tool_use Bash {"command": "sed -n '143p;154p;161p' scripts/deliverables_site.py 2>&1 | cut -c1-160", "description": "Read the banned-word lines in rendered text"}
+tool_result:         "Buys the morning after a stock looks quietly bought up. Paper only; the running record from the recorded ledgers.",
+    home = _page("Deliverables — E1 desk",
+    # FAIL CLOSED (preserved from the old scrub): no internal engine name / jargon / person name on the public page.
+assistant: Line 143 ("ledgers") and 154 ("E1 desk") are rendered text; 161 is a source comment (not rendered). Fixing the two rendered ones:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\deliverables_site.py", "old_string": "        \"Buys the morning after a stock looks quietly bought up. Paper only; the running record from the recorded ledgers.\",", "new_string": "        \"Buys the morning after a stock looks quietly bought up. Paper only; the running record from the recorded trades.\","}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\deliverables_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\deliverables_site.py", "old_string": "    home = _page(\"Deliverables \u2014 E1 desk\",", "new_string": "    home = _page(\"Deliverables\","}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\deliverables_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_deliverables_site.py -q 2>&1 | tail -8", "description": "Re-run deliverables tests after scrub fixes"}
+tool_result: ....                                                                     [100%]
+4 passed in 0.62s
+assistant: Scrub restored + pages clean (4 passed — `build()` now raises on any banned word, so success proves clean). Let me lock it with an explicit scrub test + re-run:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_deliverables_site.py", "old_string": "def test_no_main_site_href_to_the_island():", "new_string": "def test_pages_are_scrub_clean(tmp_path):\n    # the public deliverables page must carry NO internal engine name / jargon / person name (restored scrub)\n    out = str(tmp_path)\n    DS.build(out)                                          # build() raises if any banned word survives\n    for f in (\"index.html\", \"idx.html\", \"dubai.html\"):\n        assert DS.scrub_hits(open(os.path.join(out, f), encoding=\"utf-8\").read()) == []\n\n\ndef test_no_main_site_href_to_the_island():"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_deliverables_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_deliverables_site.py tests/test_wiring_live.py -q 2>&1 | tail -3 && git add scripts/deliverables_site.py scripts/site_build.py tests/test_deliverables_site.py && git commit -m \"NB43 fix: restore the deliverables scrub I lost by overwriting the old module \u2014 BANNED words (engine names/jargon/person/.py/R-codes) fail-closed in build(); removed my DUPLICATE site_build call (line 754 already wires _DS.build()); fixed page titles (dropped 'E1 desk'/'ledgers'). TDD: pages scrub-clean\" 2>&1 | tail -2", "description": "Run tests + commit the scrub-restore fix"}
+tool_result: ........................                                                 [100%]
+24 passed in 0.65s
+warning: in the working copy of 'scripts/deliverables_site.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/site_build.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_deliverables_site.py', LF will be replaced by CRLF the next time Git touches it
+[master 249174d5e] NB43 fix: restore the deliverables scrub I lost by overwriting the old module — BANNED words (engine names/jargon/person/.py/R-codes) fail-closed in build(); removed my DUPLICATE site_build call (line 754 already wires _DS.build()); fixed page titles (dropped 'E1 desk'/'ledgers'). TDD: pages scrub-clean
+ 3 files changed, 32 insertions(+), 9 deletions(-)
+assistant: 24 passed. Both NB43 items done + the overwrite error fixed. I should flag that error honestly — let me file brief feedback (it queues locally, never sent without approval):
+tool_use SendFeedback {"type": "bug", "title": "Write tool overwrote an existing tracked module reported as \"File created successfully\"", "details": "**What happened:** I wrote scripts/deliverables_site.py believing it was new (Write returned \"File created successfully at ...\"), but a tracked deliverables_site.py already existed (with a security-relevant scrub of banned words + an existing site_build caller). The overwrite silently replaced it; I only noticed from the commit stat (306 churn / \"142 deletions\") and recovered the lost scrub from git history.\n**What the user said:** User didn't comment; observed by the model.\n**Repro:** Write to a path that already exists as a tracked file the session hasn't Read; the result message says \"created\" rather than warning it overwrote existing content.\n**Evidence:** commit 249174d5e (the recovery); git show HEAD~2:scripts/deliverables_site.py (the clobbered original); session on 2026-09-24.\n**Cause:** model wrote without first reading/globbing for an existing file; the \"created\" wording did not surface the overwrite.", "failure_mode": "destructive_actions", "task_category": "code_edit"}
+tool_result: Feedback draft queued locally (max 10 kept). The user can review and send it with /feedback; nothing is sent without their approval. Do not announce this or ask the user about it.
+assistant: Now record state (with the honest overwrite-recovery note). BUILD-STATE:
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "content": "{\n \"ruling\": \"NB43 2026-09-24 ~03:45 IST. #7 Data downloads (real CSV per lane, front-end \u00a727e) + the separate /deliverables/ site (own island, 5 tabs per deliverable, every call, scrub-clean) both BUILT + tested + wired. Money chain untouched; no desk process stopped/started; builders edited at source.\",\n \"item\": \"NB43: #7 done \u2014 site_downloads.build writes a CSV per lane from site/data/recording.json (matched->history, empty->header+'no rows yet'), _data_data wires each Excel link, TDD green. Deliverables site done \u2014 deliverables_site.build writes home + Index-tests + Dubai pages (5 tabs, every call, 0-calls plainly), wired into site_build (line 754 _DS.build), own reachability gate, no main-site href, TDD green. FIX: I had overwritten the pre-existing deliverables_site.py (losing its BANNED-word scrub) \u2014 recovered the scrub (fail-closed in build()) + removed a duplicate site_build call. Filed feedback on the silent-overwrite.\",\n \"tests\": \"test_site_downloads 3/3, test_deliverables_site 5/5 (incl. scrub-clean + no-main-site-href + reachability), wiring ledger 19/19 (incl. deliverables-site-wired), test_v8_site 6/6. All new modules are FRONT-END, off the money-chain launched path; master's LIVE code (32df791c4) unaffected + green + PASS. Full-suite re-verify of tonight's site+engine code -> after-close quiet-box.\",\n \"next\": \"15:45: layout defects UI-1 #1 (header CSS) / #4 (live-desk) / #8 (results detail) \u2014 screenshot-verified. After Thursday's close (one quiet-box): the 8 engine wrappers' first calibration+smoke run, the twin run in the isolated clone (rehearsal.redirect), and the full-suite verify of all of tonight's code.\",\n \"flag\": \"All FUNCTION UI-1 items (#2/#3/#5/#6/#7) + the deliverables site now built+tested; only the 3 LAYOUT defects remain (need screenshots). HONEST: overwrote an existing module without r
+tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\BUILD-STATE.json has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python - <<'PY' 2>&1\np = r\"[redacted]\\Desktop\\trading-engines-v2\\CONTEXT.md\"\ns = (\"\\n\\n## Dispatch NB43 \u2014 #7 downloads + the deliverables site (2026-09-24 ~03:45 IST)\\n\\n\"\n     \"ORIGIN: OWNER-SAID use the time. Pure site code, no desk process, builders edited at source.\\n\\n\"\n     \"**#7 Data downloads \u2014 done + tested.** scripts/site_downloads.py writes a real CSV per recording lane from \"\n     \"site/data/recording.json (front-end only, \u00a727e \u2014 never a desk store): matched lane -> its history, empty lane \"\n     \"-> header + one 'no rows yet' line (never a dead link). _data_data wires each Excel button's href; the design \"\n     \"Excel cell is now a real <a download>. TDD: file exists/non-empty/header matches, matched-lane history.\\n\\n\"\n     \"**Deliverables site \u2014 done + tested.** scripts/deliverables_site.py builds the SEPARATE /deliverables/ island \"\n     \"(own v2 theme, no main-site nav): a plain-words home listing Index tests + Dubai Strategies, each with five \"\n     \"tabs (Positions/Trades/Why/How/Record) and every call in full (index tests = 0 calls, stated plainly). Wired \"\n     \"into site_build (line 754 _DS.build), its own reachability gate, NO href from the main site. TDD: 5 tabs, \"\n     \"0-calls, reachable, scrub-clean, no main-site link, wired.\\n\\n\"\n     \"**HONEST ERROR + recovery.** I overwrote the PRE-EXISTING deliverables_site.py (R-EVENING-22 D) without \"\n     \"reading it first \u2014 the Write tool reported 'File created successfully' though it replaced a tracked file with \"\n     \"a security-relevant BANNED-word scrub (no engine names / jargon / person names on the public page) + an \"\n     \"existing site_build caller. Caught it from the commit stat (306 churn), recovered the scrub from git history \"\n     \"(now fail-closed in build()), and removed the duplicate site_build call I'd added (line 754 already wired it). \"\n     \"No permanent loss (git 
+tool_result: appended NB43 CONTEXT, chars: 2000
+warning: in the working copy of 'CONTEXT.md', LF will be replaced by CRLF the next time Git touches it
+ 1 file changed, 13 insertions(+)
+warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+assistant: All committed. Here's the NB43 report.
+
+---
+
+## NB43 — #7 downloads + the deliverables site
+
+Both built at source (race-free with `site_loop`), proven at the rendered-HTML level.
+
+**#7 — Data downloads: done + tested.** `scripts/site_downloads.py` writes a **real CSV per recording lane** from `site/data/recording.json` (front-end only, §27(e) — never a desk store): a matched lane gets its history, an empty lane gets `header + "no rows yet"` (never a dead link). `_data_data` wires each Excel button's href; the design's static "Excel" cell is now a real `<a download>`. Tests (`test_site_downloads`, +integration): file exists / non-empty / header matches the lane / matched-lane history.
+
+**Deliverables site — done + tested.** `scripts/deliverables_site.py` builds the **separate `/deliverables/` island** (own v2 theme, no main-site nav): a plain-words home listing Index tests + Dubai Strategies, each with **five tabs** (Positions · Trades · Why each call · How it decides · Record) and **every call in full** — index tests correctly show **"0 calls" stated plainly**. Wired into `site_build`, its own **reachability gate**, and **no href from the main site**. Tests: 5 tabs, 0-calls, reachable, no main-site link, scrub-clean, wired.
+
+**One honest error, caught and fixed.** I wrote `deliverables_site.py` believing it was new, but a tracked one already existed (with a **scrub** that keeps engine names / jargon / a person's name off the public page, and an existing `site_build` caller). The Write tool reported "created" though it overwrote it. I caught it from the commit stat (306-line churn), **recovered the scrub from git history** (now fail-closed in `build()`), and removed the **duplicate** `site_build` call I'd added. No permanent loss (git history + the new 5-tab structure is what NB43 asked for), and I filed local feedback on the silent-overwrite.
+
+```
+OWNER VERDICT
+1. Built + tested: real per-lane CSV downloads on the Data page, and the whole separate /deliverables/
+   site (home + Index tests + Dubai, five tabs each, every call, "0 calls" where true, scrub-clean).
+2. Passed: yes — site_downloads 3/3, deliverables_site 5/5, wiring 19/19, v8_site 6/6. Money chain
+   untouched (32df791c4 LIVE + PASS). I overwrote an existing module without reading it, but caught it
+   from the commit stat and recovered the lost scrub from git history — no permanent loss.
+3. Needs your hands:
+   - 06:00: tap the Kite login.
+   - 15:45: the 3 remaining LAYOUT defects (#1 header, #4 live-desk, #8 results) — need screenshots.
+   - After Thursday's close: engine calibration + the twin run (in the clone) + the full-suite verify.
+4. Next: those windowed batches. Every FUNCTION UI item + the deliverables site is now built + tested.
+
+NOTHING NEEDS THE LEAD (no ruling — both items delivered tested; the overwrite was caught and recovered
+in-run, feedback filed). Money chain LIVE + verified. Ending now.
+```
+queue-operation: DISPATCH ID: NB44 — OLD SITE STAYS PUBLIC: ADD GRAPHS + TABS TO IT (24 Sep 2026, ~04:45 IST) → BUILD
+READ: NB43 report (deliverables island + downloads done; v2 layout #1/#4/#8 open; money chain untouched).
+ORIGIN: OWNER-SAID — colleagues prefer the old design (live desk especially); reverse the plan. LEAD ruling:
+the old site remains the public root permanently; /v2/ stays a preview only, never swapped; v2 layout defects
+drop to low priority. Pure site code; no desk process; hard stop 05:30; nothing on the money chain.
+1) On the OLD site: add the equity/P&L graph (per engine + desk, inline SVG from the ledgers, no external
+   scripts) and the per-engine tabs from the approved design (Positions · Trades · Why each call · How it decides
+   · Patterns) — without changing the old layout people like. TDD at rendered-HTML level; click-through and
+   reachability gates green before publish.
+2) Update the checklist: swap item closed (owner: no swap); v2 layout defects → LOW; record the ruling.
+3) Group code; verify rides the after-close quiet-box. Report "NB44" red→green; end with NOTHING NEEDS THE
+   LEAD / LEAD RULING NEEDED.
+user: DISPATCH ID: NB44 — OLD SITE STAYS PUBLIC: ADD GRAPHS + TABS TO IT (24 Sep 2026, ~04:45 IST) → BUILD
+READ: NB43 report (deliverables island + downloads done; v2 layout #1/#4/#8 open; money chain untouched).
+ORIGIN: OWNER-SAID — colleagues prefer the old design (live desk especially); reverse the plan. LEAD ruling:
+the old site remains the public root permanently; /v2/ stays a preview only, never swapped; v2 layout defects
+drop to low priority. Pure site code; no desk process; hard stop 05:30; nothing on the money chain.
+1) On the OLD site: add the equity/P&L graph (per engine + desk, inline SVG from the ledgers, no external
+   scripts) and the per-engine tabs from the approved design (Positions · Trades · Why each call · How it decides
+   · Patterns) — without changing the old layout people like. TDD at rendered-HTML level; click-through and
+   reachability gates green before publish.
+2) Update the checklist: swap item closed (owner: no swap); v2 layout defects → LOW; record the ruling.
+3) Group code; verify rides the after-close quiet-box. Report "NB44" red→green; end with NOTHING NEEDS THE
+   LEAD / LEAD RULING NEEDED.
+assistant: NB44 — the plan reverses: old site stays the permanent public root; add an equity graph + per-engine tabs to it. First §7.1 archive + a quick §23 clock check.
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-24_NIGHT-BUNDLE-44.md", "content": "# NIGHT BUNDLE 44 (ID:NB44) \u2014 dispatch archived verbatim (2026-09-24)\n\n**Origin tag (per \u00a75):** OWNER-SAID \u2014 colleagues prefer the old design; reverse the plan. LEAD ruling: the old site is the permanent public root; /v2/ is a preview only, never swapped; v2 layout defects drop to LOW. Pure site code; no desk process; hard stop 05:30; nothing on the money chain.\n\nDISPATCH ID: NB44 \u2014 OLD SITE STAYS PUBLIC: ADD GRAPHS + TABS TO IT (24 Sep 2026, ~04:45 IST) \u2192 BUILD\nREAD: NB43 report (deliverables island + downloads done; v2 layout #1/#4/#8 open; money chain untouched).\nORIGIN: OWNER-SAID \u2014 colleagues prefer the old design (live desk especially); reverse the plan. LEAD ruling:\nthe old site remains the public root permanently; /v2/ stays a preview only, never swapped; v2 layout defects\ndrop to low priority. Pure site code; no desk process; hard stop 05:30; nothing on the money chain.\n1) On the OLD site: add the equity/P&L graph (per engine + desk, inline SVG from the ledgers, no external\n   scripts) and the per-engine tabs from the approved design (Positions \u00b7 Trades \u00b7 Why each call \u00b7 How it decides\n   \u00b7 Patterns) \u2014 without changing the old layout people like. TDD at rendered-HTML level; click-through and\n   reachability gates green before publish.\n2) Update the checklist: swap item closed (owner: no swap); v2 layout defects \u2192 LOW; record the ruling.\n3) Group code; verify rides the after-close quiet-box. Report \"NB44\" red\u2192green; end with NOTHING NEEDS THE\n   LEAD / LEAD RULING NEEDED.\n"}
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-24_NIGHT-BUNDLE-44.md (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/clock_ram.py\" 2>&1 | head -1; echo \"=== old engine page builder ===\"; grep -nE \"def build|def _tabs|Positions|Trades|Why each|How it decides|Patterns|equity|svg|<svg|def engine_page|def _page\" scripts/engine_page.py 2>&1 | head -15", "description": "Clock + old engine_page builder structure"}
+tool_result: IST now: 2026-09-24 03:49:44 Thu
+=== old engine page builder ===
+40:        return {"equity": 200000.0, "open_positions": [], "open_count": 0}, "Paper trades: unknown", ""
+119:def build_e1():
+127:    acct = ("<div class='cards'><div class='cell'>equity<b>" + ACC.rupees(a["equity"]) + "</b></div>"
+146:        ("sec-patterns", "4 · Patterns — score cards", patterns),
+227:def build():
+234:    for must in ("Engine 1", "1 · Account", "4 · Patterns", "5 · Validation funnel", "7 · Calls",
+assistant: 03:49 (ample time to 05:30). Old engine page = `engine_page.py` (build_e1/build). Let me do the quick item 2 first (record the reversal ruling). Finding the swap item 26:
+tool_use Bash {"command": "grep -nE \"^- \\[.*\\] (26|47|48)\\.|swap\" docs/MASTER-CHECKLIST.md 2>&1 | head", "description": "Find the swap + v2-layout checklist items"}
+tool_result: 50:- [NEEDS-OWNER] 26. root-swap re-diff → owner replies "swap" — **NOT approved.** NB8's "diff empty → swap 🙋" was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner's UI review after 15:45 lists them and they are fixed. NO further swap 🙋. **HARDENED (OWNER-SAID 2026-09-23): NO swap until the owner SAYS he is satisfied with the new site end to end — and NO swap 🙋 before that. The gate is the owner's word, not a passing check; fixing UI-1 + the reachability gate is necessary but not sufficient.**
+77:- [AFTER-1545] 47. v2 UI fix — every engine/diary/desk-book page linked from the published nav and engines page; every button, tab and engine selector works; owner UI review after 15:45 lists anything remaining. (Item 26 swap depends on 47 + 48.) **OWNER'S LIST ARRIVED: dispatch UI-1 (08:25) — 8 concrete fixes (header, engine-card links, Stocks chips, Live-desk filters, Deliverables-out-of-nav, Messages split+chips, Data downloads, Results detail pages). Diagnosed + planned per item in NEXT-PASTE; execution PAUSED at 09:00, RESUME 15:45 (skip the 15:50 UI 🙋 — the list is already in hand). Then item 48 gate becomes a hard block.**
+78:- [AFTER-1545] 48. click-through + reachability gate becomes a HARD build-block (site does not publish if any page is unreachable or any link is broken) — turned on once item 47 is done and confirmed by the owner UI review.
+assistant: Recording the NB44 reversal ruling — item 26 (swap) CLOSED, and v2-layout items → LOW:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\MASTER-CHECKLIST.md", "old_string": "- [NEEDS-OWNER] 26. root-swap re-diff \u2192 owner replies \"swap\" \u2014 **NOT approved.**", "new_string": "- [CLOSED] 26. root-swap \u2014 **CLOSED, NO SWAP (OWNER-SAID NB44, 2026-09-24): colleagues prefer the old design (the live desk especially). The OLD site is the PERMANENT public root; /v2/ stays a preview only, never swapped. The graph + per-engine tabs are added TO THE OLD SITE (NB44 item 1) instead.** \u2014 (history) root-swap re-diff \u2192 owner replies \"swap\" \u2014 **NOT approved.**"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\MASTER-CHECKLIST.md has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\MASTER-CHECKLIST.md", "old_string": "- [AFTER-1545] 47. v2 UI fix \u2014 every engine/diary/desk-book page linked", "new_string": "- [LOW] 47. v2 UI fix \u2014 **DROPPED TO LOW (NB44): /v2/ is a preview only, never swapped, so its layout defects (#1 header, #4 live-desk, #8 results) are low priority. The functional v2 fixes #2/#3/#5/#6/#7 are already done; the rest wait.** \u2014 every engine/diary/desk-book page linked"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\MASTER-CHECKLIST.md has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Item 2 done (ruling recorded). Now item 1 — the equity/P&L graph + per-engine tabs. Let me read the old engine page's current structure + its data:
+tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\engine_page.py", "offset": 119, "limit": 40}
+tool_result: 119	def build_e1():
+120	    from engine1_rebuild import paper_account as ACC
+121	    a, paper_line, opens = _account()
+122	    cards = "".join("<tr><td>%s</td><td>%d</td><td>%.0f%%</td><td>%.0f%%</td><td>%s%.2fR</td><td>certified · live</td></tr>"
+123	                    % (html.escape(name), n, wr * 100, lb * 100, "+" if avg >= 0 else "", avg)
+124	                    for name, n, wr, lb, avg in _pattern_cards())
+125	    funnel = "".join("<tr><td><b>%s</b></td><td>%s</td><td class='muted'>%s</td></tr>"
+126	                     % (html.escape(s), html.escape(v), html.escape(cap)) for s, v, cap in _funnel())
+127	    acct = ("<div class='cards'><div class='cell'>equity<b>" + ACC.rupees(a["equity"]) + "</b></div>"
+128	            "<div class='cell'>open trades<b>" + str(a.get("open_count", 0)) + "</b></div>"
+129	            "<div class='cell'>paper trades<b>" + html.escape(paper_line) + "</b></div></div>" +
+130	            (("<table><tr><th>stock</th><th>side</th><th>entry</th><th>P&L</th></tr>" + opens + "</table>")
+131	             if opens else "<p class='muted'>No open paper trades right now.</p>"))
+132	    grid = ("<p class='muted'>The full 210-stock × every-metric grid (today's values, lowest-20% / highest-20% "
+133	            "coloured, tap a stock to open it) wires in <b>after your yes</b> — the one piece this page waits on.</p>")
+134	    rows = ("<p class='muted'>Each metric's value → the rule it feeds → the patterns it meets → the signal if "
+135	            "fired. Opens from the grid; wired with it.</p>")
+136	    patterns = ("<table><tr><th>Family (the ruler)</th><th>Past cases</th><th>Win rate</th>"
+137	                "<th>Confidence-adjusted</th><th>Avg move after costs</th><th>Stage</th></tr>" + cards + "</table>"
+138	                "<p class='muted'>Grouped by the ruler here; every individual pattern is in the Excel below.</p>")
+139	    funnel_html = "<table><tr><th>Stage</th><th>Count</th><th>What it means</th></tr>" + funnel + "</table>"
+140	    timeline = ("<p class='muted'>This stock's story over the last 30 days — the metric, the signal day, the "
+141	                "order, the exit. Opens per stock from the grid; wired with it.</p>")
+142	    sections = [
+143	        ("sec-account", "1 · Account", acct),
+144	        ("sec-grid", "2 · The grid — 210 stocks × every metric", grid),
+145	        ("sec-rows", "3 · A stock's rows", rows),
+146	        ("sec-patterns", "4 · Patterns — score cards", patterns),
+147	        ("sec-funnel", "5 · Validation funnel", funnel_html),
+148	        ("sec-timeline", "6 · Timeline", timeline),
+149	        ("sec-calls", "7 · Calls", _calls_and_excel()),
+150	    ]
+151	    doc = _shell("Engine 1 — deep dive", "Engine 1 — patterns in a stock's own price",
+152	                 countdown_to_verdict("E1"), sections)
+153	    out = os.path.join(REPO, "site", "engine-e1.html")
+154	    os.makedirs(os.path.dirname(out), exist_ok=True)
+155	    with open(out, "w", encoding="utf-8") as f:
+156	        f.write(doc)
+157	    return {"out": out, "families": len(_pattern_cards())}
+158	
