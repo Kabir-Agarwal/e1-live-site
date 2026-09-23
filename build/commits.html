@@ -1,4 +1,99 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>883a671f9</b> · 2026-09-23 23:34</div><div>NB32 item2: wire the PreCompact resume-card hook (.claude/settings.json runs scripts/resume_card.py before every compaction) + wiring test RED-&gt;GREEN; proven via the hook&#x27;s own dry-run, card timestamp 2026-09-23 23:33:49</div><div class='sub h'>.claude/settings.json     | 11 +++++++++++</div><div class='sub h'>tests/test_wiring_live.py |  9 +++++++++</div><pre>diff --git a/.claude/settings.json b/.claude/settings.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c3461e636</b> · 2026-09-23 23:38</div><div>NB32 item3: auto-continue verified wired (watchdog:770 calls session_resurrect.resurrect) + gates unit-proven; FIX the single-instance gap — add the SessionStart hook (writes scheduler/.owner_active + prints the resume card, §14.1/§23.2) so the guard is real (was 5.4d stale); wiring test RED-&gt;GREEN, dry-run flips _session_active True. LIVE reopen proof deferred: needs a real session-end + RAM&gt;=2.0GB (now 1.11)</div><div class='sub h'>.claude/hooks/session_start.py | 47 ++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>.claude/settings.json          | 11 ++++++++++</div><div class='sub h'>tests/test_wiring_live.py      | 12 +++++++++++</div><pre>diff --git a/.claude/hooks/session_start.py b/.claude/hooks/session_start.py
+new file mode 100644
+index 000000000..56a050c0a
+--- /dev/null
++++ b/.claude/hooks/session_start.py
+@@ -0,0 +1,47 @@
++&quot;&quot;&quot;SessionStart hook (CLAUDE.md §14.1 + §23.2).
++
++Two jobs, both fail-open (a hook bug must never block a session from starting):
++  1) Mark THIS session active — write scheduler/.owner_active with the machine clock. This is the
++     single-instance marker the watchdog&#x27;s auto-continue reads (session_resurrect._session_active): a fresh
++     marker (&lt; 4h) means &quot;a session is live, do NOT reopen a second one over it&quot;. Nothing else refreshes it,
++     so without this hook the guard is carried only by the RAM gate + cooldown (the marker goes stale).
++  2) Print the resume card + the pointer to the three resume files (§23.2), so a resumed/fresh session reads
++     the disk before acting. The first line after any resume is `resuming #N, step X` (read-only).
++&quot;&quot;&quot;
++import os
++import sys
++import time
++
++REPO = os.environ.get(&quot;E1_REPO&quot;) or r&quot;[redacted]\Desktop\trading-engines-v2&quot;
++
++
++def _mark_active():
++    try:
++        oa = os.path.join(REPO, &quot;scheduler&quot;, &quot;.owner_active&quot;)
++        os.makedirs(os.path.dirname(oa), exist_ok=True)
++        with open(oa, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;))
++    except Exception:
++        pass
++
++
++def _print_card():
++    try:
++        sys.path.insert(0, REPO)
++        from scripts import resume_card
++        if os.path.exists(resume_card.CARD):
++            print(open(resume_card.CARD, encoding=&quot;utf-8&quot;).read())
++        else:
++            print(&quot;(no resume card yet — re-read NEXT-PASTE.md, MASTER-CHECKLIST.md, reports/BUILD-STATE.json)&quot;)
++    except Exception:
++        pass
++
++
++def main():
++    _mark_active()
++    _print_card()
++    sys.exit(0)
++
++
++if __name__ == &quot;__main__&quot;:
++    main()
+diff --git a/.claude/settings.json b/.claude/settings.json
+index 2f148ebe9..db122a2bf 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -58,6 +58,17 @@
+           }
+         ]
+       }
++    ],
++    &quot;SessionStart&quot;: [
++      {
++        &quot;hooks&quot;: [
++          {
++            &quot;type&quot;: &quot;command&quot;,
++            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\.claude\\hooks\\session_start.py\&quot;&quot;,
++            &quot;timeout&quot;: 15
++          }
++        ]
++      }
+     ]
+   }
+ }
+diff --git a/tests/test_wiring_live.py b/tests/test_wiring_live.py
+index 47b5e593e..915454d7b 100644
+--- a/tests/test_wiring_live.py
++++ b/tests/test_wiring_live.py
+@@ -62,3 +62,15 @@ def test_precompact_resume_card_wired():
+     cmds = [h.get(&quot;command&quot;, &quot;&quot;) for grp in groups for h in grp.get(&quot;hooks&quot;, [])]
+     assert any(&quot;resume_card&quot; in c for c in cmds), \
+         &quot;RED: no PreCompact hook runs scripts/resume_card.py (docs/RESUME-CARD.md never written before compaction)&quot;
++
++
++def test_sessionstart_owner_active_wired():
++    # §14.1/§23.2: a SessionStart hook must mark the session active (scheduler/.owner_active) so the watchdog&#x27;s
++    # auto-continue single-instance guard is real, and print the resume card. Without it the guard is carried
++    # only by the RAM gate + cooldown (the marker goes stale and _session_active() reads False).
++    import json
++    s = json.loads(_src(&quot;.claude/settings.json&quot;))
++    groups = s.get(&quot;hooks&quot;, {}).get(&quot;SessionStart&quot;, [])
++    cmds = [h.get(&quot;command&quot;, &quot;&quot;) for grp in groups for h in grp.get(&quot;hooks&quot;, [])]
++    assert any(&quot;session_start&quot; in c for c in cmds), \
++        &quot;RED: no SessionStart hook (scheduler/.owner_active never refreshed -&gt; single-instance guard off)&quot;
+</pre></div><div class='c'><div class='h'><b>883a671f9</b> · 2026-09-23 23:34</div><div>NB32 item2: wire the PreCompact resume-card hook (.claude/settings.json runs scripts/resume_card.py before every compaction) + wiring test RED-&gt;GREEN; proven via the hook&#x27;s own dry-run, card timestamp 2026-09-23 23:33:49</div><div class='sub h'>.claude/settings.json     | 11 +++++++++++</div><div class='sub h'>tests/test_wiring_live.py |  9 +++++++++</div><pre>diff --git a/.claude/settings.json b/.claude/settings.json
 index 784cd66a6..2f148ebe9 100644
 --- a/.claude/settings.json
 +++ b/.claude/settings.json
@@ -922,23 +1017,4 @@ index e619f334a..2306a38a5 100644
      try:                   # R-NIGHT-CLOSE (3): record the E21 one-lot SPAN margin (read-only calc); sizing
          from engine21_overnight import overnight as E21   # stays record-only until this succeeds
          overnight_span = E21.record_span()
-</pre></div><div class='c'><div class='h'><b>b47580206</b> · 2026-09-23 21:16</div><div>NB28: HOLD-FLAG-LOG entry (docs) — hold-flag state change per NB19-R2 delegation after the independent PASS; moment light + six checks + kill + breaker still gate orders; real-money rail unchanged</div><div class='sub h'>docs/HOLD-FLAG-LOG.md | 11 +++++++++--</div><pre>diff --git a/docs/HOLD-FLAG-LOG.md b/docs/HOLD-FLAG-LOG.md
-index 247e7d80e..f83dd0b41 100644
---- a/docs/HOLD-FLAG-LOG.md
-+++ b/docs/HOLD-FLAG-LOG.md
-@@ -34,5 +34,12 @@ The lift is **opening the door** → reserved to the owner (§21). Steps, in ord
-   flag is STILL PLACED — the lift is the owner&#x27;s hand (step 3), folded into the 06:00 click. The build session did
-   NOT lift it.
- 
--_The PASS marker now exists, so the 06:00 🙋 becomes &quot;delete the flag file, then tap the login.&quot; The flag still
--stands until the owner&#x27;s 06:00 act — opening the door is owner-only (§21)._
-+- **2026-09-23 20:38 IST — HOLD LIFTED under NB19-R2 delegation, after reports/CHAIN-DRY-RUN-PASS.md** (NB28 #1).
-+  Deleted `scheduler/.orders_held_R_HOLD_AND_FIX`. Confirmed after: `gate.held()=False`, `hold_reason=&#x27;&#x27;`,
-+  `orders_allowed()` (two-key) `=True` — the order gate is OPEN. The owner delegated the lock decision on
-+  2026-09-23 16:25 (&quot;you decide and do it&quot;), NB19-R2 gated it on an independent PASS, and that PASS now exists —
-+  so this lift is within the recorded delegation, not a session opening the door on its own.
-+
-+_The flag is now LIFTED. The order gate is open, but every actual order at 09:15 still passes the moment light
-+(a real green two-sided quote), the six checks, the kill switch and the circuit breaker — nothing is forced. Real
-+MONEY stays closed (hold_orders / positive_audited_verdict rail, §gate) — this is the PAPER book._
 </pre></div></main></body></html>
