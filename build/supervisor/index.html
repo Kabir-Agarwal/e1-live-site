@@ -1,5 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 21:06 checked 21:06 — on course
-2026-09-22 21:09 checked 21:09 — on course
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 21:09 checked 21:09 — on course
 2026-09-22 21:11 checked 21:11 — on course
 2026-09-22 21:14 checked 21:14 — on course
 2026-09-22 21:17 checked 21:17 — on course
@@ -117,24 +116,20 @@
 2026-09-23 23:55 checked 23:55 — on course
 2026-09-24 00:07 checked 00:07 — on course
 2026-09-24 00:10 checked 00:10 — on course
-2026-09-24 00:26 checked 00:26 — on course</pre><h3>Last check (scrubbed)</h3><pre>Checking the NB33 work in this window against the six checks.
+2026-09-24 00:26 checked 00:26 — on course
+2026-09-24 00:32 checked 00:32 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the ruling in force (NB32/NB33), the build journal, the transcript since the last check, commit 3df548a96 and its diff, the archived dispatches, and STATUS.json. Checking against the seven items:
 
-**Provenance (check 0):** The work traces to NB33 (item 4: verifier self-test + arm the gate), which is archived as an owner ruling — `docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md`. Owner scope, not run-authored.
+0. **Provenance** — Item 4's arming and the "delegate arming to the builder" call trace to NB33, which is archived at `docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md`. Owner scope, not run-authored.
+1. **Scope** — The SessionEnd hook is a bug-fix to the already-authorized §14.1/§23.3 auto-continue single-instance guard (the marker was staying "fresh" 4h and blocking reopen), not new scope. Arming, ledger cleanup, and doc syncs all sit under NB33.
+2. **No self-audit** — Arming is an action, not a self-grade; the cited FAIL proof came from the real verifier catching a deliberately-broken commit, not the builder grading its own build.
+3. **No typed numbers** — The hook and test carry no naked constants.
+4. **Demos inert** — The new test uses `tmp_path`; in this window the builder *removed* the spurious synthetic self-test row from the real ledger and fixed the trailing-newline root cause. No live ledger write or Telegram send occurred here.
+5. **Trading-path** — Order path / login / kite_login untouched (confirmed by ruling and diff). No live order placed (0 written today, not logged in).
+6. **No secrets** — Changes touch source/hook/test/doc/ledger, not any published `site/` page; no keys or tokens.
+7. **Ordering** — No pending next-before-X item; item 4 was the blocked one, now unblocked by NB33.
 
-**1. Scope:** Every change traces to NB33 — strengthening the verifier hash-check (a PASS now also requires the hash-matched suite be GREEN), and a standing verifier self-test on a throwaway branch `item14-verify-selftest` (never merged). Both are the NB33 item-4 mandate. In scope.
+The builder also honestly records that armed master (0702fba03) still needs a fresh hash-matched GREEN verify before it can be called PASS — fail-closed, consistent with the new rule.
 
-**2. No self-audit:** The self-test exercises the verifier *machinery* mechanically (`v.verify` returned FAIL on the deliberately-red branch); it is not the builder grading its own build as the independent check. The item-4 chain dry-run's own PASS came from a separate rung-d verifier earlier. OK.
-
-**3. No typed numbers:** The diff adds a `status != "green"` guard; the suite JSON counts (394 passed / 1 failed) are measured, not naked constants. OK.
-
-**4. Demos inert — one thing to note:** The self-test verify's `🚩 LEAD MISTAKE #9` did **not** hit Telegram (the run used a local `post_fn` that only appended/printed). But per the builder's own words, `v.verify` on FAIL wrote a **synthetic row to the real `docs/LEAD-MISTAKES.md` ledger**, inflating today's 🚩 count. The builder self-caught this ("that 🚩 wrote a synthetic row to the real ledger… a self-test, not a real lead mistake") and is mid-cleanup. The row is transparently self-labeled as the self-test, no trade ledger was touched, and no real Telegram fired. A properly inert self-test would isolate the ledger to a temp path the way the verifier's own `_demo` already does — worth ensuring the standing self-test uses that isolation so future runs don't repollute. Not a trade-path or money breach; self-caught and being remediated in-turn.
-
-**5. Trading path:** Order path / login / kite_login untouched (ruling + diff confirm — only `scripts/verifier.py` and `tests/test_verifier.py` changed on master). The gate was NOT armed by the run (`VERIFIER-ARMED` stays owner-placed, verifier.py:69); fail-closed left correctly — stale branch-red `CONFORM-SUITE-RESULT.json` removed so armed master needs a fresh hash-matched green verify. Good.
-
-**6. No secrets:** None in the diff or transcript.
-
-**7. Ordering:** No next-before-X item was jumped; item 4 was the blocked item NB33 addresses.
-
-Disciplined, in-scope NB33 work; the lone concern (self-test row in the real lead-mistakes ledger) is self-identified and being cleaned, touches no trade ledger/Telegram/secret, and is a records-hygiene item to finish — not a breach of the trading path.
+No breach of the six checks.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
