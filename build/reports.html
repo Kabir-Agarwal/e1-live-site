@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 02:35 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 02:46 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
 
 _Measured this run, no model called. The Opus rule-extraction is GATED until the owner has seen these numbers (the whole library is NOT read yet)._
 
@@ -320,6 +320,47 @@ _A difference = a leftover {{placeholder}}, a render token the gate rejects, a p
 **31 v2 pages checked · 0 difference(s).**
 
 **DIFF EMPTY (objective checks)** — no leftover placeholder, no render token, no broken link, no unreachable page, every mapped record shown. This is the OBJECTIVE part only; the swap (item 26) still needs the owner&#x27;s UI review after 15:45 (item 47) — does every button actually work, any wrong pages — before a swap 🙋. No swap posted.
+</pre><h3>twin-2026-09-22.md</h3><pre># twin-2026-09-22 — live loop vs exam (status: HARNESS READY, live run DEFERRED)
+
+**Written 2026-09-24 ~02:55 IST (NB38).** Dry-run/report only — nothing to Telegram or the live ledger.
+
+## What is done tonight
+
+- **Detective-net GAP fixed (the important one).** `twin_run.live_ledgers()` globbed only `reports/*LEDGER*.csv`
+  and `reports/books/*.csv` — it **missed the main paper ledger `engine1_rebuild/paper/ledger.csv`** (the money
+  book `paper.append_rows` writes). So the twin&#x27;s DETECTIVE safety net would NOT have caught a rehearsal that
+  corrupted the money book. Fixed: `live_ledgers()` now also globs `engine1_rebuild/paper/*.csv`. TDD
+  (`tests/test_twin_run.py::test_detective_net_guards_the_main_paper_ledger`), green.
+
+## Why the LIVE run is DEFERRED to a daytime window (not run tonight)
+
+The real live loop is `book20_runner.run_once(asof=…)` + `simulate_session`. Replaying Tuesday through it means
+routing **every** write to a rehearsal dir — the book blotter (`book20_runner.LEDGER`), the readout
+(`book20_runner.READOUT`), **and the main paper ledger via `paper.append_rows`** — and suppressing every Telegram
+card/entry/exit message. A single missed write path would **corrupt the main paper ledger**, and (until tonight&#x27;s
+fix) the detective net didn&#x27;t even guard it. Doing that at ~02:50, hours before the **06:00 money-chain login**,
+is an unacceptable risk to the live book.
+
+The SAFE way to run the live-loop twin is inside the **isolated verify-clone** (`E1-DESK\verify-clone`, its own
+ledgers on a separate path — the same clone the verifier now creates, NB37 item 13), so the live repo&#x27;s ledgers
+cannot be touched by construction. That is a **daytime, after-close task**, not a pre-06:00 one.
+
+## The exam side (reference), ready to wire read-only
+
+`real_exam(recorded_day)` runs read-only over Tuesday: `conform.evaluate_at_close(asof=&quot;2026-09-22&quot;)` → the QUEUE
+decisions, then the exam&#x27;s own fill/exit model (`engine1_rebuild.paper.simulate_trade`) for each. No writes.
+
+## Plan for the live run (after Thursday&#x27;s close, in the clone)
+
+1. `prepare_clone()` → the confined clone at HEAD.
+2. In the clone, run `book20_runner.run_once(asof=&quot;2026-09-22&quot;, quotes=&lt;recorded Tuesday book&gt;)` + `simulate_session`
+   per fire → the live-loop trades (clone ledgers only).
+3. `real_exam(&quot;2026-09-22&quot;)` → the exam trades.
+4. `twin_run.compare(...)` → MATCH or a numbered per-pattern diff (signal_time · verdict · fill · exit · pnl_R);
+   the detective net (now guarding the money ledger) confirms no live ledger changed.
+5. Rewrite this file with the verdict + diff table.
+
+**Verdict tonight: DEFERRED (harness + safety-net ready; live run scheduled for the isolated-clone daytime window).**
 </pre><h3>o1-coverage.md</h3><pre># O1 coverage — point-in-time F&amp;O/index membership (NIGHT BUNDLE 4 item 8)
 
 _Mechanical, computed this run from `data_acquisition.pit_universe.coverage()` and `check_corpus()`. Nothing is
