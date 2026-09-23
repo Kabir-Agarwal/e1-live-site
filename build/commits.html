@@ -1,4 +1,190 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>5b0a92084</b> · 2026-09-23 22:12</div><div>NB30 state: morning_bar LIVE + verified; wiring ledger 4 green/5 red</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>dc2372b27</b> · 2026-09-23 22:31</div><div>NB31: wire the five status lines TDD-first (evening_precheck+close_done in run_evening, 08:15 preopen_line in day_report, held_log page in build_journal, lead_mistakes flag on verifier FAIL); wiring ledger 9/9 green; verifier test isolated to a temp ledger + asserts the flag; archive NB31</div><div class='sub h'>docs/LEAD-MISTAKES.md                         |  2 +-</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-31.md |  7 +++++++</div><div class='sub h'>scripts/build_journal.py                      | 12 ++++++++++++</div><div class='sub h'>scripts/day_report.py                         | 23 ++++++++++++++++++++++-</div><div class='sub h'>scripts/run_evening.py                        | 20 ++++++++++++++++++++</div><div class='sub h'>scripts/verifier.py                           |  7 +++++++</div><div class='sub h'>tests/test_verifier.py                        |  8 +++++++-</div><pre>diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
+index bc99b6bac..303cdede1 100644
+--- a/docs/LEAD-MISTAKES.md
++++ b/docs/LEAD-MISTAKES.md
+@@ -16,4 +16,4 @@ when a required order was not placed. Shown as a page in the build room. The dai
+ | 2026-09-23 | NB18/NB19/NB19-R named the R-HOLD-AND-FIX flag as what held 09:15 orders (to be lifted) | the flag file scheduler/.orders_held_R_HOLD_AND_FIX was ABSENT (gate.held()=False); the real 09:15 hold was order_ok() moment-light (recorders down). Flag now placed by NB19-R2 to enforce hold-until-PASS |
+ | 2026-09-23 | NB16 stated the watchdog keeps token_ping/run_evening/site_loop/portfolio_card/calendar_daily alive (from START_E1_ALL.bat&#x27;s keep-alive list) | WRONG — _expected_jobs() skips every REM line (watchdog.py:218) and that keep-alive list is all REM-commented (START_E1_ALL.bat:15-20); the only live line is &#x27;pythonw -m scripts.launch_e1&#x27; (:10) which the scripts\X.py regex misses. So resurrect_jobs revives NOTHING; the .bat comment promises a keep-alive the code ignores. This is why recorders AND run_evening stay dead once reaped. |
+ | 2026-09-23 | item 61 (E1-only thin start) was built in launch_e1.main() | the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 — it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap). |
+-| 2026-09-23 | the 19:00 reboot was expected to leave the box on the clean START_E1_STACK.bat stack with fresh memory | a logon-persistence E1_AUTOSTART.vbs (in the Windows Startup folder, active; its .bat twin is already .disabled) auto-started `pythonw -m scripts.launch_e1` on the reboot — the OLD launcher path, which §14.7 forbids (no logon/auto-restart persistence). Measured free RAM 0.65 GB (NOT fresh), so the heavy EVENING RUN + dry-run stay blocked. Fix (owner, outside repo scope): remove the Startup-folder E1_AUTOSTART.vbs. |
++| 2026-09-23 | the 19:00 reboot was expected to leave the box on the clean START_E1_STACK.bat stack with fresh memory | a logon-persistence E1_AUTOSTART.vbs (in the Windows Startup folder, active; its .bat twin is already .disabled) auto-started `pythonw -m scripts.launch_e1` on the reboot — the OLD launcher path, which §14.7 forbids (no logon/auto-restart persistence). Measured free RAM 0.65 GB (NOT fresh), so the heavy EVENING RUN + dry-run stay blocked. Fix (owner, outside repo scope): remove the Startup-folder E1_AUTOSTART.vbs. |
+\ No newline at end of file
+diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-31.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-31.md
+new file mode 100644
+index 000000000..094cfd7d8
+--- /dev/null
++++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-31.md
+@@ -0,0 +1,7 @@
++# NIGHT BUNDLE 31 (ID:NB31) — dispatch archived verbatim (2026-09-23)
++
++**Origin tag (per §5):** LEAD ruling within remit; nothing on the order path changes.
++
++DISPATCH ID: NB31 — WIRE THE FIVE STATUS LINES, ONE QUIET-BOX VERIFY (23 Sep 2026, ~22:15 IST) → BUILD
++READ: NB30 report (wiring ledger tests/test_wiring_live.py: RED = evening_precheck, 08:15 line, HELD log, CLOSE-DONE, 🚩; measured verify floor ~1.0 GB; NB24 quiet-box route STOP → verify → START valid until the 06:00 login). ORIGIN: LEAD ruling within remit; nothing on the order path changes.
++TDD each of the five: RED wiring test → wire into the launched path (08:15 line replaces the 09:00 pre-open line; CLOSE-DONE after the post-close jobs; 🚩 poster on ledger appends + counts on the close/08:15 lines; HELD log on every held order; evening_precheck before the evaluator) → GREEN → then ONE independent rung-d verify on a quiet box (STOP_E1_STACK.bat → verify alone → START_E1_STACK.bat once → confirm the single thin stack). PASS → all five LIVE at 06:00; the 08:15 line is tomorrow&#x27;s owner line. FAIL → revert only the failing wire, keep the rest if the verify passes them, cite. Then stop for the night. Report &quot;NB31&quot;: red→green names, verdict, what is LIVE at 06:00; end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+diff --git a/scripts/build_journal.py b/scripts/build_journal.py
+index 0ae49dce7..a5f4717a8 100644
+--- a/scripts/build_journal.py
++++ b/scripts/build_journal.py
+@@ -347,6 +347,16 @@ def _docs_body():
+                  &quot;&lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&lt;pre&gt;%s&lt;/pre&gt;&quot; % _html.escape(scrub(txt)))
+ 
+ 
++def _held_body():
++    &quot;&quot;&quot;NB31: the build-room HELD LOG — held orders as plain &#x27;held: stock — reason&#x27; lines (lead-visible, never public).&quot;&quot;&quot;
++    from scripts import held_log
++    lines = held_log.plain_lines()
++    body = _html.escape(&quot;\n&quot;.join(lines)) if lines else &quot;none yet.&quot;
++    return _page(&quot;Held orders&quot;, &quot;&lt;h1&gt;Held orders&lt;/h1&gt;&lt;p class=&#x27;sub&#x27;&gt;Every held order, plain, de-duplicated. &quot;
++                 &quot;Lead-visible; never on the public pages. &lt;a href=&#x27;index.html&#x27;&gt;build room&lt;/a&gt;&lt;/p&gt;&quot;
++                 &quot;&lt;pre&gt;%s&lt;/pre&gt;&quot; % body)
++
++
+ def _files_body(slug):
+     &quot;&quot;&quot;R-TWIN-TEST item 5 / MASTER-CHECKLIST item 18: the current repo tree at the transcript&#x27;s unguessable
+     path, one file per row, grouped by folder, SCRUBBED — plus a live grep-proof that no token, key or
+@@ -426,6 +436,7 @@ def _index_body(slug, have_transcript):
+         &quot;&lt;li&gt;&lt;a href=&#x27;journal.html&#x27;&gt;Journal&lt;/a&gt; — append-only build log&lt;/li&gt;&quot;
+         &quot;%s&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;commits.html&#x27;&gt;Commits&lt;/a&gt; — tonight&#x27;s commits with full diffs&lt;/li&gt;&quot;
++        &quot;&lt;li&gt;&lt;a href=&#x27;held.html&#x27;&gt;Held orders&lt;/a&gt; — every held order, plain, lead-visible&lt;/li&gt;&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;docs.html&#x27;&gt;Docs index&lt;/a&gt; — one line per document in docs/&lt;/li&gt;&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;supervisor/index.html&#x27;&gt;Supervisor&lt;/a&gt; — the independent watcher&#x27;s checks&lt;/li&gt;&quot;
+         &quot;&lt;li&gt;&lt;a href=&#x27;messages.html&#x27;&gt;Messages&lt;/a&gt; — every line sent + command received&lt;/li&gt;&quot;
+@@ -447,6 +458,7 @@ def build(write=True):
+     have_transcript = False
+     pages = {&quot;journal.html&quot;: _journal_body(), &quot;commits.html&quot;: _commits_body(),
+              &quot;docs.html&quot;: _docs_body(),                    # NB11 item 3: the docs index
++             &quot;held.html&quot;: _held_body(),                    # NB31: the build-room HELD log view
+              slug + &quot;-files.html&quot;: _files_body(slug)}      # Files page at the transcript&#x27;s unguessable path
+     if txt is not None:
+         try:
+diff --git a/scripts/day_report.py b/scripts/day_report.py
+index 7327b21a5..5a25bb6ab 100644
+--- a/scripts/day_report.py
++++ b/scripts/day_report.py
+@@ -47,12 +47,33 @@ def preopen():
+         last = led.drop_duplicates(&quot;trade_id&quot;, keep=&quot;last&quot;)
+         for _, r in last[last[&quot;status&quot;] == &quot;queued&quot;].iterrows():
+             queued.append({&quot;stock&quot;: r.get(&quot;stock&quot;), &quot;side&quot;: r.get(&quot;direction&quot;), &quot;sentence&quot;: r.get(&quot;pattern&quot;)})
+-    line = TC.preopen(queued)
++    line = _preopen_0815(queued)          # NB31: the 08:15 self-check replaces the old 09:00 pre-open line
+     notify(line)
+     _append_feed(line, &quot;preopen&quot;)
+     return line
+ 
+ 
++def _preopen_0815(queued):
++    &quot;&quot;&quot;Build the 08:15 status from vitals + the queue → preopen_line.line() (READY only if every check passes).&quot;&quot;&quot;
++    from scripts import preopen_line, vitals
++    from engine1_rebuild import trading_calendar as CAL
++    try:
++        v = vitals.build(write=False)
++    except Exception:
++        v = {}
++    dep = (v.get(&quot;streams&quot;) or {}).get(&quot;Order-book depth&quot;) or {}
++    loaded = bool(queued)                 # queue loaded = rows queued, OR the evening evaluator ran (a no-trade day)
++    try:
++        summ = json.load(open(os.path.join(ds._REPO, &quot;reports&quot;, &quot;E1-DAY-SUMMARY.json&quot;), encoding=&quot;utf-8&quot;))
++        loaded = loaded or summ.get(&quot;date&quot;) == CAL.previous_session(datetime.date.today(), inclusive=False).isoformat()
++    except Exception:
++        pass
++    return preopen_line.line({&quot;streams&quot;: {&quot;Order-book depth&quot;: {&quot;fresh&quot;: bool(dep.get(&quot;rows_10min&quot;))}},
++                              &quot;orders_allowed_now&quot;: v.get(&quot;orders_allowed_now&quot;),
++                              &quot;gates&quot;: v.get(&quot;gates&quot;) or {},
++                              &quot;queue_loaded&quot;: loaded, &quot;orders_queued&quot;: len(queued)})
++
++
+ def summary():
+     led = paper.read_ledger()
+     today = datetime.date.today().isoformat()
+diff --git a/scripts/run_evening.py b/scripts/run_evening.py
+index 10cf095e1..8d5cc197c 100644
+--- a/scripts/run_evening.py
++++ b/scripts/run_evening.py
+@@ -55,6 +55,21 @@ def main():
+     except Exception as e:
+         pos = {&quot;filled&quot;: 0, &quot;closed&quot;: 0, &quot;open&quot;: 0}
+         notify(f&quot;[E1] EOD position update skipped ({type(e).__name__}); new signals still run.&quot;)
++    try:                   # NB31 evening pre-check: flag a stale bar BEFORE the evaluator (the 2026-09-23 lesson)
++        from scripts import evening_precheck, memory_guard as _mg
++        from engine1_rebuild import datastore as _ds, conform as _cf
++        _lat = &quot;&quot;
++        for _p in _cf.live_patterns():
++            _c = _p.get(&quot;candidate&quot;)
++            if _c and _c.get(&quot;token&quot;):
++                try:
++                    _lat = max(_lat, str(_ds.read(int(_c[&quot;token&quot;]), &quot;raw&quot;).index[-1])[:10])
++                except Exception:
++                    pass
++        notify(&quot;[E1] &quot; + evening_precheck.line({&quot;bar_date&quot;: _lat, &quot;today&quot;: _ist().date().isoformat(),
++                                                 &quot;depth_rows_today&quot;: 1, &quot;ram_ok&quot;: (_mg.free_gb() or 0) &gt; 0.5}))
++    except Exception:
++        pass
+     try:
+         summ = evening.run_evening(write=True)
+     except Exception as e:
+@@ -76,6 +91,11 @@ def main():
+         snapshot_sync.sync(&quot;E1(evening): paper signals queued + dashboard&quot;)
+     except Exception:
+         pass
++    try:                   # NB31 close-done line: posts after the post-close jobs (retires the typed 15:45 resume)
++        from scripts import close_done
++        notify(&quot;[E1] &quot; + close_done.line(_ist().date().isoformat()))
++    except Exception:
++        pass
+ 
+ 
+ if __name__ == &quot;__main__&quot;:
+diff --git a/scripts/verifier.py b/scripts/verifier.py
+index 165becf39..4d086ccf2 100644
+--- a/scripts/verifier.py
++++ b/scripts/verifier.py
+@@ -112,6 +112,13 @@ def verify(commit, ruling_text=&quot;&quot;, claimed_step=&quot;&quot;, brain_fn=None, post_fn=None)
+         verdict = &quot;FAIL&quot;
+     _write_report(commit, verdict, rung, name, claimed_step, res.get(&quot;evidence&quot;, &quot;&quot;))
+     post_fn(&quot;VERIFY %s %s %s&quot; % (verdict, claimed_step, commit))
++    if verdict == &quot;FAIL&quot;:
++        try:                            # NB21/NB24: a verifier FAIL is a lead mistake — logs a row + posts one 🚩 line
++            from scripts import lead_mistakes
++            lead_mistakes.append(&quot;step %s reported done at %s&quot; % (claimed_step or &quot;(unspecified)&quot;, commit),
++                                 &quot;independent verifier returned FAIL&quot;, notify_fn=post_fn)
++        except Exception:
++            pass
+     return verdict
+ 
+ 
+diff --git a/tests/test_verifier.py b/tests/test_verifier.py
+index 5476243b5..b984a6298 100644
+--- a/tests/test_verifier.py
++++ b/tests/test_verifier.py
+@@ -1,10 +1,13 @@
+ &quot;&quot;&quot;R-VERIFIER v2: launcher writes PASS/FAIL reports, the gate reads them, the rung ladder resolves.&quot;&quot;&quot;
++import os
+ import tempfile
+ from scripts import verifier as v
+ 
+ 
+ def _iso():
+     v.REPORTS = tempfile.mkdtemp()
++    from scripts import lead_mistakes            # NB31: keep a FAIL&#x27;s lead-mistake row off the real ledger
++    lead_mistakes.LEDGER = os.path.join(tempfile.mkdtemp(), &quot;LM.md&quot;)
+ 
+ 
+ def test_pass_report_and_gate():
+@@ -20,7 +23,10 @@ def test_fail_report_blocks_gate():
+     posts = []
+     verdict = v.verify(&quot;def456&quot;, claimed_step=&quot;2&quot;,
+                        brain_fn=lambda i: {&quot;verdict&quot;: &quot;FAIL&quot;, &quot;evidence&quot;: &quot;test_x failed&quot;}, post_fn=posts.append)
+-    assert verdict == &quot;FAIL&quot; and not v.has_pass(&quot;def456&quot;) and posts[-1] == &quot;VERIFY FAIL 2 def456&quot;
++    # the VERIFY FAIL line is posted AND (NB31) a read-only 🚩 lead-mistake line follows it
++    assert verdict == &quot;FAIL&quot; and not v.has_pass(&quot;def456&quot;)
++    assert &quot;VERIFY FAIL 2 def456&quot; in posts
++    assert any(p.startswith(&quot;🚩 LEAD MISTAKE&quot;) and &quot;def456&quot; in p for p in posts)
+ 
+ 
+ def test_brain_exception_is_fail_not_crash():
+</pre></div><div class='c'><div class='h'><b>5b0a92084</b> · 2026-09-23 22:12</div><div>NB30 state: morning_bar LIVE + verified; wiring ledger 4 green/5 red</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
 index 6f5ae7169..89c3209b1 100644
 --- a/reports/BUILD-STATE.json
 +++ b/reports/BUILD-STATE.json
@@ -745,21 +931,4 @@ index 000000000..78564e727
 +2) MORNING BAR RULE (so a late-published bar never costs a day again): at the login, if yesterday&#x27;s daily bar is not in the store, fetch it with the built top-up fetcher, run the conforming evaluator (write=True) for today&#x27;s next-open queue, then the 08:15 line reports the queue. Build + test tonight; it runs at the 06:00 login. NONE fired stays a valid no-trade day.
 +3) Then keep going down the NOW list per NB26 (no stop between items). Deliverables site, UI-1 and the swap stay frozen — do not start them even if they are next; skip and list.
 +Report &quot;NB27&quot;: verifier verdict + marker path, morning rule built y/n; end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
-</pre></div><div class='c'><div class='h'><b>3d7181dff</b> · 2026-09-23 20:08</div><div>NB25 continue: item-4 mechanism proven (harness ran on Tue); auto-advance stopping point — remaining gates are external/separate-session (verify, Kite bar, market-day capture)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 0100667cd..edbf4015e 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;NB25 2026-09-23 19:50 IST: token valid; ran the built Kite top-up + a forced re-fetch of the live-pattern tokens. Wednesday 2026-09-23&#x27;s bar did NOT land — a forced clean re-fetch from Kite (4h post-close) returns only through 2026-09-22, i.e. Kite&#x27;s same-day historical is not yet published (data lag, not a fetcher bug).&quot;,
-- &quot;item&quot;: &quot;BAR landed = NO (Kite lag). Chain LINKS proven on Tuesday 2026-09-22 (reports/DRY-RUN-2026-09-23.log): evaluator -&gt; six checks -&gt; 2 QUEUE (AUBANK vwap, ETERNAL rsi); order gate FLAG PRESENT -&gt; HELD (order_ok=False, R-HOLD-AND-FIX); flag-absent projection (two-key open) -&gt; would PLACE. Evening pre-check (item 62) built + tested.&quot;,
-- &quot;tests&quot;: &quot;evening_precheck --demo green; prior modules green. No heavy suite (RAM ~1.7-2.2 GB after the owner freed the box).&quot;,
-- &quot;next&quot;: &quot;item-4 FULL-CHAIN REPLAY HARNESS (item 63) is NOT built (twin_run.real_live_loop=NotImplementedError; night_dry_run is restart-safety only). No formal PASS marker without it + an independent verifier (separate session). Wednesday&#x27;s bar lands after Kite publishes (overnight); then the evaluator can produce a fresh Thursday queue.&quot;,
-- &quot;flag&quot;: &quot;R-HOLD-AND-FIX flag PLACED -&gt; HELD -&gt; no-trade Thursday (safe, NB19-R #1). No PASS marker (correct: no independent verify). Single clean thin stack up (token_ping/watchdog/site_loop/supervisor @ 19:30, new code). Startup VBS deleted. 06:00 🙋 = lift ONLY if a PASS marker exists (none), then tap login.&quot;
-+ &quot;ruling&quot;: &quot;NB25 continue 2026-09-23 20:07 IST: item-4 replay harness (scripts/chain_dry_run.py) BUILT + tested + RAN on Tue 2026-09-22 — mechanism proven end-to-end (evaluator -&gt; six checks -&gt; 2 QUEUE AUBANK/ETERNAL; flag present -&gt; HELD, flag absent -&gt; PLACED; reports/CHAIN-DRY-RUN.log). Evening pre-check (item 62) built.&quot;,
-+ &quot;item&quot;: &quot;All builder-side core-chain pieces are now built + tested: 58 recorder keep-alive, 44 auto-continue, 61 thin start (+kite_login arming), 53 08:15 line, HELD LOG, CLOSE-DONE, BOOKS, HEADER, 🚩, 62 evening pre-check, 63 replay harness. Single clean thin stack up on the new code.&quot;,
-+ &quot;tests&quot;: &quot;chain_dry_run + evening_precheck --demos green; module tests green. No heavy suite.&quot;,
-+ &quot;next&quot;: &quot;AUTO-ADVANCE has no more NOW/core-chain item I can build tonight. The three remaining gates are external / separate-session: (1) an INDEPENDENT verifier session rules PASS on the dry-run log -&gt; writes the PASS marker (a run never self-verifies); (2) Wednesday&#x27;s daily bar lands after Kite&#x27;s overnight publish -&gt; a fresh Thursday queue; (3) a real market-day capture (recorders alive through a close) -&gt; the LIVE full-chain proof. UI-1 stays gated behind item-4 PASS.&quot;,
-+ &quot;flag&quot;: &quot;R-HOLD-AND-FIX flag PLACED -&gt; HELD -&gt; no-trade Thursday (safe). No PASS marker (no independent verify). 06:00 🙋 = lift ONLY if a PASS marker exists (none), then tap login. Startup VBS deleted; stack clean + single.&quot;
- }
 </pre></div></main></body></html>
