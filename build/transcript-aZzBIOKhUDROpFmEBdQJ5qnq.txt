@@ -1,40 +1,3 @@
-tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\NEXT-PASTE.md has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Committing NEXT-PASTE, then building the remaining NOW items (54 catalogue line, 51 pre-commit guard, 49 resume-card writer):
-tool_use Bash {"command": "git add docs/NEXT-PASTE.md && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB15: NEXT-PASTE \u2014 tonight's ordered block (wire-ins->restart->proofs->arm 46->UI list->swap), NOW items, universe_full built\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && echo \"=== ENGINE_CATALOGUE location ===\" && find . -path ./.git -prune -o -iname \"*ENGINE_CATALOGUE*\" -print 2>/dev/null | head", "description": "Commit NEXT-PASTE and locate ENGINE_CATALOGUE"}
-tool_result: warning: in the working copy of 'docs/NEXT-PASTE.md', LF will be replaced by CRLF the next time Git touches it
-66f25753e
-=== ENGINE_CATALOGUE location ===
-./docs/ENGINE_CATALOGUE.md
-tool_use Bash {"command": "head -30 docs/ENGINE_CATALOGUE.md", "description": "Read ENGINE_CATALOGUE header"}
-tool_result: # ENGINE CATALOGUE
-
-_Append-only. New entries are added at the bottom with a date; nothing above a date is rewritten.
-Chapter 7 of the project book (`scripts/build_project_book.py` includes this file verbatim). Paper only,
-RECORD-ONLY — no engine here places a real-money order._
-
-Each engine is one page: **what it hunts · why it would earn · data · locks · account · what it sends the
-owner · state today.** "State today" is the honest state on the disk, not the plan.
-
----
-
-## 2026-09-21 — the catalogue as it stands (R-DAY1-BUNDLE A9)
-
-### E1 — price, same-stock (the one live engine)
-- **What it hunts:** certified same-stock directional patterns (a metric in an extreme band → the next
-  20-day move is bigger/smaller than usual), each with a walk-forward Wilson lower-bound hit-rate.
-- **Why it would earn:** at the 20-day horizon the required-move rule clears cost on the mid fill —
-  +15.45R at limit-at-mid, +1.88R crossing the spread (937 calls, 69.1% win). The edge is essentially the
-  spread saved by resting at the mid; the live paper book is measuring whether those mid fills are real.
-- **Data:** the frozen 210-name universe, daily bars + read-only Kite quote/depth at fire time.
-- **Locks:** the full fail-closed stack — R-HOLD-AND-FIX hard hold, the two-key gate, the per-stock moment
-  light (its own measured spread ceiling, A1), the 20-position cap, the daily-loss book guard, the circuit
-  breaker, the kill switch. Any one shut = no order.
-- **Account:** its own persistent ₹2,00,000 paper account (1R = ₹1,000), run twice — a FLAT reference book
-  and an ADAPTIVE book — on the same fires.
-- **Sends the owner:** one fire card at fire time ([E1], PLACED/HELD), a close card on exit, the 30-min
-  portfolio card (change-gated), the recorders line on login.
-- **State today:** LIVE paper — **HELD** (R-HOLD-AND-FIX flag present; two-key gate open). Records the
-  would-be book; places nothing until the owner deletes the hold flag.
 assistant: The catalogue already carries per-engine "Data:" lines. Adding the standing rule (item 54) that makes it an arming gate:
 tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\ENGINE_CATALOGUE.md", "old_string": "Each engine is one page: **what it hunts \u00b7 why it would earn \u00b7 data \u00b7 locks \u00b7 account \u00b7 what it sends the\nowner \u00b7 state today.** \"State today\" is the honest state on the disk, not the plan.", "new_string": "Each engine is one page: **what it hunts \u00b7 why it would earn \u00b7 data \u00b7 locks \u00b7 account \u00b7 what it sends the\nowner \u00b7 state today.** \"State today\" is the honest state on the disk, not the plan.\n\n**ARMING RULE \u2014 data its gates need (NB15 item 54, 2026-09-23).** No engine is armed until its **Data** line\nnames, for every gate it reads, the **on-disk store** that gate is computed from (\u00a713 four-part standard:\nmetric \u00b7 on-disk data source \u00b7 numeric threshold \u00b7 action). The pre-open check (MASTER-CHECKLIST item 53)\nposts **NOT READY** at 08:15 if any armed engine's instrument has no recorded data \u2014 so a \"Data\" line that\nnames a store which does not yet hold that instrument's data keeps the engine unarmed. This is the same field\nthe ruling template now requires (field 9); an engine and the ruling that arms it must agree."}
 tool_result: The file [redacted]\Desktop\trading-engines-v2\docs\ENGINE_CATALOGUE.md has been updated successfully. (file state is current in your context — no need to Read it back)
@@ -3312,3 +3275,39 @@ stack is single and RAM is above the floor — the heavy steps stay held, correc
 ```
 
 Done - see block above.
+queue-operation: DISPATCH ID: NB24 — OWNER YES: BUILDER RESTARTS THE STACK TONIGHT (23 Sep 2026, 18:29 IST) → BUILD
+READ: NB23 post-"restarted" report (doubled stack: old set from 01:22 + new set from 18:22, free RAM 0.37 GB,
+STOP_E1_STACK.bat kill pattern matches both sets, START_E1_STACK.bat is the only starter). ASSUMING: nothing.
+ORIGIN: OWNER-SAID — the owner replied "YES" at 18:29 IST to the lead's plain-words line: "let the builder do the
+stop-and-start itself tonight". This is a ONE-TIME exception to §14.10 (a session never restarts the stack),
+valid for tonight 23 Sep only, expiring at the 06:00 login; record it verbatim in CLAUDE.md's exceptions log.
+DO, in order, market closed:
+ 1) Run Desktop\E1-DESK\STOP_E1_STACK.bat and WAIT for it to finish; verify by process list that no scripts/
+    engine1_rebuild/book20 pythonw remains (the two windows-mcp "serve" helpers may stay). If anything survives,
+    kill it by PID (kill-by-pid-only rule) and cite the PID.
+ 2) Run Desktop\E1-DESK\START_E1_STACK.bat ONCE. Verify a single clean stack: token_ping · watchdog · site_loop ·
+    supervisor, one each, all started after 18:29, on the new code; measured free RAM after (cite).
+ 3) The R-HOLD-AND-FIX flag STAYS placed. No orders tonight.
+ 4) Then continue NB23's queue: confirm thin recorder set → EVENING RUN (write=True → Thursday's queue; NONE fired
+    is valid) → item-4 full-chain dry-run + independent verify → the 06:00 🙋 = "lift the flag ONLY if the PASS
+    marker exists, then tap the login".
+If step 1 or 2 fails for a cited reason, stop, leave everything as is, post ONE 🙋 with the exact owner clicks
+for 06:00. Report "NB24"; end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: <question>.
+user: DISPATCH ID: NB24 — OWNER YES: BUILDER RESTARTS THE STACK TONIGHT (23 Sep 2026, 18:29 IST) → BUILD
+READ: NB23 post-"restarted" report (doubled stack: old set from 01:22 + new set from 18:22, free RAM 0.37 GB,
+STOP_E1_STACK.bat kill pattern matches both sets, START_E1_STACK.bat is the only starter). ASSUMING: nothing.
+ORIGIN: OWNER-SAID — the owner replied "YES" at 18:29 IST to the lead's plain-words line: "let the builder do the
+stop-and-start itself tonight". This is a ONE-TIME exception to §14.10 (a session never restarts the stack),
+valid for tonight 23 Sep only, expiring at the 06:00 login; record it verbatim in CLAUDE.md's exceptions log.
+DO, in order, market closed:
+ 1) Run Desktop\E1-DESK\STOP_E1_STACK.bat and WAIT for it to finish; verify by process list that no scripts/
+    engine1_rebuild/book20 pythonw remains (the two windows-mcp "serve" helpers may stay). If anything survives,
+    kill it by PID (kill-by-pid-only rule) and cite the PID.
+ 2) Run Desktop\E1-DESK\START_E1_STACK.bat ONCE. Verify a single clean stack: token_ping · watchdog · site_loop ·
+    supervisor, one each, all started after 18:29, on the new code; measured free RAM after (cite).
+ 3) The R-HOLD-AND-FIX flag STAYS placed. No orders tonight.
+ 4) Then continue NB23's queue: confirm thin recorder set → EVENING RUN (write=True → Thursday's queue; NONE fired
+    is valid) → item-4 full-chain dry-run + independent verify → the 06:00 🙋 = "lift the flag ONLY if the PASS
+    marker exists, then tap the login".
+If step 1 or 2 fails for a cited reason, stop, leave everything as is, post ONE 🙋 with the exact owner clicks
+for 06:00. Report "NB24"; end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: <question>.
