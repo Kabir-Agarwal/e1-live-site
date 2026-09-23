@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 00:48 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 01:08 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
 
 _Measured this run, no model called. The Opus rule-extraction is GATED until the owner has seen these numbers (the whole library is NOT read yet)._
 
@@ -177,6 +177,43 @@ Read-only. No file modified, staged, or committed. HEAD unchanged at `972650ae6`
 Every claim in the step carries a running-evidence or cited-code line, and no run contradicts the claim → **PASS**.
 
 `VERIFY PASS R-EXAM-CONFORM-step1 a905edd32`
+</pre><h3>verify-52b26efee.md</h3><pre># verify-52b26efee
+
+VERDICT: PASS
+
+- rung: (a) Codex CLI (ChatGPT sign-in)
+- claimed step: NB31 five status-line wires
+
+## evidence
+
+pre-run FULL suite (run ALONE under the RAM gate) sha256=f712c33c35eb4d5f554dabb9843565a160012d16222ae24f7ee6e66bb20c36e3: status=green, 399 passed, 0 failed, min_free=None GB, peak_used=None GB
+
+I&#x27;ll run the targeted checks as instructed, plus verify the sha256 and read the guiding docs.
+Targeted checks pass and the sha256 matches. The claimed step is &quot;NB31 five status-line wires&quot; and the ruling&#x27;s own acceptance is `tests/test_wiring_live.py` 9/9 GREEN — I&#x27;ll run that (read-only) to get running-evidence for the actual claim, plus confirm the wired scripts exist.
+Wiring test is GREEN (13 passed — grew past the ruling&#x27;s 9). Let me confirm the test genuinely covers the five NB31 wires (not vacuous) before I sign off.
+VERDICT: PASS
+
+All targeted checks ran read-only under the specified Python 3.10 interpreter; no file was modified, staged, or committed.
+
+**Claimed step:** NB31 five status-line wires (ruling: evening_precheck + close_done in `scripts/run_evening.py`; `preopen_line` in `scripts/day_report.py`; `held_log` in `scripts/build_journal.py`; lead_mistakes flag poster in `scripts/verifier.py`; wiring ledger `tests/test_wiring_live.py` GREEN).
+
+Evidence (each claim, command run + output line):
+
+1. **Targeted check 1 — conform module** — `python -B -m engine1_rebuild.conform`
+   → `conform demo OK: 5 live patterns; decisions reuse evening._fire_today + LB.checklist`
+
+2. **Targeted check 2 — conform tests** — `python -B -m pytest tests/test_conform.py -q -p no:cacheprovider`
+   → `3 passed in 10.17s`
+
+3. **Ruling acceptance — wiring ledger GREEN** — `python -B -m pytest tests/test_wiring_live.py -q -p no:cacheprovider`
+   → `13 passed in 0.07s`. Non-vacuous and covers all five NB31 wires directly: `test_evening_precheck_wired` and `test_close_done_wired` (both assert the strings in `scripts/run_evening.py`), `test_preopen_0815_wired` (`preopen_line` in `scripts/day_report.py`), `test_held_log_wired_into_build_room` (`held_log` in `scripts/build_journal.py`), `test_flag_poster_wired_into_verifier` (`lead_mistakes` in `scripts/verifier.py`). Ruling named 9/9; the ledger has grown to 13/13 — a superset, not a regression.
+
+4. **Full-suite hash-check (authoritative pre-run, run ALONE under RAM gate)** — `sha256sum reports/CONFORM-SUITE-RESULT.json`
+   → `f712c33c35eb4d5f554dabb9843565a160012d16222ae24f7ee6e66bb20c36e3` — **matches** the handed PRE-RUN SUITE sha256 exactly. File on disk reports `status=green, 399 passed, 0 failed, commit 52b26efee`. Not re-run (per instruction).
+
+**Noted transparently (does not block PASS):** the handed commit diff `52b26efee` touches only `reports/BUILD-STATE.json` (a bookkeeping/state commit, message &quot;NB34 state: measured reopen floor&quot;) — it is not itself the commit that landed the five wires. The five NB31 wires are nonetheless present on disk and proven GREEN by the wiring ledger and the conform checks above, so the claimed step&#x27;s work is real and verified with running evidence.
+
+Telegram line: `VERIFY PASS NB31 five status-line wires 52b26efee`
 </pre><h3>v2-diff-2026-09-23.md</h3><pre># v2 design-vs-page diff (NB8 item 2 / NB9 item 2 / item 26 prep) — 2026-09-23
 
 _A difference = a leftover {{placeholder}}, a render token the gate rejects, a page whose mapped store record is not shown, a BROKEN link/tab/selector (does not resolve), or an UNREACHABLE page (nothing links to it — you cannot click to it). NB9: the content-only diff missed the last two; they are now checked. No swap performed._
