@@ -1,4 +1,154 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>e9aafffac</b> · 2026-09-23 22:55</div><div>NB31 state: five status lines LIVE (wiring ledger 9/9) + independent verify PASS on ad3ce9caf; full suite alone 384 passed / 3 pre-existing unrelated reds flagged for the owner; checklist 53/59/60/62 done; CONTEXT + NEXT-PASTE synced</div><div class='sub h'>CONTEXT.md               | 41 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  8 ++++----</div><div class='sub h'>docs/NEXT-PASTE.md       |  7 +++++++</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/CONTEXT.md b/CONTEXT.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>883a671f9</b> · 2026-09-23 23:34</div><div>NB32 item2: wire the PreCompact resume-card hook (.claude/settings.json runs scripts/resume_card.py before every compaction) + wiring test RED-&gt;GREEN; proven via the hook&#x27;s own dry-run, card timestamp 2026-09-23 23:33:49</div><div class='sub h'>.claude/settings.json     | 11 +++++++++++</div><div class='sub h'>tests/test_wiring_live.py |  9 +++++++++</div><pre>diff --git a/.claude/settings.json b/.claude/settings.json
+index 784cd66a6..2f148ebe9 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -47,6 +47,17 @@
+           }
+         ]
+       }
++    ],
++    &quot;PreCompact&quot;: [
++      {
++        &quot;hooks&quot;: [
++          {
++            &quot;type&quot;: &quot;command&quot;,
++            &quot;command&quot;: &quot;python \&quot;[redacted]\\Desktop\\trading-engines-v2\\scripts\\resume_card.py\&quot;&quot;,
++            &quot;timeout&quot;: 15
++          }
++        ]
++      }
+     ]
+   }
+ }
+diff --git a/tests/test_wiring_live.py b/tests/test_wiring_live.py
+index d1ee5458a..47b5e593e 100644
+--- a/tests/test_wiring_live.py
++++ b/tests/test_wiring_live.py
+@@ -53,3 +53,12 @@ def test_close_done_wired():
+ def test_flag_poster_wired_into_verifier():
+     assert &quot;lead_mistakes&quot; in _src(&quot;scripts/verifier.py&quot;), \
+         &quot;RED: the 🚩 poster (lead_mistakes append on verifier FAIL) not wired into the verifier&quot;
++
++
++def test_precompact_resume_card_wired():
++    import json
++    s = json.loads(_src(&quot;.claude/settings.json&quot;))
++    groups = s.get(&quot;hooks&quot;, {}).get(&quot;PreCompact&quot;, [])
++    cmds = [h.get(&quot;command&quot;, &quot;&quot;) for grp in groups for h in grp.get(&quot;hooks&quot;, [])]
++    assert any(&quot;resume_card&quot; in c for c in cmds), \
++        &quot;RED: no PreCompact hook runs scripts/resume_card.py (docs/RESUME-CARD.md never written before compaction)&quot;
+</pre></div><div class='c'><div class='h'><b>760e1fe26</b> · 2026-09-23 23:32</div><div>NB32 item1: fix the 3 stale reds at the cause — isolate cost_ledger&#x27;s persistent week-slot (self-poisoning), retarget the diaries test to site_v2&#x27;s own diary pages in a temp dir (R-V2-PAGE-OWNERS moved data/engines to v8_site), update the How-nav test to R-V2-PAGE-OWNERS item 1 (Deliverables stays, rewritten lowercase); archive NB32</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-32.md | 22 ++++++++++++++++++++++</div><div class='sub h'>scripts/cost_ledger.py                        |  4 ++++</div><div class='sub h'>tests/test_cost_ledger.py                     |  5 ++++-</div><div class='sub h'>tests/test_diaries.py                         | 26 +++++++++++++++++++-------</div><div class='sub h'>tests/test_v8_site.py                         |  5 ++++-</div><pre>diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-32.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-32.md
+new file mode 100644
+index 000000000..8f09de2e0
+--- /dev/null
++++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-32.md
+@@ -0,0 +1,22 @@
++# NIGHT BUNDLE 32 (ID:NB32) — dispatch archived verbatim (2026-09-23)
++
++**Origin tag (per §5):** LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight.
++
++DISPATCH ID: NB32 — NIGHT PLUMBING, TEST-FIRST (23 Sep 2026, ~22:50 IST) → BUILD
++READ: NB31 report (5 status lines LIVE, verify PASS on ad3ce9caf, suite 384 pass / 3 fail: cost_ledger weekly-post,
++diaries + v8_site page tests; RESUME-CARD absent = PreCompact hook not wired; auto-continue built, never proven).
++ORIGIN: LEAD ruling within remit. Order path, login flow, kite_login.py: DO NOT TOUCH tonight. TDD (§26) on each.
++Quiet-box route (NB24, valid until the 06:00 login) only if a verify needs it; single thin stack up at the end.
++1) The 3 old failing tests: fix each properly — RED (reproduce) → fix the cause, not the assertion → GREEN.
++   If a test reads half-written generated site files, make the test read a stable snapshot. Suite must be 0 fail.
++2) PreCompact resume-card hook: wiring test RED → wire the hook (.claude/settings.json) so docs/RESUME-CARD.md is
++   written before any compaction → GREEN → prove it once (trigger a compaction in a throwaway session or the
++   hook&#x27;s own dry-run) and cite the card&#x27;s timestamp.
++3) AUTO-CONTINUE PROOF (the loop the owner keeps asking about): end this session deliberately with a NOW item
++   left; the watchdog must reopen `claude --continue` by itself and the next item must start with NOBODY typing.
++   Cite the watchdog log line and the new session&#x27;s first action. If it does not reopen within the cooldown,
++   that is a FAIL: fix the cause, retest. Post one ✅ &quot;auto-continue proven&quot; line only when proven.
++4) Verifier self-test (item 14): run the verifier against branch item14-broken-test-demo; it must return FAIL and
++   post a 🚩; cite. Then arm the verify gate so a broken commit can never be called PASS.
++5) Then keep going down the NOW list (no stop between items, §23.3) until empty or the pause window; frozen
++   items skipped and listed. Report per item; final report ends NOTHING NEEDS THE LEAD / LEAD RULING NEEDED.
+diff --git a/scripts/cost_ledger.py b/scripts/cost_ledger.py
+index aa1867130..60f795ed8 100644
+--- a/scripts/cost_ledger.py
++++ b/scripts/cost_ledger.py
+@@ -117,8 +117,12 @@ def tick():
+ 
+ 
+ def _demo():
++    import tempfile
++    global WEEK_SLOT, LOG
+     line = weekly_line()
+     assert &quot;Cost check&quot; in line and &quot;FILL-LAW-UNVERIFIED&quot; in line, line
++    d = tempfile.mkdtemp()                                       # isolate so the demo never poisons the real slot
++    WEEK_SLOT, LOG = os.path.join(d, &quot;.cost_week&quot;), os.path.join(d, &quot;COST-LEDGER.md&quot;)
+     posts = []
+     a = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)
+     b = maybe_post(post_fn=posts.append, now_week=&quot;1999-W01&quot;)   # same week -&gt; no second post
+diff --git a/tests/test_cost_ledger.py b/tests/test_cost_ledger.py
+index ed5274433..af7e82087 100644
+--- a/tests/test_cost_ledger.py
++++ b/tests/test_cost_ledger.py
+@@ -8,7 +8,10 @@ def test_weekly_line_is_badged_and_honest():
+     assert &quot;FILL-LAW-UNVERIFIED&quot; in line          # §19: a funding-relevant number always carries its badge
+ 
+ 
+-def test_posts_once_per_iso_week():
++def test_posts_once_per_iso_week(tmp_path, monkeypatch):
++    # isolate the persistent week-slot + log so the test neither reads nor poisons the real gitignored files
++    monkeypatch.setattr(cl, &quot;WEEK_SLOT&quot;, str(tmp_path / &quot;.cost_week&quot;))
++    monkeypatch.setattr(cl, &quot;LOG&quot;, str(tmp_path / &quot;COST-LEDGER.md&quot;))
+     posts = []
+     a = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
+     b = cl.maybe_post(post_fn=posts.append, now_week=&quot;1999-W02&quot;)
+diff --git a/tests/test_diaries.py b/tests/test_diaries.py
+index df59fe938..a38af3f51 100644
+--- a/tests/test_diaries.py
++++ b/tests/test_diaries.py
+@@ -19,10 +19,22 @@ def test_every_engine_rule_is_plain():
+             assert b not in rule, (rule, b)
+ 
+ 
+-def test_v2_data_and_engines_show_diaries():
+-    V2.build()
+-    for page in (&quot;data.html&quot;, &quot;engines.html&quot;):
+-        import os
+-        t = open(os.path.join(V2.V2, page), encoding=&quot;utf-8&quot;).read()
+-        # diaries are SERVER-RENDERED into the page (baked from diaries.json at build time), not client-fetched
+-        assert &quot;live diar&quot; in t.lower() and &quot;day &quot; in t.lower()
++def test_v2_diaries_render_on_their_own_pages(tmp_path, monkeypatch):
++    # R-V2-PAGE-OWNERS (2026-09-23) moved data.html/engines.html to v8_site — site_v2._write now REFUSES them,
++    # so V2.build() no longer writes those pages. The live diaries render on site_v2&#x27;s OWN diary-*.html pages
++    # instead. Render one into an isolated temp _OUT (site_v2 solely owns diary-*), so the test reads a STABLE
++    # snapshot immune to the running site_loop. Replaces the pre-ruling assertion on data/engines.
++    monkeypatch.setattr(V2, &quot;_OUT&quot;, str(tmp_path))
++    O.open_all()
++    rows = [{&quot;engine&quot;: d.get(&quot;engine&quot;), &quot;name&quot;: d.get(&quot;name&quot;), &quot;rule&quot;: d.get(&quot;rule&quot;),
++             &quot;stage&quot;: d.get(&quot;_stage&quot;), &quot;day&quot;: d.get(&quot;_day&quot;), &quot;totals&quot;: d.get(&quot;_totals&quot;)}
++            for d in D.all_diaries()]
++    assert rows, &quot;day-one diaries must open&quot;
++    V2._diary_page(rows[0])
++    import glob
++    import os
++    pages = glob.glob(os.path.join(str(tmp_path), &quot;diary-*.html&quot;))
++    assert pages, &quot;site_v2 must render a diary page it owns&quot;
++    t = open(pages[0], encoding=&quot;utf-8&quot;).read().lower()
++    # the live diary is SERVER-RENDERED, carrying its &quot;live diary — day N&quot; stage
++    assert &quot;live diar&quot; in t and &quot;day &quot; in t
+diff --git a/tests/test_v8_site.py b/tests/test_v8_site.py
+index b4e9e564d..64e235a08 100644
+--- a/tests/test_v8_site.py
++++ b/tests/test_v8_site.py
+@@ -10,7 +10,10 @@ def test_how_ports_clean_and_verbatim():
+     assert r.get(&quot;how.html&quot;) == []                       # no sample value / {{}} survives
+     html = v8_site.port(&quot;How.dc.html&quot;, {})
+     assert &quot;&lt;x-dc&gt;&quot; not in html and &quot;text/x-dc&quot; not in html and &quot;1280px&quot; in html   # wrapper gone, markup kept
+-    assert &#x27;href=&quot;Deliverables&#x27; not in html and &quot;&gt;Deliverables&lt;&quot; not in html       # deliverables off the nav
++    # R-V2-PAGE-OWNERS item 1 (supersedes R-V2-EXACT pt 4): Deliverables STAYS in the nav, rewritten to the
++    # served lowercase page; the capital .dc.html form must not survive.
++    assert &quot;&gt;Deliverables&lt;&quot; in html and &#x27;href=&quot;deliverables.html&quot;&#x27; in html
++    assert &#x27;href=&quot;Deliverables.dc.html&quot;&#x27; not in html and &#x27;href=&quot;Deliverables&#x27; not in html
+ 
+ 
+ def test_ticker_baked_sample_replaced():
+</pre></div><div class='c'><div class='h'><b>e9aafffac</b> · 2026-09-23 22:55</div><div>NB31 state: five status lines LIVE (wiring ledger 9/9) + independent verify PASS on ad3ce9caf; full suite alone 384 passed / 3 pre-existing unrelated reds flagged for the owner; checklist 53/59/60/62 done; CONTEXT + NEXT-PASTE synced</div><div class='sub h'>CONTEXT.md               | 41 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  8 ++++----</div><div class='sub h'>docs/NEXT-PASTE.md       |  7 +++++++</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/CONTEXT.md b/CONTEXT.md
 index 603b65f3f..60d6dd63a 100644
 --- a/CONTEXT.md
 +++ b/CONTEXT.md
@@ -791,74 +941,4 @@ index 247e7d80e..f83dd0b41 100644
 +_The flag is now LIFTED. The order gate is open, but every actual order at 09:15 still passes the moment light
 +(a real green two-sided quote), the six checks, the kill switch and the circuit breaker — nothing is forced. Real
 +MONEY stays closed (hold_orders / positive_audited_verdict rail, §gate) — this is the PAPER book._
-</pre></div><div class='c'><div class='h'><b>4afdf99a2</b> · 2026-09-23 20:27</div><div>NB27 state: item-4 chain dry-run PASSED (independent verifier); morning-bar built; auto-advance stopping point (launch-path wire-in batch + market-day capture + owner flag-lift remain)</div><div class='sub h'>reports/BUILD-STATE.json | 10 +++++-----</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index edbf4015e..3911c9263 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;NB25 continue 2026-09-23 20:07 IST: item-4 replay harness (scripts/chain_dry_run.py) BUILT + tested + RAN on Tue 2026-09-22 — mechanism proven end-to-end (evaluator -&gt; six checks -&gt; 2 QUEUE AUBANK/ETERNAL; flag present -&gt; HELD, flag absent -&gt; PLACED; reports/CHAIN-DRY-RUN.log). Evening pre-check (item 62) built.&quot;,
-- &quot;item&quot;: &quot;All builder-side core-chain pieces are now built + tested: 58 recorder keep-alive, 44 auto-continue, 61 thin start (+kite_login arming), 53 08:15 line, HELD LOG, CLOSE-DONE, BOOKS, HEADER, 🚩, 62 evening pre-check, 63 replay harness. Single clean thin stack up on the new code.&quot;,
-- &quot;tests&quot;: &quot;chain_dry_run + evening_precheck --demos green; module tests green. No heavy suite.&quot;,
-- &quot;next&quot;: &quot;AUTO-ADVANCE has no more NOW/core-chain item I can build tonight. The three remaining gates are external / separate-session: (1) an INDEPENDENT verifier session rules PASS on the dry-run log -&gt; writes the PASS marker (a run never self-verifies); (2) Wednesday&#x27;s daily bar lands after Kite&#x27;s overnight publish -&gt; a fresh Thursday queue; (3) a real market-day capture (recorders alive through a close) -&gt; the LIVE full-chain proof. UI-1 stays gated behind item-4 PASS.&quot;,
-- &quot;flag&quot;: &quot;R-HOLD-AND-FIX flag PLACED -&gt; HELD -&gt; no-trade Thursday (safe). No PASS marker (no independent verify). 06:00 🙋 = lift ONLY if a PASS marker exists (none), then tap login. Startup VBS deleted; stack clean + single.&quot;
-+ &quot;ruling&quot;: &quot;NB27 2026-09-23 20:26 IST: the INDEPENDENT verifier (rung d fresh Claude, the 02:29 route) ruled VERDICT: PASS on the item-4 chain dry-run (relayed, not self-judged). PASS marker written: reports/CHAIN-DRY-RUN-PASS.md. Morning-bar rule built (item 64, idempotent). NB26 rule recorded: one item at a time, same session.&quot;,
-+ &quot;item&quot;: &quot;All buildable core-chain modules built + tested AND the item-4 full-chain dry-run PASSED (the big milestone): 58 keep-alive, 44 auto-continue, 61 thin start + arming, 53 08:15 line, HELD LOG, CLOSE-DONE, BOOKS, HEADER, 🚩, 62 evening pre-check, 63 replay harness (+verifier PASS), 64 morning-bar. Single clean thin stack on the new code.&quot;,
-+ &quot;tests&quot;: &quot;morning_bar / chain_dry_run / evening_precheck --demos green; independent verifier PASS on the harness+log with file:line cites. No heavy suite.&quot;,
-+ &quot;next&quot;: &quot;AUTO-ADVANCE stopping point — no more buildable NOW module. Remaining: (1) the LAUNCH-PATH WIRE-IN batch (morning_bar into post_login, evening_precheck into the evening flow, 53/HELD/CLOSE-DONE/🚩 into the runners) via ONE batched dry-run + ONE verify (§25) — a deliberate step; (2) a real market-day capture (recorders alive through a close) + the owner&#x27;s 06:00 flag-lift -&gt; the first live paper order. UI-1, the deliverables site, and the root swap stay FROZEN.&quot;,
-+ &quot;flag&quot;: &quot;R-HOLD-AND-FIX flag PLACED; the PASS marker now EXISTS so the owner MAY lift it at the 06:00 login (owner-only, §21) — 06:00 🙋 = delete scheduler/.orders_held_R_HOLD_AND_FIX then tap the login. A green moment light at 09:15 still gates each actual order. Startup VBS deleted; stack clean+single.&quot;
- }
-</pre></div><div class='c'><div class='h'><b>f0559bf67</b> · 2026-09-23 20:26</div><div>NB27 item 64: morning_bar idempotency guard (already_queued_fn — no duplicate rows on the login wire); documented the post_login wire as a deliberate launch-path step</div><div class='sub h'>docs/MASTER-CHECKLIST.md |  2 +-</div><div class='sub h'>scripts/morning_bar.py   | 20 +++++++++++++++-----</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 6e5534a4e..d15a3d668 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -92,6 +92,6 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
- - [NOW] 59. lead-mistake ledger (NB19, OWNER-SAID) — BUILT this session: docs/LEAD-MISTAKES.md (seeded with 5 rows for 2026-09-23) + scripts/lead_mistakes.py (machine-append + count_today, tested). Appended by the builder on an uncited-name refusal (CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed; daily close line ends &quot;Lead mistakes today: N&quot;. Build-room page + the verifier/close append CALLS are the AFTER-1545 wire-in
- - [AFTER-1545] 62. evening pre-check (NB25 item 3) — BUILT: scripts/evening_precheck.py posts &quot;✅ evening — today&#x27;s bar in store, depth rows today N, RAM ok&quot; or &quot;🙋 evening — &lt;gap&gt; — send this to the lead&quot; BEFORE the evaluator runs (the stale-bar lesson: on 2026-09-23 the evaluator ran on Tuesday&#x27;s bar and re-produced expired signals). Pure/tested. Wire with the chain items
- - [AFTER-1545] 63. item-4 full-chain replay harness — BUILT + tested + RUN (NB25 continue). scripts/chain_dry_run.py: replays a fully-recorded day → 08:15 line → evaluate (six checks) → order gate → card to a dry-run log ONLY, twice; the mechanism proof is flag-present=HELD AND flag-absent=PLACED (a chain that PLACES under the flag FAILS). RAN on Tue 2026-09-22: 2 QUEUE (AUBANK,ETERNAL) → HELD with the flag, PLACED without → mechanism ok=True (reports/CHAIN-DRY-RUN.log). → **INDEPENDENT VERIFIER PASS (NB27, 2026-09-23 20:20)**: a separate fresh Claude (rung d, the 02:29 route via supervisor._invoke_claude) ruled VERDICT: PASS on the harness + reports/CHAIN-DRY-RUN.log with file:line cites (relayed, not self-judged). PASS marker written: reports/CHAIN-DRY-RUN-PASS.md. Item-4 dry-run DONE. The 06:00 🙋 becomes &quot;lift the flag (owner deletes scheduler/.orders_held_R_HOLD_AND_FIX), then tap the login&quot; — the flag-lift is the owner&#x27;s hand (§21)
--- [AFTER-1545] 64. morning-bar rule (NB27 item 2) — BUILT: scripts/morning_bar.py — at the 06:00 login, if yesterday&#x27;s daily bar is not in the store, run the built top-up fetcher (Kite has published it overnight), then the conforming evaluator (write=True) for today&#x27;s next-open queue; the 08:15 line reports it (NONE fired = valid no-trade day). Pure/tested. Runs at login (launch-path wire). Fixes the late-published-bar-costs-a-day gap
-+- [AFTER-1545] 64. morning-bar rule (NB27 item 2) — BUILT: scripts/morning_bar.py — at the 06:00 login, if yesterday&#x27;s daily bar is not in the store, run the built top-up fetcher (Kite has published it overnight), then the conforming evaluator (write=True) for today&#x27;s next-open queue; the 08:15 line reports it (NONE fired = valid no-trade day). Pure/tested + IDEMPOTENT (already_queued_fn → skips if the evening already produced today&#x27;s queue, so the login wire never duplicates rows). WIRE (deliberate launch-path step, not rushed into the login flow tonight): in kite_login.post_login after the top-up, an isolated try/except calls morning_bar.run(TODAY_ISO, CAL.previous_session(TODAY), store_latest_fn, topup_fn, lambda a: conform.queue_orders(asof=a, write=True)[&quot;decisions&quot;], already_queued_fn=&lt;ledger has queued rows for today&gt;) then notify(r[&quot;line&quot;]). Fixes the late-published-bar-costs-a-day gap
- - [AFTER-1545] 61. E1-only thin start (NB22-B) — BUILT: launch_e1 starts ONLY the Price Engine chain until one clean paper trade is on record (reports/CLEAN-TRADE-ON-RECORD). ON = watchdog · login ask (token_ping) · evening scan (run_evening) · site publisher · depth recorder (E13, the only lane the six checks read — conform.py:132) [+ book20_runner via login]. OFF = portfolio_card · calendar_daily · chain recorder (E4) · NSE/BSE (E12) · positioning (E14) · all heavy. plan()/e1_only() tested (--demo). Free RAM measured 0.36 GB before — this is the fix. LIVE via dry-run + restart (RAM measured after on the next start)
- - [AFTER-1545] 60. 🚩 lead-mistake signal (NB21) — BUILT non-launch (scripts/lead_mistakes.py: flag_line, is_read_only guard, backfill_lines, append(notify_fn=), tested; docs/FLAG-BACKFILL-2026-09-23.md ready). WIRE-IN (launch-path, tonight&#x27;s dry-run): pass notify.notify as append&#x27;s notify_fn so every mistake posts one read-only 🚩 line; the notify guard rejects an action-carrying 🚩; close line ends &quot;🚩 today: N&quot;, 08:15 line carries &quot;🚩 yesterday: N&quot;; post the 7 backfill lines
-diff --git a/scripts/morning_bar.py b/scripts/morning_bar.py
-index d754572b9..1302b131a 100644
---- a/scripts/morning_bar.py
-+++ b/scripts/morning_bar.py
-@@ -16,13 +16,18 @@ tested without Kite, the store, or the evaluator. It RUNS at the 06:00 login (la
- from __future__ import annotations
- 
- 
--def run(today, prev_trading_day, store_latest_fn, topup_fn, evaluate_fn):
-+def run(today, prev_trading_day, store_latest_fn, topup_fn, evaluate_fn, already_queued_fn=None):
-     &quot;&quot;&quot;Ensure prev&#x27;s bar is in the store (top up if not), then evaluate prev&#x27;s close for today&#x27;s next-open queue.
-     Returns a dict describing what happened. All side-effecting deps are injected.
--      store_latest_fn() -&gt; &#x27;YYYY-MM-DD&#x27; latest bar date in the store (or &#x27;&#x27; if none)
--      topup_fn()        -&gt; fetch the missing bar (the built Kite top-up); returns anything
--      evaluate_fn(asof) -&gt; the conforming evaluator (write=True), returns the decisions list
-+      store_latest_fn()     -&gt; &#x27;YYYY-MM-DD&#x27; latest bar date in the store (or &#x27;&#x27; if none)
-+      topup_fn()            -&gt; fetch the missing bar (the built Kite top-up); returns anything
-+      evaluate_fn(asof)     -&gt; the conforming evaluator (write=True), returns the decisions list
-+      already_queued_fn()   -&gt; True if today&#x27;s queue already exists (evening produced it) — then SKIP (idempotent,
-+                               so the login wire never duplicates rows the evening already wrote)
-     &quot;&quot;&quot;
-+    if already_queued_fn is not None and already_queued_fn():
-+        return {&quot;topped_up&quot;: False, &quot;bar_present&quot;: True, &quot;queued&quot;: None, &quot;held&quot;: None, &quot;decisions&quot;: [],
-+                &quot;line&quot;: &quot;✅ morning — queue already loaded for %s (evening ran); nothing to catch up&quot; % today}
-     latest = str(store_latest_fn() or &quot;&quot;)
-     topped_up = False
-     if latest &lt; prev_trading_day:                 # prev&#x27;s bar not in the store yet -&gt; fetch it (Kite has it now)
-@@ -58,7 +63,12 @@ def _demo():
-     # case C: top-up fails to land it (Kite still hasn&#x27;t published) -&gt; no-trade day, 🙋
-     r = run(&quot;2026-09-24&quot;, &quot;2026-09-23&quot;, store_latest_fn=lambda: &quot;2026-09-22&quot;, topup_fn=lambda: None, evaluate_fn=lambda a: [])
-     assert r[&quot;bar_present&quot;] is False and r[&quot;queued&quot;] == 0 and r[&quot;line&quot;].startswith(&quot;🙋 morning —&quot;) and &quot;send this to the lead&quot; in r[&quot;line&quot;], r
--    print(&quot;morning_bar demo OK: bar present -&gt; evaluate; missing -&gt; top-up then evaluate; still missing -&gt; 🙋 no-trade.&quot;)
-+    # case D: today&#x27;s queue already exists (evening ran) -&gt; idempotent skip, no re-evaluate/duplicate
-+    seen = {&quot;eval&quot;: 0}
-+    r = run(&quot;2026-09-24&quot;, &quot;2026-09-23&quot;, store_latest_fn=lambda: &quot;2026-09-23&quot;, topup_fn=lambda: None,
-+            evaluate_fn=lambda a: seen.__setitem__(&quot;eval&quot;, seen[&quot;eval&quot;] + 1) or [], already_queued_fn=lambda: True)
-+    assert seen[&quot;eval&quot;] == 0 and &quot;already loaded&quot; in r[&quot;line&quot;], r
-+    print(&quot;morning_bar demo OK: bar present -&gt; evaluate; missing -&gt; top-up; still missing -&gt; 🙋; already-queued -&gt; skip.&quot;)
- 
- 
- if __name__ == &quot;__main__&quot;:
 </pre></div></main></body></html>
