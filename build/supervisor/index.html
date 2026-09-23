@@ -1,5 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 21:09 checked 21:09 — on course
-2026-09-22 21:11 checked 21:11 — on course
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-22 21:11 checked 21:11 — on course
 2026-09-22 21:14 checked 21:14 — on course
 2026-09-22 21:17 checked 21:17 — on course
 2026-09-22 21:21 checked 21:21 — on course
@@ -117,18 +116,24 @@
 2026-09-24 00:07 checked 00:07 — on course
 2026-09-24 00:10 checked 00:10 — on course
 2026-09-24 00:26 checked 00:26 — on course
-2026-09-24 00:32 checked 00:32 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the ruling in force (NB32/NB33), the build journal, the transcript since the last check, commit 3df548a96 and its diff, the archived dispatches, and STATUS.json. Checking against the seven items:
+2026-09-24 00:32 checked 00:32 — on course
+2026-09-24 00:34 checked 00:34 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the NB33 work since the last check against the six checks.
 
-0. **Provenance** — Item 4's arming and the "delegate arming to the builder" call trace to NB33, which is archived at `docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md`. Owner scope, not run-authored.
-1. **Scope** — The SessionEnd hook is a bug-fix to the already-authorized §14.1/§23.3 auto-continue single-instance guard (the marker was staying "fresh" 4h and blocking reopen), not new scope. Arming, ledger cleanup, and doc syncs all sit under NB33.
-2. **No self-audit** — Arming is an action, not a self-grade; the cited FAIL proof came from the real verifier catching a deliberately-broken commit, not the builder grading its own build.
-3. **No typed numbers** — The hook and test carry no naked constants.
-4. **Demos inert** — The new test uses `tmp_path`; in this window the builder *removed* the spurious synthetic self-test row from the real ledger and fixed the trailing-newline root cause. No live ledger write or Telegram send occurred here.
-5. **Trading-path** — Order path / login / kite_login untouched (confirmed by ruling and diff). No live order placed (0 written today, not logged in).
-6. **No secrets** — Changes touch source/hook/test/doc/ledger, not any published `site/` page; no keys or tokens.
-7. **Ordering** — No pending next-before-X item; item 4 was the blocked one, now unblocked by NB33.
+**0. Provenance** — NB33 is archived (`docs/dispatches/2026-09-24_NIGHT-BUNDLE-33.md`), and item 14 (verifier self-test + arm) is an owner-checklist item. Arming is cited to the owner's 23-Sep-16:25 delegation. These are owner scope, not run-authored.
 
-The builder also honestly records that armed master (0702fba03) still needs a fresh hash-matched GREEN verify before it can be called PASS — fail-closed, consistent with the new rule.
+**1. Scope** — The changes (verifier hash-check rule, item-4 self-test redesign, SessionEnd guard-clear hook, arming the gate, doc syncs) all trace to NB33 / the master checklist / the standing delegation. No self-invented scope.
+
+**2. No self-audit** — The builder did **not** grade its own work as PASS. It explicitly leaves master **fail-closed "unverified"** pending a fresh independent green verify, and removed the stale branch-red suite result so nothing false backs a master PASS. Correct posture.
+
+**3. No typed numbers** — RAM figures (2.0 floor, 1.9/0.6 measured) are cited to code constants (`session_resurrect._ram_ok` / `memory_guard.HEAVY_START_GB`) or measured; test counts (394/1) are observed. No naked trading constant; order path untouched.
+
+**4. Demos inert** — The self-test's 🚩 landed in `docs/LEAD-MISTAKES.md` (the *mistakes* doc, not a trade/live-money ledger) and was promptly removed as synthetic; the 🚩 is read-only by design. No trade ledger written, no order card sent. Within bounds.
+
+**5. Trading-path** — `kite_login.py` / login / order path untouched (stated and consistent with the diffs, which touch only `reports/BUILD-STATE.json`, `CONTEXT.md`, `docs/*`). No live order call.
+
+**6. No secrets** — Diffs and STATUS.json carry no key, token, Telegram id, or published-page absolute path. `E1-DESK\VERIFIER-ARMED` is a marker path in a repo doc, not a secret.
+
+**7. Ordering** — No next-before-X item was jumped; master-PASS is correctly gated behind the now-armed verifier. Ending the session with item 54 still NOW is the deliberate reopen-proof, permitted under NB33.
 
 No breach of the six checks.
 
