@@ -1,4 +1,63 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>0947a82a2</b> · 2026-09-23 18:09</div><div>NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged</div><div class='sub h'>docs/LEAD-MISTAKES.md            |  1 +</div><div class='sub h'>scripts/kite_login.py            |  2 +-</div><div class='sub h'>scripts/launch_e1.py             | 12 +++++++++++-</div><div class='sub h'>scripts/watchdog.py              |  2 +-</div><div class='sub h'>tests/test_watchdog_recorders.py |  3 ++-</div><pre>diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>6c607ce1b</b> · 2026-09-23 18:22</div><div>NB19 CLOSE-DONE + NB21 #2: close_done.py — &#x27;✅ close done — build session free · 🚩 today: N&#x27; (machine-read count); tested. Runtime post is the launch-path wire-in</div><div class='sub h'>scripts/close_done.py | 32 ++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/close_done.py b/scripts/close_done.py
+new file mode 100644
+index 000000000..874dc2771
+--- /dev/null
++++ b/scripts/close_done.py
+@@ -0,0 +1,32 @@
++&quot;&quot;&quot;NB19 CLOSE-DONE line (+ NB21 item 2): the line posted when the post-close jobs finish —
++  &quot;✅ close done — build session free · 🚩 today: N · lead mistakes today: N&quot;
++It retires the typed 15:45 resume: from tomorrow the owner pastes on THIS line instead of a fixed clock time.
++The 🚩/mistake count is machine-read from docs/LEAD-MISTAKES.md (scripts.lead_mistakes.count_today) — never typed.
++Pure/light (no heavy import). The runtime post (after run_evening / the close jobs finish) is the launch-path
++wire-in, LIVE via the dry-run + restart.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++
++def line(date=None, count_fn=None):
++    &quot;&quot;&quot;The close-done line. count_fn defaults to lead_mistakes.count_today (injected in tests).&quot;&quot;&quot;
++    if count_fn is None:
++        from scripts import lead_mistakes
++        count_fn = lead_mistakes.count_today
++    n = int(count_fn(date) if date is not None else count_fn())
++    return &quot;✅ close done — build session free · 🚩 today: %d · lead mistakes today: %d&quot; % (n, n)
++
++
++def _demo():
++    assert line(count_fn=lambda *_: 0) == &quot;✅ close done — build session free · 🚩 today: 0 · lead mistakes today: 0&quot;
++    r = line(date=&quot;2026-09-23&quot;, count_fn=lambda d: 8)
++    assert r.startswith(&quot;✅ close done — build session free&quot;) and &quot;🚩 today: 8&quot; in r and &quot;mistakes today: 8&quot; in r
++    print(&quot;close_done demo OK: &#x27;✅ close done — build session free&#x27; + machine-read 🚩/mistake count.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        print(line())
+</pre></div><div class='c'><div class='h'><b>aa8e160ce</b> · 2026-09-23 18:16</div><div>NB23: archive + thin-arming fix outcome (restart 🙋 posted; hold stays)</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-23.md | 15 +++++++++++++++</div><pre>diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-23.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-23.md
+new file mode 100644
+index 000000000..1fc105c82
+--- /dev/null
++++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-23.md
+@@ -0,0 +1,15 @@
++# NIGHT BUNDLE 23 (ID:NB23) — dispatch archived verbatim (2026-09-23)
++
++**Origin tag (per §5):** LEAD ruling within remit (the restart click is the owner&#x27;s, §14.10).
++
++DISPATCH ID: NB23 — RESTART TONIGHT, NOT 06:00 (23 Sep 2026, ~18:05 IST) → BUILD
++READ: NB20 continue report (free RAM 0.37 GB, heavy_ok=False; evening run + item-4 dry-run blocked; thin start item 61 built; auto-continue item 44 built; keep-alive item 58 built). ASSUMING: nothing. MISSING: nothing.
++ORIGIN: LEAD ruling within remit; the click is the owner&#x27;s (§14.10). Market is closed; owner is at the laptop now.
++RULING: bring the restart forward to NOW. Post ONE 🙋 line with the exact owner click for a full stack restart (the cited file the login/stack starter uses — cite its path; end with a sanctioned closer). The R-HOLD-AND-FIX flag stays placed through the restart (no lift tonight). After the restart: confirm the thin start is what came up (process list + measured free RAM after, from LAUNCH-RAM.log), then run the queue in this order — HELD LOG · CLOSE-DONE · EVENING RUN (write=True → Thursday&#x27;s queue; NONE fired is valid) · item-4 full-chain dry-run + the independent verify · then the 06:00 🙋 becomes: &quot;lift the flag only if PASS marker exists, then tap the login&quot;. If the restart cannot be done by the owner&#x27;s click tonight for a cited reason, say so in the 🙋 and fall back to 06:00. Report &quot;NB23&quot;; end with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
++
++## Outcome (this session)
++Found before posting: the thin start (item 61) was in launch_e1.main(), which START_E1_STACK.bat does NOT run —
++the stack arms recorders via kite_login._arm_recorder (kite_login.py:315). Fixed: routed recorder arming +
++watchdog keep-alive through launch_e1.recorder_set() (depth-only until one clean trade), so the restart actually
++brings up the thin recorder. Committed 0947a82a2. Restart 🙋 posted (STOP_E1_STACK.bat → START_E1_STACK.bat).
++Hold flag stays placed. Post-restart queue (CLOSE-DONE, EVENING RUN, dry-run+verify) runs once the owner restarts.
+</pre></div><div class='c'><div class='h'><b>0947a82a2</b> · 2026-09-23 18:09</div><div>NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged</div><div class='sub h'>docs/LEAD-MISTAKES.md            |  1 +</div><div class='sub h'>scripts/kite_login.py            |  2 +-</div><div class='sub h'>scripts/launch_e1.py             | 12 +++++++++++-</div><div class='sub h'>scripts/watchdog.py              |  2 +-</div><div class='sub h'>tests/test_watchdog_recorders.py |  3 ++-</div><pre>diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
 index 3b63b083b..9f54f5661 100644
 --- a/docs/LEAD-MISTAKES.md
 +++ b/docs/LEAD-MISTAKES.md
@@ -1018,96 +1077,4 @@ index 66019f366..cf67c5abe 100644
          &quot;passed&quot; if (s.get(&quot;audit&quot;) or {}).get(&quot;pass&quot;) else &quot;not passed&quot;))
  
  
-</pre></div><div class='c'><div class='h'><b>55992e75b</b> · 2026-09-23 16:06</div><div>NB19 BOOKS CHECK: desk audit compares STARTING capital (start_equity) not current equity — a traded book is not a failure (run_audit.py:44; cite paper_account.START_EQUITY)</div><div class='sub h'>scripts/run_audit.py | 7 +++++--</div><pre>diff --git a/scripts/run_audit.py b/scripts/run_audit.py
-index 32e8c7699..853f06abe 100644
---- a/scripts/run_audit.py
-+++ b/scripts/run_audit.py
-@@ -41,8 +41,11 @@ def _ledgers_clean():
-             if tid == &quot;BOOK20-111&quot; or tid.startswith((&quot;BOOK20-111-&quot;, &quot;ROOF-&quot;, &quot;SIM-&quot;)) \
-                     or str(r.get(&quot;stock&quot;) or r.get(&quot;instrument&quot;) or &quot;&quot;).strip() in (&quot;111&quot;, &quot;instrument 111&quot;):
-                 bad += 1
--    two_l = all(ACC.account(a)[&quot;equity&quot;] == 200000.0 for a in (&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;, &quot;E1-ADAPTIVE&quot;))
--    return (bad == 0 and two_l), &quot;synthetic rows=%d; engine books all ₹2,00,000=%s&quot; % (bad, two_l)
-+    # NB19 BOOKS CHECK: compare STARTING capital, not current equity — a traded book (e.g. −5.45R) is not a
-+    # failure; current equity legitimately drifts from ₹2,00,000 once a book trades or marks an open position.
-+    two_l = all(ACC.account(a)[&quot;start_equity&quot;] == ACC.START_EQUITY for a in (&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;, &quot;E1-ADAPTIVE&quot;))
-+    return (bad == 0 and two_l), &quot;synthetic rows=%d; engine books all start ₹%.0f=%s&quot; % (
-+        bad, ACC.START_EQUITY, two_l)
- 
- 
- def _live_set():
-</pre></div><div class='c'><div class='h'><b>575cae0f8</b> · 2026-09-23 16:04</div><div>NB20: AUTO-ADVANCE rule in CLAUDE.md 25 + checklist header; archive NB20</div><div class='sub h'>CLAUDE.md                                     | 25 +++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md                      |  5 +++++</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-20.md | 19 +++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
-index 890cffa12..bfc2e9610 100644
---- a/CLAUDE.md
-+++ b/CLAUDE.md
-@@ -858,3 +858,28 @@ end to end. So:
-    that ID. A block without them is worked cautiously and the gap is named in the report.
- 5. **NO TYPED TIMES OR NUMBERS.** Clock times come from the machine (R-CLOCK); any number is measured or cited to
-    a file:line or a log line — never typed from memory.
-+
-+## 25. AUTO-ADVANCE through the checklist (owner dispatch NB20, 2026-09-23)
-+
-+When a block finishes, the builder does **NOT stop and wait for a paste** — it opens `docs/MASTER-CHECKLIST.md`
-+and takes the next item, by this **priority order**, then checklist order within a priority:
-+
-+1. anything that serves the **core chain** (login → token → recorders → 08:15 line → six checks → order → card → ledger),
-+2. **proofs** (dry runs, verifier self-test, twin run),
-+3. **UI-1** and the separate deliverables site,
-+4. everything else.
-+
-+**Status routing:** `NOW` = do it now; `AFTER-1545` = do it after the close-done line; `NEEDS-OWNER` and
-+`PARKED-5/5` = **SKIP** and list at the end of every report with the one plain-words action the owner must take;
-+`DAYS` = skip until the measured day count says it is due.
-+
-+**Per item, no exceptions:** one item per session (write the resume card before any compaction); build → its own
-+tests → commit with **explicit paths** (never `git commit -a`); **heavy tests run ALONE**; any **launch-path**
-+change goes live only through the **nightly dry run + independent verifier** (batch the night&#x27;s launch-path items
-+into ONE dry run + ONE verify); a thing is **&quot;live&quot; only after that PASS, else &quot;built&quot;**; post one **✅ line per
-+item finished** (machine clock).
-+
-+**STOP only for:** a `LEAD RULING NEEDED` (post it, then continue with the next item that does not depend on it);
-+a **verifier FAIL** (fix that item, re-verify, never argue it away); **memory below the watchdog&#x27;s floor**; the
-+**feature freeze** (§24 — nothing new that is not on the checklist). Every 🙋 ends with one of the four sanctioned
-+actions. When **no NOW item is left**, post the ✅ checklist-empty line and stop.
-diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 322ee0134..1e409e7fb 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -4,6 +4,11 @@ _This is the single canonical list of everything from zero to five clean trading
- beat&#x27;s &quot;left&quot; count read from THIS file (`scripts/master_checklist.py`). Every dispatch report updates the
- lines it touched. `docs/NEXT-PASTE.md` lists only the items whose status is AFTER-1545 or TONIGHT._
- 
-+**AUTO-ADVANCE (NB20, CLAUDE.md §25):** when a block finishes, take the next item by priority — (1) core chain,
-+(2) proofs, (3) UI-1 + deliverables site, (4) everything else — checklist order within a priority. NOW = do now;
-+AFTER-1545 = after the close-done line; NEEDS-OWNER/PARKED = SKIP + list for the owner; DAYS = skip until due.
-+One item per session, build→test→commit (explicit paths), launch-path goes live only via the nightly dry-run+verify.
-+
- **Status keys (NB15):** `NOW` · `AFTER-1545` · `NEEDS-OWNER` · `PARKED-5/5` · `DAYS` · `DONE`. Every open item
- carries exactly one. **`NOW` = doable with the market open (docs / non-launch that cannot disturb the recorder);
- the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `left:` shows the NOW count first.
-diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-20.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-20.md
-new file mode 100644
-index 000000000..ac4e3da95
---- /dev/null
-+++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-20.md
-@@ -0,0 +1,19 @@
-+# NIGHT BUNDLE 20 (ID:NB20) — dispatch archived verbatim (2026-09-23)
-+
-+**Origin tag (per §5):** OWNER-SAID.
-+
-+DISPATCH ID: NB20 — AUTO-ADVANCE (23 Sep 2026) → BUILD
-+READ: docs/MASTER-CHECKLIST.md (58 items, 18 done per NB12–15), docs/NEXT-PASTE.md, NB19 report.
-+ASSUMING: nothing named here beyond those files.  MISSING: nothing — the file is the list.
-+ORIGIN: OWNER-SAID (owner asked that the builder move through the checklist by itself).
-+
-+STANDING RULE — AUTO-ADVANCE: from now on, when a block finishes, do NOT stop and wait for a paste. Open docs/MASTER-CHECKLIST.md and take the next item in this priority order:
-+  1) anything that serves the core chain (login → token → recorders → 08:15 line → six checks → order → card → ledger),
-+  2) proofs (dry runs, verifier self-test, twin run), 3) UI-1 and the separate deliverables site, 4) everything else.
-+Within a priority, checklist order. Status NOW = do it; AFTER-1545 = do it after the close-done line; NEEDS-OWNER and PARKED = SKIP (list them at the end of every report with the one plain-words line the owner must act on); DAYS = skip until the measured day count says it is due.
-+
-+Per item, no exceptions: one item per session (resume card before any compaction); build → its own tests → commit with explicit paths (no git commit -a); heavy tests run ALONE; any launch-path change goes live only through the nightly dry run + independent verifier (batch the night&#x27;s launch-path items into ONE dry run + ONE verify); &quot;live&quot; is claimed only after that PASS, else &quot;built&quot;; post one ✅ line per item finished (machine clock).
-+
-+STOP only for: LEAD RULING NEEDED (post it, then continue with the next item that does not depend on it); a verifier FAIL (fix that item, re-verify, never argue it away); memory below the floor the watchdog uses; the feature freeze (nothing new that is not on the checklist). Every 🙋 line ends with one of the four sanctioned actions. When no NOW item is left, post the ✅ checklist-empty line and stop.
-+
-+Add this rule to CLAUDE.md and docs/MASTER-CHECKLIST.md&#x27;s header. Report: &quot;NB20&quot;, then keep reporting per item as above; each report ends with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
 </pre></div></main></body></html>

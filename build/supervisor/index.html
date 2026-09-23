@@ -109,24 +109,17 @@
 2026-09-23 18:01 checked 18:01 — on course
 2026-09-23 18:03 checked 18:03 — on course
 2026-09-23 18:06 checked 18:06 — on course
-2026-09-23 18:13 checked 18:13 — on course</pre><h3>Last check (scrubbed)</h3><pre>Provenance check: the change is the NB23 thin-arming fix — routing recorder arming through `launch_e1.recorder_set()` so item 61's E1-only thin start (depth-only until one clean paper trade) actually takes effect on the real stack path. Item 61 / thin start traces to NB22/NB22-B (archived: NIGHT-BUNDLE-22, NIGHT-BUNDLE-23). Owner scope, not run-authored.
+2026-09-23 18:13 checked 18:13 — on course
+2026-09-23 18:17 checked 18:17 — on course
+2026-09-23 18:24 checked 18:24 — on course</pre><h3>Last check (scrubbed)</h3><pre>I'll independently verify the one commit since last check rather than trust the diff dump — including that the function it cites actually exists (§24 uncited-names).
+Independent verification confirms the build session's claims for the one commit since last check (`6c607ce1b`):
 
-Running the checks:
-
-1. **SCOPE** — The builder discovered item 61's thin start lived in `launch_e1.main()`, which `START_E1_STACK.bat` (§14.10) never runs; the real arming happens in `kite_login._arm_recorder` (kite_login.py:315) and the watchdog keep-alive. Both now call `recorder_set()`. This is a fix to the core chain, permitted under the §24 feature freeze (fixes to the chain are not "new"). Traces to NB23. ✓
-
-2. **NO SELF-AUDIT** — Builder is building, not grading its own work as an independent check. ✓
-
-3. **NO TYPED NUMBERS** — `recorder_set()` filters by the `"e13_depth"` string; no naked constants introduced. ✓
-
-4. **DEMOS INERT** — `launch_e1 --demo` and the touched tests (4 passed) ran; nothing wrote a live ledger or sent a real message. ✓
-
-5. **TRADING-PATH** — Change is to the read-only recorder arming/keep-alive, not the order path (book20_runner untouched). Nothing live was called. Direction is fail-safe: a restart now brings back the *thin* (depth-only) set, avoiding the OOM state, rather than all five. ✓
-
-6. **NO SECRETS** — LEAD-MISTAKES row and diff carry file names and line refs only; no key/token/path on a published page. ✓
-
-7. **ORDERING** — No next-before-X item was pending; this is a chain correction. ✓
-
-The builder also honestly logged the item-61 location error to `docs/LEAD-MISTAKES.md` (row appended, count 8 today) rather than quietly patching over it. Consistent with §24.3/§24.6.
+- **Provenance (§0):** `close_done.py` traces to owner dispatches NIGHT-BUNDLE-19 (CLOSE-DONE line) and NB21 #2 (🚩 count), both archived in `docs/dispatches/`. Owner scope, not run-authored.
+- **Scope:** the line reproduces the owner's "✅ close done" wording; no new scope invented.
+- **No self-audit:** builder ran a normal `--demo`, did not grade its own work as an independent check.
+- **No typed numbers:** the count is read from `lead_mistakes.count_today` (confirmed to exist at `scripts/lead_mistakes.py:81` — §24 uncited-name check passes); the `0`/`8` in the demo are injected test values.
+- **Demos inert:** demo uses an injected `count_fn` lambda; nothing wrote a live ledger or sent Telegram. `close_done` is wired into no launch path (grep found zero references outside its own file).
+- **Trading-path:** untouched; R-HOLD-AND-FIX hold stays on, 0 orders.
+- **Ordering:** builder correctly did NOT assume the restart happened (owner said "continue", not "restarted"), verified the stack is the same long-running set with 0.7 GB free, and deferred the heavy next-before items (evening run, dry-run) while doing only the restart-independent light item. No next-before-X item was jumped.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>

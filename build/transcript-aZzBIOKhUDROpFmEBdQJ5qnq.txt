@@ -37,9 +37,6 @@ resolve is: `VIOLATION | LEAD RULING NEEDED: <question>`. When in doubt and no l
 NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57
 
 ===== BUILD JOURNAL =====
-2026-09-23 03:23 | ruling NIGHT BUNDLE 2 + R-MASTER-CHECKLIST (docs / pages / bookkeeping; no launch-path files, touched-module tests only) | NIGHT BUNDLE 2 bookkeeping (item 3) + R-MASTER-CHECKLIST — Queue page and beat 'left' now read docs/MASTER-CHECKLIST.md | commit 3af11ae8e "NIGHT BUNDLE 2 item 3 + R-MASTER-CHECKLIST v2: one canonical checklist, bookkeeping" (2026-09-23 03:18) | tests touched-module tests 22/22 green (site_v2, conform, live_pattern_set, v2 tabs/render, deliverables); last full suite 330/330 @ 2026-09-23 02:03 (LAST-TESTS.json) | files touched 9 | next MASTER-CHECKLIST actionable: 15/16/17/18 TONIGHT (this run), then AFTER-1545 items after 15:45
-checked 03:26 — on course
-checked 03:37 — on course
 checked 03:42 — on course
 checked 03:47 — on course
 checked 03:49 — on course
@@ -97,196 +94,129 @@ checked 18:01 — on course
 checked 18:03 — on course
 2026-09-23 18:04 | ruling NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57 | NB12-15 done. New un-wired modules built + tested; nothing launch-path touched; commits per sub-step with explicit paths (no git commit -a) | commit c90dc2f68 "auto-advance progress: AUBANK/ETERNAL expired + item 53 done; heavy items (evening run, dry-run) deferred on the 0.37 GB memory floor" (2026-09-23 18:02) | tests each new module --demo green (universe_full, archive_rows, practice_counter, publish_event, proof_apply, session_resurrect, precommit_guard, resume_card); build_beat 6, record_store 6; no heavy suite (RAM floor) | files touched 1 | next TONIGHT in order (NB15 #3): wire-ins (7,21,27,44,45,hold-rule) -> one restart -> proofs when memory allows (twin run, verifier self-test on branch item14-broken-test-demo, confined Codex) -> arm 46 on lead's word -> owner UI list after 15:45 -> swap only after 47+48. NOW leftovers: hook wiring for 49/51, ENGINE_CATALOGUE per-engine check.
 checked 18:06 — on course
+2026-09-23 18:12 | ruling NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57 | NB12-15 done. New un-wired modules built + tested; nothing launch-path touched; commits per sub-step with explicit paths (no git commit -a) | commit 0947a82a2 "NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged" (2026-09-23 18:09) | tests each new module --demo green (universe_full, archive_rows, practice_counter, publish_event, proof_apply, session_resurrect, precommit_guard, resume_card); build_beat 6, record_store 6; no heavy suite (RAM floor) | files touched 5 | next TONIGHT in order (NB15 #3): wire-ins (7,21,27,44,45,hold-rule) -> one restart -> proofs when memory allows (twin run, verifier self-test on branch item14-broken-test-demo, confined Codex) -> arm 46 on lead's word -> owner UI list after 15:45 -> swap only after 47+48. NOW leftovers: hook wiring for 49/51, ENGINE_CATALOGUE per-engine check.
+checked 18:13 — on course
+checked 18:17 — on course
 
 ===== TRANSCRIPT SINCE LAST CHECK =====
-assistant: **Critical NB23 finding:** `START_E1_STACK.bat` (§14.10, the only stack starter) launches token_ping/watchdog/site_loop/supervisor and arms recorders via **`kite_login._arm_recorder` (kite_login.py:247)** on login — it does **not** run `launch_e1`. So item 61's thin start (built in `launch_e1`) would **not** take effect on a restart, and run_evening isn't started by the stack at all. A restart now would bring the **full** recorder set back (the OOM state). I must fix the real arming path first. Reading it:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\kite_login.py", "offset": 240, "limit": 45}
-tool_result: File does not exist. Note: your current working directory is [redacted]\Desktop\trading-engines-v2.
-tool_use Bash {"command": "find . -path ./.git -prune -o -name \"kite_login.py\" -print 2>/dev/null; echo \"=== _arm_recorder location ===\"; grep -rln \"_arm_recorder\\|def _arm_recorder\\|def post_login\" --include=*.py . 2>/dev/null | grep -v \".snapshot\" | head", "description": "Locate kite_login.py and _arm_recorder"}
-tool_result: ./.snapshot/scripts/kite_login.py
-./scripts/kite_login.py
-=== _arm_recorder location ===
-./scripts/kite_login.py
-./scripts/rehearsal_day1.py
-tool_use Bash {"command": "grep -n \"def _arm_recorder\\|def post_login\\|RECORDERS\\|record-loop\\|chain_recorder\\|xchange\\|e13_depth\\|positioning\\|for .* in\\|start\\|launch\" scripts/kite_login.py | head -30", "description": "Inspect kite_login._arm_recorder"}
-tool_result: 4:`data_acquisition.kite.exchange_token`, which writes the gitignored token file and NEVER prints,
-107:    for attempt in (1, 2):
-143:    start = datetime.fromisoformat(SINCE).date()
-146:    a = start
-152:    for tok in ds.frozen_tokens():
-153:        for frm, to in chunks:
-167:    for tok in ds.frozen_tokens():
-170:        slices = [s for s in glob.glob(os.path.join(kite.HISTORY_DIR, f"{tok}_minute_*.json"))
-175:        for sp in slices:
-229:    rc = token_gate.run(port=GATE_PORT, open_browser=False)   # tested: gate + exchange + save
-240:def post_login():
-244:    # R-TOKEN-DIAG: _verify() classifies + 🙋s on failure and returns False; on success recorders start now.
-247:    _arm_recorder()          # R-HIDE-WINDOWS: recorders start the MOMENT the test call succeeds (hidden)
-253:        for tok in ds.frozen_tokens():
-262:    notify(f"[E1] Kite logged in. Top-up done for {done} of 210 instruments (2026-07-15 → {TODAY_ISO}, "
-273:    try:                   # R-EVENING-22 A1: 2 min after the token lands, self-check the room and relaunch once
-275:        deskproc.launch(["-m", "scripts.post_login_selfcheck"], "post_login_selfcheck")
-281:    """R-KITE-LOGIN-FIX (3) + R-HOLD-AND-FIX (2): start the 20-day BOOK runner (the ONLY order path)
-282:    detached — but ONLY if the R-HOLD-AND-FIX hold is lifted. While held, start nothing and say so. The
-283:    retired intraday loop (run_live/live/live_engine) is NEVER started here."""
-288:                   "runner was NOT started. Recorders are running; the book records only. The retired "
-289:                   "intraday loop is not started.")
-292:        deskproc.launch(["-m", "engine1_rebuild.book20_runner", "--loop"], "book20_runner")
-293:        notify("[E1] 20-day book runner started (the single order path; every poll re-checks the fail-closed "
-300:    """R-HIDE-WINDOWS: the windowless interpreter (pythonw.exe) so a launched job NEVER pops a console."""
-306:def _arm_recorder():
-307:    """R-E4-RECORD-LIVE + R-DAY1-BUNDLE A2: when the login lands, launch ALL FIVE recording lanes DETACHED
-308:    (E4 chains, E7 ticks, E12 NSE/BSE, E13 depth, E14 positioning). Each self-gates on market hours + a
-309:    fresh token (read-only quote/depth only, no orders). R-RESTART-RESUME: started through the one launcher —
-310:    hidden, free RAM logged, never started twice. Then send exactly ONE line 'recorders: N/5 running' (this
-assistant: `_arm_recorder` (kite_login.py:306) launches all five lanes — this is the real path to make thin. Reading it:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\kite_login.py", "offset": 306, "limit": 40}
-tool_result: 306	def _arm_recorder():
-307	    """R-E4-RECORD-LIVE + R-DAY1-BUNDLE A2: when the login lands, launch ALL FIVE recording lanes DETACHED
-308	    (E4 chains, E7 ticks, E12 NSE/BSE, E13 depth, E14 positioning). Each self-gates on market hours + a
-309	    fresh token (read-only quote/depth only, no orders). R-RESTART-RESUME: started through the one launcher —
-310	    hidden, free RAM logged, never started twice. Then send exactly ONE line 'recorders: N/5 running' (this
-311	    is the login's recorder line — no timer repeats it, A6). Best-effort; never fatal."""
-312	    try:
-313	        from scripts import launch_e1 as L
-314	        procs = L.running_cmdlines()
-315	        for label, args in L.RECORDERS:
-316	            L.start(label, args, procs)                          # start any that are down; leaves the rest alone
-317	        up, total, down = L.recorders_running()                  # re-read: how many are actually up now
-318	        line = "[E1] recorders: %d/%d running" % (up, total)
-319	        if down:
-320	            line += " — down: " + ", ".join(down)
-321	        notify(line)
-322	    except Exception:
-323	        pass
-324	
-325	
-326	if __name__ == "__main__":
-327	    main()
-328	
-assistant: `_arm_recorder` (kite_login.py:315) arms all five lanes — this is where the thin start must live (not launch_e1's `main()`, which the stack never runs). Adding a thin-aware `recorder_set()` and pointing both the arming path and the keep-alive at it:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\launch_e1.py", "old_string": "def plan():\n    \"\"\"(on, off) labels for the current start \u2014 the report's ON/OFF lists, machine-derived (never typed).\"\"\"\n    on = [x[0] for x in _essential()]\n    off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]\n    return on, off", "new_string": "def recorder_set():\n    \"\"\"The recorder lanes to ARM/keep-alive: thin = DEPTH ONLY (the only lane the six checks read,\n    conform.py:132) until one clean paper trade is on record; then all five. This is the set the real arming\n    path (kite_login._arm_recorder) and the watchdog keep-alive (watchdog.resurrect_recorders) both use \u2014 so the\n    E1-only thin start (item 61) actually takes effect on the stack the owner starts.\"\"\"\n    if e1_only():\n        return [x for x in RECORDERS if \"e13_depth\" in x[1]]\n    return list(RECORDERS)\n\n\ndef plan():\n    \"\"\"(on, off) labels for the current start \u2014 the report's ON/OFF lists, machine-derived (never typed).\"\"\"\n    on = [x[0] for x in _essential() if x not in RECORDERS] + [x[0] for x in recorder_set()]\n    off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]\n    return on, off"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\launch_e1.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\kite_login.py", "old_string": "        from scripts import launch_e1 as L\n        procs = L.running_cmdlines()\n        for label, args in L.RECORDERS:\n            L.start(label, args, procs)                          # start any that are down; leaves the rest alone\n        up, total, down = L.recorders_running()                  # re-read: how many are actually up now", "new_string": "        from scripts import launch_e1 as L\n        procs = L.running_cmdlines()\n        for label, args in L.recorder_set():                     # NB22-B/NB23: thin (depth only) until one clean trade\n            L.start(label, args, procs)                          # start any that are down; leaves the rest alone\n        up, total, down = L.recorders_running()                  # re-read: how many are actually up now"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\kite_login.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\watchdog.py", "old_string": "    relaunched = []\n    for label, args in launch_e1.RECORDERS:\n        if not running_fn(args):", "new_string": "    relaunched = []\n    for label, args in launch_e1.recorder_set():          # NB23: thin (depth only) until one clean trade\n        if not running_fn(args):"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\watchdog.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Updating the test to the thin-aware set and running the touched self-tests:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_watchdog_recorders.py", "old_string": "    r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,\n                                     running_fn=down, start_fn=start)\n    from scripts import launch_e1\n    assert len(r[\"relaunched\"]) == len(launch_e1.RECORDERS) and len(started) == len(launch_e1.RECORDERS)", "new_string": "    r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,\n                                     running_fn=down, start_fn=start)\n    from scripts import launch_e1\n    assert len(r[\"relaunched\"]) == len(launch_e1.recorder_set()) and len(started) == len(launch_e1.recorder_set())\n    assert r[\"relaunched\"], \"the thin recorder set must be non-empty (depth at least)\""}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_watchdog_recorders.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "python scripts/launch_e1.py --demo 2>&1 | tail -1 && python -m pytest tests/test_watchdog_recorders.py -q 2>&1 | tail -2 && echo \"=== thin recorder_set ===\" && cat > \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" <<'PY'\nimport sys\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import launch_e1\nprint(\"e1_only:\", launch_e1.e1_only())\nprint(\"recorder_set:\", [x[0] for x in launch_e1.recorder_set()])\nPY\npython \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" 2>&1 | head", "description": "Verify thin recorder_set and tests"}
-tool_result: AssertionError: ['watchdog', 'login ask', 'evening scan', 'site publisher + digest']
-FAILED tests/test_watchdog_recorders.py::test_relaunches_dead_lanes_only_when_token_and_ram
-1 failed, 3 passed, 1 warning in 1.55s
-=== thin recorder_set ===
-e1_only: True
-recorder_set: []
-assistant: `recorder_set()` returned `[]` — the RECORDERS args are lists (`["-m","scripts.e13_depth",...]`), so `"e13_depth" in x[1]` fails. Fixing:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\launch_e1.py", "old_string": "    if e1_only():\n        return [x for x in RECORDERS if \"e13_depth\" in x[1]]\n    return list(RECORDERS)", "new_string": "    if e1_only():\n        return [x for x in RECORDERS if any(\"e13_depth\" in a for a in x[1])]   # args is a list\n    return list(RECORDERS)"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\launch_e1.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "python scripts/launch_e1.py --demo 2>&1 | tail -1 && python -m pytest tests/test_watchdog_recorders.py -q 2>&1 | tail -2 && python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" 2>&1 | tail -2", "description": "Re-verify thin recorder_set and tests"}
-tool_result: launch_e1 demo OK: hidden pythonw starts, no double start, heavy jobs never essential; thin E1 plan ok
-....                                                                     [100%]
-4 passed in 0.72s
-e1_only: True
-recorder_set: ['depth recorder (E13)']
-assistant: `recorder_set()` = `['depth recorder (E13)']` (thin), demo + 4 tests pass. The thin start is now in the **real** arming path (`kite_login._arm_recorder`) + the keep-alive. Logging the item-61-location correction and committing:
-tool_use Bash {"command": "cat > \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/lm3.py\" <<'PY'\nimport sys\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import lead_mistakes\nlead_mistakes.append(\n  \"item 61 (E1-only thin start) was built in launch_e1.main()\",\n  \"the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 \u2014 it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap).\",\n  date=\"2026-09-23\")\nprint(\"today:\", lead_mistakes.count_today(\"2026-09-23\"))\nPY\npython \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/lm3.py\" 2>&1 | tail -1 && git add scripts/kite_login.py scripts/launch_e1.py scripts/watchdog.py tests/test_watchdog_recorders.py docs/LEAD-MISTAKES.md && python scripts/precommit_guard.py && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) \u2014 kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && date \"+CLOCK: %H:%M IST\"", "description": "Log correction and commit thin-arming fix"}
-tool_result: today: 8
-warning: in the working copy of 'docs/LEAD-MISTAKES.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/watchdog.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tests/test_watchdog_recorders.py', LF will be replaced by CRLF the next time Git touches it
-0947a82a2
-CLOCK: 18:09 IST
+assistant: Committed (`aa8e160ce`, 18:16 IST). NB23 report:
+
+```
+NB23 — RESTART TONIGHT. Session 18:05 → 18:16 IST, 23 Sep 2026. Market closed.
+
+🙋 RESTART NOW — double-click Desktop\E1-DESK\STOP_E1_STACK.bat, wait until it finishes, then double-click
+   Desktop\E1-DESK\START_E1_STACK.bat (the only stack starter — R-NIGHT-CLOSE / §14.10; both paths cited, files
+   confirmed on disk). This brings up the clean 4-process stack (token_ping · watchdog · site_loop · supervisor)
+   with the NEW watchdog live (thin depth-only recorder keep-alive + auto-continue), and on the next login it
+   arms ONLY the depth recorder (thin E1 chain). The R-HOLD-AND-FIX hold STAYS placed — no orders tonight. Then
+   reply "restarted" and I'll confirm the stack + measured free RAM · send this to the lead.
+
+WHY A FIX HAD TO LAND FIRST (and did): before posting I checked what START_E1_STACK.bat actually runs — it starts
+   4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315), and does NOT run launch_e1.
+   So item 61's thin start (built in launch_e1.main()) would NOT have taken effect — a restart would have brought
+   the FULL 5-recorder set back (the OOM state). I routed recorder arming AND the watchdog keep-alive through a
+   single launch_e1.recorder_set() (depth-only until one clean trade), used by kite_login._arm_recorder and
+   watchdog.resurrect_recorders. Now the restart genuinely brings up the thin recorder. Tested (4 tests + demos);
+   committed 0947a82a2. Logged as a lead-mistake (item 61 was in the unused launcher).
+
+ALSO FOUND (NB19-R #1 gap, cited): run_evening (the evening job → Thursday's queue) is NOT started by
+   START_E1_STACK.bat at all, nor armed by kite_login — which is why it was absent. Tonight I RUN the evening eval
+   by hand after the restart (when RAM frees); making run_evening watchdog-kept is a follow-up build.
+
+AFTER YOU REPLY "restarted", I will, in order: confirm the thin stack (process list + free RAM from
+   LAUNCH-RAM.log) → build CLOSE-DONE → RUN the evening eval (write=True → Thursday's queue; NONE fired is a valid
+   no-trade Thursday) → the item-4 full-chain dry-run + independent verify. The 06:00 🙋 then becomes: "lift the
+   flag ONLY if the PASS marker exists, then tap the login." If the dry-run FAILs, the flag stays and 09:15 holds.
+
+HELD LOG (this session, before NB23): ✅ built — scripts/held_log.py, the plain "held: <stock> — <reason>"
+   build-room view (lead-visible, not public), tested (95c21e13c).
+
+Restart feasibility: the owner is at the laptop and the market is closed, so the click can be done now — no
+   fallback to 06:00 needed. (If for any reason you can't, the same two double-clicks work at 06:00.)
+
+NOTHING NEEDS THE LEAD. (The restart is your click — the 🙋 above; the hold stays placed; the flag-lift waits for
+the dry-run PASS. Everything else is queued and proceeds once you reply "restarted".)
+```
+
+Done - see block above.
+queue-operation: continue 
+user: continue 
+assistant: The owner said "continue," not "restarted" — so I must not assume the restart happened. Let me check the current state read-only (did the stack restart? did RAM change?), then advance on what's safe:
+tool_use Bash {"command": "date \"+CLOCK: %H:%M IST\" && echo \"=== running pythonw stack ===\" && powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | ForEach-Object { ($_.CommandLine -replace '.*\\\\\\\\','' ) }\" 2>/dev/null | grep -iE \"token_ping|watchdog|site_loop|supervisor|book20|recorder|kite|run_evening|e13\" | sort | uniq -c; echo \"=== free RAM ===\" && python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/mem.py\" 2>&1 | head -1", "description": "Check current stack and free RAM"}
+tool_result: CLOCK: 18:19 IST
+=== running pythonw stack ===
+=== free RAM ===
+free_gb: 0.7 | LOW_FREE_GB: 1.2 | HEAVY_START_GB: 2.0
+assistant: Let me get a clean process listing (the filter regex misfired):
+tool_use Bash {"command": "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | Select-Object -ExpandProperty CommandLine\" 2>/dev/null | sed 's#C:.*Python310.pythonw.exe ##' | sort", "description": "Clean pythonw command-line listing"}
+tool_result: -m engine1_rebuild.book20_runner --loop
+-m scripts.positioning_recorder --record-loop
+scripts\site_loop.py
+scripts\supervisor.py
+scripts\token_ping.py
+scripts\watchdog.py
+assistant: Confirmed: the stack is the **same long-running one** (book20 + positioning + the original 4), **not** a fresh restart — the owner hasn't restarted yet, so my new watchdog/arming code isn't live, and free RAM is 0.7 GB (still below the floor). So heavy work (EVENING RUN, dry-run) stays blocked; I'll advance the next **light** queue item, CLOSE-DONE (restart-independent). Building it (reuses the 🚩 count, NB21 #2):
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\close_done.py", "content": "\"\"\"NB19 CLOSE-DONE line (+ NB21 item 2): the line posted when the post-close jobs finish \u2014\n  \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: N \u00b7 lead mistakes today: N\"\nIt retires the typed 15:45 resume: from tomorrow the owner pastes on THIS line instead of a fixed clock time.\nThe \ud83d\udea9/mistake count is machine-read from docs/LEAD-MISTAKES.md (scripts.lead_mistakes.count_today) \u2014 never typed.\nPure/light (no heavy import). The runtime post (after run_evening / the close jobs finish) is the launch-path\nwire-in, LIVE via the dry-run + restart.\n\"\"\"\nfrom __future__ import annotations\n\n\ndef line(date=None, count_fn=None):\n    \"\"\"The close-done line. count_fn defaults to lead_mistakes.count_today (injected in tests).\"\"\"\n    if count_fn is None:\n        from scripts import lead_mistakes\n        count_fn = lead_mistakes.count_today\n    n = int(count_fn(date) if date is not None else count_fn())\n    return \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: %d \u00b7 lead mistakes today: %d\" % (n, n)\n\n\ndef _demo():\n    assert line(count_fn=lambda *_: 0) == \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: 0 \u00b7 lead mistakes today: 0\"\n    r = line(date=\"2026-09-23\", count_fn=lambda d: 8)\n    assert r.startswith(\"\u2705 close done \u2014 build session free\") and \"\ud83d\udea9 today: 8\" in r and \"mistakes today: 8\" in r\n    print(\"close_done demo OK: '\u2705 close done \u2014 build session free' + machine-read \ud83d\udea9/mistake count.\")\n\n\nif __name__ == \"__main__\":\n    import sys\n    if \"--demo\" in sys.argv:\n        _demo()\n    else:\n        print(line())\n"}
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\scripts\close_done.py (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python scripts/close_done.py --demo 2>&1 | tail -2 && git add scripts/close_done.py && python scripts/precommit_guard.py && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB19 CLOSE-DONE + NB21 #2: close_done.py \u2014 '\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && date \"+CLOCK: %H:%M IST\"", "description": "Test and commit CLOSE-DONE"}
+tool_result: close_done demo OK: '✅ close done — build session free' + machine-read 🚩/mistake count.
+warning: in the working copy of 'scripts/close_done.py', LF will be replaced by CRLF the next time Git touches it
+6c607ce1b
+CLOCK: 18:22 IST
+queue-operation: restarted
 
 ===== COMMITS SINCE LAST CHECK =====
-0947a82a2 18:09 NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged
+6c607ce1b 18:22 NB19 CLOSE-DONE + NB21 #2: close_done.py — '✅ close done — build session free · 🚩 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in
 
 
 ===== DIFFS SINCE LAST CHECK =====
-commit 0947a82a2375e4faea2e824e0e2d4bb90270741f
+commit 6c607ce1b9127d8d119df9a614b932b5f2f2bbcb
 Author: use[redacted]ai-dev <[redacted]>
-Date:   Wed Sep 23 18:09:44 2026 +0530
+Date:   Wed Sep 23 18:22:19 2026 +0530
 
-    NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged
+    NB19 CLOSE-DONE + NB21 #2: close_done.py — '✅ close done — build session free · 🚩 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in
     
     Co-Authored-By: Claude Opus 4.8 <[redacted]>
     Claude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb
 
-diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
-index 3b63b083b..9f54f5661 100644
---- a/docs/LEAD-MISTAKES.md
-+++ b/docs/LEAD-MISTAKES.md
-@@ -15,3 +15,4 @@ when a required order was not placed. Shown as a page in the build room. The dai
- <!-- rows below appended by scripts/lead_mistakes.py — never hand-edit -->
- | 2026-09-23 | NB18/NB19/NB19-R named the R-HOLD-AND-FIX flag as what held 09:15 orders (to be lifted) | the flag file scheduler/.orders_held_R_HOLD_AND_FIX was ABSENT (gate.held()=False); the real 09:15 hold was order_ok() moment-light (recorders down). Flag now placed by NB19-R2 to enforce hold-until-PASS |
- | 2026-09-23 | NB16 stated the watchdog keeps token_ping/run_evening/site_loop/portfolio_card/calendar_daily alive (from START_E1_ALL.bat's keep-alive list) | WRONG — _expected_jobs() skips every REM line (watchdog.py:218) and that keep-alive list is all REM-commented (START_E1_ALL.bat:15-20); the only live line is 'pythonw -m scripts.launch_e1' (:10) which the scripts\X.py regex misses. So resurrect_jobs revives NOTHING; the .bat comment promises a keep-alive the code ignores. This is why recorders AND run_evening stay dead once reaped. |
-+| 2026-09-23 | item 61 (E1-only thin start) was built in launch_e1.main() | the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 — it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap). |
-diff --git a/scripts/kite_login.py b/scripts/kite_login.py
-index fd12a66ae..e619f334a 100644
---- a/scripts/kite_login.py
-+++ b/scripts/kite_login.py
-@@ -312,7 +312,7 @@ def _arm_recorder():
-     try:
-         from scripts import launch_e1 as L
-         procs = L.running_cmdlines()
--        for label, args in L.RECORDERS:
-+        for label, args in L.recorder_set():                     # NB22-B/NB23: thin (depth only) until one clean trade
-             L.start(label, args, procs)                          # start any that are down; leaves the rest alone
-         up, total, down = L.recorders_running()                  # re-read: how many are actually up now
-         line = "[E1] recorders: %d/%d running" % (up, total)
-diff --git a/scripts/launch_e1.py b/scripts/launch_e1.py
-index 46b280211..febe9adfb 100644
---- a/scripts/launch_e1.py
-+++ b/scripts/launch_e1.py
-@@ -77,9 +77,19 @@ def _essential():
-     return E1_ESSENTIAL if e1_only() else ESSENTIAL
- 
- 
-+def recorder_set():
-+    """The recorder lanes to ARM/keep-alive: thin = DEPTH ONLY (the only lane the six checks read,
-+    conform.py:132) until one clean paper trade is on record; then all five. This is the set the real arming
-+    path (kite_login._arm_recorder) and the watchdog keep-alive (watchdog.resurrect_recorders) both use — so the
-+    E1-only thin start (item 61) actually takes effect on the stack the owner starts."""
-+    if e1_only():
-+        return [x for x in RECORDERS if any("e13_depth" in a for a in x[1])]   # args is a list
-+    return list(RECORDERS)
+diff --git a/scripts/close_done.py b/scripts/close_done.py
+new file mode 100644
+index 000000000..874dc2771
+--- /dev/null
++++ b/scripts/close_done.py
+@@ -0,0 +1,32 @@
++"""NB19 CLOSE-DONE line (+ NB21 item 2): the line posted when the post-close jobs finish —
++  "✅ close done — build session free · 🚩 today: N · lead mistakes today: N"
++It retires the typed 15:45 resume: from tomorrow the owner pastes on THIS line instead of a fixed clock time.
++The 🚩/mistake count is machine-read from docs/LEAD-MISTAKES.md (scripts.lead_mistakes.count_today) — never typed.
++Pure/light (no heavy import). The runtime post (after run_evening / the close jobs finish) is the launch-path
++wire-in, LIVE via the dry-run + restart.
++"""
++from __future__ import annotations
 +
 +
- def plan():
-     """(on, off) labels for the current start — the report's ON/OFF lists, machine-derived (never typed)."""
--    on = [x[0] for x in _essential()]
-+    on = [x[0] for x in _essential() if x not in RECORDERS] + [x[0] for x in recorder_set()]
-     off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]
-     return on, off
- 
-diff --git a/scripts/watchdog.py b/scripts/watchdog.py
-index 31e55ecce..c56515fb8 100644
---- a/scripts/watchdog.py
-+++ b/scripts/watchdog.py
-@@ -539,7 +539,7 @@ def resurrect_recorders(now, token_fn=None, ram_fn=None, running_fn=None, start_
-     start_fn = start_fn or launch_e1.start
-     running_fn = running_fn or (lambda args: launch_e1.is_running(args, launch_e1.running_cmdlines()))
-     relaunched = []
--    for label, args in launch_e1.RECORDERS:
-+    for label, args in launch_e1.recorder_set():          # NB23: thin (depth only) until one clean trade
-         if not running_fn(args):
-             start_fn(label, args)                          # hidden, single-instance; logs to LAUNCH-RAM.log
-             relaunched.append(label)
-diff --git a/tests/test_watchdog_recorders.py b/tests/test_watchdog_recorders.py
-index 7e2dba8fe..2f9bd804e 100644
---- a/tests/test_watchdog_recorders.py
-+++ b/tests/test_watchdog_recorders.py
-@@ -12,7 +12,8 @@ def test_relaunches_dead_lanes_only_when_token_and_ram():
-     r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,
-                                      running_fn=down, start_fn=start)
-     from scripts import launch_e1
--    assert len(r["relaunched"]) == len(launch_e1.RECORDERS) and len(started) == len(launch_e1.RECORDERS)
-+    assert len(r["relaunched"]) == len(launch_e1.recorder_set()) and len(started) == len(launch_e1.recorder_set())
-+    assert r["relaunched"], "the thin recorder set must be non-empty (depth at least)"
- 
- 
- def test_no_token_no_relaunch():
++def line(date=None, count_fn=None):
++    """The close-done line. count_fn defaults to lead_mistakes.count_today (injected in tests)."""
++    if count_fn is None:
++        from scripts import lead_mistakes
++        count_fn = lead_mistakes.count_today
++    n = int(count_fn(date) if date is not None else count_fn())
++    return "✅ close done — build session free · 🚩 today: %d · lead mistakes today: %d" % (n, n)
++
++
++def _demo():
++    assert line(count_fn=lambda *_: 0) == "✅ close done — build session free · 🚩 today: 0 · lead mistakes today: 0"
++    r = line(date="2026-09-23", count_fn=lambda d: 8)
++    assert r.startswith("✅ close done — build session free") and "🚩 today: 8" in r and "mistakes today: 8" in r
++    print("close_done demo OK: '✅ close done — build session free' + machine-read 🚩/mistake count.")
++
++
++if __name__ == "__main__":
++    import sys
++    if "--demo" in sys.argv:
++        _demo()
++    else:
++        print(line())
 
 
 ===== ARCHIVED OWNER RULINGS (docs/dispatches) =====
@@ -294,7 +224,7 @@ index 7e2dba8fe..2f9bd804e 100644
 
 ===== STATUS.json =====
 {
- "generated": "2026-09-23T18:09:13.357636+05:30",
+ "generated": "2026-09-23T18:22:28.239952+05:30",
  "token": {
   "valid": true,
   "exchanged": null
@@ -324,9 +254,24 @@ index 7e2dba8fe..2f9bd804e 100644
    "name": "book20_runner",
    "pid": 18980,
    "since": "/Date(1790123619054"
+  },
+  {
+   "name": "token_ping",
+   "pid": 18044,
+   "since": "/Date(1790167945587"
+  },
+  {
+   "name": "watchdog",
+   "pid": 28784,
+   "since": "/Date(1790167945603"
+  },
+  {
+   "name": "site_loop",
+   "pid": 7612,
+   "since": "/Date(1790167945616"
   }
  ],
- "last_runner_poll": "2026-09-23T18:07:24.283727+05:30",
+ "last_runner_poll": "2026-09-23T18:19:34.333739+05:30",
  "streams": {
   "Order-book depth": {
    "rows_10min": 0,
@@ -352,14 +297,15 @@ index 7e2dba8fe..2f9bd804e 100644
  "gates": {
   "hold": "on",
   "orders_allowed": true,
-  "kill_switch": "orders allowed"
+  "hold_reason": "R-HOLD-AND-FIX flag",
+  "kill_switch": "armed"
  },
  "audit": {
   "pass": false,
   "line": "AUDIT: FAIL \u2014 moment light truthful (575cae0f8)",
   "commit": "575cae0f8"
  },
- "plain": "logged in \u00b7 5 desk processes up \u00b7 216 stocks ready \u00b7 orders not allowed yet \u00b7 0 placed today \u00b7 audit not passed",
+ "plain": "logged in \u00b7 8 desk processes up \u00b7 216 stocks ready \u00b7 orders HELD \u2014 R-HOLD-AND-FIX flag \u00b7 0 placed today \u00b7 audit not passed",
  "ready_line": "READY \u2014 1 recorders + runner up, 216 stocks ready, orders arming."
 }
 
@@ -402,9 +348,6 @@ resolve is: `VIOLATION | LEAD RULING NEEDED: <question>`. When in doubt and no l
 NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57
 
 ===== BUILD JOURNAL =====
-2026-09-23 03:23 | ruling NIGHT BUNDLE 2 + R-MASTER-CHECKLIST (docs / pages / bookkeeping; no launch-path files, touched-module tests only) | NIGHT BUNDLE 2 bookkeeping (item 3) + R-MASTER-CHECKLIST — Queue page and beat 'left' now read docs/MASTER-CHECKLIST.md | commit 3af11ae8e "NIGHT BUNDLE 2 item 3 + R-MASTER-CHECKLIST v2: one canonical checklist, bookkeeping" (2026-09-23 03:18) | tests touched-module tests 22/22 green (site_v2, conform, live_pattern_set, v2 tabs/render, deliverables); last full suite 330/330 @ 2026-09-23 02:03 (LAST-TESTS.json) | files touched 9 | next MASTER-CHECKLIST actionable: 15/16/17/18 TONIGHT (this run), then AFTER-1545 items after 15:45
-checked 03:26 — on course
-checked 03:37 — on course
 checked 03:42 — on course
 checked 03:47 — on course
 checked 03:49 — on course
@@ -462,196 +405,129 @@ checked 18:01 — on course
 checked 18:03 — on course
 2026-09-23 18:04 | ruling NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57 | NB12-15 done. New un-wired modules built + tested; nothing launch-path touched; commits per sub-step with explicit paths (no git commit -a) | commit c90dc2f68 "auto-advance progress: AUBANK/ETERNAL expired + item 53 done; heavy items (evening run, dry-run) deferred on the 0.37 GB memory floor" (2026-09-23 18:02) | tests each new module --demo green (universe_full, archive_rows, practice_counter, publish_event, proof_apply, session_resurrect, precommit_guard, resume_card); build_beat 6, record_store 6; no heavy suite (RAM floor) | files touched 1 | next TONIGHT in order (NB15 #3): wire-ins (7,21,27,44,45,hold-rule) -> one restart -> proofs when memory allows (twin run, verifier self-test on branch item14-broken-test-demo, confined Codex) -> arm 46 on lead's word -> owner UI list after 15:45 -> swap only after 47+48. NOW leftovers: hook wiring for 49/51, ENGINE_CATALOGUE per-engine check.
 checked 18:06 — on course
+2026-09-23 18:12 | ruling NB13/NB14/NB15 (2026-09-23 07:48 IST): universe_full built (fail-closed); resume + one-item-per-session discipline recorded (CLAUDE.md 23); MASTER-CHECKLIST NOW status + items 49-57 | NB12-15 done. New un-wired modules built + tested; nothing launch-path touched; commits per sub-step with explicit paths (no git commit -a) | commit 0947a82a2 "NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged" (2026-09-23 18:09) | tests each new module --demo green (universe_full, archive_rows, practice_counter, publish_event, proof_apply, session_resurrect, precommit_guard, resume_card); build_beat 6, record_store 6; no heavy suite (RAM floor) | files touched 5 | next TONIGHT in order (NB15 #3): wire-ins (7,21,27,44,45,hold-rule) -> one restart -> proofs when memory allows (twin run, verifier self-test on branch item14-broken-test-demo, confined Codex) -> arm 46 on lead's word -> owner UI list after 15:45 -> swap only after 47+48. NOW leftovers: hook wiring for 49/51, ENGINE_CATALOGUE per-engine check.
+checked 18:13 — on course
+checked 18:17 — on course
 
 ===== TRANSCRIPT SINCE LAST CHECK =====
-assistant: **Critical NB23 finding:** `START_E1_STACK.bat` (§14.10, the only stack starter) launches token_ping/watchdog/site_loop/supervisor and arms recorders via **`kite_login._arm_recorder` (kite_login.py:247)** on login — it does **not** run `launch_e1`. So item 61's thin start (built in `launch_e1`) would **not** take effect on a restart, and run_evening isn't started by the stack at all. A restart now would bring the **full** recorder set back (the OOM state). I must fix the real arming path first. Reading it:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\kite_login.py", "offset": 240, "limit": 45}
-tool_result: File does not exist. Note: your current working directory is [redacted]\Desktop\trading-engines-v2.
-tool_use Bash {"command": "find . -path ./.git -prune -o -name \"kite_login.py\" -print 2>/dev/null; echo \"=== _arm_recorder location ===\"; grep -rln \"_arm_recorder\\|def _arm_recorder\\|def post_login\" --include=*.py . 2>/dev/null | grep -v \".snapshot\" | head", "description": "Locate kite_login.py and _arm_recorder"}
-tool_result: ./.snapshot/scripts/kite_login.py
-./scripts/kite_login.py
-=== _arm_recorder location ===
-./scripts/kite_login.py
-./scripts/rehearsal_day1.py
-tool_use Bash {"command": "grep -n \"def _arm_recorder\\|def post_login\\|RECORDERS\\|record-loop\\|chain_recorder\\|xchange\\|e13_depth\\|positioning\\|for .* in\\|start\\|launch\" scripts/kite_login.py | head -30", "description": "Inspect kite_login._arm_recorder"}
-tool_result: 4:`data_acquisition.kite.exchange_token`, which writes the gitignored token file and NEVER prints,
-107:    for attempt in (1, 2):
-143:    start = datetime.fromisoformat(SINCE).date()
-146:    a = start
-152:    for tok in ds.frozen_tokens():
-153:        for frm, to in chunks:
-167:    for tok in ds.frozen_tokens():
-170:        slices = [s for s in glob.glob(os.path.join(kite.HISTORY_DIR, f"{tok}_minute_*.json"))
-175:        for sp in slices:
-229:    rc = token_gate.run(port=GATE_PORT, open_browser=False)   # tested: gate + exchange + save
-240:def post_login():
-244:    # R-TOKEN-DIAG: _verify() classifies + 🙋s on failure and returns False; on success recorders start now.
-247:    _arm_recorder()          # R-HIDE-WINDOWS: recorders start the MOMENT the test call succeeds (hidden)
-253:        for tok in ds.frozen_tokens():
-262:    notify(f"[E1] Kite logged in. Top-up done for {done} of 210 instruments (2026-07-15 → {TODAY_ISO}, "
-273:    try:                   # R-EVENING-22 A1: 2 min after the token lands, self-check the room and relaunch once
-275:        deskproc.launch(["-m", "scripts.post_login_selfcheck"], "post_login_selfcheck")
-281:    """R-KITE-LOGIN-FIX (3) + R-HOLD-AND-FIX (2): start the 20-day BOOK runner (the ONLY order path)
-282:    detached — but ONLY if the R-HOLD-AND-FIX hold is lifted. While held, start nothing and say so. The
-283:    retired intraday loop (run_live/live/live_engine) is NEVER started here."""
-288:                   "runner was NOT started. Recorders are running; the book records only. The retired "
-289:                   "intraday loop is not started.")
-292:        deskproc.launch(["-m", "engine1_rebuild.book20_runner", "--loop"], "book20_runner")
-293:        notify("[E1] 20-day book runner started (the single order path; every poll re-checks the fail-closed "
-300:    """R-HIDE-WINDOWS: the windowless interpreter (pythonw.exe) so a launched job NEVER pops a console."""
-306:def _arm_recorder():
-307:    """R-E4-RECORD-LIVE + R-DAY1-BUNDLE A2: when the login lands, launch ALL FIVE recording lanes DETACHED
-308:    (E4 chains, E7 ticks, E12 NSE/BSE, E13 depth, E14 positioning). Each self-gates on market hours + a
-309:    fresh token (read-only quote/depth only, no orders). R-RESTART-RESUME: started through the one launcher —
-310:    hidden, free RAM logged, never started twice. Then send exactly ONE line 'recorders: N/5 running' (this
-assistant: `_arm_recorder` (kite_login.py:306) launches all five lanes — this is the real path to make thin. Reading it:
-tool_use Read {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\kite_login.py", "offset": 306, "limit": 40}
-tool_result: 306	def _arm_recorder():
-307	    """R-E4-RECORD-LIVE + R-DAY1-BUNDLE A2: when the login lands, launch ALL FIVE recording lanes DETACHED
-308	    (E4 chains, E7 ticks, E12 NSE/BSE, E13 depth, E14 positioning). Each self-gates on market hours + a
-309	    fresh token (read-only quote/depth only, no orders). R-RESTART-RESUME: started through the one launcher —
-310	    hidden, free RAM logged, never started twice. Then send exactly ONE line 'recorders: N/5 running' (this
-311	    is the login's recorder line — no timer repeats it, A6). Best-effort; never fatal."""
-312	    try:
-313	        from scripts import launch_e1 as L
-314	        procs = L.running_cmdlines()
-315	        for label, args in L.RECORDERS:
-316	            L.start(label, args, procs)                          # start any that are down; leaves the rest alone
-317	        up, total, down = L.recorders_running()                  # re-read: how many are actually up now
-318	        line = "[E1] recorders: %d/%d running" % (up, total)
-319	        if down:
-320	            line += " — down: " + ", ".join(down)
-321	        notify(line)
-322	    except Exception:
-323	        pass
-324	
-325	
-326	if __name__ == "__main__":
-327	    main()
-328	
-assistant: `_arm_recorder` (kite_login.py:315) arms all five lanes — this is where the thin start must live (not launch_e1's `main()`, which the stack never runs). Adding a thin-aware `recorder_set()` and pointing both the arming path and the keep-alive at it:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\launch_e1.py", "old_string": "def plan():\n    \"\"\"(on, off) labels for the current start \u2014 the report's ON/OFF lists, machine-derived (never typed).\"\"\"\n    on = [x[0] for x in _essential()]\n    off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]\n    return on, off", "new_string": "def recorder_set():\n    \"\"\"The recorder lanes to ARM/keep-alive: thin = DEPTH ONLY (the only lane the six checks read,\n    conform.py:132) until one clean paper trade is on record; then all five. This is the set the real arming\n    path (kite_login._arm_recorder) and the watchdog keep-alive (watchdog.resurrect_recorders) both use \u2014 so the\n    E1-only thin start (item 61) actually takes effect on the stack the owner starts.\"\"\"\n    if e1_only():\n        return [x for x in RECORDERS if \"e13_depth\" in x[1]]\n    return list(RECORDERS)\n\n\ndef plan():\n    \"\"\"(on, off) labels for the current start \u2014 the report's ON/OFF lists, machine-derived (never typed).\"\"\"\n    on = [x[0] for x in _essential() if x not in RECORDERS] + [x[0] for x in recorder_set()]\n    off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]\n    return on, off"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\launch_e1.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\kite_login.py", "old_string": "        from scripts import launch_e1 as L\n        procs = L.running_cmdlines()\n        for label, args in L.RECORDERS:\n            L.start(label, args, procs)                          # start any that are down; leaves the rest alone\n        up, total, down = L.recorders_running()                  # re-read: how many are actually up now", "new_string": "        from scripts import launch_e1 as L\n        procs = L.running_cmdlines()\n        for label, args in L.recorder_set():                     # NB22-B/NB23: thin (depth only) until one clean trade\n            L.start(label, args, procs)                          # start any that are down; leaves the rest alone\n        up, total, down = L.recorders_running()                  # re-read: how many are actually up now"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\kite_login.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\watchdog.py", "old_string": "    relaunched = []\n    for label, args in launch_e1.RECORDERS:\n        if not running_fn(args):", "new_string": "    relaunched = []\n    for label, args in launch_e1.recorder_set():          # NB23: thin (depth only) until one clean trade\n        if not running_fn(args):"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\watchdog.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Updating the test to the thin-aware set and running the touched self-tests:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_watchdog_recorders.py", "old_string": "    r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,\n                                     running_fn=down, start_fn=start)\n    from scripts import launch_e1\n    assert len(r[\"relaunched\"]) == len(launch_e1.RECORDERS) and len(started) == len(launch_e1.RECORDERS)", "new_string": "    r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,\n                                     running_fn=down, start_fn=start)\n    from scripts import launch_e1\n    assert len(r[\"relaunched\"]) == len(launch_e1.recorder_set()) and len(started) == len(launch_e1.recorder_set())\n    assert r[\"relaunched\"], \"the thin recorder set must be non-empty (depth at least)\""}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_watchdog_recorders.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "python scripts/launch_e1.py --demo 2>&1 | tail -1 && python -m pytest tests/test_watchdog_recorders.py -q 2>&1 | tail -2 && echo \"=== thin recorder_set ===\" && cat > \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" <<'PY'\nimport sys\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import launch_e1\nprint(\"e1_only:\", launch_e1.e1_only())\nprint(\"recorder_set:\", [x[0] for x in launch_e1.recorder_set()])\nPY\npython \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" 2>&1 | head", "description": "Verify thin recorder_set and tests"}
-tool_result: AssertionError: ['watchdog', 'login ask', 'evening scan', 'site publisher + digest']
-FAILED tests/test_watchdog_recorders.py::test_relaunches_dead_lanes_only_when_token_and_ram
-1 failed, 3 passed, 1 warning in 1.55s
-=== thin recorder_set ===
-e1_only: True
-recorder_set: []
-assistant: `recorder_set()` returned `[]` — the RECORDERS args are lists (`["-m","scripts.e13_depth",...]`), so `"e13_depth" in x[1]` fails. Fixing:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\launch_e1.py", "old_string": "    if e1_only():\n        return [x for x in RECORDERS if \"e13_depth\" in x[1]]\n    return list(RECORDERS)", "new_string": "    if e1_only():\n        return [x for x in RECORDERS if any(\"e13_depth\" in a for a in x[1])]   # args is a list\n    return list(RECORDERS)"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\launch_e1.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "python scripts/launch_e1.py --demo 2>&1 | tail -1 && python -m pytest tests/test_watchdog_recorders.py -q 2>&1 | tail -2 && python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/rs.py\" 2>&1 | tail -2", "description": "Re-verify thin recorder_set and tests"}
-tool_result: launch_e1 demo OK: hidden pythonw starts, no double start, heavy jobs never essential; thin E1 plan ok
-....                                                                     [100%]
-4 passed in 0.72s
-e1_only: True
-recorder_set: ['depth recorder (E13)']
-assistant: `recorder_set()` = `['depth recorder (E13)']` (thin), demo + 4 tests pass. The thin start is now in the **real** arming path (`kite_login._arm_recorder`) + the keep-alive. Logging the item-61-location correction and committing:
-tool_use Bash {"command": "cat > \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/lm3.py\" <<'PY'\nimport sys\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import lead_mistakes\nlead_mistakes.append(\n  \"item 61 (E1-only thin start) was built in launch_e1.main()\",\n  \"the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 \u2014 it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap).\",\n  date=\"2026-09-23\")\nprint(\"today:\", lead_mistakes.count_today(\"2026-09-23\"))\nPY\npython \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/lm3.py\" 2>&1 | tail -1 && git add scripts/kite_login.py scripts/launch_e1.py scripts/watchdog.py tests/test_watchdog_recorders.py docs/LEAD-MISTAKES.md && python scripts/precommit_guard.py && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) \u2014 kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && date \"+CLOCK: %H:%M IST\"", "description": "Log correction and commit thin-arming fix"}
-tool_result: today: 8
-warning: in the working copy of 'docs/LEAD-MISTAKES.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/watchdog.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tests/test_watchdog_recorders.py', LF will be replaced by CRLF the next time Git touches it
-0947a82a2
-CLOCK: 18:09 IST
+assistant: Committed (`aa8e160ce`, 18:16 IST). NB23 report:
+
+```
+NB23 — RESTART TONIGHT. Session 18:05 → 18:16 IST, 23 Sep 2026. Market closed.
+
+🙋 RESTART NOW — double-click Desktop\E1-DESK\STOP_E1_STACK.bat, wait until it finishes, then double-click
+   Desktop\E1-DESK\START_E1_STACK.bat (the only stack starter — R-NIGHT-CLOSE / §14.10; both paths cited, files
+   confirmed on disk). This brings up the clean 4-process stack (token_ping · watchdog · site_loop · supervisor)
+   with the NEW watchdog live (thin depth-only recorder keep-alive + auto-continue), and on the next login it
+   arms ONLY the depth recorder (thin E1 chain). The R-HOLD-AND-FIX hold STAYS placed — no orders tonight. Then
+   reply "restarted" and I'll confirm the stack + measured free RAM · send this to the lead.
+
+WHY A FIX HAD TO LAND FIRST (and did): before posting I checked what START_E1_STACK.bat actually runs — it starts
+   4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315), and does NOT run launch_e1.
+   So item 61's thin start (built in launch_e1.main()) would NOT have taken effect — a restart would have brought
+   the FULL 5-recorder set back (the OOM state). I routed recorder arming AND the watchdog keep-alive through a
+   single launch_e1.recorder_set() (depth-only until one clean trade), used by kite_login._arm_recorder and
+   watchdog.resurrect_recorders. Now the restart genuinely brings up the thin recorder. Tested (4 tests + demos);
+   committed 0947a82a2. Logged as a lead-mistake (item 61 was in the unused launcher).
+
+ALSO FOUND (NB19-R #1 gap, cited): run_evening (the evening job → Thursday's queue) is NOT started by
+   START_E1_STACK.bat at all, nor armed by kite_login — which is why it was absent. Tonight I RUN the evening eval
+   by hand after the restart (when RAM frees); making run_evening watchdog-kept is a follow-up build.
+
+AFTER YOU REPLY "restarted", I will, in order: confirm the thin stack (process list + free RAM from
+   LAUNCH-RAM.log) → build CLOSE-DONE → RUN the evening eval (write=True → Thursday's queue; NONE fired is a valid
+   no-trade Thursday) → the item-4 full-chain dry-run + independent verify. The 06:00 🙋 then becomes: "lift the
+   flag ONLY if the PASS marker exists, then tap the login." If the dry-run FAILs, the flag stays and 09:15 holds.
+
+HELD LOG (this session, before NB23): ✅ built — scripts/held_log.py, the plain "held: <stock> — <reason>"
+   build-room view (lead-visible, not public), tested (95c21e13c).
+
+Restart feasibility: the owner is at the laptop and the market is closed, so the click can be done now — no
+   fallback to 06:00 needed. (If for any reason you can't, the same two double-clicks work at 06:00.)
+
+NOTHING NEEDS THE LEAD. (The restart is your click — the 🙋 above; the hold stays placed; the flag-lift waits for
+the dry-run PASS. Everything else is queued and proceeds once you reply "restarted".)
+```
+
+Done - see block above.
+queue-operation: continue 
+user: continue 
+assistant: The owner said "continue," not "restarted" — so I must not assume the restart happened. Let me check the current state read-only (did the stack restart? did RAM change?), then advance on what's safe:
+tool_use Bash {"command": "date \"+CLOCK: %H:%M IST\" && echo \"=== running pythonw stack ===\" && powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | ForEach-Object { ($_.CommandLine -replace '.*\\\\\\\\','' ) }\" 2>/dev/null | grep -iE \"token_ping|watchdog|site_loop|supervisor|book20|recorder|kite|run_evening|e13\" | sort | uniq -c; echo \"=== free RAM ===\" && python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/mem.py\" 2>&1 | head -1", "description": "Check current stack and free RAM"}
+tool_result: CLOCK: 18:19 IST
+=== running pythonw stack ===
+=== free RAM ===
+free_gb: 0.7 | LOW_FREE_GB: 1.2 | HEAVY_START_GB: 2.0
+assistant: Let me get a clean process listing (the filter regex misfired):
+tool_use Bash {"command": "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"name='pythonw.exe'\\\" | Select-Object -ExpandProperty CommandLine\" 2>/dev/null | sed 's#C:.*Python310.pythonw.exe ##' | sort", "description": "Clean pythonw command-line listing"}
+tool_result: -m engine1_rebuild.book20_runner --loop
+-m scripts.positioning_recorder --record-loop
+scripts\site_loop.py
+scripts\supervisor.py
+scripts\token_ping.py
+scripts\watchdog.py
+assistant: Confirmed: the stack is the **same long-running one** (book20 + positioning + the original 4), **not** a fresh restart — the owner hasn't restarted yet, so my new watchdog/arming code isn't live, and free RAM is 0.7 GB (still below the floor). So heavy work (EVENING RUN, dry-run) stays blocked; I'll advance the next **light** queue item, CLOSE-DONE (restart-independent). Building it (reuses the 🚩 count, NB21 #2):
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\close_done.py", "content": "\"\"\"NB19 CLOSE-DONE line (+ NB21 item 2): the line posted when the post-close jobs finish \u2014\n  \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: N \u00b7 lead mistakes today: N\"\nIt retires the typed 15:45 resume: from tomorrow the owner pastes on THIS line instead of a fixed clock time.\nThe \ud83d\udea9/mistake count is machine-read from docs/LEAD-MISTAKES.md (scripts.lead_mistakes.count_today) \u2014 never typed.\nPure/light (no heavy import). The runtime post (after run_evening / the close jobs finish) is the launch-path\nwire-in, LIVE via the dry-run + restart.\n\"\"\"\nfrom __future__ import annotations\n\n\ndef line(date=None, count_fn=None):\n    \"\"\"The close-done line. count_fn defaults to lead_mistakes.count_today (injected in tests).\"\"\"\n    if count_fn is None:\n        from scripts import lead_mistakes\n        count_fn = lead_mistakes.count_today\n    n = int(count_fn(date) if date is not None else count_fn())\n    return \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: %d \u00b7 lead mistakes today: %d\" % (n, n)\n\n\ndef _demo():\n    assert line(count_fn=lambda *_: 0) == \"\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: 0 \u00b7 lead mistakes today: 0\"\n    r = line(date=\"2026-09-23\", count_fn=lambda d: 8)\n    assert r.startswith(\"\u2705 close done \u2014 build session free\") and \"\ud83d\udea9 today: 8\" in r and \"mistakes today: 8\" in r\n    print(\"close_done demo OK: '\u2705 close done \u2014 build session free' + machine-read \ud83d\udea9/mistake count.\")\n\n\nif __name__ == \"__main__\":\n    import sys\n    if \"--demo\" in sys.argv:\n        _demo()\n    else:\n        print(line())\n"}
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\scripts\close_done.py (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "PYTHONUTF8=1 python scripts/close_done.py --demo 2>&1 | tail -2 && git add scripts/close_done.py && python scripts/precommit_guard.py && git -c user.name=\"use[redacted]ai-dev\" commit -q -m \"NB19 CLOSE-DONE + NB21 #2: close_done.py \u2014 '\u2705 close done \u2014 build session free \u00b7 \ud83d\udea9 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" && git log -1 --format=\"%h\" && date \"+CLOCK: %H:%M IST\"", "description": "Test and commit CLOSE-DONE"}
+tool_result: close_done demo OK: '✅ close done — build session free' + machine-read 🚩/mistake count.
+warning: in the working copy of 'scripts/close_done.py', LF will be replaced by CRLF the next time Git touches it
+6c607ce1b
+CLOCK: 18:22 IST
+queue-operation: restarted
 
 ===== COMMITS SINCE LAST CHECK =====
-0947a82a2 18:09 NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged
+6c607ce1b 18:22 NB19 CLOSE-DONE + NB21 #2: close_done.py — '✅ close done — build session free · 🚩 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in
 
 
 ===== DIFFS SINCE LAST CHECK =====
-commit 0947a82a2375e4faea2e824e0e2d4bb90270741f
+commit 6c607ce1b9127d8d119df9a614b932b5f2f2bbcb
 Author: use[redacted]ai-dev <[redacted]>
-Date:   Wed Sep 23 18:09:44 2026 +0530
+Date:   Wed Sep 23 18:22:19 2026 +0530
 
-    NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged
+    NB19 CLOSE-DONE + NB21 #2: close_done.py — '✅ close done — build session free · 🚩 today: N' (machine-read count); tested. Runtime post is the launch-path wire-in
     
     Co-Authored-By: Claude Opus 4.8 <[redacted]>
     Claude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb
 
-diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
-index 3b63b083b..9f54f5661 100644
---- a/docs/LEAD-MISTAKES.md
-+++ b/docs/LEAD-MISTAKES.md
-@@ -15,3 +15,4 @@ when a required order was not placed. Shown as a page in the build room. The dai
- <!-- rows below appended by scripts/lead_mistakes.py — never hand-edit -->
- | 2026-09-23 | NB18/NB19/NB19-R named the R-HOLD-AND-FIX flag as what held 09:15 orders (to be lifted) | the flag file scheduler/.orders_held_R_HOLD_AND_FIX was ABSENT (gate.held()=False); the real 09:15 hold was order_ok() moment-light (recorders down). Flag now placed by NB19-R2 to enforce hold-until-PASS |
- | 2026-09-23 | NB16 stated the watchdog keeps token_ping/run_evening/site_loop/portfolio_card/calendar_daily alive (from START_E1_ALL.bat's keep-alive list) | WRONG — _expected_jobs() skips every REM line (watchdog.py:218) and that keep-alive list is all REM-commented (START_E1_ALL.bat:15-20); the only live line is 'pythonw -m scripts.launch_e1' (:10) which the scripts\X.py regex misses. So resurrect_jobs revives NOTHING; the .bat comment promises a keep-alive the code ignores. This is why recorders AND run_evening stay dead once reaped. |
-+| 2026-09-23 | item 61 (E1-only thin start) was built in launch_e1.main() | the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 — it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap). |
-diff --git a/scripts/kite_login.py b/scripts/kite_login.py
-index fd12a66ae..e619f334a 100644
---- a/scripts/kite_login.py
-+++ b/scripts/kite_login.py
-@@ -312,7 +312,7 @@ def _arm_recorder():
-     try:
-         from scripts import launch_e1 as L
-         procs = L.running_cmdlines()
--        for label, args in L.RECORDERS:
-+        for label, args in L.recorder_set():                     # NB22-B/NB23: thin (depth only) until one clean trade
-             L.start(label, args, procs)                          # start any that are down; leaves the rest alone
-         up, total, down = L.recorders_running()                  # re-read: how many are actually up now
-         line = "[E1] recorders: %d/%d running" % (up, total)
-diff --git a/scripts/launch_e1.py b/scripts/launch_e1.py
-index 46b280211..febe9adfb 100644
---- a/scripts/launch_e1.py
-+++ b/scripts/launch_e1.py
-@@ -77,9 +77,19 @@ def _essential():
-     return E1_ESSENTIAL if e1_only() else ESSENTIAL
- 
- 
-+def recorder_set():
-+    """The recorder lanes to ARM/keep-alive: thin = DEPTH ONLY (the only lane the six checks read,
-+    conform.py:132) until one clean paper trade is on record; then all five. This is the set the real arming
-+    path (kite_login._arm_recorder) and the watchdog keep-alive (watchdog.resurrect_recorders) both use — so the
-+    E1-only thin start (item 61) actually takes effect on the stack the owner starts."""
-+    if e1_only():
-+        return [x for x in RECORDERS if any("e13_depth" in a for a in x[1])]   # args is a list
-+    return list(RECORDERS)
+diff --git a/scripts/close_done.py b/scripts/close_done.py
+new file mode 100644
+index 000000000..874dc2771
+--- /dev/null
++++ b/scripts/close_done.py
+@@ -0,0 +1,32 @@
++"""NB19 CLOSE-DONE line (+ NB21 item 2): the line posted when the post-close jobs finish —
++  "✅ close done — build session free · 🚩 today: N · lead mistakes today: N"
++It retires the typed 15:45 resume: from tomorrow the owner pastes on THIS line instead of a fixed clock time.
++The 🚩/mistake count is machine-read from docs/LEAD-MISTAKES.md (scripts.lead_mistakes.count_today) — never typed.
++Pure/light (no heavy import). The runtime post (after run_evening / the close jobs finish) is the launch-path
++wire-in, LIVE via the dry-run + restart.
++"""
++from __future__ import annotations
 +
 +
- def plan():
-     """(on, off) labels for the current start — the report's ON/OFF lists, machine-derived (never typed)."""
--    on = [x[0] for x in _essential()]
-+    on = [x[0] for x in _essential() if x not in RECORDERS] + [x[0] for x in recorder_set()]
-     off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]
-     return on, off
- 
-diff --git a/scripts/watchdog.py b/scripts/watchdog.py
-index 31e55ecce..c56515fb8 100644
---- a/scripts/watchdog.py
-+++ b/scripts/watchdog.py
-@@ -539,7 +539,7 @@ def resurrect_recorders(now, token_fn=None, ram_fn=None, running_fn=None, start_
-     start_fn = start_fn or launch_e1.start
-     running_fn = running_fn or (lambda args: launch_e1.is_running(args, launch_e1.running_cmdlines()))
-     relaunched = []
--    for label, args in launch_e1.RECORDERS:
-+    for label, args in launch_e1.recorder_set():          # NB23: thin (depth only) until one clean trade
-         if not running_fn(args):
-             start_fn(label, args)                          # hidden, single-instance; logs to LAUNCH-RAM.log
-             relaunched.append(label)
-diff --git a/tests/test_watchdog_recorders.py b/tests/test_watchdog_recorders.py
-index 7e2dba8fe..2f9bd804e 100644
---- a/tests/test_watchdog_recorders.py
-+++ b/tests/test_watchdog_recorders.py
-@@ -12,7 +12,8 @@ def test_relaunches_dead_lanes_only_when_token_and_ram():
-     r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,
-                                      running_fn=down, start_fn=start)
-     from scripts import launch_e1
--    assert len(r["relaunched"]) == len(launch_e1.RECORDERS) and len(started) == len(launch_e1.RECORDERS)
-+    assert len(r["relaunched"]) == len(launch_e1.recorder_set()) and len(started) == len(launch_e1.recorder_set())
-+    assert r["relaunched"], "the thin recorder set must be non-empty (depth at least)"
- 
- 
- def test_no_token_no_relaunch():
++def line(date=None, count_fn=None):
++    """The close-done line. count_fn defaults to lead_mistakes.count_today (injected in tests)."""
++    if count_fn is None:
++        from scripts import lead_mistakes
++        count_fn = lead_mistakes.count_today
++    n = int(count_fn(date) if date is not None else count_fn())
++    return "✅ close done — build session free · 🚩 today: %d · lead mistakes today: %d" % (n, n)
++
++
++def _demo():
++    assert line(count_fn=lambda *_: 0) == "✅ close done — build session free · 🚩 today: 0 · lead mistakes today: 0"
++    r = line(date="2026-09-23", count_fn=lambda d: 8)
++    assert r.startswith("✅ close done — build session free") and "🚩 today: 8" in r and "mistakes today: 8" in r
++    print("close_done demo OK: '✅ close done — build session free' + machine-read 🚩/mistake count.")
++
++
++if __name__ == "__main__":
++    import sys
++    if "--demo" in sys.argv:
++        _demo()
++    else:
++        print(line())
 
 
 ===== ARCHIVED OWNER RULINGS (docs/dispatches) =====
@@ -659,7 +535,7 @@ index 7e2dba8fe..2f9bd804e 100644
 
 ===== STATUS.json =====
 {
- "generated": "2026-09-23T18:09:13.357636+05:30",
+ "generated": "2026-09-23T18:22:28.239952+05:30",
  "token": {
   "valid": true,
   "exchanged": null
@@ -689,9 +565,24 @@ index 7e2dba8fe..2f9bd804e 100644
    "name": "book20_runner",
    "pid": 18980,
    "since": "/Date(1790123619054"
+  },
+  {
+   "name": "token_ping",
+   "pid": 18044,
+   "since": "/Date(1790167945587"
+  },
+  {
+   "name": "watchdog",
+   "pid": 28784,
+   "since": "/Date(1790167945603"
+  },
+  {
+   "name": "site_loop",
+   "pid": 7612,
+   "since": "/Date(1790167945616"
   }
  ],
- "last_runner_poll": "2026-09-23T18:07:24.283727+05:30",
+ "last_runner_poll": "2026-09-23T18:19:34.333739+05:30",
  "streams": {
   "Order-book depth": {
    "rows_10min": 0,
@@ -717,13 +608,14 @@ index 7e2dba8fe..2f9bd804e 100644
  "gates": {
   "hold": "on",
   "orders_allowed": true,
-  "kill_switch": "orders allowed"
+  "hold_reason": "R-HOLD-AND-FIX flag",
+  "kill_switch": "armed"
  },
  "audit": {
   "pass": false,
   "line": "AUDIT: FAIL \u2014 moment light truthful (575cae0f8)",
   "commit": "575cae0f8"
  },
- "plain": "logged in \u00b7 5 desk processes up \u00b7 216 stocks ready \u00b7 orders not allowed yet \u00b7 0 placed today \u00b7 audit not passed",
+ "plain": "logged in \u00b7 8 desk processes up \u00b7 216 stocks ready \u00b7 orders HELD \u2014 R-HOLD-AND-FIX flag \u00b7 0 placed today \u00b7 audit not passed",
  "ready_line": "READY \u2014 1 recorders + runner up, 216 stocks ready, orders arming."
 }
