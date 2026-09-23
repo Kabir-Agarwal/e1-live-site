@@ -107,21 +107,26 @@
 2026-09-23 17:16 checked 17:16 — on course
 2026-09-23 17:47 checked 17:47 — on course
 2026-09-23 18:01 checked 18:01 — on course
-2026-09-23 18:03 checked 18:03 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've reviewed the two commits since the last check (18:01) against the six checks.
+2026-09-23 18:03 checked 18:03 — on course
+2026-09-23 18:06 checked 18:06 — on course
+2026-09-23 18:13 checked 18:13 — on course</pre><h3>Last check (scrubbed)</h3><pre>Provenance check: the change is the NB23 thin-arming fix — routing recorder arming through `launch_e1.recorder_set()` so item 61's E1-only thin start (depth-only until one clean paper trade) actually takes effect on the real stack path. Item 61 / thin start traces to NB22/NB22-B (archived: NIGHT-BUNDLE-22, NIGHT-BUNDLE-23). Owner scope, not run-authored.
 
-**What happened:** Item 53 (the 08:15 self-check line) was built as a pure function `scripts/preopen_line.py` — takes a status dict, returns either `✅ READY` (only when cameras fresh + gate open + queue loaded all pass) or `🙋 NOT READY — <gap> — send this to the lead`. Plus a NEXT-PASTE bookkeeping commit noting the expiries and that heavy items (evening run, dry-run) are deferred on the 0.37 GB memory floor.
+Running the checks:
 
-**Against the six checks:**
+1. **SCOPE** — The builder discovered item 61's thin start lived in `launch_e1.main()`, which `START_E1_STACK.bat` (§14.10) never runs; the real arming happens in `kite_login._arm_recorder` (kite_login.py:315) and the watchdog keep-alive. Both now call `recorder_set()`. This is a fix to the core chain, permitted under the §24 feature freeze (fixes to the chain are not "new"). Traces to NB23. ✓
 
-0. **Provenance** — item 53 traces to NB19 (`2026-09-23_NIGHT-BUNDLE-19.md` is archived), marked "(NB19, OWNER-SAID)" in the checklist. Owner scope, not run-authored.
-1. **Scope** — the module builds exactly the 08:15 line NB19 names; NEXT-PASTE commit is bookkeeping. No invented scope.
-2. **No self-audit** — the `--demo` is a unit test, not the builder grading its own work as an independent check.
-3. **No typed numbers** — no strategy constant; `expected_cameras=1` is a runtime-fed parameter, and the 10-min freshness is the status page's own existing measure.
-4. **Demos inert** — `--demo` only asserts over dicts and prints "demo OK"; no ledger write, no Telegram.
-5. **Trading-path** — pure function, explicitly NOT wired to runtime ("runtime wiring is the launch-path wire-in, LIVE via dry-run + restart"). Nothing live called.
-6. **No secrets** — none in the file or diff.
-7. **Ordering** — no next-before-X was jumped; heavy/launch-path work is correctly held on the memory floor pending the dry-run + restart.
+2. **NO SELF-AUDIT** — Builder is building, not grading its own work as an independent check. ✓
 
-Small, in-scope, tested pure module; nothing launch-path went live.
+3. **NO TYPED NUMBERS** — `recorder_set()` filters by the `"e13_depth"` string; no naked constants introduced. ✓
+
+4. **DEMOS INERT** — `launch_e1 --demo` and the touched tests (4 passed) ran; nothing wrote a live ledger or sent a real message. ✓
+
+5. **TRADING-PATH** — Change is to the read-only recorder arming/keep-alive, not the order path (book20_runner untouched). Nothing live was called. Direction is fail-safe: a restart now brings back the *thin* (depth-only) set, avoiding the OOM state, rather than all five. ✓
+
+6. **NO SECRETS** — LEAD-MISTAKES row and diff carry file names and line refs only; no key/token/path on a published page. ✓
+
+7. **ORDERING** — No next-before-X item was pending; this is a chain correction. ✓
+
+The builder also honestly logged the item-61 location error to `docs/LEAD-MISTAKES.md` (row appended, count 8 today) rather than quietly patching over it. Consistent with §24.3/§24.6.
 
 SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>

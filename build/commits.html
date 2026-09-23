@@ -1,4 +1,171 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c90dc2f68</b> · 2026-09-23 18:02</div><div>auto-advance progress: AUBANK/ETERNAL expired + item 53 done; heavy items (evening run, dry-run) deferred on the 0.37 GB memory floor</div><div class='sub h'>docs/NEXT-PASTE.md | 7 ++++++-</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>0947a82a2</b> · 2026-09-23 18:09</div><div>NB23 thin-arming fix: route recorder arming through launch_e1.recorder_set() (depth-only until clean trade) — kite_login._arm_recorder (the REAL path) + watchdog keep-alive; item 61 was in the unused launch_e1.main(). Tested. LEAD-MISTAKES logged</div><div class='sub h'>docs/LEAD-MISTAKES.md            |  1 +</div><div class='sub h'>scripts/kite_login.py            |  2 +-</div><div class='sub h'>scripts/launch_e1.py             | 12 +++++++++++-</div><div class='sub h'>scripts/watchdog.py              |  2 +-</div><div class='sub h'>tests/test_watchdog_recorders.py |  3 ++-</div><pre>diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
+index 3b63b083b..9f54f5661 100644
+--- a/docs/LEAD-MISTAKES.md
++++ b/docs/LEAD-MISTAKES.md
+@@ -15,3 +15,4 @@ when a required order was not placed. Shown as a page in the build room. The dai
+ &lt;!-- rows below appended by scripts/lead_mistakes.py — never hand-edit --&gt;
+ | 2026-09-23 | NB18/NB19/NB19-R named the R-HOLD-AND-FIX flag as what held 09:15 orders (to be lifted) | the flag file scheduler/.orders_held_R_HOLD_AND_FIX was ABSENT (gate.held()=False); the real 09:15 hold was order_ok() moment-light (recorders down). Flag now placed by NB19-R2 to enforce hold-until-PASS |
+ | 2026-09-23 | NB16 stated the watchdog keeps token_ping/run_evening/site_loop/portfolio_card/calendar_daily alive (from START_E1_ALL.bat&#x27;s keep-alive list) | WRONG — _expected_jobs() skips every REM line (watchdog.py:218) and that keep-alive list is all REM-commented (START_E1_ALL.bat:15-20); the only live line is &#x27;pythonw -m scripts.launch_e1&#x27; (:10) which the scripts\X.py regex misses. So resurrect_jobs revives NOTHING; the .bat comment promises a keep-alive the code ignores. This is why recorders AND run_evening stay dead once reaped. |
++| 2026-09-23 | item 61 (E1-only thin start) was built in launch_e1.main() | the R-NIGHT-CLOSE stack (START_E1_STACK.bat) does NOT run launch_e1 — it starts 4 processes and arms recorders via kite_login._arm_recorder (kite_login.py:315). So the thin start was ineffective until routed through launch_e1.recorder_set() (now used by _arm_recorder AND watchdog.resurrect_recorders). Also: run_evening is not started by the stack at all (NB19-R #1 gap). |
+diff --git a/scripts/kite_login.py b/scripts/kite_login.py
+index fd12a66ae..e619f334a 100644
+--- a/scripts/kite_login.py
++++ b/scripts/kite_login.py
+@@ -312,7 +312,7 @@ def _arm_recorder():
+     try:
+         from scripts import launch_e1 as L
+         procs = L.running_cmdlines()
+-        for label, args in L.RECORDERS:
++        for label, args in L.recorder_set():                     # NB22-B/NB23: thin (depth only) until one clean trade
+             L.start(label, args, procs)                          # start any that are down; leaves the rest alone
+         up, total, down = L.recorders_running()                  # re-read: how many are actually up now
+         line = &quot;[E1] recorders: %d/%d running&quot; % (up, total)
+diff --git a/scripts/launch_e1.py b/scripts/launch_e1.py
+index 46b280211..febe9adfb 100644
+--- a/scripts/launch_e1.py
++++ b/scripts/launch_e1.py
+@@ -77,9 +77,19 @@ def _essential():
+     return E1_ESSENTIAL if e1_only() else ESSENTIAL
+ 
+ 
++def recorder_set():
++    &quot;&quot;&quot;The recorder lanes to ARM/keep-alive: thin = DEPTH ONLY (the only lane the six checks read,
++    conform.py:132) until one clean paper trade is on record; then all five. This is the set the real arming
++    path (kite_login._arm_recorder) and the watchdog keep-alive (watchdog.resurrect_recorders) both use — so the
++    E1-only thin start (item 61) actually takes effect on the stack the owner starts.&quot;&quot;&quot;
++    if e1_only():
++        return [x for x in RECORDERS if any(&quot;e13_depth&quot; in a for a in x[1])]   # args is a list
++    return list(RECORDERS)
++
++
+ def plan():
+     &quot;&quot;&quot;(on, off) labels for the current start — the report&#x27;s ON/OFF lists, machine-derived (never typed).&quot;&quot;&quot;
+-    on = [x[0] for x in _essential()]
++    on = [x[0] for x in _essential() if x not in RECORDERS] + [x[0] for x in recorder_set()]
+     off = [x[0] for x in ESSENTIAL if x[0] not in on] + [x[0] for x in HEAVY]
+     return on, off
+ 
+diff --git a/scripts/watchdog.py b/scripts/watchdog.py
+index 31e55ecce..c56515fb8 100644
+--- a/scripts/watchdog.py
++++ b/scripts/watchdog.py
+@@ -539,7 +539,7 @@ def resurrect_recorders(now, token_fn=None, ram_fn=None, running_fn=None, start_
+     start_fn = start_fn or launch_e1.start
+     running_fn = running_fn or (lambda args: launch_e1.is_running(args, launch_e1.running_cmdlines()))
+     relaunched = []
+-    for label, args in launch_e1.RECORDERS:
++    for label, args in launch_e1.recorder_set():          # NB23: thin (depth only) until one clean trade
+         if not running_fn(args):
+             start_fn(label, args)                          # hidden, single-instance; logs to LAUNCH-RAM.log
+             relaunched.append(label)
+diff --git a/tests/test_watchdog_recorders.py b/tests/test_watchdog_recorders.py
+index 7e2dba8fe..2f9bd804e 100644
+--- a/tests/test_watchdog_recorders.py
++++ b/tests/test_watchdog_recorders.py
+@@ -12,7 +12,8 @@ def test_relaunches_dead_lanes_only_when_token_and_ram():
+     r = watchdog.resurrect_recorders(0, token_fn=lambda: True, ram_fn=lambda: True,
+                                      running_fn=down, start_fn=start)
+     from scripts import launch_e1
+-    assert len(r[&quot;relaunched&quot;]) == len(launch_e1.RECORDERS) and len(started) == len(launch_e1.RECORDERS)
++    assert len(r[&quot;relaunched&quot;]) == len(launch_e1.recorder_set()) and len(started) == len(launch_e1.recorder_set())
++    assert r[&quot;relaunched&quot;], &quot;the thin recorder set must be non-empty (depth at least)&quot;
+ 
+ 
+ def test_no_token_no_relaunch():
+</pre></div><div class='c'><div class='h'><b>95c21e13c</b> · 2026-09-23 18:05</div><div>NB19 HELD LOG: held_log.py — plain de-duplicated &#x27;held: stock — reason&#x27; build-room view of HELD-SIGNALS.log (lead-visible, not public); tested. Build-room render is the site wire-in</div><div class='sub h'>scripts/held_log.py | 87 +++++++++++++++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/held_log.py b/scripts/held_log.py
+new file mode 100644
+index 000000000..52c9086f5
+--- /dev/null
++++ b/scripts/held_log.py
+@@ -0,0 +1,87 @@
++&quot;&quot;&quot;NB19 HELD LOG — held orders as plain &quot;held: &lt;stock&gt; — &lt;reason&gt;&quot; lines for the BUILD ROOM&#x27;s Messages page
++(lead-visible, never the public pages — NB9 removed held signals from public).
++
++The order path already records each held signal to reports/HELD-SIGNALS.log (TSV:
++`&lt;ts&gt;\\t[engine]\\t&lt;stock&gt;\\t&lt;pattern&gt;\\tHELD — &lt;reason&gt;`). This module is the plain, de-duplicated build-room
++VIEW of that log (`plain_lines`) plus an `append` for any caller that wants to write one directly. Pure/light —
++no heavy import. The build-room page rendering (build_journal) consumes plain_lines(); that render is the
++launch-path/site wire-in, LIVE via the site build.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import os
++
++_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++LOG = os.path.join(_REPO, &quot;reports&quot;, &quot;HELD-SIGNALS.log&quot;)
++
++
++def append(stock, reason, path=None):
++    &quot;&quot;&quot;Write one plain held line &#x27;held: &lt;stock&gt; — &lt;reason&gt;&#x27;. Returns the line.&quot;&quot;&quot;
++    path = path or LOG
++    line = &quot;held: %s — %s&quot; % (stock, reason)
++    with open(path, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++        f.write(line + &quot;\n&quot;)
++    return line
++
++
++def _reason(field):
++    &quot;&quot;&quot;The plain reason from a HELD-SIGNALS field: the part after &#x27;HELD — &#x27;, else the field itself.&quot;&quot;&quot;
++    s = field.strip()
++    return s.split(&quot;HELD —&quot;, 1)[1].strip() if &quot;HELD —&quot; in s else (s[len(&quot;held:&quot;):].strip()
++                                                                   if s.lower().startswith(&quot;held:&quot;) else s)
++
++
++def plain_lines(path=None):
++    &quot;&quot;&quot;The build-room view: de-duplicated &#x27;held: &lt;stock&gt; — &lt;reason&gt;&#x27; lines from the held log, order preserved.
++    Reads both the TSV order-path rows and any plain lines this module appended.&quot;&quot;&quot;
++    path = path or LOG
++    out, seen = [], set()
++    try:
++        for ln in open(path, encoding=&quot;utf-8&quot;):
++            ln = ln.rstrip(&quot;\n&quot;)
++            if not ln.strip():
++                continue
++            if &quot;\t&quot; in ln:                                   # order-path TSV: ts, [engine], stock, pattern, HELD—reason
++                parts = ln.split(&quot;\t&quot;)
++                if len(parts) &gt;= 5:
++                    stock, reason = parts[2].strip(), _reason(parts[4])
++                else:
++                    continue
++            elif ln.lower().startswith(&quot;held:&quot;):             # a plain line we appended
++                body = ln[len(&quot;held:&quot;):].strip()
++                stock, _, reason = body.partition(&quot;—&quot;)
++                stock, reason = stock.strip(), reason.strip()
++            else:
++                continue
++            key = (stock, reason)
++            if key not in seen and stock:
++                seen.add(key)
++                out.append(&quot;held: %s — %s&quot; % (stock, reason))
++    except OSError:
++        pass
++    return out
++
++
++def _demo():
++    import tempfile
++    p = os.path.join(tempfile.mkdtemp(), &quot;H.log&quot;)
++    open(p, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(
++        &quot;2026-09-23T06:06:56+05:30\t[E1]\tAUBANK\tvwap|q4 …\tHELD — moment light not green (spread/depth)\n&quot;
++        &quot;2026-09-23T06:06:56+05:30\t[E10]\tAUBANK\tvwap|q4 …\tHELD — moment light not green (spread/depth)\n&quot;
++        &quot;2026-09-23T06:06:57+05:30\t[E1]\tETERNAL\trsi …\tHELD — order gate held (R-HOLD-AND-FIX flag)\n&quot;)
++    lines = plain_lines(p)
++    # de-duplicated across engines: AUBANK once, ETERNAL once
++    assert lines == [&quot;held: AUBANK — moment light not green (spread/depth)&quot;,
++                     &quot;held: ETERNAL — order gate held (R-HOLD-AND-FIX flag)&quot;], lines
++    append(&quot;BSE&quot;, &quot;spread over the ceiling&quot;, path=p)
++    assert plain_lines(p)[-1] == &quot;held: BSE — spread over the ceiling&quot;
++    print(&quot;held_log demo OK: plain &#x27;held: stock — reason&#x27; view, de-duplicated across engines; append works.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        for l in plain_lines():
++            print(l)
+</pre></div><div class='c'><div class='h'><b>c90dc2f68</b> · 2026-09-23 18:02</div><div>auto-advance progress: AUBANK/ETERNAL expired + item 53 done; heavy items (evening run, dry-run) deferred on the 0.37 GB memory floor</div><div class='sub h'>docs/NEXT-PASTE.md | 7 ++++++-</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
 index 8d6463070..5adfb9854 100644
 --- a/docs/NEXT-PASTE.md
 +++ b/docs/NEXT-PASTE.md
@@ -943,218 +1110,4 @@ index 000000000..ac4e3da95
 +STOP only for: LEAD RULING NEEDED (post it, then continue with the next item that does not depend on it); a verifier FAIL (fix that item, re-verify, never argue it away); memory below the floor the watchdog uses; the feature freeze (nothing new that is not on the checklist). Every 🙋 line ends with one of the four sanctioned actions. When no NOW item is left, post the ✅ checklist-empty line and stop.
 +
 +Add this rule to CLAUDE.md and docs/MASTER-CHECKLIST.md&#x27;s header. Report: &quot;NB20&quot;, then keep reporting per item as above; each report ends with NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
-</pre></div><div class='c'><div class='h'><b>2c5dbbf20</b> · 2026-09-23 16:00</div><div>NB19: NEXT-PASTE progress + remaining-items plan (GATE ruling blocks; restart owner-only; dry-run+verify pending)</div><div class='sub h'>docs/NEXT-PASTE.md | 23 +++++++++++++++++++++++</div><pre>diff --git a/docs/NEXT-PASTE.md b/docs/NEXT-PASTE.md
-index 634add311..347511943 100644
---- a/docs/NEXT-PASTE.md
-+++ b/docs/NEXT-PASTE.md
-@@ -60,6 +60,29 @@ plan; 15:45 executes it. This avoids repeating the NB8 unverified-UI mistake.
- 10. After 1–8: re-run the click-through + reachability gate and make it a HARD build-block (item 48); post one
-     🙋 &quot;UI fixes done — review again · send this to the lead&quot;. **No swap until the owner says so after that review.**
- 
-+## 🔗 NB19 CHAIN-FIRST — progress (2026-09-23 15:58) — feature freeze until one clean trade
-+
-+DONE this session: item 1 read-only cites (in the NB19 report + dispatch archive); item 59 lead-mistake ledger
-+BUILT (docs/LEAD-MISTAKES.md seeded 5 rows + scripts/lead_mistakes.py, tested); CLAUDE.md §24 laws (feature
-+freeze, &quot;live&quot;=one proven dry run, refuse uncited names, lead-block shape, no typed times). Commit e905d64fc.
-+
-+REMAINING NB19 items (one per session, commit per item, tests each — feature freeze holds):
-+- **GATE — LEAD RULING NEEDED (blocks this item).** 1b shows the ORDER PATH already reads the proof marker
-+  (book20_runner.py:46/403/625); gate.py is record-only BY DESIGN (gate.py:8) and the 09:15 hold is the manual
-+  R-HOLD-AND-FIX HOLD_FLAG (gate.py:120/134) + two-key gate — NOT a missing proof read. Auto-allowing on
-+  marker+checks would remove the owner&#x27;s manual hold = opening the door (owner-reserved §21). Do not build until ruled.
-+- **58 recorders** (watchdog keep-alive + token-file gate + RAM floor + STATUS.json lanes) — launch-path.
-+- **53 08:15 line** (READY/NOT-READY self-check, replaces 09:00) — launch-path.
-+- **HEADER** — status page must print gate.orders_allowed() (vitals.py:140), NOT the kill-switch (vitals.py:145).
-+- **BOOKS CHECK** — run_audit.py:44 compares current equity `==200000.0`; change to STARTING capital (cite the
-+  paper_account starting field first). NB18 promise CLEARED: the check is E1/E10/E11/E1-ADAPTIVE, not E21 — my
-+  NB12 archival did not cause it; all four read ₹2,00,000 now (08:37 FAIL was a transient intraday mark).
-+- **HELD LOG** — held orders → build-room Messages page (lead-visible).
-+- **CLOSE-DONE line** — &quot;✅ close done — build session free&quot; after the post-close jobs.
-+- **item 3 RESTART = OWNER-ONLY (§14.10)** — a session never restarts the stack; owner double-clicks.
-+- **item 4 dry-run + independent verify** — heavy, solo, memory-safe; PASS marker before 05:00 or 09:15 stays held.
-+- **item 5 UI-1** — only AFTER item 4 PASS (else tomorrow&#x27;s first item after close-done).
-+
- ## 🚨 NB18 EMERGENCY findings (2026-09-23 ~08:41) — 4 causes; recorder relaunch HELD as owner-only
- 
- **Item 1 (relaunch) NOT done — same wall as NB16, and the §14.10 amendment does not move it.** The amendment
-</pre></div><div class='c'><div class='h'><b>e905d64fc</b> · 2026-09-23 15:58</div><div>NB19 item 59 + laws: lead-mistake ledger (seeded, tested) + CLAUDE.md 24 (feature freeze, live defined, refuse uncited names); checklist 53/59; archive NB19</div><div class='sub h'>CLAUDE.md                                     | 22 ++++++++++</div><div class='sub h'>docs/LEAD-MISTAKES.md                         | 15 +++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md                      |  3 +-</div><div class='sub h'>docs/dispatches/2026-09-23_NIGHT-BUNDLE-19.md | 39 +++++++++++++++++</div><div class='sub h'>scripts/lead_mistakes.py                      | 62 +++++++++++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
-index 458179ae0..890cffa12 100644
---- a/CLAUDE.md
-+++ b/CLAUDE.md
-@@ -836,3 +836,25 @@ a cache.**
- 5. **STATE IN FILES, NOT CONTEXT (NB14 #4).** Every decision, ruling and finding is written to its file
-    (the dispatch archive, `NEXT-PASTE.md`, `MASTER-CHECKLIST.md`, `reports/`) **the moment it is made,
-    before the next step** — so a session that dies mid-item loses at most one step.
-+
-+## 24. Core-chain first: feature freeze, &quot;live&quot; defined, uncited names refused (owner dispatch NB19, 2026-09-23)
-+
-+The failure this addresses: features and pages were built for months while the core money chain
-+(06:00 login → token → recorders → 08:15 READY line → six checks → order → card → ledger) had never once run
-+end to end. So:
-+
-+1. **FEATURE FREEZE (LEAD-PROPOSED, owner informed).** **Nothing new is built** — no engine, room, page, decider
-+   or tool — until the core chain has done **ONE clean paper trade end to end**. Fixes to the chain itself, and
-+   the owner&#x27;s own dispatched items, are not &quot;new features&quot;; a new surface is.
-+2. **&quot;LIVE&quot; IS DEFINED.** A thing is **BUILT** when it is on disk with its tests; it is **LIVE** only when the
-+   **whole chain is proven in ONE dry run** (login → token → recorders → checks → order → card), cameras
-+   (recorders) included. A report calls nothing LIVE before that dry run passes an independent verify.
-+3. **BUILDER REFUSES UNCITED NAMES (OWNER-SAID 10:45).** If a lead instruction names a **function, file, folder,
-+   number or time** that does not exist in the repo or in a cited report, the builder **STOPs that item**,
-+   reports **&quot;lead named `&lt;X&gt;` — not found&quot;**, and **appends a row to `docs/LEAD-MISTAKES.md`** (via
-+   `scripts/lead_mistakes.py`, item 59). The ledger is also appended by the verifier on a FAIL and by the close
-+   job when a required order was not placed; the daily close line ends with &quot;Lead mistakes today: N&quot;.
-+4. **EVERY LEAD BLOCK CARRIES `READ / ASSUMING / MISSING` AND AN `ID`** — and the run&#x27;s report first line matches
-+   that ID. A block without them is worked cautiously and the gap is named in the report.
-+5. **NO TYPED TIMES OR NUMBERS.** Clock times come from the machine (R-CLOCK); any number is measured or cited to
-+   a file:line or a log line — never typed from memory.
-diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
-new file mode 100644
-index 000000000..1ea00360e
---- /dev/null
-+++ b/docs/LEAD-MISTAKES.md
-@@ -0,0 +1,15 @@
-+# LEAD MISTAKES — the ledger (NB19 item 59, OWNER-SAID 2026-09-23)
-+
-+_One row per lead error: date · what the lead said · why wrong. **Machine-appended** by `scripts/lead_mistakes.py`
-+— by the builder when it refuses an uncited name (CLAUDE.md §24), by the verifier on a FAIL, and by the close job
-+when a required order was not placed. Shown as a page in the build room. The daily close line ends with
-+&quot;Lead mistakes today: N&quot;. Never hand-edit below the marker._
-+
-+| date | what the lead said | why wrong |
-+|---|---|---|
-+| 2026-09-23 | NB16/NB18 named the watchdog&#x27;s &quot;own resurrect/arm function&quot; to relaunch recorders | no such function exists — watchdog.py has resurrect_jobs/resurrect_runner/resurrect_supervisor only; recorders are started by launch_e1, not kept alive by the watchdog (3 session refusals to relaunch, §14.10 &quot;never a session&quot;) |
-+| 2026-09-23 | work/relaunch instructions aimed at E1-DESK vs trading-engines-v2 | wrong folder — the repo is [redacted]\Desktop\trading-engines-v2; E1-DESK holds the stores/logs/stack .bat, not the code |
-+| 2026-09-23 | &quot;site frozen&quot; alarm acted on for ~7 hours | the alarm came from the lead&#x27;s own CACHED page, not the live site — a stale read treated as truth |
-+| 2026-09-23 | owner&#x27;s pastes recorded as agreement/approval | a paste is not consent — approval must be an explicit owner &quot;yes&quot; (§5 origin tags; a background/automated relay is never approval) |
-+| 2026-09-23 | AUBANK + ETERNAL &quot;required at 09:15&quot; | not placed — the order gate was HELD (R-HOLD-AND-FIX) and the recorders were down; a required order that the gate cannot place is a mistake to log, not to force |
-+&lt;!-- rows below appended by scripts/lead_mistakes.py — never hand-edit --&gt;
-diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 4218f0547..322ee0134 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -78,9 +78,10 @@ _STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–3
- - [AFTER-1545] 50. one item per session (CLAUDE.md §23.3) — session ends cleanly on item done, next item starts fresh; enabled by item 44&#x27;s watchdog relaunch (the one §14.7 exception, OWNER-SAID); wire with item 44
- - [NOW] 51. commit-small pre-commit check (CLAUDE.md §23.4) — a pre-commit hook refuses a CODE commit that sweeps generated files (site/, reports/*.json, readouts); never `git commit -a`. Rule RECORDED; the hook script is the build (doable now, non-launch) — see NEXT-PASTE
- - [DONE] 52. state in files, not context (CLAUDE.md §23.5) — every decision/ruling/finding written to its file the moment made; in force this run (dispatches archived first, checklist/NEXT-PASTE updated per step)
--- [AFTER-1545] 53. pre-open data check — the 08:15 gate posts NOT READY if any ARMED engine&#x27;s instrument has no recorded data (the Overnight/futures case); needs the gate/recorder (launch-path)
-+- [AFTER-1545] 53. 08:15 self-check line (NB19, OWNER-SAID) — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page&#x27;s own measure; the real order gate is open; tomorrow&#x27;s queue is loaded) and posts EXACTLY ONE of &quot;✅ READY — N cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY only after every check passes. REPLACES the 09:00 pre-open line. Launch-path (needs the gate/recorder); wire tonight
- - [NOW] 54. &quot;data its gates need&quot; line — required before any engine is armed; written into the ruling template (field 9, DONE) and to be written into ENGINE_CATALOGUE (the on-disk store each gate reads, §13 four-part standard)
- - [DAYS] 55. one exam per cadence class — intraday engines (Gap Timer, Pairs tick lane) get their own exam with intraday fills (DESIGN-LATER, the lead writes it)
- - [DAYS] 56. cost-efficiency size floor in adaptive sizing (DESIGN-LATER, the lead writes it)
- - [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
- - [AFTER-1545] 58. recorder keep-alive (NB16/NB17, §14.10 amendment) — the watchdog relaunches a DEAD recorder itself (token present + RAM above floor, logged); all 5 lanes (E4/E7/E12/E13/E14) in the watchdog keep-alive set; recorders start only AFTER the token lands; E4/E12 always in STATUS.json &quot;streams&quot; even when down so STREAM SILENT is never blind. Root cause: NB16 found E4/E12 dead since 06:02 with nothing to resurrect them. Launch-path wire-in tonight
-+- [NOW] 59. lead-mistake ledger (NB19, OWNER-SAID) — BUILT this session: docs/LEAD-MISTAKES.md (seeded with 5 rows for 2026-09-23) + scripts/lead_mistakes.py (machine-append + count_today, tested). Appended by the builder on an uncited-name refusal (CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed; daily close line ends &quot;Lead mistakes today: N&quot;. Build-room page + the verifier/close append CALLS are the AFTER-1545 wire-in
-diff --git a/docs/dispatches/2026-09-23_NIGHT-BUNDLE-19.md b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-19.md
-new file mode 100644
-index 000000000..4899b7ff7
---- /dev/null
-+++ b/docs/dispatches/2026-09-23_NIGHT-BUNDLE-19.md
-@@ -0,0 +1,39 @@
-+# NIGHT BUNDLE 19 (ID:NB19) — dispatch archived verbatim (2026-09-23)
-+
-+**Origin tag (per §5):** LEAD-PROPOSED order change + OWNER-SAID items (marked in the text).
-+
-+DISPATCH ID: NB19 — CHAIN FIRST (23 Sep 2026, 15:45 IST) → BUILD
-+READ: NB18 report (08:43), status page read 09:57 (5 processes, depth 0 rows, gate/header contradiction), NB12–15 reports.
-+ASSUMING: nothing about function or file names — every name below must be cited by you before it is touched.
-+MISSING: what runs after 15:30 and how long it took today (item 1d asks you).
-+ORIGIN: LEAD-PROPOSED order change + OWNER-SAID items (marked). Match this ID in your report&#x27;s first line.
-+
-+STANDING CHANGE (LEAD-PROPOSED, owner informed): FEATURE FREEZE. Nothing new is built — no engine, room, page, decider, tool — until the core chain (06:00 login → token → recorders → 08:15 READY line → six checks → order → card → ledger) has done ONE clean paper trade end to end. Tonight&#x27;s order is therefore: this block first, UI-1 after (UI-1 stays queued; do not start it before item 5). One item per session; commit per item with explicit paths (no git commit -a); no heavy test alongside other work; clock times from the machine; no typed numbers — measure or cite.
-+
-+NEW LAW (OWNER-SAID, 10:45): BUILDER REFUSES UNCITED NAMES. If a lead instruction names a function, file, folder, number or time that does not exist in the repo or in a cited report, you STOP that item, report &quot;lead named &lt;X&gt; — not found&quot;, and append a row to docs/LEAD-MISTAKES.md (item 59 below). Add to CLAUDE.md.
-+
-+1) READ-ONLY CITES FIRST — no edits until these are in your report, each with file:line:
-+   a) the watchdog&#x27;s keep-alive list (which processes it revives) and how recorders are launched today (by what, in what order, and whether anything checks for the Kite token before launching them).
-+   b) the live order gate: where it reads allowed=False under R-HOLD-AND-FIX, and whether it reads reports/EXAM-CONFORM-PROVEN at all. If it never reads the proof marker, say so plainly — that is why 09:15 would have held even with recorders up.
-+   c) the desk-audit &quot;books = ₹2,00,000&quot; check line, and which book failed it today (your NB18 promise).
-+   d) what runs after the 15:30 close today (close books, pattern evaluation on today&#x27;s bar, tomorrow&#x27;s order queue), each job&#x27;s measured duration from today&#x27;s logs, and which Price Engine patterns fired today for Thursday&#x27;s queue.
-+   e) the 09:57 header &quot;READY / orders allowed&quot;: which value it prints, and the value the audit checks.
-+
-+2) BUILD, one item at a time, each a separate commit, each with the tests that prove it:
-+   58 RECORDERS (OWNER-SAID): recorders start only after the token file exists (cite the token path from token_ping); memory floor = the same floor the watchdog already uses for the stack (cite it, do not type one); all recorder lanes (depth, option chains, NSE/BSE two-exchange, positioning) in the watchdog keep-alive list so a dead recorder is relaunched automatically, token-gated and RAM-gated; E4/E12 streams always listed in STATUS.json. Log every relaunch with the machine clock.
-+   53 08:15 LINE (OWNER-SAID): at 08:15 the machine checks itself — each recorder has rows in the last 10 min (reuse the status page&#x27;s own measure), the real order gate is open, tomorrow&#x27;s queue is loaded — and posts exactly one of: &quot;✅ READY — 4 cameras up, gate open, N orders queued&quot; or &quot;🙋 NOT READY — &lt;which camera/gate, plain words&gt; — send this to the lead&quot;. READY is printed only after every check passes. This replaces the 09:00 pre-open line.
-+   GATE: if 1b shows the live gate never reads the proof marker, make it read reports/EXAM-CONFORM-PROVEN (line-cited) so allowed becomes True only when the marker exists and the six checks pass. Order-path change → goes live only through item 4.
-+   BOOKS CHECK: compare starting capital, not current balance; a traded book at −5.45R is not a failure.
-+   HEADER: the status page prints the SAME gate value the audit checks — never the kill switch alone.
-+   HELD LOG: every held order writes &quot;held: &lt;stock&gt; — &lt;plain reason&gt;&quot; to the build room&#x27;s Messages page (lead-visible, not the public pages).
-+   59 MISTAKE LEDGER (OWNER-SAID): docs/LEAD-MISTAKES.md, machine-appended, shown as a page in the build room: one row per lead error — date · what the lead said · why wrong — appended by you when you refuse an uncited name, by the verifier on FAIL, and by the close job when a required order was not placed. The daily close line ends with &quot;Lead mistakes today: N&quot;. Seed it now with 23 Sep rows: NB18 named a watchdog resurrect function that does not exist (3 refusals); wrong folder instruction (E1-DESK vs trading-engines-v2); 7-hour &quot;site frozen&quot; alarm from the lead&#x27;s cached page; owner&#x27;s pastes recorded as agreement; AUBANK + ETERNAL required at 09:15, not placed.
-+   CLOSE-DONE LINE (OWNER-SAID): when the post-close jobs from 1d finish, post &quot;✅ close done — build session free&quot;. This retires the typed 15:45 resume from tomorrow; the owner pastes on that line.
-+   CHECKLIST + CLAUDE.md: add items 53/58/59 as above; the laws: &quot;live&quot; = the whole chain proven in ONE dry run (login → token → recorders → checks → order → card), cameras included; feature freeze until one clean trade; builder refuses uncited names; every lead block carries READ / ASSUMING / MISSING and an ID; no typed times.
-+
-+3) ONE FULL STACK RESTART (trading + messaging parts) after item 2, memory-safe, so the new formats and the keep-alive list are live tonight. Confirm after restart: all four recorders up with the token present, rows flowing, and the beat&#x27;s new bar format visible.
-+
-+4) FULL-CHAIN DRY RUN + INDEPENDENT VERIFY, tonight, alone (nothing else running): replay today&#x27;s recorded data through the loop the login actually launches — token present → recorders up → 08:15 self-check prints READY → six checks read live rows → a next-open order like AUBANK/ETERNAL → card written to the dry-run log (NEVER to Telegram or the live ledger). Then the independent verifier (fresh session, file:line citations) rules PASS or FAIL. A FAIL is never argued away — fix, re-verify. PASS marker written before 05:00 or the order-path change (GATE) waits a night and 09:15 orders stay held with the reason logged.
-+
-+5) ONLY AFTER item 4 PASS, and only if memory allows tonight: UI-1 (the owner&#x27;s 8 v2 defects, per your plan), phone-width screenshots per fix. Otherwise UI-1 is tomorrow&#x27;s first item after the close-done line.
-+
-+REPORT: first line &quot;NB19&quot;; every claim with file:line or a log line; machine clock on every time; the 1d table of post-close jobs and durations; what is BUILT vs LIVE (live only after item 3/4); the seeded ledger rows; then end with exactly one of: NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
-diff --git a/scripts/lead_mistakes.py b/scripts/lead_mistakes.py
-new file mode 100644
-index 000000000..1fba2d856
---- /dev/null
-+++ b/scripts/lead_mistakes.py
-@@ -0,0 +1,62 @@
-+&quot;&quot;&quot;NB19 item 59 (OWNER-SAID) — the machine-appended LEAD MISTAKE ledger.
-+
-+One row per lead error: date · what the lead said · why wrong. Appended by the builder when it refuses an uncited
-+name (NEW LAW, CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed.
-+The daily close line ends with &quot;Lead mistakes today: N&quot; (count_today). Shown as a page in the build room.
-+Machine-appended, never hand-edited below the header. Times from the machine clock (no typed dates).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+import os
-+
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+LEDGER = os.path.join(_REPO, &quot;docs&quot;, &quot;LEAD-MISTAKES.md&quot;)
-+_MARK = &quot;&lt;!-- rows below appended by scripts/lead_mistakes.py — never hand-edit --&gt;&quot;
-+
-+
-+def _today():
-+    return _dt.date.today().isoformat()          # machine clock (R-CLOCK)
-+
-+
-+def append(said, why, date=None, path=None):
-+    &quot;&quot;&quot;Append one row. Returns the row text. Escapes pipes so the markdown table never breaks.&quot;&quot;&quot;
-+    path = path or LEDGER
-+    date = date or _today()
-+    row = &quot;| %s | %s | %s |&quot; % (date, str(said).replace(&quot;|&quot;, &quot;\\|&quot;), str(why).replace(&quot;|&quot;, &quot;\\|&quot;))
-+    with open(path, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+        f.write(row + &quot;\n&quot;)
-+    return row
-+
-+
-+def count_today(date=None, path=None):
-+    &quot;&quot;&quot;How many rows carry today&#x27;s date — for the close line &#x27;Lead mistakes today: N&#x27;.&quot;&quot;&quot;
-+    path = path or LEDGER
-+    date = date or _today()
-+    try:
-+        return sum(1 for ln in open(path, encoding=&quot;utf-8&quot;)
-+                   if ln.startswith(&quot;| &quot; + date + &quot; |&quot;))
-+    except OSError:
-+        return 0
-+
-+
-+def _demo():
-+    import tempfile
-+    p = os.path.join(tempfile.mkdtemp(), &quot;LM.md&quot;)
-+    open(p, &quot;w&quot;, encoding=&quot;utf-8&quot;).write(&quot;| date | what the lead said | why wrong |\n|---|---|---|\n&quot;)
-+    append(&quot;named foo() &quot;, &quot;not in repo&quot;, date=&quot;2026-09-23&quot;, path=p)
-+    append(&quot;used a | pipe&quot;, &quot;escaped ok&quot;, date=&quot;2026-09-23&quot;, path=p)
-+    append(&quot;old thing&quot;, &quot;wrong&quot;, date=&quot;2026-09-22&quot;, path=p)
-+    assert count_today(&quot;2026-09-23&quot;, path=p) == 2, count_today(&quot;2026-09-23&quot;, path=p)
-+    assert count_today(&quot;2026-09-22&quot;, path=p) == 1
-+    assert count_today(&quot;2026-09-21&quot;, path=p) == 0
-+    assert &quot;\\|&quot; in open(p, encoding=&quot;utf-8&quot;).read()          # the pipe was escaped, table intact
-+    print(&quot;lead_mistakes demo OK: rows append, pipes escaped, count_today per date correct.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        print(&quot;Lead mistakes today: %d&quot; % count_today())
 </pre></div></main></body></html>
