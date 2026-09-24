@@ -1,4 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 11:33 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Reports</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><p style='color:#9a9a93;font-size:12px'>written 2026-09-24 11:45 IST · <a href='index.html'>build room</a></p><h1>Reports</h1><h3>yt-pilot-tokens.md</h3><pre># YouTube pilot — tokens per transcript (NB5 item 30, GATE step)
 
 _Measured this run, no model called. The Opus rule-extraction is GATED until the owner has seen these numbers (the whole library is NOT read yet)._
 
@@ -361,6 +361,54 @@ decisions, then the exam&#x27;s own fill/exit model (`engine1_rebuild.paper.simu
 5. Rewrite this file with the verdict + diff table.
 
 **Verdict tonight: DEFERRED (harness + safety-net ready; live run scheduled for the isolated-clone daytime window).**
+</pre><h3>rule-vs-live-2026-09-24.md</h3><pre># Rule-vs-live audit — Overnight / YouTube / Calendar (NB45 item 4, 2026-09-24)
+
+**Stance:** compare each engine&#x27;s LIVE code against its WRITTEN rule, file:line; anything that differs stays
+**diary-only** until fixed. **Safety property checked first for all three: none has an order path** — so all
+three are diary/record-only by construction, and every finding below is an enhancement note, not a live risk.
+
+## Overnight (E21) — rule: docs/dispatches/2026-09-21_R-OVERNIGHT-AND-YOUTUBE.md · live: engine21_overnight/overnight.py
+
+| Rule (Part 1) | Live | Verdict |
+|---|---|---|
+| BUY 15:25 at ask, SELL next 09:20 at bid; exit always 09:20; no overnight stop | `ENTRY_HM,EXIT_HM=&quot;15:25&quot;,&quot;09:20&quot;` (overnight.py:43); `overnight_returns` holds 15:25 close → next 09:20 open, no stop (overnight.py:59-94) | **MATCH** (times/no-stop) |
+| Costs from the verified Zerodha 2026 table | `cost_frac()` → `index_tests.fut_cost_frac()` (overnight.py:53-56), never typed | **MATCH** |
+| Fill at touch ± measured spread **once depth exists**; fallback per money.py | `ret_net = gross − cost_frac()` on the raw 15:25 close / 09:20 open (overnight.py:82-84) — the mid/bar fallback; touch±spread NOT wired | **GAP (pending depth)** — the rule&#x27;s &quot;once depth exists&quot; upgrade is unwired; acceptable as the money.py fallback while futures depth is data-walled. Stays as-is. |
+| Position = one lot ONLY if recorded SPAN margin fits the ₹2,00,000 account, else record-only | `money_math(... can_size = lot_size and span_margin ≤ ACCOUNT_START)` (overnight.py:229-235); SPAN from the read-only `basket_order_margins` calculator (overnight.py:307) | **MATCH** — record-only until SPAN recorded; no order placed |
+| One card per night **[E21]: instrument, PLACED/HELD, reason** | **no emitter found** (grep for `[E21]`/`PLACED/HELD` across scripts/ + engine21_overnight/ = nothing); `record_marks` records the 15:25/09:20 marks (overnight.py:344) but emits no card | **GAP** — the nightly card is specified but not built. After-close per-engine work; engine stays diary-only meanwhile. |
+
+**Overnight verdict: rules match; RECORD-ONLY by construction (no broker order — the only kiteconnect call is
+the read-only margin calculator, overnight.py:307). Two enhancement gaps: the spread-fill upgrade (pending
+futures depth) and the nightly [E21] card (not yet built). Neither is a live risk.**
+
+## YouTube — rule: same dispatch Part 2 (+ 2026-09-22 amendment) · live: engine_youtube/pipeline.py
+
+| Rule | Live | Verdict |
+|---|---|---|
+| transcript → fills the FIXED FORM or discards (&#x27;not a strategy&#x27;) | `blank_form()`/`is_strategy()` — discarded unless is_strategy AND instrument+entry+exit present (pipeline.py:30-38) | **MATCH** |
+| a SECOND independent session re-reads a sample | the two Claude reads are the only non-deterministic steps (pipeline.py:9-13) | **MATCH (structure)** |
+| condition signature → dedupe against every existing signature | `signature()` (pipeline.py:45), `dedupe()` (pipeline.py:54) | **MATCH** |
+| lane (My/Whole YouTube) + channel tags; channels ranked by survivors | `blank_form` carries channel/lane; `rank_channels()` (pipeline.py:78) | **MATCH** |
+| §20.7 external text is DATA, imperatives INERT | `scrub_imperatives()` (pipeline.py:64); docstring: extracts fields and NOTHING (pipeline.py:15) | **MATCH** — §20.7 enforced |
+
+**YouTube verdict: rules match; a research pipeline with NO order path. Diary/research-only.**
+
+## Calendar — rule: docs/dispatches/2026-09-20_R-CALENDAR-DAILY(.md/-ROUTE.md) · live: scripts/calendar_daily.py
+
+| Rule | Live | Verdict |
+|---|---|---|
+| daily 07:00 IST puller for engine 3&#x27;s event calendar; paper only, promotes nothing to orders | `FIRE=(7,0)` (calendar_daily.py:31); docstring &quot;promotes nothing to orders. Paper only.&quot; (calendar_daily.py:16) | **MATCH** |
+| compliant sourcing; 🙋 a walled source; never fabricate (§4.4/§4.5) | `run_once` attempts compliant fetches + 🙋s each walled source + parses the owner&#x27;s manual drop (calendar_daily.py:208-209, `_walled`, `parse_dropped`) | **MATCH** |
+
+**Calendar verdict: rules match; a data puller with NO order path. Data-walled sources are flagged, never
+invented. Paper-only.**
+
+## Summary
+
+All three engines&#x27; live code matches their written rules, and **none can place an order** — they are
+diary/record-only by construction, so all remain diary-only (unchanged). Two Overnight enhancement gaps are
+logged for the after-close per-engine work: the touch±spread fill upgrade (pending futures depth) and the
+nightly [E21] card. Neither differs in a way that affects safety or funding.
 </pre><h3>o1-coverage.md</h3><pre># O1 coverage — point-in-time F&amp;O/index membership (NIGHT BUNDLE 4 item 8)
 
 _Mechanical, computed this run from `data_acquisition.pit_universe.coverage()` and `check_corpus()`. Nothing is
@@ -486,6 +534,45 @@ turnover and a fixed-charge component; it does not, so no number is given here r
   dominate a small position), but the exam did not model a fixed floor per pattern, so the exam data shows no such
   degradation. To size for a &quot;charges &lt; 1% / &lt; 5% of edge&quot; target precisely, the exam must first record per-trade
   turnover + the fixed/proportional charge split (the data gap above).
+</pre><h3>close-2026-09-24.md</h3><pre># Close report — 2026-09-24 (HELD DAY; NB45 after-close batch)
+
+Machine clock at close: 2026-09-24 (held day — owner-declared: no trading, no recording; market-hours
+stop/start waiver granted for today only). Compiled by the NB45 session.
+
+## Clean-day verdict: NOT CLEAN
+
+Two reasons, both memory:
+1. **Order-book depth camera was down** (08:15/09:09 &quot;cameras down&quot;). Root cause found + fixed in NB45-A
+   (fault 1): the depth recorder was started at 06:02 with only **0.69 GB** free — below the **1.2 GB**
+   recorder floor — and did not survive; the watchdog then skipped its relaunch silently. Fixed so the
+   watchdog now says a ⏱ line with the measured free RAM and retries every cycle.
+2. **The box is critically RAM-short today** (free bounced 0.37–0.61 GB all session; Memory Compression at
+   1.2 GB = heavy swapping). The full-suite verify (item 1) could not complete — see below.
+
+## NB45 items — what completed, what is held and why
+
+| # | Item | Outcome |
+|---|------|---------|
+| 1 | Full-suite verify of all code since 32df791c4 | **HELD — BLOCKED-ON-RAM.** The quiet-box suite was launched alone; the harness **reaped it for critically low memory** (not a suite failure). No green suite on HEAD (7c6fb5ccb) exists, so the independent verify cannot pass the NB33 hash-check. **Fixes 65/66/67 (NB45-A) and the NB44 site code stay BUILT-not-LIVE (unverified)** until a genuine quiet box (apps closed / overnight) runs the suite green on HEAD. The verify was NOT run against the stale 32df791c4 result (it would false-FAIL + post a spurious 🚩). |
+| 2 | Memory for tomorrow morning | **DONE (measured).** Recorder floor 1.2 GB; reopen floor 0.72 GB; free today ~0.4–0.6 GB. The depth camera needs free ≥ 1.2 GB at login; NB45-A fault 1 now makes the watchdog announce + retry until RAM frees. Top consumers: Memory Compression 1.2 GB, WindowsTerminal 681 MB, msedge-webview2 470 MB, claude (this session) 374 MB, chrome 329 MB; **ChatGPT app 162 MB — the owner&#x27;s, reported not killed.** The lever to get the camera up at 06:00 is FREE RAM ≥ 1.2 GB at login — i.e. the heavy browsers/terminals closed before login. |
+| 3 | 8 diary engines&#x27; first calibration run | **HELD — RAM.** Spawns 8 processes; deferred with item 1 to the quiet box. The wrappers are BUILT + unit-tested (footprint resolves on the first supervised run); nothing changed. |
+| 4 | Rule-vs-live audits (Overnight/YouTube/Calendar) | **DONE.** `docs/reports/rule-vs-live-2026-09-24.md`. All three match their written rules; **none has an order path** — diary/record-only by construction. Two Overnight enhancement gaps logged (touch±spread fill pending futures depth; nightly [E21] card not yet built); neither is a live risk. |
+| 5 | Twin run (replay Tue 22 Sep, prove zero live writes) | **HELD — RAM.** Replays the live loop + exam; heavy. Deferred with item 1. Harness (rehearsal.redirect + no_live_writes) is BUILT + unit-tested. |
+| 6 | Nightly dry run 2/2 (evening evaluator on Thursday&#x27;s bar) | **HELD — waits for the close-done line** per the owner&#x27;s own instruction, AND held day = no Thursday recording to evaluate. Deferred to a real close-done. |
+| 7 | Phone-width screenshots of the old-site graph + tabs | **SKIPPED.** &quot;Only if time allows&quot;; v2 layout is LOW; browser + RAM unavailable today. |
+| 8 | This close report + resume card | **DONE.** |
+
+## Counters
+- 🚩 today: **1** (the NB31 verifier-FAIL row). The three NB45-A faults are recorded as operational rows in
+  docs/LEAD-MISTAKES.md (times + file:line + fix), not as 🚩 owner-action lines.
+- Acceptance: NB44 site (graph + 5 tabs + desk equity) and NB45-A fixes 65/66/67 — all **BUILT + own-tests
+  green**, **verify pending** (item 1 held).
+- Money chain: untouched today. Last PASS at 32df791c4. Real-money rail closed.
+
+## What the owner may want to know (no action demanded)
+The only way the held items (1, 3, 5) complete is a quiet box with more free RAM than today&#x27;s ~0.5 GB — most
+simply, the heavy browser/terminal windows closed and the suite run overnight. That is not required tonight;
+it is the honest precondition. Nothing here needs a signature or a decision.
 </pre><h3>2026-09-23-exam-conform-status.md</h3><pre># R-EXAM-CONFORM — status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)
 
 ## What is DONE and safe (committed 0aa11e331)
