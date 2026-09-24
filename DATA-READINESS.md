@@ -1,13 +1,13 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-24 23:57 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-25 00:07 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
-| E4 options | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-23 | `live_chains` |
+| E4 options | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-24 | `live_chains` |
 | E7 arbitrage-tick | 🔴 red | 0 sessions | 5 | — | unknown until recording begins | `e7_ticks` |
-| E12 cross-exchange | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-23 | `xchange` |
-| E13 microstructure | 🟡 amber | 2 days recorded | 30 | 2.0 | 2026-10-08 | `depth5` |
+| E12 cross-exchange | 🟡 amber | 1 days recorded | 30 | 1.0 | 2026-10-24 | `xchange` |
+| E13 microstructure | 🟡 amber | 2 days recorded | 30 | 2.0 | 2026-10-09 | `depth5` |
 | E14 retail positioning | 🔴 red | 0 days recorded | 30 | — | unknown until recording begins | `e1_positioning_store` |
 | L14 public flows | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L14_public_flows` |
 | L15 macro & overnight | 🔴 red | 0 observations | 30 | — | unknown until recording begins | `L15_macro` |
