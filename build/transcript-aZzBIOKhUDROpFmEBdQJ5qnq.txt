@@ -1,46 +1,4 @@
-join(DESIGN, dc_name), encoding="utf-8").read()
-98	    html = _fix_nav_and_links(v8_port.page(dc, data))
-99	    if dc_name in POST:
-100	        html = POST[dc_name](html)
-101	    return html
-102	
-103	
-104	
-105	def _short_reason(sentence):
-106	    """A short plain phrase from a real signal sentence, e.g. 'when VWAP is in its lowest 20%'."""
-107	    body = sentence.split(":", 1)[-1] if ":" in sentence else sentence
-108	    body = body.split("→")[0].split("->")[0]         # cut at the arrow
-109	    body = body.replace("daily,", "").replace("daily ", "").strip(" ,.")
-110	    return (body[:60] + "…") if len(body) > 62 else body
-111	
-112	
-113	def _calls():
-114	    import json
-115	    try:
-116	        return json.load(open(os.path.join(REPO, "site", "data", "live.json"), encoding="utf-8")).get("calls") or []
-117	    except Exception:
-118	        return []
-119	
-120	
-assistant: Order is right (`_fix_nav_and_links` before `_fix_main`). Let me probe the actual ported anchor to see why the regex missed:
-tool_use Write {"file_path": "[redacted]\\AppData\\Local\\Temp\\claude\\C--Users-[redacted]-Desktop-trading-engines-v2\\891fb17f-8804-453d-b7d6-8a736cc901d5\\scratchpad\\probe_main.py", "content": "import sys, re\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import v8_site\n# port WITHOUT _fix_main to see the anchor form after _fix_nav_and_links only\nimport scripts.v8_site as V\ndc = open(V.os.path.join(V.DESIGN, \"Main.dc.html\"), encoding=\"utf-8\").read()\nfrom scripts import v8_port\npre = V._fix_nav_and_links(v8_port.page(dc, V._main_data()))\n# show the first engine-card anchor region\ni = pre.find('grid-template-columns')\nprint(\"anchor context:\", repr(pre[max(0,i-60):i+120]))\nprint(\"engines.html count:\", pre.count('href=\"engines.html\"'))\nprint(\"font-weight 600 E-codes:\", re.findall(r'font-weight: 600;\">(E\\d+)', pre)[:20])\nfull = v8_site.port(\"Main.dc.html\", V._main_data())\nprint(\"engine-E in final:\", sorted(set(re.findall(r'href=\"(engine-E\\d+\\.html)\"', full)))[:20])\n"}
-tool_result: File created successfully at: [redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\scratchpad\probe_main.py (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "PYTHONUTF8=1 python \"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/891fb17f-8804-453d-b7d6-8a736cc901d5/scratchpad/probe_main.py\" 2>&1 | head -12", "description": "Probe the ported Main anchor form"}
-tool_result: anchor context: 'positions yet</div></div>\n</div>\n<div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; padding: 12px 40px 0;">\n  <div style="padding: 10px 12px; b'
-engines.html count: 16
-font-weight 600 E-codes: ['E1', 'E1', 'E1', 'E10', 'E11', 'E21', 'E13', 'E4', 'E7', 'E12', 'E14', 'E6', 'E19', 'E9', 'E16']
-engine-E in final: ['engine-E1.html', 'engine-E10.html', 'engine-E11.html', 'engine-E12.html', 'engine-E13.html', 'engine-E14.html', 'engine-E16.html', 'engine-E19.html', 'engine-E21.html', 'engine-E4.html', 'engine-E6.html', 'engine-E7.html', 'engine-E9.html']
-assistant: The rewrite **works** (probe: `engine-E1.html`…`engine-E21.html`, 13 distinct pages). So the failing assertion is likely my over-strict third check. Let me see the exact failure:
-tool_use Bash {"command": "PYTHONUTF8=1 python -m pytest tests/test_v8_site.py::test_home_engine_cards_link_to_their_own_pages -vv 2>&1 | grep -iE \"assert|error|engines.html\" | head -10", "description": "See the exact failing assertion"}
-tool_result: <persisted-output>
-Output too large (61.6KB). Full output saved to: [redacted]\.claude\projects\C--Users-[redacted]-Desktop-trading-engines-v2\891fb17f-8804-453d-b7d6-8a736cc901d5\tool-results\b4hluo37x.txt
-
-Preview (first 2KB):
-        # UI-1 item 2: the home leaderboard cards were all href="engines.html"; each must now open its own engine page.
-        assert 'href="engine-E1.html"' in html                       # the first card resolves to its own page
-        assert len(engines) >= 3, engines                            # many distinct engine pages, not all the same
->       assert 'href="engines.html" style="display: grid' not in html
-E       assert 'href="engines.html" style="display: grid' not in '<!doctype html><html lang=\'en\'><head><meta charset=\'utf-8\'><meta name=\'viewport\' content=\'width=device-width,initial-scale=1\'><title>E1 Terminal - leaderboard</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n<style>\nbody{margin:0;font-family:\'IBM Plex Sans\',system-ui,sans-serif;background:#0f1115}\na{color:#e8e6e1;text-decoration:none}a:hover{color:#ffffff}\nbutton,input{font-family:\'IBM Plex Sans\',system-ui,sans-serif}\nbutton{cursor:pointer}\n</style></head><body><div style="width: 1280px; height: 1820px; box-sizing: border-box; background: #0f1115; color: #e8e6e1; display: flex; flex-direction: column;">\n<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid #23262d;">\n  <div style="display: flex; align-items: center; gap: 12px;">\n    <a href="index.html" style="display: flex; align-items: center; gap: 10px;"><div style="width: 30px; height: 30px; border-radius: 8px; background: #5DCAA5; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0f1115;">E1</div><div style="font-size: 16px; font-weight: 600;">E1 Terminal</div></a>\n    <div style="font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;">Paper only</div>\n  </div>\n  <div style="display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;">\n 
+ style="font-size: 16px; font-weight: 600;">E1 Terminal</div></a>\n    <div style="font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;">Paper only</div>\n  </div>\n  <div style="display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;">\n 
 ...
 </persisted-output>
 assistant: One residual `href="engines.html" style="display: grid` remains — 15 of 16 cards rewritten (the E-code ones). Let me see which row didn't match:
@@ -5505,3 +5463,76 @@ tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2
 assistant: Now update the resume state (BUILD-STATE.json) and commit the close report:
 tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "content": "{\n \"ruling\": \"NB45 2026-09-24 (HELD DAY, market-hours stop/start waived for today). After-close batch. Held day = not clean (camera down + box critically RAM-short). Money chain untouched; last PASS 32df791c4.\",\n \"item\": \"NB45 done where RAM allowed: item 4 rule-vs-live audit (Overnight/YouTube/Calendar all match rules, none place orders \u2014 docs/reports/rule-vs-live-2026-09-24.md); item 2 memory measured (recorder floor 1.2 GB, reopen floor 0.72 GB, free ~0.4-0.6 GB, ChatGPT app 162 MB reported-not-killed); item 8 close report (docs/reports/close-2026-09-24.md). Commits babb1026b + this.\",\n \"tests\": \"NB44 + NB45-A own-tests green (equity_graph 4, engine_page 4, engines_page_desk 2, watchdog_recorders 5, session_resurrect_markethours 3, auto_login_link 5). FULL-SUITE VERIFY (item 1) HELD: the quiet-box suite was launched alone and the harness REAPED it for critically low memory (not a suite failure). No green suite on HEAD 7c6fb5ccb -> the NB33 hash-check cannot pass -> NB44 site code + fixes 65/66/67 stay BUILT-not-LIVE (unverified). Verify NOT run against the stale 32df791c4 result (would false-FAIL + spurious \ud83d\udea9).\",\n \"next\": \"QUIET BOX (apps closed / overnight, free RAM >> 0.5 GB): run the full suite green on HEAD -> pin CONFORM-SUITE-RESULT.json -> independent verify. PASS -> 65/66/67 + NB44 LIVE at the next 06:00. Then the held items: 3 (8 diary engines' first calibration), 5 (twin run Tue 22 Sep), 6 (nightly dry run 2/2, needs the close-done line). Item 7 (screenshots) if time. DO NOT restart the suite unprompted \u2014 the box reaped it for memory.\",\n \"flag\": \"HELD DAY, NOT CLEAN (camera down + critical RAM). Items 2/4/8 DONE; items 1/3/5/6 HELD on RAM (1 also on the close-done line). Money chain LIVE code untouched; master last PASS 32df791c4; real-money rail closed. Auto-reopen is locked out until tomorrow's close-done 
 tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\BUILD-STATE.json has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "git add docs/reports/close-2026-09-24.md && git commit -q -m \"NB45 item 8: held-day close report \u2014 items 2/4/8 done; items 1/3/5/6 held on RAM (suite reaped for low memory); not-clean (camera+RAM)\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\nClaude-Session: https://claude.ai/code/session_01VJNfctNN3cKuR6vvFfZTWb\" 2>&1 | tail -1\ngit add reports/BUILD-STATE.json && git commit -q -m \"NB45 state: held-day batch \u2014 verify HELD (suite reaped for memory); 65/66/67+NB44 BUILT-unverified; audit+memory+close done\" 2>&1 | tail -1\ngit log --oneline -3", "description": "Commit close report + state (separate)"}
+tool_result: warning: in the working copy of 'docs/reports/close-2026-09-24.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
+be4f0a7a5 NB45 state: held-day batch — verify HELD (suite reaped for memory); 65/66/67+NB44 BUILT-unverified; audit+memory+close done
+53c25dfa2 NB45 item 8: held-day close report — items 2/4/8 done; items 1/3/5/6 held on RAM (suite reaped for low memory); not-clean (camera+RAM)
+babb1026b NB45 item 4: rule-vs-live audit (Overnight/YouTube/Calendar) — all match rules, none place orders (diary-only); archive NB45 dispatch
+assistant: All committed. NB45 is as complete as this critically RAM-short held-day box allows. Final report:
+
+```
+NB45 — AFTER-CLOSE BATCH (HELD DAY)                    per item
+================================================================
+Owner waived today's stop/start rule (held day: no trading, no recording). Machine clock
+at close 11:5x IST. Money chain untouched; last PASS 32df791c4. VERDICT: NOT A CLEAN DAY —
+two reasons, both memory (camera down this morning + the box critically RAM-short all session).
+
+1) FULL-SUITE VERIFY ......................................... HELD (blocked on RAM)
+   I launched the full suite alone (quiet box). The harness KILLED it because the system
+   was critically low on memory — free RAM sat at 0.37–0.61 GB all session, heavy swapping.
+   That is not a test failure; it means the suite never produced a green result on the
+   current code. So the independent verify cannot pass its hash-check, and the NB44 site
+   code + the NB45-A fixes (65/66/67) stay BUILT-not-LIVE (unverified). I did NOT run the
+   verify against the old (32df791c4) result — that would have posted a false failure.
+   → This finishes only on a quieter box (heavy apps closed / overnight). I was told not to
+     restart the suite on my own after the memory kill, and I have not.
+
+2) MEMORY FOR TOMORROW ....................................... DONE (measured)
+   Camera needs free RAM ≥ 1.2 GB at login; today it tried at 0.69 GB (06:02) and couldn't
+   survive — exactly what the NB45-A fix now announces and retries. Biggest users: Memory
+   Compression 1.2 GB (swap), WindowsTerminal 681 MB, Edge-webview 470 MB; the ChatGPT app
+   is 162 MB — yours, reported and NOT touched. The lever is free RAM ≥ 1.2 GB at 06:00.
+
+3) 8 DIARY ENGINES — FIRST CALIBRATION ....................... HELD (RAM)
+   Launches 8 processes; deferred with item 1 to a quiet box. Wrappers BUILT + tested;
+   nothing changed.
+
+4) RULE-VS-LIVE AUDITS (Overnight/YouTube/Calendar) .......... DONE
+   docs/reports/rule-vs-live-2026-09-24.md. All three match their written rules and NONE
+   can place an order — diary/record-only by construction. Two Overnight enhancement notes
+   logged (spread-fill upgrade pending futures depth; the nightly [E21] card isn't built
+   yet) — neither is a live risk.
+
+5) TWIN RUN (replay Tue 22 Sep) .............................. HELD (RAM)
+   Replays the live loop + exam; heavy. Deferred with item 1. Harness BUILT + tested.
+
+6) NIGHTLY DRY RUN 2/2 ....................................... HELD (waits for close-done)
+   Per your own instruction it waits for the close-done line; and a held day has no
+   Thursday recording to evaluate. Deferred to a real close-done.
+
+7) SCREENSHOTS of the old-site graph + tabs ................... SKIPPED
+   "Only if time allows"; v2 is LOW; no browser/RAM headroom today.
+
+8) CLOSE REPORT + resume card ................................ DONE
+   docs/reports/close-2026-09-24.md; BUILD-STATE.json refreshed. 🚩 today: 1.
+
+The thin stack was NOT started at the end — held day (nothing to record) + critical RAM;
+starting it is your double-click, and nothing needs it today.
+Commits: babb1026b (audit + archive), 53c25dfa2 (close report), be4f0a7a5 (state).
+Auto-reopen is locked out until tomorrow's close-done line (the NB45-A fix + your rule).
+
+OWNER VERDICT
+1. Built: the rule-vs-live audit, the morning-memory measurement, and the held-day close
+   report; the four heavy items are held.
+2. Did it pass: partly — items 2/4/8 done; the full-suite verify and the three heavy replays
+   (1/3/5/6) are HELD because the box ran out of memory (the suite was killed for it), not
+   because anything failed. The NB44 + NB45-A code stays BUILT, unverified.
+3. Owner's hands: NOTHING NEEDS THE LEAD. (Optional, not required: the held items finish once
+   the box has more free RAM than today's ~0.5 GB — e.g. heavy windows closed, run overnight.)
+4. Next: on a quiet box, run the full suite green on the current code → independent verify →
+   65/66/67 + NB44 go live at the next 06:00; then the diary calibration, the twin run, and
+   the dry run on the close-done line.
+```
+
+Done — see block above. Session ending; nothing else is startable on this memory-critical held-day box.
