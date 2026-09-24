@@ -1,13 +1,4 @@
- style="font-size: 16px; font-weight: 600;">E1 Terminal</div></a>\n    <div style="font-size: 11px; padding: 3px 8px; border: 1px solid #3a3f4a; border-radius: 999px; color: #b8b6ae;">Paper only</div>\n  </div>\n  <div style="display: flex; gap: 22px; font-size: 14px; color: #b8b6ae; align-items: center;">\n 
-...
-</persisted-output>
-assistant: One residual `href="engines.html" style="display: grid` remains — 15 of 16 cards rewritten (the E-code ones). Let me see which row didn't match:
-tool_use Bash {"command": "PYTHONUTF8=1 python - <<'PY' 2>&1 | head -8\nimport sys, re\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import v8_site as V\nhtml = V.port(\"Main.dc.html\", V._main_data())\ni = html.find('href=\"engines.html\" style=\"display: grid')\nprint(\"residual context:\", repr(html[i:i+260]))\nPY", "description": "Find the residual card row's content"}
-tool_result: residual context: 'href="engines.html" style="display: grid; grid-template-columns: 2fr 1fr 0.8fr 0.8fr 0.8fr 0.7fr 0.9fr 0.9fr 0.9fr 0.7fr; gap: 0; padding: 14px 20px; font-size: 14px; align-items: center;"><div style="display: flex; align-items: center; gap: 12px;"><div style='
-assistant: The non-greedy `mid` can span across rows if a row lacks an E-code — risking a card linking to a *later* row's engine (a mis-link). Let me constrain `mid` so each card pairs only with the code in its **own** row:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\v8_site.py", "old_string": "    html = re.sub(\n        r'<a href=\"engines\\.html\"(?P<attrs> style=\"display: grid[^>]*)>(?P<mid>.*?)font-weight: 600;\">(?P<code>E\\d+)',\n        _card_href, html, flags=re.DOTALL)", "new_string": "    # `mid` may NOT contain another card anchor, so each card pairs ONLY with the engine code in its OWN row\n    # (never steals a later row's code -> never mis-links a card to the wrong engine).\n    html = re.sub(\n        r'<a href=\"engines\\.html\"(?P<attrs> style=\"display: grid[^>]*)>'\n        r'(?P<mid>(?:(?!href=\"engines\\.html\").)*?)font-weight: 600;\">(?P<code>E\\d+)',\n        _card_href, html, flags=re.DOTALL)"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\v8_site.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "PYTHONUTF8=1 python - <<'PY' 2>&1 | head -8\nimport sys, re\nsys.path.insert(0, r\"[redacted]\\Desktop\\trading-engines-v2\")\nfrom scripts import v8_site as V\nhtml = V.port(\"Main.dc.html\", V._main_data())\nprint(\"distinct engine pages:\", sorted(set(re.findall(r'href=\"(engine-E\\d+\\.html)\"', html))))\nprint(\"residual engines.html-grid anchors:\", html.count('href=\"engines.html\" style=\"display: grid'))\n# check each card's href matches the code in its OWN row (no mis-link)\nrows = re.findall(r'href=\"(engine-E\\d+|engines)\\.html\" style=\"display: grid(?:(?!href=\").)*?font-weight: 600;\">(E\\d+)', html, re.DOTALL)\nbad = [(h,c) for h,c in rows if h != \"engine-%s\" % c]\nprint(\"mislinked rows (href != row code):\", bad[:5], \"count\", len(bad))\nPY", "description": "Verify no mis-links + count residual after the fix"}
+0;\">(E\\d+)', html, re.DOTALL)\nbad = [(h,c) for h,c in rows if h != \"engine-%s\" % c]\nprint(\"mislinked rows (href != row code):\", bad[:5], \"count\", len(bad))\nPY", "description": "Verify no mis-links + count residual after the fix"}
 tool_result: distinct engine pages: ['engine-E1.html', 'engine-E10.html', 'engine-E11.html', 'engine-E12.html', 'engine-E13.html', 'engine-E14.html', 'engine-E16.html', 'engine-E19.html', 'engine-E21.html', 'engine-E4.html', 'engine-E6.html', 'engine-E7.html', 'engine-E9.html']
 residual engines.html-grid anchors: 1
 mislinked rows (href != row code): [] count 0
@@ -5536,3 +5527,33 @@ OWNER VERDICT
 ```
 
 Done — see block above. Session ending; nothing else is startable on this memory-critical held-day box.
+queue-operation: DISPATCH ID: NB46 — OWNER YES: START THE DESK + OVERNIGHT QUIET RUN (24 Sep 2026, 12:16 IST) → BUILD
+READ: NB45 report (desk not started after the held-day batch; full-suite verify HELD on RAM 0.37–0.61 GB;
+NB44 + NB45-A code BUILT unverified; recorder floor 1.2 GB; top RAM: memory compression 1.2 GB, WindowsTerminal
+681 MB, Edge webview 470 MB, ChatGPT 162 MB). ORIGIN: OWNER-SAID "YES" at 12:16 IST (owner away from the laptop):
+one-time §14.10 exception for today, expiring at the 06:00 login — the builder starts the desk itself.
+1) START_E1_STACK.bat once; confirm the single thin stack (token_ping · watchdog · site_loop · supervisor), one
+   each, on the current code; post the 👀 line. Free RAM measured after.
+2) Free what the builder itself can: end this build session's own heavy children, drop the terminal scrollback
+   if a command exists for it, close nothing that is the owner's (ChatGPT stays). Report free RAM before/after.
+3) Leave the overnight path armed: the 03:00 suite runner on the current HEAD → independent verify → proof_apply
+   makes NB44 + NB45-A LIVE at 06:00 on PASS; if RAM is still below the floor at 03:00, the runner must post ONE
+   ⏱ line with the measured number and skip (never crash-loop). Cite the runner's window and RAM guard.
+4) Then END this session (memory) — auto-reopen stays locked until tomorrow's close-done line.
+Report "NB46": stack confirmed, RAM numbers, what is armed for 03:00/06:00; end with NOTHING NEEDS THE LEAD /
+LEAD RULING NEEDED.
+user: DISPATCH ID: NB46 — OWNER YES: START THE DESK + OVERNIGHT QUIET RUN (24 Sep 2026, 12:16 IST) → BUILD
+READ: NB45 report (desk not started after the held-day batch; full-suite verify HELD on RAM 0.37–0.61 GB;
+NB44 + NB45-A code BUILT unverified; recorder floor 1.2 GB; top RAM: memory compression 1.2 GB, WindowsTerminal
+681 MB, Edge webview 470 MB, ChatGPT 162 MB). ORIGIN: OWNER-SAID "YES" at 12:16 IST (owner away from the laptop):
+one-time §14.10 exception for today, expiring at the 06:00 login — the builder starts the desk itself.
+1) START_E1_STACK.bat once; confirm the single thin stack (token_ping · watchdog · site_loop · supervisor), one
+   each, on the current code; post the 👀 line. Free RAM measured after.
+2) Free what the builder itself can: end this build session's own heavy children, drop the terminal scrollback
+   if a command exists for it, close nothing that is the owner's (ChatGPT stays). Report free RAM before/after.
+3) Leave the overnight path armed: the 03:00 suite runner on the current HEAD → independent verify → proof_apply
+   makes NB44 + NB45-A LIVE at 06:00 on PASS; if RAM is still below the floor at 03:00, the runner must post ONE
+   ⏱ line with the measured number and skip (never crash-loop). Cite the runner's window and RAM guard.
+4) Then END this session (memory) — auto-reopen stays locked until tomorrow's close-done line.
+Report "NB46": stack confirmed, RAM numbers, what is armed for 03:00/06:00; end with NOTHING NEEDS THE LEAD /
+LEAD RULING NEEDED.
