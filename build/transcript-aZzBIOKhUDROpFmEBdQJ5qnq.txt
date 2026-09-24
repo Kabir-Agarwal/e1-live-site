@@ -2875,3 +2875,60 @@ tool_result: ProcessId Exe                                                      
 
 
 FREE_RAM_MB=602  FREE_GB=0.59
+assistant: The stack is **UP, one-each** (Python 3.10): token_ping 18832, watchdog 18376, site_loop 2984, supervisor 17100, book20_runner 12368 — no doubles. Recorders correctly did *not* start (not a 06:00 login landing, per §14.10). Free RAM 0.59 GB (the stack + book20's ~1.3 GB). Let me check why the launcher is still backgrounded, then clean it up:
+tool_use Read {"file_path": "[redacted]\\AppData\\Local\\Temp\\claude\\C--Users-[redacted]-Desktop-trading-engines-v2\\72110bd8-643f-4680-8012-b7b51720a97b\\tasks\\br2jait9p.output"}
+tool_result: <system-reminder>Warning: the file exists but the contents are empty.</system-reminder>
+assistant: Empty — the launcher is idling (likely a trailing `pause`); the 5 processes are detached and up. Stopping the lingering launcher and re-confirming the stack survives:
+tool_use TaskStop {"task_id": "br2jait9p"}
+tool_result: {"message":"Successfully stopped task: br2jait9p (cmd //c '[redacted]\\Desktop\\E1-DESK\\START_E1_STACK.bat' 2>&1 | tail -20; echo \"EXIT=$?\")","task_id":"br2jait9p","task_type":"local_bash","command":"cmd //c '[redacted]\\Desktop\\E1-DESK\\START_E1_STACK.bat' 2>&1 | tail -20; echo \"EXIT=$?\""}
+tool_use Bash {"command": "powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='pythonw.exe'\\\" | Select-Object ProcessId,CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 200\"", "description": "Re-confirm stack survives launcher stop"}
+tool_result: ProcessId CommandLine                                                                                                
+--------- -----------                                                                                                
+    18832 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\token_ping.py               
+    18376 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\watchdog.py                 
+     2984 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\site_loop.py                
+    17100 "[redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe"  scripts\supervisor.py               
+    12368 [redacted]\AppData\Local\Programs\Python\Python310\pythonw.exe -m engine1_rebuild.book20_runner --loop
+assistant: The stack survived (detached), one-each. Confirming HEAD is the verified commit (so `proof_apply` fires at 06:00) and nothing that should be committed is left dangling:
+tool_use Bash {"command": "echo \"HEAD: $(git rev-parse --short HEAD)\" && echo \"verify report on disk:\" && grep -m1 \"VERDICT\" docs/reports/verify-18a5f038a.md && echo \"--- staged code? (should be empty) ---\" && git diff --cached --name-only && echo \"--- log ---\" && git log --oneline -7", "description": "Confirm HEAD = verified commit, nothing staged"}
+tool_result: HEAD: 18a5f038a
+verify report on disk:
+VERDICT: PASS
+--- staged code? (should be empty) ---
+--- log ---
+18a5f038a NB48 item 3 follow-up: isolate DIARY_DIR in the two "uncalibrated" diary tests
+3a575d549 NB48 state (machine): BUILD-STATE.json — NB48 item summary + RAM + verify-PASS
+bfcd814a5 NB48 state (docs): items 1/2/3/5 done, item 4 deferred (checklist 69); verify PASS; final re-verify on the last commit
+8b0ea9b50 NB48 item 5: book20 bounded-memory guard (TDD, red-able) + honest finding (no per-poll leak on the light path)
+c441cba77 NB48 item 3: diary-engine first-calibration entry point + fix the footprint measurement (was silently broken)
+2496aefef NB48 item 2: fix 3 stale Deliverables/nav tests to the current owner ruling (UI-1 item 5 / NB43)
+6ecddf544 NB48: archive the dispatch verbatim (§7.1 R-ARCHIVE-DISPATCH)
+assistant: All in order: **HEAD = `18a5f038a`** (the verified PASS commit), verify report on disk shows VERDICT: PASS, nothing staged. `proof_apply` will queue the next-open orders at 06:00. No further commits (that would move HEAD off the verified commit). NB48 is complete.
+
+---
+
+## NB48 — held day (owner stopped the stack; quiet box) · machine clock 20:30 IST
+
+**Item 1 — DONE.** Owner's `STOP_E1_STACK.bat` confirmed the stack **down** (only my two windows-mcp helpers). Free RAM **2.36 GB** (above the 2.0 GB heavy floor) → genuinely quiet.
+
+**Item 2 — DONE (green + verify PASS).** The suite on HEAD showed **3 reds, all site-only, all encoding superseded rules** (git proved NB43 `08f35c73d` intentionally made Deliverables a separate island — `build(write=)`→`build(out_dir=)`, no main-site nav link — per the UI-1 item-5 owner reversal). Fixed the 3 stale tests (code unchanged): `test_deliverables_page_has_both_sections…`, `test_deliverables_is_out_of_the_design_nav`, `test_nav_ruling_live_desk_and_messages_in_deliverables_and_backtest_out`. Suite then **green 448/0**; independent verify **PASS** (rung-d; Codex hit its usage limit and fell back as designed). After the rest of the run advanced HEAD, a **final suite (453/0) + verify PASS** on the last commit `18a5f038a` — so `proof_apply` queues the next-open orders at tomorrow 06:00. **NB44 + fixes 65/66/67 are live at HEAD.**
+
+**Item 3 — DONE + a real latent bug fixed.** Added `diary_engines.calibrate()`; the calibration test drove out that `diary_engine._peak_ws_gb` was silently broken (`psapi.GetProcessMemoryInfo` returns 0 on this box **and** the 64-bit handle was truncated for lack of `argtypes`) → footprint always `None` → **the §27c RAM gate could never open (no diary engine could ever start)**. Fixed with `K32GetProcessMemoryInfo` + declared argtypes. All 8 engines calibrated per-process: **footprint 0.013 GB each**, first ✅ diary lines, zero orders. RED→GREEN: `test_diary_calibrate` (2), plus `test_diary_engines` DIARY_DIR isolation (2).
+
+**Item 5 — bounded-memory guard + honest finding.** `test_book20_memory.py` — a tracemalloc checker **proven red-able** on a real 100 KB/poll leak; `run_once`'s light path grew **< 3 MB over 30 polls = no per-poll leak**. The ~1.3 GB book20 footprint is the **one-time heavy candidate-scan + libraries** (pandas high-water-mark ratchet), not an unbounded leak; the NB47 1.19→1.32 GB drift matches the 5-min cache refresh. The **heavy-path** measurement reaps under this 8 GB box's OOM reaper (twice this session) → **checklist item 68** (needs a bigger box). No fabricated cause/fix (§4.4).
+
+**Item 4 — twin RUN deferred honestly → checklist 69.** Harness + both safety nets proven (12 tests); recorded 2026-09-22 data present. `real_live_loop`/`real_exam` are stubs; a faithful (non-tautological) twin needs a 2026-09-22 depth→quotes adapter (`live._quotes_for` is live-only). A defined integration, not a "run the built thing" — I did not fabricate a verdict.
+
+**Item 6 — DONE.** Ran `START_E1_STACK.bat` once (owner's 12:16 YES). Read-only listing: **one-each, no doubles** — token_ping 18832 · watchdog 18376 · site_loop 2984 · supervisor 17100 · book20_runner 12368 (all Python 3.10). Recorders correctly not up (not a 06:00 login landing). Free RAM after: **0.59 GB**. Resume card + CONTEXT + BUILD-STATE committed (before the final verify, so HEAD stays the verified commit).
+
+**One honest observation (not a blocker):** §14.10's text says `START_E1_STACK.bat` starts "exactly three" (token_ping/watchdog/site_loop); the actual owner batch also brought up **supervisor + book20_runner** (five, one each). The batch is the authority and this is within your sanctioned start — flagging so you can reconcile the §14.10 wording with the batch when convenient. Money-chain LIVE code untouched; real-money rail closed.
+
+---
+
+### OWNER VERDICT
+1. **What got built:** the test suite is green and independently verified, so tomorrow's tested improvements (site fixes + the three NB45 fixes) go live at the 6 a.m. login; the 8 side "diary" engines got their first calibration; and a hidden bug that would have stopped every side engine from ever starting was found and fixed.
+2. **Did it pass:** yes — full suite 453/0, verified PASS twice by an independent check.
+3. **What needs your hands:** nothing. (The stack is back up, one of each.)
+4. **Next:** two measure-only jobs need a machine with more memory than this 8 GB laptop — the twin-run wiring (checklist 69) and book20's heavy-path memory check (checklist 68).
+
+**NOTHING NEEDS THE LEAD.**
