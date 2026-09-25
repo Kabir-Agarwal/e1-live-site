@@ -1,4 +1,4 @@
-# E19 finder — the context engine's rulers (R-DEPTH) — 2026-09-25 19:15 IST
+# E19 finder — the context engine's rulers (R-DEPTH) — 2026-09-25 19:25 IST
 
 _The same exact-condition finder the price side uses, pointed at four context lanes: 5-level depth, retail crowding, macro/overnight, breadth. A ruler's exam runs only when its lane is GREEN on the readiness page; a certified ruler enters PROBATION and never trades on history alone. RECORD-ONLY, no orders._
 
