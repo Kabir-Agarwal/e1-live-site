@@ -29,7 +29,7 @@ _Engine 1 runs the SAME fires two ways — **FLAT** (1R = ₹1,000) and **ADAPTI
 | E4-ADAPTIVE | ₹2,00,000 |
 | desk | ₹6,00,000 |
 
-_Generated 2026-09-25 09:17:33 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY. Paper trades: ON — 216 stocks unlocked._
+_Generated 2026-09-25 09:27:35 IST. Every number is COMPUTED FROM the linked blotter (backtest_stats on that file's own R columns), so it reconciles to its source by construction — nothing typed. Rupees at the paper book's STATED notional: 1R = ₹1,000, starting capital ₹200,000. Both fill models (mid vs crossing) side by side. Per-test downloadable blotters: site/blotters/<key>.csv. RECORD-ONLY. Paper trades: ON — 216 stocks unlocked._
 
 | Engine | Test | Period | Calls | Win% / Acc% | Sharpe (mid/cross) | Sortino (mid/cross) | maxDD R (mid/cross) | Total R (mid/cross) | End cap mid (P/L) | End cap cross (P/L) | Fees | Blotter |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
