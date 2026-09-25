@@ -1,6 +1,6 @@
 # ROOF — SIGNAL COPYBOOK + SCOREBOARD (R-ROOF-SITE-PROBATION 1)
 
-_Generated 2026-09-25 22:02 IST. The roof COPIES every engine's signal verbatim into one combined ledger; an exact opposite pair (same instrument, same timestamp window, buy vs sell) CANCELS and is logged. NO sizing, NO edits, NO capital, NO orders — engines place their own. The combined ledger's P&L (both fills) is the cumulative book. RECORD-ONLY._
+_Generated 2026-09-25 22:12 IST. The roof COPIES every engine's signal verbatim into one combined ledger; an exact opposite pair (same instrument, same timestamp window, buy vs sell) CANCELS and is logged. NO sizing, NO edits, NO capital, NO orders — engines place their own. The combined ledger's P&L (both fills) is the cumulative book. RECORD-ONLY._
 
 ## Combined book (the copybook)
 
