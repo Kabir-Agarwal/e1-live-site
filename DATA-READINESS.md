@@ -1,6 +1,6 @@
 # DATA READINESS — the five recording lanes (R-DATA-LANES)
 
-_Generated 2026-09-25 12:53 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-25 13:03 IST. Each lane keeps a point-in-time store + manifest; this tracks how close each is to having enough to backtest. When a lane turns GREEN its backtest is queued automatically. RECORD-ONLY; nothing here places an order._
 
 | Lane | flag | recorded | min | rate/day | projected enough | store |
 |---|---|---|---|---|---|---|
