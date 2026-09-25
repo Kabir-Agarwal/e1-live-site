@@ -1,6 +1,6 @@
 # GRAVEYARD DIARY — failed strategies, logged live vs flat (R-GRAVEYARD-DIARY)
 
-_Generated 2026-09-25 07:09 IST. Every backtest-failed equity strategy runs as a LOGGED DIARY on live data beside the flat E1 book — never placing an order, same fees, both fills — and is scored weekly vs flat. A diary may be PROPOSED for paper orders ONLY when it beats flat LIVE by more than noise (|per-fire diff| > 2 measured SE) AND passes a fresh walk-forward backtest on the recorded data. RECORD-ONLY; nothing here places an order._
+_Generated 2026-09-25 07:21 IST. Every backtest-failed equity strategy runs as a LOGGED DIARY on live data beside the flat E1 book — never placing an order, same fees, both fills — and is scored weekly vs flat. A diary may be PROPOSED for paper orders ONLY when it beats flat LIVE by more than noise (|per-fire diff| > 2 measured SE) AND passes a fresh walk-forward backtest on the recorded data. RECORD-ONLY; nothing here places an order._
 
 ## The seven graveyard diaries (armed as shadows)
 
