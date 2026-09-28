@@ -1,4 +1,148 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>bcdf3b063</b> · 2026-09-28 07:49</div><div>NB52 step 4: add NB50 item-3 operational additions to MASTER-CHECKLIST §H (desk day-log, nightly rehearsal, market-hours mode, event blackout, monthly fill calibration) — items 70-74, docs only. Count 65 · done 37 · pending 28</div><div class='sub h'>docs/MASTER-CHECKLIST.md           | 9 +++++++++</div><div class='sub h'>docs/dispatches/2026-09-28_NB52.md | 9 +++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>952a8a6a6</b> · 2026-09-28 08:09</div><div>NB53 step 2: Engine Bus design doc (docs/architecture/ENGINE-BUS.md) — one scheduler (engine_bus.py called from run_evening after the morning bar), per-engine isolation (§27), money math cited to money.py/liquidity_backtest/engine_book/paper_account, cadence lanes, RAM-measured or REPLAY. Docs only; code+tests after close-done</div><div class='sub h'>docs/architecture/ENGINE-BUS.md | 74 +++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
+new file mode 100644
+index 000000000..712ec0002
+--- /dev/null
++++ b/docs/architecture/ENGINE-BUS.md
+@@ -0,0 +1,74 @@
++# ENGINE BUS — the one scheduler for all 8 engines (NB53 step 2, 2026-09-28)
++
++_Design doc, written BEFORE code (§26 TDD, §13). Today (28 Sep) the desk is up → docs/design only; the
++`scripts/engine_bus.py` module + its RED→GREEN tests land after close-done. Every number below is CITED to an
++existing constant/function — no new typed number (§4.1)._
++
++## 1. One scheduler, one name
++
++- **The bus is `scripts/engine_bus.py`**, called ONCE per day from the existing evening scheduler
++  `scripts/run_evening.py::main` (run_evening.py:20) **after the morning bar** (the same place the Price Engine&#x27;s
++  conforming evaluator runs today — run_evening.py:60 `conform`, :79 `practice_counter`). There is exactly one
++  scheduler; the bus is a sequence step inside it, not a second loop (§27 isolation: one driver).
++- After the morning bar, the bus **evaluates each DAILY engine in sequence** (order = NB53 step 3). Each call is
++  wrapped in its own try/except so one engine&#x27;s fault never touches another or the chain (§27d quiet failures).
++
++## 2. Isolation — each engine owns its lane (§27)
++
++| Concern | Rule |
++|---|---|
++| Folder | each engine in its own package `engineN_&lt;name&gt;/` (E1 stays where it is — the protected chain, §27a) |
++| State | its own state files under its folder / `reports/&lt;engine&gt;/`; never another engine&#x27;s |
++| Ledger | its own paper ledger `reports/books/&lt;ENGINE&gt;-LEDGER.csv` (the pattern `engine_book`/`paper_account` already use) |
++| Inputs | shared inputs are **READ-ONLY**: the bar store (`engine1_rebuild/datastore`), the quote/depth stores (`E1-DESK/stores/e1_deriv_store/*`, e13_depth), the fee model (`engine1_rebuild/money`), Sizing Families (`engine1_rebuild/engine_book`) |
++| Order path | **only the Price Engine (E1/E10/E11) places an order**; every other engine is diary-only until it earns the order path by a separate owner decision (§27b) |
++| Telegram | one line per engine per day, tagged with the engine name, existing ⏱/✅/🙋 conventions; a non-chain engine NEVER 🙋 (§27d). Demos/tests never reach Telegram or any live ledger (§25). |
++
++## 3. Money math — identical to the Price Engine, cited (each engine restates this in its own doc BEFORE code)
++
++- **Fees:** `engine1_rebuild/money.py` — statutory round-trip `COST_STATUTORY_RT` (money.py:17, ~10 bps,
++  Zerodha+NSE published rates) plus the measured spread via `money.cost_readout()` (money.py:189); the F&amp;O leg
++  cost is `money._leg_cost` (money.py:40). No engine invents a cost.
++- **Fill bar + cost gate:** identical to the Price Engine — entry at the **next daily open**
++  (`engine1_rebuild/paper.simulate_trade`, the conforming fill `engine1_rebuild/conform`) gated by the **six
++  execution checks** `scripts/liquidity_backtest.checklist` (liquidity_backtest.py:185). An engine reuses these
++  functions; it does not copy them.
++- **Sizing:** via **Sizing Families** — `engine1_rebuild/engine_book.weight(family)` (engine_book.py:4-5,
++  `risk = weight(family) × PAPER_R_RUPEES`). Cold start = flat 1.0 (engine_book.py:13).
++- **Starting paper capital:** the SAME figure the Price Engine uses — `engine1_rebuild/money.NOTIONAL_CAPITAL`
++  (money.py:13 = ₹2,00,000; `paper_account.START_EQUITY = money.NOTIONAL_CAPITAL`, paper_account.py:25). No new
++  number: each engine&#x27;s account reads this constant.
++- **Positions / exits / caps:** from the engine&#x27;s OWN rules, stated in its design doc.
++- **Failed strategies → probation:** the existing diary mechanism — `scripts/diary_engines.py` /
++  `scripts/diaries.py` / `scripts/engine_accounts.py`. A strategy that loses after costs is written to its diary
++  on probation with its reason; it never silently vanishes.
++
++## 4. Cadence lanes
++
++- **Daily engines** (Claude Price, YouTube, Calendar, Copycat Roof, Deliverables-daily): evaluated by the bus
++  after the morning bar, once per day.
++- **Machine Factory:** research only — runs **after close-done and before 04:30**, generates + tests candidate
++  rules offline, writes to its own ledger/reports, **never to any live queue** (NB53 step 5 / §27b).
++- **Intraday engines** (Arbitrage two-exchange, Nikhil&#x27;s index tests): run as **lanes in the existing recorder
++  set** — but ONLY after the lane&#x27;s **RAM floor is MEASURED** the same way the depth camera&#x27;s was
++  (`memory_guard.RECORDER_FLOOR_GB` = measured peak + 0.3 margin = 0.378 GB, NB49). If the box cannot hold a
++  lane beside the desk (measured free RAM &lt; the lane&#x27;s measured floor), that engine runs in **REPLAY mode** on
++  recorded quotes — the full paper loop against a recorded day, its own ledger — and the report says so. **No
++  engine is skipped for RAM.**
++
++## 5. The bus contract (what `engine_bus.py` will expose — tested RED→GREEN after close-done)
++
++```
++engine_bus.register(name, evaluate_fn, cadence)      # cadence in {daily, nightly, intraday, replay}
++engine_bus.run_daily(asof, reader) -&gt; {name: {line, ledger_rows, error}}   # one entry per daily engine
++engine_bus.line(name, result) -&gt; &quot;&lt;✅|⏱|🙋&gt; &lt;engine&gt; — &lt;plain summary&gt;&quot;    # never 🙋 for a non-chain engine
++```
++
++Wiring test (§26 &quot;live&quot; is a test): a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not
++called from `run_evening.main`, and passes only when it is — committed RED where unwired (the honest state).
++
++## 6. What this doc does NOT decide (each engine&#x27;s own design doc does)
++
++The bus is the plumbing. Each engine&#x27;s rules — its signal, positions, exits, caps — live in that engine&#x27;s
++design doc (NB53 step 3), written before its code, every rule cited to a source. An engine whose rules exist
++nowhere gets a DESIGN SHEET of questions and a LEAD RULING NEEDED, never an invented rule (§4.4).
+</pre></div><div class='c'><div class='h'><b>e8b0d64af</b> · 2026-09-28 08:06</div><div>NB53 step 1: CLAUDE.md §28 — all 8 engines built now (E1-only freeze retired); never-delete amended (dead code deleted only in the commit that lands its verified-live replacement, cited). Archive NB53. Docs only</div><div class='sub h'>CLAUDE.md                          | 24 ++++++++++++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53.md | 26 ++++++++++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
+index 4aff1dbcc..84635caed 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -950,3 +950,27 @@ Engine money chain is now PROTECTED BY ISOLATION, not by a freeze. Five rules bi
+ _Why: the chain is proven LIVE + verified (32df791c4); the risk in unparking is a peripheral engine or a UI build
+ regressing the money path. Isolation removes that risk by construction — the chain&#x27;s files/launch/processes are
+ off-limits to everything else, and every other process is diary-only, RAM-gated, killed-first, and quiet._
++
++## 28. Complete the build — all 8 engines (owner dispatch NB53, 2026-09-28)
++
++The owner said (28 Sep ~08:05 IST): *&quot;all the engines made and running, whether they fire patterns or not;
++complete the build now, even if it does not run today.&quot;* Two dated amendments carry this ID:
++
++**(a) ALL 8 ENGINES ARE BUILT NOW**, in the NB53 step-3 order: 1 [redacted] Price Engine (the protected chain,
++§27a — only the §H 70–73 additions, launch-path, verify-gated), 2 Claude Price Engine, 3 YouTube, 4 Calendar,
++5 Machine Factory, 6 Arbitrage, 7 Copycat Roof, 8 Deliverables (Nikhil index tests + Dubai Strategies). **The
++23 Sep &quot;E1-only until 5 clean days&quot; freeze (§24) is RETIRED** — engines are built now, each isolated (§27),
++diary-only, placing nothing, verified before it is called live. An engine whose design exists nowhere on the
++laptop is NOT invented: a DESIGN SHEET of the rule questions is written and reported LEAD RULING NEEDED (§4.4).
++
++**(b) NEVER-DELETE, AMENDED.** The old repo `[redacted]\Desktop\trading-engines` stays READ-ONLY until the
++twin run (MASTER-CHECKLIST item 6/69) MATCHes — unchanged. **Inside the rebuild**, dead code is no longer kept
++forever: it is deleted **in the same commit that makes its verified-live replacement**, and that commit **cites
++what it deletes and the replacement**. Deletion outside that pairing is still forbidden. This is the one
++carve-out from the standing never-delete posture, and it is bounded to a replacement landing verified.
++
++_Isolation (§27) still governs every engine here: own folder, own state, own paper ledger; shared inputs are
++READ-ONLY (bar store, quote/depth stores, the fee model, Sizing Families); no engine but the Price Engine
++touches the order path; a non-chain engine&#x27;s failure is quiet (✅/⏱, never 🙋). The gates (§26 TDD, §18.1
++independent verify, no launch-path edit in market hours, 04:30 hard stop, per-day owner YES for a stack
++stop/start) are unchanged: a thing is &quot;built&quot; until a fresh session verifies it._
+diff --git a/docs/dispatches/2026-09-28_NB53.md b/docs/dispatches/2026-09-28_NB53.md
+new file mode 100644
+index 000000000..10a12e8a2
+--- /dev/null
++++ b/docs/dispatches/2026-09-28_NB53.md
+@@ -0,0 +1,26 @@
++ID: NB53 — COMPLETE THE BUILD, ALL 8 ENGINES END TO END → BUILD
++ORIGIN: OWNER-SAID (28 Sep ~08:05 IST): &quot;all the engines made and running, whether they fire patterns or not; complete the build now, even if it does not run today.&quot; LEAD-RULED (owner delegated execution): the 23 Sep &quot;E1-only until 5 clean days&quot; line is retired; never-delete amended (step 1b).
++READ: NB52 report (items 65 · done 37 · pending 28; HEAD bcdf3b063; launch path reverted to 86534e1d7; Friday fix f08c41e78 and disk floor 5f62b21a9 kept in git, unverified; §H items 70–74 added; 0.68 GB free with the desk off while this session is open). ASSUMING: the owner did not start the desk today — step 0 checks. MISSING: whether CLAUDE-PRICE-ENGINE-ARCHITECTURE.md is in the repo; design docs on the laptop for YouTube, Calendar, Machine Factory, Arbitrage, Copycat Roof, Deliverables.
++
++0. STATE: machine clock; process list. If ANY desk process is up → market-hours mode until close-done: docs/design writing only, no code runs, no tests, no launch-path edits; resume the build after close-done. If none is up → build all day. Never start the desk yourself.
++
++1. LAW CHANGES, write into CLAUDE.md as dated amendments carrying this ID: (a) all 8 engines are built now, in the order of step 3. (b) never-delete: the old repo stays read-only until the twin run (item 6) MATCHes; inside the rebuild, dead code is deleted in the same commit that makes its replacement verified-live — cite what you delete and the replacement.
++
++2. ENGINE BUS first (isolation law §27, TDD §26): one scheduler, one name, cite the file. After the morning bar it evaluates each daily engine in sequence; each engine in its own folder, own state, own paper ledger; shared READ-ONLY inputs only: bar store, quote/depth stores, the fee model with the verified Zerodha 2026 costs, Sizing Families. Money math per engine, written in its design doc BEFORE code: fees + fill bar + cost gate identical to the Price Engine&#x27;s (cite the functions); sizing via Sizing Families; starting paper capital = the same figure the Price Engine&#x27;s paper ledger uses (cite where it is set — no new typed numbers); positions, exits, caps from the engine&#x27;s own rules; failed strategies → probation (existing mechanism, cite). Telegram: one line per engine per day, tagged with the engine&#x27;s name, existing ⏱/✅/🙋 conventions; demos/tests never reach Telegram or any live ledger. Machine Factory runs only after close-done and before 04:30. Intraday engines (Arbitrage, Nikhil&#x27;s index tests) run as lanes in the existing recorder set with their RAM floor MEASURED before adding (same method as the depth camera&#x27;s 0.378 GB); if the box cannot hold a lane beside the desk, that engine runs in REPLAY mode on recorded quotes — full paper loop, own ledger — and the report says so. No engine is skipped for RAM.
++
++3. ORDER — one engine at a time; each = design doc → RED tests → code → GREEN → commit → checklist line:
++   1 [redacted] Price Engine: rulers untouched (35 untouchable). Only §H items 70–73: desk day-log (one line per step per day incl. free RAM + disk), nightly full-morning rehearsal on the real stack (fake token, recorded quotes, RAM + disk measured per step, PASS / NOT READY line), market-hours mode, event blackout. These touch the launch path: build them, but they go LIVE only via the fresh-session verify the owner runs with this session closed.
++   2 Claude Price Engine: chunks 1–7 per CLAUDE-PRICE-ENGINE-ARCHITECTURE.md. If the file is not in the repo: report MISSING for this engine and continue.
++   3 YouTube Engine: rules from the strategy library and the Desktop\yt-transcripts corpus, every rule with its source (channel, video, line); a rule without a citation is not built.
++   4 Calendar Trading: rules from the existing design (cite). Needs an expiry/holiday/event calendar; if none exists, build it first from the exchange&#x27;s published list and cite the file.
++   5 Machine Factory: research engine — candidate rules generated and tested offline at night; outputs to its own ledger/reports only, never to any live queue.
++   6 Arbitrage: the 15–16 Sep arbitrage-paper rules (cite) — two-exchange spread, paper only.
++   7 Copycat Roof: from the existing design (cite).
++   8 Deliverables: Nikhil&#x27;s index tests (index-only, intraday index; cite the request record) and Dubai Strategies (delivery/accumulation; cite) — each its own paper account and ledger.
++   If an engine&#x27;s design exists nowhere on the laptop: write a DESIGN SHEET listing exactly the rule questions the lead must answer, report LEAD RULING NEEDED for that engine, and move to the next engine. Never invent a rule.
++
++4. HALTS: after each engine&#x27;s GREEN post the ⏱ line and the count, then keep going. Stop only for an ambiguous or missing rule (cite), a launch-path change beyond §H 70–73, or anything that would touch the Price Engine&#x27;s rulers or ledger (never do it).
++
++5. GATES unchanged: &quot;built&quot; until a fresh session verifies it; no session audits its own work; no launch-path edit in market hours; 04:30 hard stop for launch-path edits; per-day owner YES for any stack stop/start.
++
++6. REPORT at every checkpoint, first line &quot;NB53 · engine &lt;name&gt; · &lt;state&gt;&quot;: files, tests RED→GREEN, commit; design gaps; RAM measured for any lane; &quot;items N · done N · pending N&quot;; your MEASURED rate (build-hours per engine so far) so the lead computes the ETA; 🚩 rows; last line NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
+</pre></div><div class='c'><div class='h'><b>bcdf3b063</b> · 2026-09-28 07:49</div><div>NB52 step 4: add NB50 item-3 operational additions to MASTER-CHECKLIST §H (desk day-log, nightly rehearsal, market-hours mode, event blackout, monthly fill calibration) — items 70-74, docs only. Count 65 · done 37 · pending 28</div><div class='sub h'>docs/MASTER-CHECKLIST.md           | 9 +++++++++</div><div class='sub h'>docs/dispatches/2026-09-28_NB52.md | 9 +++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
 index 05fcdd9c5..4e74e4efc 100644
 --- a/docs/MASTER-CHECKLIST.md
 +++ b/docs/MASTER-CHECKLIST.md
