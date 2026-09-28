@@ -1,4 +1,48 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>952a8a6a6</b> · 2026-09-28 08:09</div><div>NB53 step 2: Engine Bus design doc (docs/architecture/ENGINE-BUS.md) — one scheduler (engine_bus.py called from run_evening after the morning bar), per-engine isolation (§27), money math cited to money.py/liquidity_backtest/engine_book/paper_account, cadence lanes, RAM-measured or REPLAY. Docs only; code+tests after close-done</div><div class='sub h'>docs/architecture/ENGINE-BUS.md | 74 +++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>19faa6f64</b> · 2026-09-28 08:11</div><div>NB53 engine 2 (Claude Price): DESIGN SHEET — architecture MISSING from repo; chunk 1-7 rule questions for the lead, no rules invented (§4.4). Slot reserved. Docs only</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md            | 38 ++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
+new file mode 100644
+index 000000000..6891f7fbe
+--- /dev/null
++++ b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
+@@ -0,0 +1,38 @@
++# Claude Price Engine — DESIGN SHEET (engine 2, NB53) — LEAD RULING NEEDED
++
++**Status: MISSING.** `CLAUDE-PRICE-ENGINE-ARCHITECTURE.md` is nowhere in the repo (searched
++`find . -iname &quot;*CLAUDE-PRICE*&quot;` → nothing). NB53 step 3 says: never invent an engine&#x27;s rules — write the exact
++rule questions the lead must answer, report LEAD RULING NEEDED, move on. This is that sheet. No code is written
++for engine 2 until these are answered; the other engines proceed.
++
++## What is already known (so answers can reference it)
++
++- The **[redacted] Price Engine (E1)** is the live chain: daily price patterns → next-open fill → the six execution
++  checks (`liquidity_backtest.checklist`) → 20-day book (`book20_runner`) → ledger. Its 35 rulers are
++  untouchable (§27a). Sizing Families (E10/E11) are its sub-books.
++- The bus (`docs/architecture/ENGINE-BUS.md`) gives engine 2, like every engine: its own folder/state/ledger,
++  the shared read-only fee model + Sizing Families, starting capital `money.NOTIONAL_CAPITAL` (₹2,00,000).
++
++## The chunk 1–7 questions the lead must answer (fill each, then I build)
++
++1. **SIGNAL SOURCE — chunk 1.** What does the Claude Price Engine trade on that E1 does NOT? (a different
++   feature set? a model over E1&#x27;s features? a different bar/horizon? news/text? cross-sectional ranking?) Name
++   the on-disk store each input is read from (§13: metric · store · threshold · action).
++2. **UNIVERSE + BAR — chunk 2.** Same 210-name daily universe and next-open fill as E1, or different? If
++   different, cite the universe source (no invented membership, §4.4).
++3. **THE RULE / MODEL — chunk 3.** Is it rule-based (like E1&#x27;s patterns) or a fitted model (meta-label,
++   cross-sectional)? If a model: trained on what, walk-forward with what embargo (de Prado, §25 learning
++   track), and where does the trained artifact live on disk?
++4. **DIRECTION + ENTRY — chunk 4.** Long-only, or long/short? (Short needs the SHORT-VEHICLE-UNRESOLVED gate,
++   §19.3.) Entry timing — next-day open like E1, or intraday?
++5. **EXITS + CAPS — chunk 5.** Hold horizon, stop rule, target/trail (or fixed), position cap. Stated as
++   numbers derived or cited (§4.1), not typed.
++6. **SIZING + RISK — chunk 6.** Sizing via Sizing Families like E1 (weight × ₹1,000), or its own scheme? Total
++   risk budget and how it composes with E1 under the Copycat Roof (E8).
++7. **PROOF — chunk 7.** What exam certifies a Claude-Price rule before it trades (same six checks + real costs +
++   luck correction as E1&#x27;s exam, or a different one)? Where do its diary/probation rows live?
++
++## Until answered
++
++Engine 2 is **not built**. The bus reserves its slot (`engine2_claude_price/`, own ledger) so wiring it later is
++a drop-in. This sheet is the LEAD RULING; the rest of NB53&#x27;s engines proceed from their present sources.
+</pre></div><div class='c'><div class='h'><b>952a8a6a6</b> · 2026-09-28 08:09</div><div>NB53 step 2: Engine Bus design doc (docs/architecture/ENGINE-BUS.md) — one scheduler (engine_bus.py called from run_evening after the morning bar), per-engine isolation (§27), money math cited to money.py/liquidity_backtest/engine_book/paper_account, cadence lanes, RAM-measured or REPLAY. Docs only; code+tests after close-done</div><div class='sub h'>docs/architecture/ENGINE-BUS.md | 74 +++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
 new file mode 100644
 index 000000000..712ec0002
 --- /dev/null
