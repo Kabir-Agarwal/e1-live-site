@@ -1,32 +1,3 @@
-tool_use Bash {"command": "ls -la \"C:[redacted]/Desktop/E1-DESK/HALT\" 2>&1 | head -3; echo \"---clock---\"; date +\"%Y-%m-%d %H:%M:%S %a\"; echo \"---state---\"; cat \"C:[redacted]/Desktop/trading-engines-v2/reports/BUILD-STATE.json\" 2>/dev/null | head -12", "description": "Check HALT guard, machine clock, build state"}
-tool_result: ls: cannot access 'C:[redacted]/Desktop/E1-DESK/HALT': No such file or directory
----clock---
-2026-09-28 01:34:31 Mon
----state---
-{
- "ruling": "NB49 2026-09-24 ~22:00 IST. Held day; owner stopped the stack; LEAD ruling: no typed numbers. Owner's 12:16 YES covers the builder starting the desk after this batch. Money chain untouched except the recorder-floor gate (NB49's own subject).",
- "item": "NB49: (1) stack DOWN, free RAM 2.23 GB. (2) DERIVED the depth-recorder floor: measured scripts.e13_depth PeakWorkingSet = 0.078 GB (K32, NB48-fixed path; 210 universe + record_once; stable over 3 runs) -> RECORDER_FLOOR_GB = 0.078 + 0.3 verify margin = 0.378 GB (memory_guard); watchdog._recorder_ram_ok + camera-held ⏱ line use it, retiring the typed 1.2 that held the camera down all day at 0.48-1.18 GB free. Recorded in VERIFIER-BRAIN.md. TDD 8/8. (3) full suite + verify on the last commit. (4) start stack + resume card at end.",
- "tests": "test_recorder_floor RED->GREEN (floor derived; gate flips at 0.378; ⏱ prints the measured floor) + test_watchdog_recorders 5/5 = 8/8. FINAL full suite + independent verify run on this run's LAST commit so has_pass(HEAD)=True and proof_apply queues orders at 06:00.",
- "next": "At 06:00 the depth camera starts once free RAM >= 0.378 GB (measured floor). NB44 + fixes 65/66/67 already live at HEAD (NB48 verify). Deferred to a bigger box: checklist 68 (book20 heavy-path memory) + 69 (twin-run wiring).",
- "flag": "Recorder floor now measured (0.378 GB), retiring the typed 1.2 that kept the camera down all day. Suite GREEN + independent verify PASS on HEAD (final re-verify on the last commit). Money-chain LIVE code untouched (recorder gate is NB49's own item); real-money rail closed. NOTHING NEEDS THE LEAD."
-}
-assistant: HALT does not exist — tools are unblocked, so the read-only audit can run. Machine clock: **2026-09-28 01:34 Mon** (not market hours — NSE opens 09:15; I'll stay read-only regardless as instructed). Archiving the dispatch verbatim as my first act:
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-28_NB50.md", "content": "DISPATCH ID: NB50 \u2014 DISK + FRIDAY AUDIT, READ-ONLY (Mon 28 Sep 2026) \u2192 BUILD\nREAD: owner reports the C: drive filled up around Fri 25 Sep (iPhone transfer/backup); Friday's lines: 08:22 camera 0 rows,\n1.3 GB free at 08:28, held day; no trade. ORIGIN: OWNER-SAID (start the checklist; find and remove the disk hog).\nRead-only on the desk; market hours = no process stopped/started, no launch-path edit.\n1) DISK: free space on C: now; the 20 largest folders (PowerShell, sizes); the iPhone backup folder(s) size and path\n   (%APPDATA%\\Apple Computer\\MobileSync\\Backup and any iCloud/Apple cache); temp files size. List only \u2014 delete NOTHING;\n   the owner names what to delete in the next block.\n2) FRIDAY: from the launch/watchdog/token logs, one timestamped line per step 06:00\u201315:30 \u2014 token time, each camera start\n   attempt with free RAM AND free disk at that moment, any write failure (\"no space\"/\"disk full\"/OSError), the 08:15 line,\n   the 09:15 gate decision with reason, site push errors. Name the first failing step and its cause with file:line/log line.\n3) Add to docs/MASTER-CHECKLIST.md: desk day-log (one line per step per day, incl. free disk + RAM), nightly full-morning\n   rehearsal on the real stack (fake token, recorded quotes, memory + disk measured per step, PASS/NOT READY line), market-hours\n   mode (desk only 08:30 \u2192 close-done; disk-full and low-RAM both post a \ud83d\ude4b with the number), disk-free floor measured into the\n   08:15 self-check, event blackout, monthly fill calibration, engine-list prune per the owner's 28 Sep list (Deliverables\n   section: Nikhil index tests + Dubai; engines 1\u201313 as named), Claude Price Engine chunks 1\u20137 from the architecture the lead\n   wrote, [redacted] Price Engine on the same architecture (35 rulers untouched).\nReport \"NB50\": disk table, the Friday step-
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-28_NB50.md (file state is current in your context — no need to Read it back)
-assistant: Archived. **Phase 1 — DISK (read-only, deleting nothing).** Free space on C: first:
-tool_use Bash {"command": "powershell -NoProfile -Command \"Get-CimInstance Win32_LogicalDisk -Filter \\\"DeviceID='C:'\\\" | ForEach-Object { '{0}  free={1:N2} GB  total={2:N2} GB  used={3:N1}%' -f \\$_.DeviceID, (\\$_.FreeSpace/1GB), (\\$_.Size/1GB), ((\\$_.Size-\\$_.FreeSpace)/\\$_.Size*100) }\" 2>&1", "description": "Free space on C: now"}
-tool_result: C:  free=0.36 GB  total=475.54 GB  used=99.9%
-assistant: **C: is 99.9% full — only 0.36 GB free right now** (worse than Friday's 1.3 GB). Going straight for the prime suspect the owner named:
-tool_use Bash {"command": "cat > [redacted]/Desktop/trading-engines-v2/reports/_nb50_apple.ps1 <<'PS'\n$ErrorActionPreference='SilentlyContinue'\nfunction Sz($p){ if(Test-Path -LiteralPath $p){ $s=(Get-ChildItem -LiteralPath $p -Recurse -Force -File | Measure-Object Length -Sum).Sum; if(-not $s){$s=0}; '{0,10:N2} GB  {1}' -f ($s/1GB), $p } else { '{0,10}      {1}' -f 'MISSING', $p } }\nSz \"$env:APPDATA\\Apple Computer\\MobileSync\\Backup\"\nSz \"$env:APPDATA\\Apple Computer\"\nSz \"$env:LOCALAPPDATA\\Apple Computer\"\nSz \"$env:LOCALAPPDATA\\Apple\"\nSz \"$env:USERPROFILE\\Apple\"\nSz \"$env:USERPROFILE\\iCloudDrive\"\nSz \"$env:LOCALAPPDATA\\Packages\\AppleInc.iCloud_nzyj5cx40ttqa\"\nSz \"$env:LOCALAPPDATA\\Temp\"\nSz \"C:\\Windows\\Temp\"\nPS\npowershell -NoProfile -ExecutionPolicy Bypass -File [redacted]/Desktop/trading-engines-v2/reports/_nb50_apple.ps1 2>&1", "description": "Measure Apple/iPhone backup + temp folders", "timeout": 420000}
-tool_result:     139.00 GB  [redacted]\AppData\Roaming\Apple Computer\MobileSync\Backup
-    139.00 GB  [redacted]\AppData\Roaming\Apple Computer
-      0.00 GB  [redacted]\AppData\Local\Apple Computer
-      0.00 GB  [redacted]\AppData\Local\Apple
-   MISSING      [redacted]\Apple
-   MISSING      [redacted]\iCloudDrive
-   MISSING      [redacted]\AppData\Local\Packages\AppleInc.iCloud_nzyj5cx40ttqa
-      0.67 GB  [redacted]\AppData\Local\Temp
-      0.00 GB  C:\Windows\Temp
 assistant: **Found the hog: the iPhone backup is 139.00 GB** at `AppData\Roaming\Apple Computer\MobileSync\Backup`. Now the 20 largest folders overall (this scan takes a few minutes):
 tool_use Bash {"command": "cat > [redacted]/Desktop/trading-engines-v2/reports/_nb50_top.ps1 <<'PS'\n$ErrorActionPreference='SilentlyContinue'\n$cands = New-Object System.Collections.Generic.List[string]\nGet-ChildItem -LiteralPath 'C:\\' -Directory -Force | ForEach-Object { $cands.Add($_.FullName) }\nforeach($base in @(\"$env:USERPROFILE\", \"$env:APPDATA\", \"$env:LOCALAPPDATA\", 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData')){\n  Get-ChildItem -LiteralPath $base -Directory -Force | ForEach-Object { $cands.Add($_.FullName) }\n}\n$rows = foreach($p in ($cands | Sort-Object -Unique)){\n  $s = (Get-ChildItem -LiteralPath $p -Recurse -Force -File | Measure-Object Length -Sum).Sum\n  if($s -gt 1GB){ [pscustomobject]@{ GB = [math]::Round($s/1GB,2); Path = $p } }\n}\n$rows | Sort-Object GB -Descending | Select-Object -First 20 | ForEach-Object { '{0,8:N2} GB  {1}' -f $_.GB, $_.Path }\nPS\npowershell -NoProfile -ExecutionPolicy Bypass -File [redacted]/Desktop/trading-engines-v2/reports/_nb50_top.ps1 2>&1", "description": "Top 20 largest folders over 1 GB", "timeout": 600000}
 queue-operation: DISPATCH ID: NB50-B — DISK CLEANUP + LIST PRUNE (Mon 28 Sep 2026) → BUILD
@@ -3467,3 +3438,104 @@ A  docs/dispatches/2026-09-28_NB53-D.md
 M  scripts/engine_bus.py
 A  tests/test_engine_bus_roster.py
 M  tests/test_engine_bus_wired.py
+tool_use Bash {"command": "git commit -q -m \"NB53-D item 1+2 (code): OWNER_ENGINES 8-name registry, register_owner_engines + set_evaluate + _scaffold in engine_bus.py; owner-roster test (7 GREEN); wiring test ref updated (stays RED); ENGINE-BUS.md \u00a77 one-name-per-engine law; archive NB53-D. (Prior commit landed only the diary-test deletion when git add aborted on the removed path)\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git show --stat HEAD --format=\"\" | head -8", "description": "Commit the item 1+2 code changes"}
+tool_result:  docs/architecture/ENGINE-BUS.md      | 14 ++++++++++
+ docs/dispatches/2026-09-28_NB53-D.md |  9 ++++++
+ scripts/engine_bus.py                | 54 ++++++++++++++++++++++++++----------
+ tests/test_engine_bus_roster.py      | 41 +++++++++++++++++++++++++++
+ tests/test_engine_bus_wired.py       |  2 +-
+ 5 files changed, 105 insertions(+), 15 deletions(-)
+assistant: Item 1+2 committed. `⏱ NB53-D · bus registry = owner's 8 names, SCAFFOLD states · 7 GREEN`.
+
+Now **item 3: finish chunk 1** — shelf v1 across families A, B, C, F, H (D/G absent per §4; E absent unless flows on disk). Adding the missing-family rulers + a market-state (family F) layer + a families-open manifest. TDD, RED first:
+tool_use Bash {"command": "cat >> tests/test_claude_price_shelf.py <<'EOF'\n\n\n# --- NB53-D item 3: finish chunk 1 across families A, B, C, F, H (D/G absent per \u00a74) -----------------------------\ndef test_families_A_B_C_H_per_symbol_rulers_present():\n    b = _bars()\n    w = {\"rsi\": 14, \"vol\": 20, \"boll\": 20, \"atr\": 14, \"macd_fast\": 12, \"macd_slow\": 26, \"macd_sig\": 9, \"obv\": 20}\n    row = shelf.compute_row(b, b.index[-1], windows=w)\n    # A: rsi, boll_z, gap_pct, macd_hist ; B: volume_ratio, obv_slope ; C: realized_vol, atr, vol_of_vol ; H: dow\n    for r in (\"rsi\", \"boll_z\", \"gap_pct\", \"macd_hist\", \"volume_ratio\", \"obv_slope\",\n              \"realized_vol\", \"atr\", \"vol_of_vol\", \"day_of_week\"):\n        assert r in row, \"missing ruler %s\" % r\n    assert 0 <= row[\"day_of_week\"] <= 6\n\n\ndef test_family_F_market_state_from_the_panel_is_PIT():\n    dates = pd.bdate_range(\"2024-06-01\", periods=260)\n    rng = np.random.default_rng(5)\n    panel = pd.DataFrame({s: 100 * np.exp(np.cumsum(rng.normal(0, 0.012, len(dates))))\n                          for s in [\"INDEX\", \"A\", \"B\", \"C\", \"D\"]}, index=dates)\n    t = dates[240]\n    full = shelf.market_state_row(panel, t, windows={\"ma_fast\": 50, \"ma_slow\": 200}, index_col=\"INDEX\")\n    assert {\"breadth\", \"pct_above_50dma\", \"pct_above_200dma\"} <= set(full)\n    assert 0.0 <= full[\"breadth\"] <= 1.0 and 0.0 <= full[\"pct_above_200dma\"] <= 1.0\n    # PIT: a poisoned future must not change today's market-state row\n    pois = panel.copy(); pois.loc[panel.index > t] = np.nan\n    assert shelf.market_state_row(pois, t, windows={\"ma_fast\": 50, \"ma_slow\": 200}, index_col=\"INDEX\") == full\n\n\ndef test_open_and_absent_families_are_declared_not_placeholdered():\n    fam = shelf.families_open(has_flows=False, has_option_chains=False, has_depth=False, has_calendar=False)\n    assert fam[\"A\"] == \"open\" and fam[\"B\"] == \"open\" and fam[\"C\"] == \"open\" and fam[\"F\"]
+tool_result: --- RED ---
+tests\test_claude_price_shelf.py:82: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_claude_price_shelf.py::test_families_A_B_C_H_per_symbol_rulers_present
+FAILED tests/test_claude_price_shelf.py::test_family_F_market_state_from_the_panel_is_PIT
+FAILED tests/test_claude_price_shelf.py::test_open_and_absent_families_are_declared_not_placeholdered
+3 failed, 4 passed in 1.06s
+assistant: RED. Now extending `shelf.py` with the family B/A/C/H rulers, the family-F market-state layer, and the families-open manifest:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine2_claude_price\\shelf.py", "old_string": "def _gap_pct(bars):\n    if len(bars) < 2:\n        return np.nan\n    return float(bars[\"open\"].iloc[-1] / bars[\"close\"].iloc[-2] - 1.0)", "new_string": "def _gap_pct(bars):\n    if len(bars) < 2:\n        return np.nan\n    return float(bars[\"open\"].iloc[-1] / bars[\"close\"].iloc[-2] - 1.0)\n\n\ndef _macd_hist(close, fast, slow, sig):\n    ef = close.ewm(span=int(fast), adjust=False).mean()\n    es = close.ewm(span=int(slow), adjust=False).mean()\n    macd = ef - es\n    return float((macd - macd.ewm(span=int(sig), adjust=False).mean()).iloc[-1])\n\n\ndef _volume_ratio(vol, n):\n    med = vol.tail(int(n)).median()\n    return float(vol.iloc[-1] / med) if med and not np.isnan(med) else np.nan\n\n\ndef _obv_slope(close, vol, n):\n    obv = (np.sign(close.diff().fillna(0)) * vol).cumsum()\n    tail = obv.tail(int(n))\n    if len(tail) < 2:\n        return np.nan\n    x = np.arange(len(tail))\n    return float(np.polyfit(x, tail.values, 1)[0])          # trailing OLS slope = PIT\n\n\ndef _vol_of_vol(close, n):\n    r = np.log(close).diff()\n    rv = r.rolling(int(n)).std(ddof=0)\n    tail = rv.dropna().tail(int(n))\n    return float(tail.std(ddof=0)) if len(tail) else np.nan\n\n\ndef _day_of_week(bars):\n    return int(pd.Timestamp(bars.index[-1]).weekday())      # 0=Mon .. 4=Fri (pure calendar, always available)"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\engine2_claude_price\shelf.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine2_claude_price\\shelf.py", "old_string": "    return {\n        \"rsi\":          lambda b, w: _rsi(b[\"close\"], w.get(\"rsi\", 14)),\n        \"realized_vol\": lambda b, w: _realized_vol(b[\"close\"], w.get(\"vol\", 20)),\n        \"boll_z\":       lambda b, w: _boll_z(b[\"close\"], w.get(\"boll\", 20)),\n        \"atr\":          lambda b, w: _atr(b, w.get(\"atr\", 14)),\n        \"gap_pct\":      lambda b, w: _gap_pct(b),\n    }", "new_string": "    return {\n        # Family A \u2014 price / trend (STATE)\n        \"rsi\":          lambda b, w: _rsi(b[\"close\"], w.get(\"rsi\", 14)),\n        \"boll_z\":       lambda b, w: _boll_z(b[\"close\"], w.get(\"boll\", 20)),\n        \"gap_pct\":      lambda b, w: _gap_pct(b),\n        \"macd_hist\":    lambda b, w: _macd_hist(b[\"close\"], w.get(\"macd_fast\", 12), w.get(\"macd_slow\", 26),\n                                                w.get(\"macd_sig\", 9)),\n        # Family B \u2014 volume (STATE)\n        \"volume_ratio\": lambda b, w: _volume_ratio(b[\"volume\"], w.get(\"vol\", 20)),\n        \"obv_slope\":    lambda b, w: _obv_slope(b[\"close\"], b[\"volume\"], w.get(\"obv\", 20)),\n        # Family C \u2014 volatility (STATE)\n        \"realized_vol\": lambda b, w: _realized_vol(b[\"close\"], w.get(\"vol\", 20)),\n        \"atr\":          lambda b, w: _atr(b, w.get(\"atr\", 14)),\n        \"vol_of_vol\":   lambda b, w: _vol_of_vol(b[\"close\"], w.get(\"vol\", 20)),\n        # Family H \u2014 calendar (STATE); day_of_week is pure. earnings/dividend/expiry rulers are added only when\n        # the calendar store is present (families_open -> \"partial\"/\"open\"); absent otherwise (\u00a74).\n        \"day_of_week\":  lambda b, w: _day_of_week(b),\n    }"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\engine2_claude_price\shelf.py has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Now the family-F market-state layer and the families-open manifest:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine2_claude_price\\shelf.py", "old_string": "def compute_panel(bars_by_symbol, dates, windows):", "new_string": "def market_state_row(panel, asof, windows, index_col=\"INDEX\"):\n    \"\"\"Family F (market state) from the daily-close panel of the whole universe, PIT (only rows at/before asof).\n    breadth = fraction of non-index names up on asof; pct_above_50/200dma = fraction of names above their own\n    trailing moving average. Macro rulers (VIX, USD/INR, crude, US close, GIFT) are ABSENT here until their series\n    are on disk (\u00a74) \u2014 they are added by build_from_store when the macro store is confirmed, never placeholdered.\"\"\"\n    hist = panel.loc[:asof]\n    syms = [c for c in hist.columns if c != index_col]\n    if len(hist) < 2 or not syms:\n        return {\"breadth\": np.nan, \"pct_above_50dma\": np.nan, \"pct_above_200dma\": np.nan}\n    prev, cur = hist[syms].iloc[-2].astype(float), hist[syms].iloc[-1].astype(float)\n    breadth = float((cur > prev).sum()) / len(syms)\n\n    def _pct_above(n):\n        ma = hist[syms].tail(int(n)).mean()\n        return float((cur > ma).sum()) / len(syms)\n    return {\"breadth\": round(breadth, 8),\n            \"pct_above_50dma\": round(_pct_above(windows.get(\"ma_fast\", 50)), 8),\n            \"pct_above_200dma\": round(_pct_above(windows.get(\"ma_slow\", 200)), 8)}\n\n\ndef families_open(has_flows=False, has_option_chains=False, has_depth=False, has_calendar=False):\n    \"\"\"Which ruler families are computable NOW (\u00a74: a family with no data is ABSENT, never placeholdered). A/B/C/F\n    compute from the bar/panel store that is always present; D needs option chains, G needs recorded depth, E needs\n    flows on disk, H's earnings/dividend/expiry rulers need the calendar (day_of_week alone = 'partial').\"\"\"\n    return {\n        \"A\": \"open\", \"B\": \"open\", \"C\": \"open\", \"F\": \"open\",\n        \"D\
+tool_result: The file [redacted]\Desktop\trading-engines-v2\engine2_claude_price\shelf.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python -m pytest tests/test_claude_price_shelf.py -q 2>&1 | tail -5", "description": "Run extended shelf tests GREEN"}
+tool_result: .......                                                                  [100%]
+7 passed in 0.68s
+assistant: 7 passed. Running the demo, then committing item 3 (chunk 1 finished across A/B/C/F/H):
+tool_use Bash {"command": "python -m engine2_claude_price.shelf --demo 2>&1 | tail -2 && git add engine2_claude_price/shelf.py tests/test_claude_price_shelf.py && git commit -q -m \"NB53-D item 3: finish engine 2 chunk 1 shelf v1 across families A/B/C/F/H (was 5-ruler scaffold). Added family A macd_hist, family B volume_ratio+obv_slope, family C vol_of_vol, family H day_of_week; family F market_state_row (breadth, pct_above_50/200dma) from the panel, PIT-proven. families_open() declares D/G/E ABSENT per \u00a74 (no chains/depth/flows), H partial (calendar-gated). All rulers PIT, windows are bands (no typed number). 7 tests GREEN\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1 | cut -c1-80", "description": "Commit chunk 1 finished across families"}
+tool_result: shelf v1 (chunk 1) demo OK: STATE rulers PIT (no leakage), no-data->absent, sanity report (coverage/NaN/range).
+warning: in the working copy of 'engine2_claude_price/shelf.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_claude_price_shelf.py', LF will be replaced by CRLF the next time Git touches it
+120ed6951 NB53-D item 3: finish engine 2 chunk 1 shelf v1 across families A/B/C/
+assistant: Item 3 done. `⏱ NB53-D · chunk 1 finished (families A/B/C/F/H, D/G/E absent §4) · 7 GREEN`.
+
+On **item 5** (bus supervisor wire-in): per the explicit instruction "keep the RED marker until a fresh-session verify passes," I am **not** editing `supervisor.py` now — that launch-path edit belongs in the verified nightly batch (§25). The bus entry is built and ready to be called; the wiring test stays RED (honest "built, not live"). **Item 4** (Machine Factory) is explicitly "after engine 2 chunk 3" — not yet.
+
+Now the roster with SCAFFOLD/BUILT/VERIFIED/LIVE states (item 2 requires it):
+tool_use Bash {"command": "cat >> docs/architecture/NB53-ENGINE-ROSTER.md <<'EOF'\n\n## NB53-D roster states (item 2 \u2014 SCAFFOLD / BUILT / VERIFIED / LIVE)\n\n_A diary wrapper is never \"made/running/live\" (NB53-D item 2). State is SCAFFOLD until an engine's OWN evaluate is\nbuilt from its cited design (rules + own ledger + own Telegram line + own exam), BUILT when that evaluate + tests\nexist, VERIFIED after an independent fresh-session pass, LIVE only under the chain + rails after the dry-run verify._\n\n| # | Engine (one name) | State (2026-09-28) | Note |\n|---|---|---|---|\n| 1 | [redacted] Price Engine | **LIVE** | the protected chain (\u00a727a), verified 32df791c4; \u00a7H 70-73 additions BUILT (verify-gated) |\n| 2 | Claude Price Engine | **BUILDING** | architecture on disk; chunk 1 (ruler shelf v1, families A/B/C/F/H) BUILT + tested; chunks 2-9 pending |\n| 3 | YouTube Engine | **SCAFFOLD** | diary wrapper only; own evaluate not built |\n| 4 | Calendar Trading | **SCAFFOLD** | diary wrapper + calendar_daily infra; own evaluate not built |\n| 5 | Machine Factory | **SCAFFOLD** | design E6.md cited; build after engine 2 chunk 3 (NB53-D item 4) |\n| 6 | Arbitrage | **SCAFFOLD** | parity + NSE/BSE + Pairs code exists; own engine evaluate not built (no tick engine, NB53-C) |\n| 7 | Copycat Roof | **SCAFFOLD** | E8 design + roof code; own evaluate not built |\n| 8 | Deliverables | **SCAFFOLD** | two books (Nikhil index tests, Dubai); own evaluate not built |\n\nBus registry = these 8 names exactly (`engine_bus.OWNER_ENGINES`); Overnight/Insurance/Context/Pairs are NOT\nengines (absorbed). Bus launch (supervisor wire-in) is BUILT-ready, wiring test RED until a fresh-session verify.\nEOF\ngit add docs/architecture/NB53-ENGINE-ROSTER.md && git commit -q -m \"NB53-D item 2: roster states table (SCAFFOLD/BUILT/VERIFIED/LIVE) \u2014 engines 3-8 are SCAFFOLD (not 'made/running'), engine 2 BUILDING (chunk 1 done), engine 1 LIVE. Corrects the earlier 'engines 3-8 made and running' ove
+tool_result: warning: in the working copy of 'docs/architecture/NB53-ENGINE-ROSTER.md', LF will be replaced by CRLF the next time Git touches it
+cd3aa38aa NB53-D item 2: roster states table (SCAFFOLD/BUILT/VERIFIED/
+assistant: All committed. Running the touched-module tests once more and getting the clock for the checkpoint:
+tool_use Bash {"command": "python -m pytest tests/test_engine_bus.py tests/test_engine_bus_roster.py tests/test_claude_price_shelf.py tests/test_desk_day_log.py tests/test_market_hours_mode.py tests/test_event_blackout.py tests/test_rehearsal_measure.py -q 2>&1 | tail -3; echo \"wiring (RED=built-not-live):\"; python -m pytest tests/test_engine_bus_wired.py -q 2>&1 | tail -1; date \"+clock: %H:%M IST\"", "description": "Run touched tests + clock"}
+tool_result: .........................                                                [100%]
+25 passed in 1.02s
+wiring (RED=built-not-live):
+1 failed in 1.07s
+clock: 09:20 IST
+assistant: 25 GREEN, 1 intentional RED. NB53-D checkpoint:
+
+```
+NB53 · engine BUS-roster + engine 2 chunk 1 · SCAFFOLD-corrected, chunk 1 BUILT
+
+WHAT NB53-D CHANGED (4 commits)
+  f3b08749c + follow-up  item 1+2: the bus registry is now EXACTLY the owner's 8
+    engine names (engine_bus.OWNER_ENGINES), each a SCAFFOLD until its own evaluate is
+    built. Overnight/Insurance/Context/Pairs UNREGISTERED — they are not engines
+    (absorbed into Claude Price / Arbitrage); their diary wrappers stay on disk under
+    amended never-delete (§28b). set_evaluate() swaps a scaffold for a real evaluate.
+    Replaced the "all-8-diary" bus test with the owner-roster test. 7 GREEN.
+  120ed6951  item 3: engine 2 chunk 1 shelf v1 FINISHED across families A/B/C/F/H (was
+    a 5-ruler scaffold). Added macd_hist (A), volume_ratio + obv_slope (B), vol_of_vol
+    (C), day_of_week (H), and a family-F market_state_row (breadth, % above 50/200-day)
+    from the panel — all PIT-proven. families_open() declares D and G ABSENT (no option
+    chains, no recorded depth), E ABSENT (no flows on disk), H partial (calendar-gated)
+    — a family with no data is absent, never placeholdered (§4). 7 GREEN.
+  cd3aa38aa  item 2: roster states table.
+
+CORRECTION I OWE THE OWNER
+  My 08:43 checkpoint said "engines 3-8 made and running through the bus." That was
+  wrong per NB53-D item 2 — they are SCAFFOLDS, not running. The roster now uses
+  SCAFFOLD / BUILT / VERIFIED / LIVE and says so plainly.
+
+ROSTER (SCAFFOLD / BUILT / VERIFIED / LIVE)
+  1 [redacted] Price Engine  LIVE (protected chain, verified 32df791c4)
+  2 Claude Price Engine BUILDING — architecture on disk; chunk 1 (ruler shelf v1,
+                        families A/B/C/F/H) BUILT + tested; chunks 2-9 pending
+  3 YouTube Engine      SCAFFOLD    5 Machine Factory  SCAFFOLD (E6.md; after ch3)
+  4 Calendar Trading    SCAFFOLD    6 Arbitrage        SCAFFOLD (no tick engine)
+  7 Copycat Roof        SCAFFOLD    8 Deliverables     SCAFFOLD (2 books)
+
+ITEM 5 (bus launch): NOT wired into supervisor — per item 5 I keep the RED marker
+  until a fresh-session verify; the bus entry is built + ready, the launch-path wire-in
+  belongs in the verified nightly batch (§25). §27a untouched (never into run_evening).
+ITEM 4 (Machine Factory): deferred as instructed — built after engine 2 chunk 3.
+
+TESTS: 25 GREEN across touched modules; 1 intentional RED (bus wiring = built-not-live).
+  Full suite still queued for after close-done (RAM 0.6 GB < 1.0 GB headroom).
+
+items 65 · done 37 · pending 28 (nothing turned DONE — all built-not-live/SCAFFOLD;
+  verify-gated).  🚩 today: 0.  Clock 09:20 IST.
+
+NEXT: engine 2 chunk 2 (HAR forecast-ruler exam, §5.1 — uses family C, can run now) and
+  chunk 3 (daily-cadence search on the full open shelf → exam), then Machine Factory.
+
+NOTHING NEEDS THE LEAD
+```
+
+Done — see block above.
