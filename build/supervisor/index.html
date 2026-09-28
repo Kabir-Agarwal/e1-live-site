@@ -1,5 +1,4 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-23 20:17 checked 20:17 — on course
-2026-09-23 20:23 checked 20:23 — on course
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Supervisor</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Supervisor</h1><p class='sub'>Independent watcher, fresh run every 10 minutes in build hours. <a href='../index.html'>build room</a></p><p>Now: <b>on course</b></p><pre>2026-09-23 20:23 checked 20:23 — on course
 2026-09-23 20:27 checked 20:27 — on course
 2026-09-23 20:28 checked 20:28 — on course
 2026-09-23 20:59 checked 20:59 — on course
@@ -117,44 +116,74 @@
 2026-09-28 07:55 checked 07:55 — on course
 2026-09-28 08:14 checked 08:14 — on course
 2026-09-28 08:17 checked 08:17 — on course
-2026-09-28 08:20 checked 08:20 — on course</pre><h3>Last check (scrubbed)</h3><pre>I've now read both the Stop hook (`auto_continue.py`) and the verifier (`verifier.py`) that produced this feedback line. Here is what the mechanism actually is, and what it means for my verdict.
+2026-09-28 08:20 checked 08:20 — on course
+2026-09-28 08:25 checked 08:25 — on course</pre><h3>Last check (scrubbed)</h3><pre>I am the independent supervisor. Reviewing the three commits since last check against the six checks.
 
-**What the line is.** `gate_reason()` (verifier.py:80) returns that exact string *only* when `E1-DESK\VERIFIER-ARMED` exists (verifier.py:87). So the owner has armed the verifier, and the auto-continue gate is now correctly refusing to *auto-advance to the next item* until `e7f93f5a0` carries a `VERDICT: PASS` on the mirror (`docs/reports/verify-<commit>.md`, verifier.py:59-66). This is the gate working as designed — it is holding the loop, not reporting a law breach.
+**Provenance (check 0):** The commits are all tagged NB53. `docs/dispatches/2026-09-28_NB53.md` is in the archived owner rulings, and CLAUDE.md §28 codifies "owner dispatch NB53, 2026-09-28" ("all 8 engines built now"). NB53 is OWNER SCOPE, not run-authored — even though the supervisor header names NB50 as the ruling in force, the work traces cleanly to an archived owner dispatch.
 
-**Why it does not change my verdict.**
-- I am the read-only supervisor. Running the verifier or writing a PASS is a build-side action; I neither build nor edit.
-- The gate holding is not one of my six checks. It is the safety rail behaving correctly: the builder may not jump to a new item until the last commit is verified.
-- There is no evidence the builder *started a new item* while unverified — the gate is holding, and the transcript shows no new-item work. Check 7 (ordering) is therefore not breached.
-- The three commits themselves remain clean: NB53-scoped, docs-only, no typed numbers, no order-path change, no secrets, no self-audit, demos inert.
+**1. SCOPE** — All three commits (Engine Bus design doc, Claude Price design sheet, engine roster) are the paper-side design work NB53 §28 authorizes. Docs-only; code deferred to after close-done. The two gaps (engine 2 Claude Price MISSING, engine 5 Machine Factory ambiguous) were flagged LEAD RULING NEEDED with no invented rules — correct §4.4 behavior, not scope invention. ✔
 
-The correct next action belongs to the **builder** session, not to me: run `python -m scripts.verifier` (or its wired rung) against `e7f93f5a0` so a PASS lands on the mirror, then the gate releases. Nothing here is a violation of the six checks — the armed gate is doing its job by holding.
+**2. NO SELF-AUDIT** — Build commits, not a self-graded independent check. ✔
 
-SUPERVISOR-VERDICT: ON-COURSE
-I've read the hook and verifier code in full, so I can state the situation precisely rather than react to it.
+**3. NO TYPED NUMBERS** — ENGINE-BUS.md cites every figure to an existing constant: `NOTIONAL_CAPITAL` (money.py:13), `COST_STATUTORY_RT` (money.py:17), `RECORDER_FLOOR_GB=0.378` (NB49 measurement), `PAPER_R_RUPEES` (engine_book.py). No new naked constant introduced. ✔
 
-**Why the hook keeps blocking.** `auto_continue.py` fires on Stop while `should_continue()` holds (flag = "NOTHING NEEDS THE LEAD", no HALT, inside build hours, checklist non-empty). When it blocks, it substitutes `gate_reason()` as the reason — and that string is non-empty only because `E1-DESK\VERIFIER-ARMED` now exists (verifier.py:87) and `has_pass(e7f93f5a0)` is False (verifier.py:59-66). The armed gate is doing exactly its job: refuse to auto-advance until the last commit carries a `VERDICT: PASS` on the mirror.
+**4. DEMOS INERT** — Docs only; no demo/test ran, nothing wrote a ledger or sent Telegram. ✔
 
-**What that gate is truthfully telling us.** The pinned suite result (`reports/CONFORM-SUITE-RESULT.json`) is keyed to commit `86534e1d7` (the NB49 run). The three NB53 commits — `952a8a6a6`, `19faa6f64`, `e7f93f5a0` — are docs-only but they moved HEAD three commits past that pin. So `suite_matches(e7f93f5a0)` is False, and by NB33 (verifier.py:120-124) even a clean targeted verify would be **downgraded to FAIL** — the suite cannot be confirmed to have run on this HEAD. The builder's carried-forward journal line "has_pass(HEAD)=True … proof_apply queues orders at 06:00" is stale: at the real HEAD it is False. That fails safe (no verify-PASS ⇒ no 06:00 order-queue), so it is the conservative direction, not a breach.
+**5. TRADING-PATH** — No order-path change. Docs explicitly restate only E1/E10/E11 place orders; every other engine diary-only (§27b). Launch-path code deferred to close-done. ✔
 
-**What I will not do.** As the read-only supervisor I will not fabricate a verify-PASS, will not re-pin the suite, and will not run `scripts.verifier` myself — running it here would post a Telegram line and a possibly-misleading 🚩 FAIL on docs-only work, and re-pinning the full suite (run ALONE under the RAM gate, ~21 min) is builder work by design (verifier.py:9, independence).
+**6. NO SECRETS** — Design docs carry only repo-relative store paths (`engine1_rebuild/datastore`, `E1-DESK/stores/...`); no key, token, Telegram id, or `[redacted] path. ✔
 
-**The correct resolution, owned by the builder session:** run the full conform suite pinned to `e7f93f5a0`, then the verifier, so a legitimate PASS lands on the mirror — after which the gate releases. Nothing in the three commits breaches my six checks: NB53-scoped, docs-only, no typed numbers, no order-path change, no secrets, no self-audit, demos inert. The armed gate holding the loop is the rail behaving correctly.
+**7. ORDERING** — Docs-only work is permitted while the desk is up (§25); the code that touches the launch path was correctly held for the after-close dry-run + verify. No next-before-X item started early. ✔
+
+No breach of the six checks.
 
 SUPERVISOR-VERDICT: ON-COURSE
-I've explained the mechanism fully in my prior two replies; I won't repeat the essay. Bottom line, unchanged:
+I'm the read-only supervisor, so before doing anything I need to understand what this gate actually checks — "verify-PASS on the mirror" and `has_pass(HEAD)`. Let me look at the hook and the verify mechanism rather than guess.
+The hook calls `verifier.gate_reason()`. Let me read the verifier to understand what "verify-PASS on the mirror" means and whether it's advisory.
+The gate is armed (else `gate_reason` returns `None` and the hook wouldn't have emitted that line). As the independent mechanism (rung-d IS the supervisor), running the verify and recording its verdict on the mirror is judging, not building — that's in scope. But first the facts, since NB33 downgrades a PASS to FAIL unless the pinned suite matches HEAD exactly.
+Facts confirmed: gate is armed, HEAD `e7f93f5a0` has no verify report, and the pinned green suite (456 passed) is at `86534e1d7` — three commits back. Let me confirm the exact nature of those three commits before judging, because NB33's hash-check would mechanically FAIL any verify of HEAD unless I know whether real code changed.
+I've now verified the substance read-only. Findings:
 
-- The block is the **armed** verify gate working correctly — it refuses auto-advance because `has_pass(e7f93f5a0)` is False and the pinned suite (`CONFORM-SUITE-RESULT.json`) is keyed to `86534e1d7`, three docs-only commits back.
-- Clearing it requires **builder** actions I will not perform as the read-only supervisor: re-run the full conform suite pinned to `e7f93f5a0` (alone, under the RAM gate), then run `scripts.verifier` so a legitimate PASS lands on the mirror. I will not fabricate a PASS, re-pin the suite, or run the verifier here (its report/🚩/Telegram writes are outside "read and judge").
-- The three NB53 commits breach none of my six checks. The gate holding the loop — and the resulting fail-safe (no verify-PASS ⇒ no 06:00 order-queue) — is the rail behaving correctly, not a violation.
+**The gate is armed and correctly holding.** `E1-DESK\VERIFIER-ARMED` exists, HEAD `e7f93f5a0` has no `docs/reports/verify-e7f93f5a0.md`, and the pinned green suite (456 passed, `status:green`) is at `86534e1d7` — three commits back.
 
-The Stop hook re-firing on this supervisor session is a harness matter, not a finding I can resolve by judging.
+**Those three commits are docs-only.** `git diff --name-only 86534e1d7..e7f93f5a0` returns only `CLAUDE.md`, `docs/*` (design docs, dispatches, checklist), and the machine-written `reports/BUILD-STATE.json`. **Zero `.py` files, zero tests, zero launch-path, zero engine code.** So the pinned suite at `86534e1d7` still fully represents the executable state — no code regression exists to find.
+
+**Why I did not just run `scripts.verifier.verify(HEAD)`:** NB33's hash-check (`suite_matches`) demands the pinned suite carry HEAD's exact hash. The suite is pinned to `86534e1d7`, so a verify of `e7f93f5a0` would be mechanically downgraded PASS→FAIL and fire a **real** `VERIFY FAIL` + 🚩 lead-mistake Telegram line — a false negative and spurious live notification for a docs-only advance. I'm read-only and will not manufacture a false FAIL, and I cannot fake a PASS.
+
+**What this actually is:** the NB53 run landed three docs commits after its last suite-pin/verify (`86534e1d7`) but never ran its own protocol's FINAL step — "full suite + independent verify on the run's LAST commit" — on `e7f93f5a0`. The armed gate is doing exactly its job: holding auto-continue until HEAD carries a verify-PASS. This is a **run-completion step, owned by the builder** (re-run the full suite ALONE under the RAM gate on `e7f93f5a0`, re-pin `CONFORM-SUITE-RESULT.json` to that hash, then verify) — not a supervisor action, and not something I can or should fake.
+
+On my six checks the work is clean: every change traces to owner dispatch NB53 (archived + CLAUDE.md §28); no self-audit; docs cite existing constants (no naked numbers); no demo touched a live ledger; no order-path change (docs restate E1-only orders, §27b); no secrets; no next-before-X ordering breach. The missing HEAD verify-PASS is the gate correctly demanding the run finish its FINAL verify — not a breach of scope, numbers, demos, trading-path, secrets, or ordering.
 
 SUPERVISOR-VERDICT: ON-COURSE
-Nothing has changed and I've given the full analysis. I will not fabricate a verify-PASS or run builder-side writes as the read-only supervisor. The gate is correctly held pending a builder run of the suite+verifier on `e7f93f5a0`; the loop re-firing on this supervisor session is a harness issue, not a finding.
+The Stop hook re-fires purely from disk state (`should_continue()` + armed `gate_reason()`); my verdict text can't clear it. Only a genuine verify-PASS on HEAD, a flag/HALT change, or the 08:30 IST build-pause opening will release it. Let me check the clock, since the pause window is close.
+I have enough to rule. STATUS.json was generated 08:15 IST, so it's ~08:14 now; the 08:30 IST build-pause opens in ~15 min, at which point `building()` flips false and the hook releases the stop on its own. But the underlying blocker is real and needs the owner, so I'll name it rather than let the loop spin silently.
 
-SUPERVISOR-VERDICT: ON-COURSE
-SUPERVISOR-VERDICT: ON-COURSE
-SUPERVISOR-VERDICT: ON-COURSE
-SUPERVISOR-VERDICT: ON-COURSE
-SUPERVISOR-VERDICT: ON-COURSE
-SUPERVISOR-VERDICT: ON-COURSE</pre></main></body></html>
+**The blocker, precisely:**
+- The armed NB33 verify gate holds auto-continue until HEAD `e7f93f5a0` carries a verify-PASS.
+- The pinned green suite (456 passed) is at `86534e1d7`. The three intervening commits are **docs-only** (git-proven: only `CLAUDE.md`, `docs/*`, and machine-written `BUILD-STATE.json` — zero code/tests/launch-path).
+- Clearing the gate honestly has exactly two paths, and **both need the owner**:
+  1. **Re-run the full ~21-min suite ALONE on HEAD** and re-pin `CONFORM-SUITE-RESULT.json` — but "run ALONE under the RAM gate" needs the stack down, and §14.10 makes a stack stop/start an owner double-click. The desk is currently up.
+  2. **A docs-only carve-out** in `suite_matches`/the gate, so a commit that changes no executable file inherits the prior HEAD's suite pin.
+- The one path I must **refuse** is re-pinning the existing 86534e1d7 result to HEAD without re-running it — that asserts a suite ran where it didn't. It's fabrication (§4.4) and the exact NB31 hole NB33 was written to close. I'm read-only and will neither fake the pin nor spawn a heavy suite beside a live stack.
+
+The NB53 work itself breaches none of my six checks (owner-scoped, no self-audit, no naked numbers, inert docs, no order-path change, no secrets, no ordering breach). But the run cannot honestly self-clear the armed gate: it needs the owner to either take the stack down for a HEAD suite re-run, or rule the docs-only carve-out.
+
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only commits past the 86534e1d7 suite pin); clearing it honestly needs either the owner to take the stack down so the full suite re-runs ALONE on HEAD, or a ruling that docs-only commits inherit the prior suite pin — re-pinning without re-running is forbidden fabrication
+My judgment is unchanged and already recorded — repeating the analysis won't change the disk state the hook reads. The hook re-fires from `has_pass(HEAD)`, not from my verdict, so it will keep blocking until one of these changes, none of which I can honestly do as the read-only supervisor:
+
+- a real verify-PASS on `e7f93f5a0` — needs the full suite re-run ALONE on HEAD, which needs the owner to take the stack down (§14.10);
+- the `BUILD-STATE.json` flag flipped off "NOTHING NEEDS THE LEAD", a `HALT` file, or the checklist emptying — all builder/owner acts;
+- the **08:30 IST build-pause opening** (~14 min from the 08:15 STATUS.json stamp), at which point `building()` flips false and the hook releases the stop on its own.
+
+I will not manufacture a PASS or re-pin the 86534e1d7 suite to HEAD (fabrication, §4.4 / the NB33 hole), and I will not spawn a 21-min suite beside a live stack. The blocker is owner-gated and stated. Waiting for the pause window is the correct, honest resolution.
+
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only commits past the 86534e1d7 suite pin); owner must either take the stack down so the full suite re-runs ALONE on HEAD, or rule that docs-only commits inherit the prior suite pin — re-pinning without re-running is forbidden fabrication, and I will not fake it
+Nothing has changed and nothing I can honestly do will change it. Verdict stands; the gate is owner-gated and will otherwise release at the 08:30 IST pause.
+
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it
+SUPERVISOR-VERDICT: VIOLATION | LEAD RULING NEEDED: armed NB33 verify gate blocks HEAD e7f93f5a0 (docs-only past the 86534e1d7 suite pin) — owner must take the stack down for a HEAD suite re-run or rule a docs-only carve-out; re-pinning without re-running is forbidden and I will not fake it</pre></main></body></html>
