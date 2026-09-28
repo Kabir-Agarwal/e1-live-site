@@ -1,53 +1,4 @@
-SSING                          → LEAD RULING
-               3 YouTube        = engine_youtube/ + yt-transcripts  → built, needs bus wire
-               4 Calendar       = ENGINE_E3.md + engine3_structure/ → built-partial
-               5 Machine Factory= AMBIGUOUS                         → LEAD RULING
-               6 Arbitrage      = 2026-09-16 R-E1-ARB-DAY + E7-ARB-PROOF + engine7_parity/
-                                  + engine12_xchange/               → built-partial
-               7 Copycat Roof   = ENGINE_E8.md                      → built-partial
-               8 Deliverables   = R-INDEX-TESTS + Dubai records      → built-partial
-
-WHAT LANDS AFTER CLOSE-DONE (the code, one engine at a time, TDD)
-  scripts/engine_bus.py + a RED test_engine_bus_wired (fails until run_evening calls it);
-  then per engine 3/4/6/7/8 a thin evaluate adapter → its own ledger, each with a RED
-  wiring test. Arbitrage's intraday RAM floor gets MEASURED first (else REPLAY). Engine 1's
-  §H 70–73 touch the launch path → built, but LIVE only via the owner-run fresh-session
-  verify with this session closed.
-
-RATE (measured, for the lead's ETA)
-  4 docs commits in 9 min (08:06→08:15) — but that is the design phase only. Engine code +
-  RED/GREEN tests have not started (blocked to after 15:45). No engine-build-hour measured
-  yet; the first real number comes after the first coded engine tonight.
-
-items 65 · done 37 · pending 28.   🚩 today: 0.
-
-LEAD RULING NEEDED (two — I build neither on a guess):
-  1. Engine 2 (Claude Price): architecture MISSING. Answer the 7 chunks in
-     docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md — chiefly: what does it trade on
-     that the [redacted] engine does NOT (different features? a model? news/text?), and where on
-     disk is each input read from?
-  2. Engine 5 (Machine Factory): which design IS it? The ruler factory lives in
-     docs/architecture/E6.md marked "SUPERSEDED — READ-ONLY ANCESTOR", while the current
-     ENGINE_E6.md is a different engine ("ML-direct"). NB53's description (candidate rules
-     generated + tested offline at night) matches the ruler factory. Confirm the source doc
-     and I build from it.
-```
-
-Done — see block above.
-user: Stop hook feedback:
-verify the last commit (e7f93f5a0) first — no verify-PASS on the mirror
-assistant: The gate is firing on a docs-only commit, and I can't clear it on this box — here's the honest state, and I'm not going to fake my way past it.
-
-The four NB53 commits (e8b0d64af, 952a8a6a6, 19faa6f64, e7f93f5a0) are **docs only** — CLAUDE.md §28, three design docs under `docs/architecture/`. They touch no launch-path file, no engine code, no test. There is nothing in them for a functional verify to exercise; they cannot regress the money chain.
-
-The verify gate can't be satisfied here, for the reason already on record from NB52:
-- The independent verify needs a **fresh Claude session** with the desk **stopped** and **~1.0 GB free RAM**. This box has **~0.68 GB free** with the desk up, and the harness blocks `STOP_E1_STACK.bat`.
-- I **must not run the verify myself** — a session never audits its own work (§18.1).
-- I **won't fabricate a PASS** (§4.4).
-
-So I'm at the correct stopping point:
-- **Docs work for today is done** (market-hours mode, desk up — no code until close-done ~15:45).
-- The remaining engines (code + RED/GREEN tests) are blocked to after 15:45 by market-hours mode, and engines 2 and 5 are additionally blocked by the two LEAD RULINGs.
+LEAD RULINGs.
 - The verify-PASS for HEAD is an **owner action**: run the fresh-session verify with this session closed, exactly as NB52 set up. That also covers the reverted Friday fix + disk floor (item 57).
 
 I have nothing further I can safely build or verify this turn. The gate should exempt docs-only commits, but I'm not the one to override it by self-verifying or stamping a pass. Stopping here.
@@ -3425,3 +3376,17 @@ tool_result: warning: in the working copy of 'CLAUDE.md', LF will be replaced by
 warning: in the working copy of 'docs/architecture/PRICE-ENGINE-V2.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/dispatches/2026-09-28_V2-ALL-1.md', LF will be replaced by CRLF the next time Git touches it
 bc56bb06f V2-ALL-1 Part A (docs): overwrite PRICE-ENGINE
+assistant: Part A committed. Now Part B. **B0 REUSE-vs-REPLACE** (printed before code, drives the build):
+
+- **REUSE** → `money.py` cost_readout/COST_STATUTORY_RT, `liquidity_backtest.checklist`, `paper.simulate_trade` (chunk 1); `engine_bus` (chunk 4); `shelf.py` ruler families (chunk 0 grid + chunk 3 Door-A); `forecast.py` v1-chunk-2 gate (§2.3 predictive-ruler admission); `search.py` candidate generator + `event_band` (chunk 3 Door-A generator).
+- **PARTIAL** → [redacted] court `stats.wilson_lower`/`final_exam.floor`/`daily.holdout_slice_of`: the *admission* test reuses the years-split/holdout machinery; the *proof* verdict is REPLACED by the trust score (§2.6/§2.19; §2.14 supersedes 70/20/10-as-proof). `accounts.py`: two-book structure reused, Wilson-Kelly size replaced by trust-score `m` (§2.19).
+- **REPLACE** (superseded §2.14): fixed cadence classes; holdout-as-proof; trades-as-independent-proof; futures-as-vehicles; brute-force-as-trading-family; slower-than-nightly re-search.
+
+**Chunk 0 (data check)** in a new isolated `pricev2/` floor package. RED first:
+tool_use Bash {"command": "mkdir -p pricev2 && touch pricev2/__init__.py && cat > tests/test_pricev2_data_check.py <<'EOF'\n\"\"\"V2-ALL-1 chunk 0 \u2014 the data check (PRICE-ENGINE-V2 \u00a72.2/\u00a72.12). Pure checkable logic over a bar frame: bar\ncount, missing minutes vs the 375-minute NSE session, bad ticks (high<low, non-positive price), zero-volume bars,\ncorporate-action break candidates, and the as-of (knowable-at) stamp. Reuses the store reader; runs light here.\"\"\"\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nimport pandas as pd\nfrom pricev2 import data_check as dc\n\n\ndef _minute_day(n=375, bad=False, zero=False):\n    idx = pd.date_range(\"2024-01-01 09:15\", periods=n, freq=\"min\")\n    o = [100.0] * n; h = [100.5] * n; l = [99.5] * n; c = [100.2] * n; v = [1000] * n\n    if bad:\n        h[10], l[10] = 99.0, 101.0          # high < low -> bad tick\n    if zero:\n        v[20] = 0\n    return pd.DataFrame({\"open\": o, \"high\": h, \"low\": l, \"close\": c, \"volume\": v}, index=idx)\n\n\ndef test_bad_ticks_and_zero_volume_counted():\n    df = _minute_day(bad=True, zero=True)\n    s = dc.bar_stats(df)\n    assert s[\"bad_ticks\"] == 1 and s[\"zero_volume\"] == 1 and s[\"rows\"] == 375\n\n\ndef test_missing_minutes_vs_session():\n    full = _minute_day(375)\n    assert dc.missing_minutes(full) == 0\n    short = _minute_day(300)\n    assert dc.missing_minutes(short) == 75          # 375 - 300\n\n\ndef test_corp_action_break_candidate_on_a_big_unexplained_jump():\n    idx = pd.bdate_range(\"2024-01-01\", periods=5)\n    daily = pd.Series([100, 101, 50, 51, 52], index=idx)   # ~2x drop day 3 = split candidate\n    breaks = dc.corp_action_breaks(daily, ratio=1.5)\n    assert breaks and str(breaks[0])[:10] == \"2024-01-03\"\n\n\ndef test_coverage_report_aggregates_and_flags_as_of():\n    rep = dc.coverage_report({\"AAA\": _minute_day(375), \"BBB\": _minute_day(300, zero=True)})\n    assert rep[\"tokens\"] == 2 a
+tool_result: --- RED ---
+E   ImportError: cannot import name 'data_check' from 'pricev2' ([redacted]\Desktop\trading-engines-v2\pricev2\__init__.py)
+=========================== short test summary info ===========================
+ERROR tests/test_pricev2_data_check.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 5.18s
