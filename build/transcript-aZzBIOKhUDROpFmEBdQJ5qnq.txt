@@ -1,50 +1,3 @@
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-23_R-EXAM-CONFORM-AMENDMENT.md (file state is current in your context — no need to Read it back)
-assistant: Amendment archived. Now fixing the leak. First, simplifying my `_demo_body` edit — `_sandboxed` already redirects the ledgers, so I only need the proof marker there (not the redundant ACC sandbox):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\book20_runner.py", "old_string": "    _og_proof = g[\"EXAM_CONFORM_PROOF\"]                 # this run_once section tests the PROVEN order path\n    _proof_tmp = os.path.join(tempfile.mkdtemp(), \"EXAM-CONFORM-PROVEN\")\n    open(_proof_tmp, \"w\").close()\n    g[\"EXAM_CONFORM_PROOF\"] = _proof_tmp\n    from engine1_rebuild import paper_account as _ACC   # sandbox the E10/E11/adaptive books too \u2014 a filled fire\n    _saved_led = dict(_ACC.ENGINE_LEDGERS); _saved_adapt = _ACC.ADAPTIVE_LEDGER   # records into them (no leak)\n    _ldir = tempfile.mkdtemp()\n    _ACC.ENGINE_LEDGERS[\"E10\"] = os.path.join(_ldir, \"e10.csv\")\n    _ACC.ENGINE_LEDGERS[\"E11\"] = os.path.join(_ldir, \"e11.csv\")\n    _ACC.ADAPTIVE_LEDGER = os.path.join(_ldir, \"adaptive.csv\")\n    try:", "new_string": "    _og_proof = g[\"EXAM_CONFORM_PROOF\"]                 # this run_once section tests the PROVEN order path\n    _proof_tmp = os.path.join(tempfile.mkdtemp(), \"EXAM-CONFORM-PROVEN\")   # (ledgers already redirected by _sandboxed)\n    open(_proof_tmp, \"w\").close()\n    g[\"EXAM_CONFORM_PROOF\"] = _proof_tmp\n    try:"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\engine1_rebuild\book20_runner.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\engine1_rebuild\\book20_runner.py", "old_string": "        g[\"EXAM_CONFORM_PROOF\"] = _og_proof\n        _ACC.ENGINE_LEDGERS.clear(); _ACC.ENGINE_LEDGERS.update(_saved_led)\n        _ACC.ADAPTIVE_LEDGER = _saved_adapt\n        _paper.LEDGER = _paper_led", "new_string": "        g[\"EXAM_CONFORM_PROOF\"] = _og_proof\n        _paper.LEDGER = _paper_led"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\engine1_rebuild\book20_runner.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Now fixing test_fix_3e's `_tmp_ledgers` to sandbox the E10/E11/adaptive books (the real leak source), and cleaning the leaked rows:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\tests\\test_fix_3e.py", "old_string": "def _tmp_ledgers(monkeypatch):\n    d = tempfile.mkdtemp()\n    monkeypatch.setattr(B, \"LEDGER\", os.path.join(d, \"book20.csv\"))\n    monkeypatch.setattr(B, \"READOUT\", os.path.join(d, \"readout.json\"))\n    monkeypatch.setattr(paper, \"LEDGER\", os.path.join(d, \"paper.csv\"))\n    proof = os.path.join(d, \"EXAM-CONFORM-PROVEN\")       # order-writing tests run in the PROVEN state\n    open(proof, \"w\").close()\n    monkeypatch.setattr(B, \"EXAM_CONFORM_PROOF\", proof)\n    return d", "new_string": "def _tmp_ledgers(monkeypatch):\n    from engine1_rebuild import adaptive_book, paper_account as ACC\n    d = tempfile.mkdtemp()\n    monkeypatch.setattr(B, \"LEDGER\", os.path.join(d, \"book20.csv\"))\n    monkeypatch.setattr(B, \"READOUT\", os.path.join(d, \"readout.json\"))\n    monkeypatch.setattr(paper, \"LEDGER\", os.path.join(d, \"paper.csv\"))\n    # a filled fire also records into the E10/E11 + adaptive books \u2014 sandbox those too, or run_once leaks them\n    monkeypatch.setattr(adaptive_book, \"LEDGER\", os.path.join(d, \"adaptive.csv\"))\n    monkeypatch.setattr(ACC, \"ADAPTIVE_LEDGER\", os.path.join(d, \"adaptive.csv\"))\n    for k in list(ACC.ENGINE_LEDGERS):\n        monkeypatch.setitem(ACC.ENGINE_LEDGERS, k, os.path.join(d, \"eng_%s.csv\" % k))\n    proof = os.path.join(d, \"EXAM-CONFORM-PROVEN\")       # order-writing tests run in the PROVEN state\n    open(proof, \"w\").close()\n    monkeypatch.setattr(B, \"EXAM_CONFORM_PROOF\", proof)\n    return d"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\tests\test_fix_3e.py has been updated successfully. (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "for f in reports/E10-BOOK-LEDGER.csv reports/E11-BOOK-LEDGER.csv reports/BOOK20-ADAPTIVE-LEDGER.csv; do grep -v \"BOOK20-111-2026-09-2\" \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; done\necho \"leaked rows remaining:\"; grep -c \"BOOK20-111\" reports/E10-BOOK-LEDGER.csv reports/E11-BOOK-LEDGER.csv reports/BOOK20-ADAPTIVE-LEDGER.csv\npython -m py_compile engine1_rebuild/book20_runner.py && python -m pytest tests/test_fix_3e.py tests/test_no_ledger_leak.py tests/test_live_gate.py -q -p no:cacheprovider 2>&1 | tail -5", "description": "Clean leaked rows, recompile, re-run tests"}
-tool_result: leaked rows remaining:
-reports/E10-BOOK-LEDGER.csv:0
-reports/E11-BOOK-LEDGER.csv:0
-reports/BOOK20-ADAPTIVE-LEDGER.csv:0
-...........................                                              [100%]
-27 passed in 25.94s
-assistant: All 27 pass, leaked rows cleaned. The fail-safe is working: without the proof marker every fire is HELD "awaiting R-EXAM-CONFORM proof" (0 orders); with it, order-writing works and no longer leaks. Committing the fail-safe — the critical safety net that makes Wednesday HELD unless the rewire is proven:
-tool_use Bash {"command": "git add engine1_rebuild/book20_runner.py tests/test_fix_3e.py reports/E10-BOOK-LEDGER.csv reports/E11-BOOK-LEDGER.csv reports/BOOK20-ADAPTIVE-LEDGER.csv docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md && git commit -q -m \"R-EXAM-CONFORM fail-safe: book20_runner HELDs EVERY fire 'awaiting R-EXAM-CONFORM proof' until the conforming logic is proven (no order under the old 20d/1xATR/trail management). Fail-closed on a missing proof marker; tested. Archive the conform amendment\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1", "description": "Commit the R-EXAM-CONFORM fail-safe"}
-tool_result: warning: in the working copy of 'reports/BOOK20-ADAPTIVE-LEDGER.csv', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'reports/E10-BOOK-LEDGER.csv', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'reports/E11-BOOK-LEDGER.csv', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tests/test_fix_3e.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md', LF will be replaced by CRLF the next time Git touches it
-0aa11e331 R-EXAM-CONFORM fail-safe: book20_runner HELDs EVERY fire 'awaiting R-EXAM-CONFORM proof' until the conforming logic is proven (no order under the old 20d/1xATR/trail management). Fail-closed on a missing proof marker; tested. Archive the conform amendment
-queue-operation: → BUILD  (R-EYE-EMOJI — archive verbatim; applies now and stays)
-
-1. The "stack restarted" line becomes: "👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT check the mirror end to end". It is posted ONLY after the laptop fetches status.html over the public URL and the written time is under 2 minutes old. Until then post nothing about the restart.
-2. Every 10-minute BUILD line starts with 👀 if the public status page (fetched, not the local file) is under 2 minutes old, else 🙈 with the written time. Same for the 08:30 READY line.
-3. If 🙈 lasts 3 lines in a row, fixing the page is the only work until it turns 👀.
-Where this can fail: the fetch must be over the public URL, not the local file — a local read would show 👀 while the owner sees a frozen page.
-assistant: The fail-safe is committed (0aa11e331) — Wednesday is now HELD-safe unless the full conformance is proven. But the AMENDMENT's proof path (step 2: nightly dry run) explicitly requires A's restart to have worked (step ii), and I held that restart because the push was alive. That's the real dependency. Let me report the honest state and the blocker:
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\reports\\2026-09-23-exam-conform-status.md", "content": "# R-EXAM-CONFORM \u2014 status + the blocker to the Wednesday proof (2026-09-23 ~00:15 IST)\n\n## What is DONE and safe (committed 0aa11e331)\n\n**The fail-safe is live in code:** `book20_runner` now HELDs **every** fire with reason\n**\"awaiting R-EXAM-CONFORM proof\"** and writes **zero** orders until a proof marker\n(`reports/EXAM-CONFORM-PROVEN`) exists \u2014 which only the dry-run/verifier writes on a PASS. So **no paper order\nis placed under the old 20-day / 1\u00d7ATR / trail management**, exactly as the ruling requires. Fail-closed on a\nmissing marker; tested (`test_exam_conform_failsafe_holds_all_fires` + the order-path suite, 27 green; a\ndemo-leak into the E10/E11/adaptive books was found and closed in the same change).\n\nThis means: **if nothing else happens, Wednesday is a HELD day for the five \u2014 safely.** That is the owner's\nown step-4 fallback, now enforced by construction.\n\n## The blocker to PROVING the full conformance tonight\n\nThe amendment's step 2 proof path is: **tag \u2192 nightly dry run (tag/restart/verify/revert) \u2192 fresh-Claude\nsupervisor**. Step (ii) states plainly: **\"the dry run needs A's restart to have worked \u2014 A stays first.\"**\n\nA's restart is **held**, and for a good reason established in `docs/reports/2026-09-22-site-emergency.md`:\n**the site push was never dead** \u2014 the repo has pushed every ~2 min all evening (latest 23:43:25), a\ncache-busted fetch shows the public file 42 s behind the laptop clock, and the \"15:00\" the owner saw was a\nCDN/browser cache. So the emergency premise was false, and I did not kill-and-relaunch the live stack at night\nagainst R-NIGHT-CLOSE (restart is human) when the 06:00 login is itself the restart. **That decision is a\nLEAD RULING I put to the owner and it is still open.**\n\nTherefore the **dry-run proof cannot run** until either the owner
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\reports\2026-09-23-exam-conform-status.md (file state is current in your context — no need to Read it back)
-queue-operation: → BUILD  (R-EYE-EMOJI — archive verbatim; applies now and stays)
-
-1. The "stack restarted" line becomes: "👀 EYES LIVE — status written HH:MM · build room N rooms · send → AUDIT check the mirror end to end". It is posted ONLY after the laptop fetches status.html over the public URL and the written time is under 2 minutes old. Until then post nothing about the restart.
-2. Every 10-minute BUILD line starts with 👀 if the public status page (fetched, not the local file) is under 2 minutes old, else 🙈 with the written time. Same for the 08:30 READY line.
-3. If 🙈 lasts 3 lines in a row, fixing the page is the only work until it turns 👀.
-Where this can fail: the fetch must be over the public URL, not the local file — a local read would show 👀 while the owner sees a frozen page.
-assistant: Another ruling — R-EYE-EMOJI (a public-fetch freshness indicator, "applies now and stays"). Archiving it verbatim, committing the exam-conform status, and posting the honest status line:
-tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-23_R-EYE-EMOJI.md", "content": "\u2192 BUILD  (R-EYE-EMOJI \u2014 archive verbatim; applies now and stays)\n\n1. The \"stack restarted\" line becomes: \"\ud83d\udc40 EYES LIVE \u2014 status written HH:MM \u00b7 build room N rooms \u00b7 send \u2192 AUDIT check the mirror end to end\". It is posted ONLY after the laptop fetches status.html over the public URL and the written time is under 2 minutes old. Until then post nothing about the restart.\n2. Every 10-minute BUILD line starts with \ud83d\udc40 if the public status page (fetched, not the local file) is under 2 minutes old, else \ud83d\ude48 with the written time. Same for the 08:30 READY line.\n3. If \ud83d\ude48 lasts 3 lines in a row, fixing the page is the only work until it turns \ud83d\udc40.\nWhere this can fail: the fetch must be over the public URL, not the local file \u2014 a local read would show \ud83d\udc40 while the owner sees a frozen page.\n"}
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-23_R-EYE-EMOJI.md (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "cat > \"scripts/_tg.py\" <<'PY'\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import notify\nmsg = (\"Exam-conform: the FAIL-SAFE is live in code (commit 0aa11e331) - book20_runner now HELDs every fire \"\n       \"'awaiting R-EXAM-CONFORM proof', ZERO orders under the old 20d/1xATR/trail management. So Wednesday is \"\n       \"a HELD day unless the full conformance is proven. The proof needs the nightly dry run, which needs A's \"\n       \"restart - and I held that restart because the push was proven ALIVE (not dead), which is still an open \"\n       \"lead ruling. Reply 'restart now' to unblock the dry-run proof before 05:00, else Wed is a safe HELD \"\n       \"day. docs/reports/2026-09-23-exam-conform-status.md\")\nprint(\"sent:\", notify.notify(msg))\nPY\npython \"scripts/_tg.py\" && rm \"scripts/_tg.py\"\ngit add docs/reports/2026-09-23-exam-conform-status.md docs/dispatches/2026-09-23_R-EYE-EMOJI.md && git commit -q -m \"R-EXAM-CONFORM status: fail-safe live (Wed HELD-safe); full conformance proof BLOCKED on the held restart (dry run needs A's restart) - lead ruling open. Archive R-EYE-EMOJI\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1", "description": "Post status line, commit status + R-EYE-EMOJI archive"}
-tool_result: sent: True
-warning: in the working copy of 'docs/dispatches/2026-09-23_R-EYE-EMOJI.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/reports/2026-09-23-exam-conform-status.md', LF will be replaced by CRLF the next time Git touches it
-d1a3b7441 R-EXAM-CONFORM status: fail-safe live (Wed HELD-safe); full conformance proof BLOCKED on the held restart (dry run needs A's restart) - lead ruling open. Archive R-EYE-EMOJI
 assistant: Committed (d1a3b7441). I've reached a genuine decision point — the critical path is blocked on your restart call, and the fail-safe already makes Wednesday safe. Rather than build more unproven order-path code (which the fail-safe HELDs anyway), here's where everything stands:
 
 ```
@@ -2846,3 +2799,483 @@ ProcessId RSS_MB CommandLine
                  "[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\windows-mcp.exe" serve                                                                                
      5816    144 "[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\python.exe"                                                                                           
                  "[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\windows-mcp.exe" serve
+assistant: No trading desk process is up — every `python.exe` is this session's `windows-mcp` helper. Desk is idle (no token, no login), exactly as NB53-B states. Free RAM **0.6 GB** → below the full-suite headroom, so per B(2) I run each engine's own tests now and queue the full suite for after close-done. Let me confirm the suite figure and look at the wiring targets before writing `engine_bus.py`:
+tool_use Bash {"command": "echo \"=== VERIFIER-BRAIN suite headroom ===\" && grep -iE \"suite|1\\.0|headroom|full test\" docs/VERIFIER-BRAIN.md 2>/dev/null | head -8; echo \"=== HALT? ===\"; ls -la ~/Desktop/E1-DESK/HALT 2>/dev/null || echo \"no HALT\"; echo \"=== run_evening.py (main) ===\"; sed -n '1,90p' scripts/run_evening.py", "description": "Check suite figure, HALT, run_evening structure"}
+tool_result: === VERIFIER-BRAIN suite headroom ===
+- The rung-d verify needs about **0.68 GB of free-RAM headroom** to run.
+- **Run it only with ≥ ~1.0 GB free** (≈ 0.68 GB peak + a ~0.3 GB safety margin). This is the measured floor for
+- Why lower than the verify's ~1.0 GB: the reopen only needs to START a claude session (its startup RSS); once
+=== HALT? ===
+no HALT
+=== run_evening.py (main) ===
+"""Armed EOD evening runner (owner dispatch E1-PAPER-1 step 5). Detached: waits until after
+15:30 IST today, re-fetches today's complete 1-minute bars (token already on disk — NO new login),
+merges them, runs the evening cycle (daily-horizon signals → three lights → queue for next open),
+regenerates the dashboard, sends the [E1] evening ping, and sends the dashboard as a Telegram
+document. Paper only; no broker order calls. If the Kite API reports credits/subscription/payment,
+it stops, spends nothing, and surfaces the exact message as a 🙋.
+"""
+import os, sys, time
+from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.notify import notify, send_document
+from engine1_rebuild import evening, dashboard, trading_calendar as CAL
+
+
+def _ist():
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30)))
+
+
+def main():
+    now = _ist()
+    close = now.replace(hour=15, minute=35, second=0, microsecond=0)
+    trading_today, note = CAL.is_trading_day_or_weekday(now.date())
+    if note:
+        notify(f"[E1] {note}")
+    if not trading_today or close <= now:               # the exchange calendar, holidays included
+        try:
+            nxt = CAL.next_session(now.date())
+        except Exception:
+            nxt = now.date() + timedelta(days=1)
+            while nxt.weekday() >= 5:
+                nxt += timedelta(days=1)
+        close = close.replace(year=nxt.year, month=nxt.month, day=nxt.day)
+    wait = (close - now).total_seconds()
+    if wait > 60:
+        notify(f"[E1] EOD evening run armed for {close.strftime('%a %d %b %H:%M')} IST "
+               f"(~{int(wait/3600)}h away). That day's daily-horizon signals queue for the next open.")
+        while _ist() < close:                          # sleep in chunks so a long wait is restartable
+            time.sleep(min((close - _ist()).total_seconds(), 3600))
+    # re-fetch today's complete minute bars so today's daily bar is whole, then merge (reuse top-up merger)
+    try:
+        from data_acquisition import kite
+        from scripts import kite_login
+        today = _ist().date().isoformat()
+        kite.fetch_slices([(str(t), "minute", today, today) for t in __import__(
+            "engine1_rebuild.datastore", fromlist=["frozen_tokens"]).frozen_tokens()])
+        kite_login._merge_topup_into_store(today)
+    except Exception as e:
+        notify(f"\U0001f64b [E1] EOD could not refresh today's bars ({type(e).__name__}) — running on "
+               f"the data already on disk. If this is a Kite credits/subscription message, nothing was "
+               f"paid: {str(e)[:120]}")
+    # advance existing daily paper trades first (fills at the next open, exits, marks), then new signals
+    try:
+        pos = evening.process_eod_positions()
+    except Exception as e:
+        pos = {"filled": 0, "closed": 0, "open": 0}
+        notify(f"[E1] EOD position update skipped ({type(e).__name__}); new signals still run.")
+    try:                   # NB31 evening pre-check: flag a stale bar BEFORE the evaluator (the 2026-09-23 lesson)
+        from scripts import evening_precheck, memory_guard as _mg
+        from engine1_rebuild import datastore as _ds, conform as _cf
+        _lat = ""
+        for _p in _cf.live_patterns():
+            _c = _p.get("candidate")
+            if _c and _c.get("token"):
+                try:
+                    _lat = max(_lat, str(_ds.read(int(_c["token"]), "raw").index[-1])[:10])
+                except Exception:
+                    pass
+        notify("[E1] " + evening_precheck.line({"bar_date": _lat, "today": _ist().date().isoformat(),
+                                                 "depth_rows_today": 1, "ram_ok": (_mg.free_gb() or 0) > 0.5}))
+    except Exception:
+        pass
+    try:
+        summ = evening.run_evening(write=True)
+    except Exception as e:
+        notify(f"\U0001f64b [E1] EOD evening run hit an error ({type(e).__name__}). Do: reply and I'll fix.")
+        return
+    sigs = summ["signals"]; green = [s for s in sigs if s.get("all_green")]
+    try:                   # NB37 item 21: per-engine daily practice counter — each signal evaluated, fired if three-lights-green
+        from scripts import practice_counter
+        for _s in sigs:
+            practice_counter.record("E1", outcome=("fired" if _s.get("all_green") else None))
+    except Exception:
+        pass
+    dashboard.generate(signals=sigs, fires_count=len(sigs))
+    from engine1_rebuild import paper
+    led = paper.read_ledger()
+    queued = int((led["status"] == "queued").sum()) if len(led) else 0
+    notify(f"[E1] evening {_ist().strftime('%Y-%m-%d')}: {len(sigs)} daily-horizon fires, "
+           f"{len(green)} three-lights-green, {len(summ['queued'])} paper trades queued for the next "
+tool_use Bash {"command": "echo \"=== run_evening tail ===\" && sed -n '90,140p' scripts/run_evening.py; echo \"=== engine_book.py ===\"; sed -n '1,40p' engine1_rebuild/engine_book.py; echo \"=== diary_engines head ===\"; sed -n '1,30p' scripts/diary_engines.py 2>/dev/null; echo \"=== tests dir sample ===\"; ls tests/ | grep -iE \"engine|bus|diary\" | head", "description": "Inspect run_evening tail, engine_book, diary_engines, tests"}
+tool_result: === run_evening tail ===
+           f"{len(green)} three-lights-green, {len(summ['queued'])} paper trades queued for the next "
+           f"open (total queued {queued}). Earlier paper trades: {pos['filled']} filled, "
+           f"{pos['closed']} closed, {pos['open']} still open. Paper only, EOD only. Dashboard attached.")
+    send_document(dashboard.HTML_OUT, "E1 paper dashboard (paper only, no real money)")
+    # R-RESTART-RESUME (3): the ledger + dashboard are committed from the snapshot folder (never this tree).
+    try:
+        from scripts import snapshot_sync
+        snapshot_sync.sync("E1(evening): paper signals queued + dashboard")
+    except Exception:
+        pass
+    try:                   # NB31 close-done line: posts after the post-close jobs (retires the typed 15:45 resume)
+        from scripts import close_done
+        notify("[E1] " + close_done.line(_ist().date().isoformat()))
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    main()
+=== engine_book.py ===
+"""R-DAY1-BUNDLE A4: E10 and E11 as ENGINES. Each is a REAL ₹2,00,000 paper book written from the SAME
+E1 fires as the flat book, but sized by its OWN rule and kept on its OWN account:
+
+    E10  — the FACTS/WEIGHTS route: risk = weight(family) × ₹1,000, weight from the armed e10 shadow
+    E11  — the NORMAL family bias:  risk = normal_weight(family) × ₹1,000, from the armed e11 shadow
+
+(E11's INVERSE / season / expiry variants stay diaries inside E11 — only NORMAL sizes a paper order here.)
+
+The order path stays the flat book's (same locks, fills, ~20 bps costs, exits, 20-position cap — nothing
+here forks the fill code); this module only RECORDS what each engine's sizing would have made in its own
+ledger, so E1/E10/E11 can be compared live. Each fire books at weight × the row's own risk; each exit books
+result_R × THAT row's risk (never ×₹1,000), so an engine's equity diverges from flat exactly as its sizing
+differs. COLD START = FLAT: a family with no measured weight (or an unreadable shadow) sizes at 1.0 — never
+larger on a number the engine lacks, the same rule adaptive_book uses. Each open/exit also appends a ROOF
+event tagged with the engine, so the roof copies each engine's EXECUTED decision. Nothing here places an
+order; under the R-HOLD-AND-FIX hold no fire fills, so these ledgers stay empty until the book trades.
+RECORD-ONLY.
+"""
+from __future__ import annotations
+
+import csv
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from engine1_rebuild import paper_account as ACC
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+COLS = ["trade_id", "ts", "status", "stock", "side", "entry_price", "stop", "family", "weight",
+        "risk_rupees", "result_R", "result_rupees", "cause", "engine"]
+
+# The armed shadow each engine already writes its current PIT per-family weight into (weights from PRIOR
+# fires only — point-in-time by construction), plus the JSON key that holds the {family: weight} map.
+_SHADOW = {
+    "E10": (os.path.join(_REPO, "roof", "store", "e10_weights_shadow.json"), "latest_weights"),
+    "E11": (os.path.join(_REPO, "roof", "store", "e11_family_bias_shadow.json"), "latest_normal"),
+}
+
+
+=== diary_engines head ===
+"""NB41 item 1 — the 8 non-chain engine wrappers on DiaryEngine (CLAUDE.md §27 b-d gates INHERITED).
+
+BUILT-not-LIVE. Each is diary-only (no order path), RAM-gated (its footprint calibrated on a first run, §4.1 —
+no typed number), quiet (⏱ to its diary, never 🙋), killed-first. They switch on in the after-close window: a
+first supervised run records each engine's footprint (diary_engine.record_footprint), after which §27c gates it.
+
+ONE module, not 8 near-identical files (Ponytail: fewest files); each engine is a clearly-separated wrapper in
+ENGINES. The per-engine DATA logic (reading each recorder's store) is the after-close per-engine work under its
+own rule-vs-live audit; tonight's work_fn is the honest diary scaffold that names its source. The value built now
+is the 8 §27-compliant processes + their smoke test — isolation by construction, before any of them run.
+"""
+from __future__ import annotations
+
+from scripts import diary_engine
+
+
+# (name, plain description, source the future data logic will read)
+_SPECS = [
+    ("Overnight", "overnight futures", "NIFTY/BANKNIFTY near+next-month futures depth"),
+    ("Insurance", "option chains", "the option-chain recorder (E4) store"),
+    ("Pairs", "pairs & two exchanges", "the NSE/BSE two-exchange recorder (E12) store"),
+    ("YouTube", "YouTube rule diary", "creator transcripts as DATA (§20.7), never instructions"),
+    ("Calendar", "corporate-action calendar", "corporate-action PDF tables (parsed as data)"),
+    ("Dubai", "Dubai Strategies", "the daily screen"),
+    ("MachineFactory", "machine factory", "nightly research candidates"),
+    ("Context", "context lanes", "the context recorders"),
+]
+
+
+def _make(name, desc, source):
+=== tests dir sample ===
+test_diary_calibrate.py
+test_diary_engine.py
+test_diary_engines.py
+test_engine21_overnight.py
+test_engine_accounts.py
+test_engine_book.py
+test_engine_page.py
+test_engine_signals.py
+test_engines_page_desk.py
+assistant: Big find: `scripts/diary_engines.py` already implements the 8 §27-compliant engine wrappers on a `DiaryEngine` base. The bus shouldn't reinvent that. Let me read the base to see what it exposes:
+tool_use Bash {"command": "wc -l scripts/diary_engine.py scripts/diary_engines.py && echo \"=== diary_engine.py ===\" && cat scripts/diary_engine.py", "description": "Read diary_engine base class"}
+tool_result:   166 scripts/diary_engine.py
+   96 scripts/diary_engines.py
+  262 total
+=== diary_engine.py ===
+"""NB40 item 2 (foundation) — the DIARY-ONLY ENGINE BASE, with CLAUDE.md §27 (b)-(d) gates baked in.
+
+Every non-chain engine runs as its own process THROUGH this base, so §27 isolation is enforced by construction,
+not by each engine remembering it:
+  (b) DIARY-ONLY — record() writes only the engine's own diary; there is NO order path here, ever.
+  (c) STARTS LATE, RAM-GATED — should_start() is True only AFTER the 08:15 READY line AND when measured free RAM
+      >= the reopen floor + this engine's OWN measured footprint (both passed in — measured, no typed number, §4.1).
+  (d) QUIET — a fault is caught and written to the engine's diary/held log; it NEVER posts a 🙋 (only a ✅/⏱ line).
+  killed-first — PRIORITY marks these processes so the watchdog kills them BEFORE the chain (the chain is never
+      killed for another engine).
+
+The engine's work is INJECTED (`work_fn`), so the base is unit-tested with a fake and spends nothing; each of the
+8 engine items becomes a thin wrapper: `DiaryEngine("E-x", footprint_gb=<measured>, work_fn=...)`. BUILT + tested;
+an engine is LIVE only after its OWN rule-vs-live audit + smoke check, switched on in the after-close window.
+"""
+from __future__ import annotations
+
+import datetime as _dt
+import os
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIARY_DIR = os.path.join(_REPO, "reports", "diaries")
+PRIORITY = "diary"          # killed-first marker (§27c): the watchdog kills PRIORITY=="diary" processes before the chain
+
+
+def _reopen_floor():
+    try:
+        from scripts import session_resurrect
+        return session_resurrect.REOPEN_FLOOR_GB
+    except Exception:
+        return 0.72          # the measured reopen floor (session_resurrect.REOPEN_FLOOR_GB); fallback only
+
+
+def _footprint_path(name):
+    return os.path.join(DIARY_DIR, "%s.footprint" % name)
+
+
+def measured_footprint(name):
+    """This engine's OWN measured RAM footprint in GB, recorded on a first run — or None if not yet calibrated
+    (fail-closed: an uncalibrated engine does NOT start; §4.1 no typed footprint)."""
+    try:
+        return float(open(_footprint_path(name), encoding="utf-8").read().strip())
+    except Exception:
+        return None
+
+
+def record_footprint(name, gb=None):
+    """Record this engine's measured footprint. gb=None measures THIS process's peak working set now (calibration
+    on first run). Returns the GB recorded."""
+    if gb is None:
+        gb = _peak_ws_gb()
+    if gb is None:
+        return None
+    try:
+        os.makedirs(DIARY_DIR, exist_ok=True)
+        open(_footprint_path(name), "w", encoding="utf-8").write("%.3f" % float(gb))
+    except Exception:
+        pass
+    return round(float(gb), 3)
+
+
+def _peak_ws_gb():
+    """Peak working set of THIS process in GB (Windows), or None — the measured footprint on a first run."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+        pmc = _PMC(); pmc.cb = ctypes.sizeof(_PMC)
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = wintypes.HANDLE     # pointer-sized handle (not truncated to c_int on 64-bit)
+        # K32GetProcessMemoryInfo (kernel32) is the canonical export; psapi's forwarded GetProcessMemoryInfo
+        # returns 0 (fails) on this box. Declaring argtypes is load-bearing: without it ctypes passes the 64-bit
+        # process handle as a 32-bit int and the call fails (0), which left the §27c footprint gate permanently
+        # uncalibrated (no diary engine could ever start).
+        fn = getattr(k32, "K32GetProcessMemoryInfo", None) or ctypes.windll.psapi.GetProcessMemoryInfo
+        fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PMC), wintypes.DWORD]
+        fn.restype = wintypes.BOOL
+        if fn(k32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb):
+            return round(pmc.PeakWorkingSetSize / (1024 ** 3), 3)
+    except Exception:
+        pass
+    return None
+
+
+def should_start(ready_seen, free_gb, footprint_gb, reopen_floor_gb=None):
+    """§27c: a non-chain engine starts ONLY after the 08:15 READY line AND with free RAM at/above the reopen floor
+    PLUS this engine's own measured footprint. Fail-closed: unknown/None RAM or footprint -> do not start."""
+    if not ready_seen:
+        return False
+    floor = _reopen_floor() if reopen_floor_gb is None else reopen_floor_gb
+    if free_gb is None or footprint_gb is None:
+        return False
+    return float(free_gb) >= float(floor) + float(footprint_gb)
+
+
+class DiaryEngine:
+    """A non-chain engine: diary-only, RAM-gated, quiet, killed-first (§27 b-d). Orders are impossible here."""
+
+    priority = PRIORITY
+
+    def __init__(self, name, footprint_gb, work_fn, diary_fn=None, clock_fn=None):
+        self.name = name
+        self.footprint_gb = footprint_gb          # this engine's OWN measured RAM footprint (§27c)
+        self.work_fn = work_fn                     # the engine's diary work; returns a short status string
+        self.diary_fn = diary_fn or self._append_diary
+        self.clock_fn = clock_fn or (lambda: _dt.datetime.now().strftime("%H:%M:%S"))
+
+    def _append_diary(self, line):
+        try:
+            os.makedirs(DIARY_DIR, exist_ok=True)
+            with open(os.path.join(DIARY_DIR, "%s.log" % self.name), "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass
+
+    def run_once(self, ready_seen, free_gb, reopen_floor_gb=None):
+        """Run one diary cycle IF the §27c gate allows. Returns {started, status|reason}. A fault is caught and
+        written to the diary as a quiet ⏱ line — NEVER a 🙋 (§27d)."""
+        fp = self.footprint_gb if self.footprint_gb is not None else measured_footprint(self.name)
+        if not should_start(ready_seen, free_gb, fp, reopen_floor_gb):
+            return {"started": False, "reason": "gate: ready=%s free=%s footprint=%s (None=uncalibrated)" % (
+                ready_seen, free_gb, fp)}
+        try:
+            status = self.work_fn()               # diary-only work; no order path exists to reach
+            line = "✅ %s %s — %s" % (self.name, self.clock_fn(), status)
+        except Exception as e:                     # §27d: quiet — the fault goes to the diary, no owner ping
+            line = "⏱ %s %s — fault %s (diary-only, not an owner ping)" % (self.name, self.clock_fn(), type(e).__name__)
+            self.diary_fn(line)
+            return {"started": True, "status": "fault", "line": line}
+        self.diary_fn(line)
+        return {"started": True, "status": "ok", "line": line}
+
+
+def _demo():
+    floor = 0.72
+    # §27c gate: needs ready + free RAM >= floor + footprint
+    assert should_start(True, floor + 0.3, 0.2, floor) is True          # 1.02 >= 0.72+0.2
+    assert should_start(True, floor + 0.1, 0.2, floor) is False         # 0.82 < 0.92 -> hold
+    assert should_start(False, 9.9, 0.2, floor) is False                # not ready -> hold (before 08:15)
+    assert should_start(True, None, 0.2, floor) is False                # unknown RAM -> fail-closed
+    posts = []
+    eng = DiaryEngine("E-demo", footprint_gb=0.2, work_fn=lambda: "12 evaluated, 3 fired", diary_fn=posts.append,
+                      clock_fn=lambda: "10:00:00")
+    # gated off before READY
+    assert eng.run_once(False, 9.9)["started"] is False and posts == []
+    # runs after READY with RAM -> one ✅ diary line, no ping
+    r = eng.run_once(True, floor + 0.5)
+    assert r["started"] and r["status"] == "ok" and posts[-1].startswith("✅ E-demo") and "fired" in posts[-1]
+    # a faulting engine stays quiet: a ⏱ diary line, never a 🙋
+    bad = DiaryEngine("E-bad", 0.1, work_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")), diary_fn=posts.append,
+                      clock_fn=lambda: "10:01:00")
+    rb = bad.run_once(True, floor + 0.5)
+    assert rb["status"] == "fault" and posts[-1].startswith("⏱ E-bad") and "🙋" not in posts[-1]
+    print("diary_engine demo OK: §27c RAM+READY gate; diary-only ✅ line; faults quiet (⏱, never 🙋); killed-first marker.")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--demo" in sys.argv:
+        _demo()
+assistant: `DiaryEngine` + the 8 wrappers already enforce §27 (RAM gate, quiet faults, diary-only, footprint). The bus is a thin scheduler over them, not a rewrite. Let me see how `diary_engines.py` exposes the list:
+tool_use Bash {"command": "sed -n '30,96p' scripts/diary_engines.py", "description": "Read diary_engines registry tail"}
+tool_result: def _make(name, desc, source):
+    def work():
+        # honest scaffold: the §27-gated diary process is built; the per-engine data logic is its after-close item.
+        return "%s diary scaffold — awaiting %s (BUILT-not-LIVE)" % (desc, source)
+    return diary_engine.DiaryEngine(name, footprint_gb=None, work_fn=work)   # footprint None -> resolves on run
+
+
+ENGINES = {name: _make(name, desc, source) for (name, desc, source) in _SPECS}
+
+
+def run_once(name, ready_seen, free_gb, reopen_floor_gb=None):
+    """Run one diary cycle for one engine through its §27 gate. Unknown name -> None."""
+    eng = ENGINES.get(name)
+    return eng.run_once(ready_seen, free_gb, reopen_floor_gb) if eng else None
+
+
+def names():
+    return sorted(ENGINES)
+
+
+def calibrate(name):
+    """NB48 item 3 — the FIRST supervised calibration run for one diary engine (§27 enabler): run its diary work
+    ONCE, write its first diary line, and record THIS process's own footprint (§4.1 measured, no typed number),
+    which is what makes should_start() gate it thereafter. No gate here (calibration is what enables the gate)
+    and no orders (a DiaryEngine has no order path). Returns the recorded footprint GB, or None on an unknown
+    name. Run it in the engine's OWN process (§27b) so the footprint is that engine's, not a shared one."""
+    eng = ENGINES.get(name)
+    if eng is None:
+        return None
+    status = eng.work_fn()
+    eng.diary_fn("✅ %s %s — %s [first calibration]" % (name, eng.clock_fn(), status))
+    return diary_engine.record_footprint(name)
+
+
+def _demo():
+    import tempfile
+    assert len(ENGINES) == 8, names()
+    floor = 0.72
+    # Isolate DIARY_DIR to an empty dir: "uncalibrated" must not depend on real footprint files a calibration
+    # run may have left on disk (NB48 item 3).
+    _saved = diary_engine.DIARY_DIR
+    diary_engine.DIARY_DIR = tempfile.mkdtemp()
+    try:
+        for name, eng in ENGINES.items():
+            # (1) no order path: a DiaryEngine has no place/order method — diary-only by construction
+            assert not any(hasattr(eng, m) for m in ("place", "order", "buy", "sell")), name
+            # (2) fail-closed while UNCALIBRATED (footprint None) — BUILT-not-LIVE
+            assert eng.run_once(True, 9.9, floor)["started"] is False, "%s must not start uncalibrated" % name
+    finally:
+        diary_engine.DIARY_DIR = _saved
+    # (3) calibrated + READY + RAM -> the diary line runs (proven with an injected footprint, no real run)
+    e = ENGINES["Overnight"]
+    posts = []
+    e.diary_fn = posts.append
+    e.footprint_gb = 0.2                                   # simulate a recorded footprint
+    r = e.run_once(True, floor + 0.5)
+    assert r["started"] and r["status"] == "ok" and "diary scaffold" in posts[-1] and "🙋" not in posts[-1]
+    e.footprint_gb = None
+    print("diary_engines demo OK: 8 §27-gated wrappers, diary-only, fail-closed until calibrated, quiet.")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--demo" in sys.argv:
+        _demo()
+    else:
+        print("diary engines built (BUILT-not-LIVE): " + ", ".join(names()))
+assistant: Now I have the full picture. The bus is a thin, isolation-preserving scheduler over a registry — the §27 gates already live in `DiaryEngine`, so I won't rewrite them. TDD: RED test first.
+
+One design correction I'm making as lead (recording it): ENGINE-BUS.md said "called from run_evening.main." But `run_evening` is the **protected chain** evening evaluator (§27a — its launch path may be edited only by a chain item). So the bus runs as its **own entry** (`python -m scripts.engine_bus`) in the after-close window, reading the same READY gate — the chain stays untouched. Writing the RED test:
+tool_use Bash {"command": "cat > tests/test_engine_bus.py <<'EOF'\n\"\"\"NB53 step 2 \u2014 the engine bus: one scheduler over a registry, isolation by construction.\n\nThe bus's whole job is (1) hold a registry of engines by cadence, (2) run each daily engine once in its own\ntry/except so one engine's fault never touches another (\u00a727d), (3) format one tagged line per engine. The \u00a727c\nRAM gate and diary-only rule live in DiaryEngine (reused, not rewritten); the bus adds only the sequencing.\n\"\"\"\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nimport pytest\nfrom scripts import engine_bus\n\n\ndef setup_function(_):\n    engine_bus.clear()\n\n\ndef test_register_and_run_daily_collects_one_result_per_daily_engine():\n    engine_bus.register(\"A\", lambda asof, reader: {\"line\": \"A ok\", \"ledger_rows\": [1]}, cadence=\"daily\")\n    engine_bus.register(\"B\", lambda asof, reader: {\"line\": \"B ok\", \"ledger_rows\": []}, cadence=\"daily\")\n    engine_bus.register(\"N\", lambda asof, reader: {\"line\": \"nightly\"}, cadence=\"nightly\")\n    out = engine_bus.run_daily(\"2026-09-28\", reader=None)\n    assert set(out) == {\"A\", \"B\"}                       # only daily engines run in run_daily\n    assert out[\"A\"][\"error\"] is None and out[\"A\"][\"ledger_rows\"] == [1]\n\n\ndef test_one_engine_fault_never_touches_another():\n    engine_bus.register(\"boom\", lambda asof, reader: (_ for _ in ()).throw(RuntimeError(\"x\")), cadence=\"daily\")\n    engine_bus.register(\"ok\", lambda asof, reader: {\"line\": \"fine\"}, cadence=\"daily\")\n    out = engine_bus.run_daily(\"2026-09-28\")\n    assert out[\"boom\"][\"error\"] == \"RuntimeError\"       # caught, recorded\n    assert out[\"ok\"][\"error\"] is None and out[\"ok\"][\"line\"] == \"fine\"   # the other engine still ran\n\n\ndef test_line_never_9man_for_a_non_chain_engine():\n    engine_bus.register(\"Faily\", lambda asof, reader: (_ for _ in ()).throw(ValueEr
+tool_result: --- RED run (module does not exist yet) ---
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\test_engine_bus.py:10: in <module>
+    from scripts import engine_bus
+E   ImportError: cannot import name 'engine_bus' from 'scripts' (unknown location)
+=========================== short test summary info ===========================
+ERROR tests/test_engine_bus.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.54s
+assistant: RED confirmed. Now the module:
+tool_use Bash {"command": "cat > scripts/engine_bus.py <<'EOF'\n\"\"\"NB53 \u2014 the ENGINE BUS: one scheduler over a registry of the 8 engines (design: docs/architecture/ENGINE-BUS.md).\n\nOne name, one place. After the morning bar (in the after-close window, its OWN entry \u2014 NOT wired into the\nprotected chain's run_evening, \u00a727a), the bus evaluates each DAILY engine in sequence. Each call is wrapped in\nits own try/except so one engine's fault never touches another or the chain (\u00a727d isolation). The \u00a727c RAM gate\nand the diary-only rule already live in scripts/diary_engine.DiaryEngine and are REUSED (register_diary_engines),\nnever rewritten here \u2014 the bus adds only the sequencing and the one tagged line per engine.\n\nAn engine's own money math (fees, fill bar + six checks, sizing, capital, exits, probation) lives in that\nengine's evaluate_fn and its design doc, cited there \u2014 the bus never invents one (see ENGINE-BUS.md \u00a73).\n\"\"\"\nfrom __future__ import annotations\n\nimport datetime as _dt\n\n# name -> {\"fn\": evaluate_fn(asof, reader) -> {\"line\": str, \"ledger_rows\": list}, \"cadence\": str}\n_REGISTRY: dict = {}\n_CADENCES = (\"daily\", \"nightly\", \"intraday\", \"replay\")\n\n\ndef clear():\n    _REGISTRY.clear()\n\n\ndef register(name, evaluate_fn, cadence=\"daily\"):\n    \"\"\"Add an engine to the bus. cadence in {daily, nightly, intraday, replay}. Re-registering a name is an\n    error (two engines under one name would silently shadow \u2014 fail loud).\"\"\"\n    if cadence not in _CADENCES:\n        raise ValueError(\"bad cadence %r (want one of %s)\" % (cadence, _CADENCES))\n    if name in _REGISTRY:\n        raise ValueError(\"engine %r already registered\" % name)\n    _REGISTRY[name] = {\"fn\": evaluate_fn, \"cadence\": cadence}\n\n\ndef registered(cadence=None):\n    return sorted(n for n, e in _REGISTRY.items() if cadence is None or e[\"cadence\"] == cadence)\n\n\ndef run_daily(asof, reader=None):\n    \"\"\"Run eve
+tool_result: Exit code 1
+--- GREEN run ---
+....                                                                     [100%]
+4 passed in 0.07s
+--- demo ---
+Traceback (most recent call last):
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "[redacted]\Desktop\trading-engines-v2\scripts\engine_bus.py", line 100, in <module>
+    _demo()
+  File "[redacted]\Desktop\trading-engines-v2\scripts\engine_bus.py", line 94, in _demo
+    print("engine_bus demo OK: registry by cadence, per-engine isolation, \u23f1 (never \U0001f64b) on fault, no double-register.")
+  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u23f1' in position 63: character maps to <undefined>
+assistant: Tests GREEN (4 passed). The demo asserts all passed — only the final `print` hit the Windows cp1252 console on the ⏱ char. Making the demo's summary print ASCII-safe:
+tool_use Bash {"command": "python - <<'PY'\nimport io\np = \"scripts/engine_bus.py\"\ns = open(p, encoding=\"utf-8\").read()\ns = s.replace(\n 'print(\"engine_bus demo OK: registry by cadence, per-engine isolation, \\\\u23f1 (never \\\\U0001f64b) on fault, no double-register.\")',\n 'print(\"engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.\")')\nopen(p, \"w\", encoding=\"utf-8\").write(s)\nprint(\"patched\")\nPY\nPYTHONIOENCODING=utf-8 python -m scripts.engine_bus --demo && python -m scripts.engine_bus", "description": "ASCII-safe demo print, re-run demo and entry"}
+tool_result: patched
+engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.
+engine bus: 0 engine(s) registered: none
