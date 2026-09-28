@@ -1,4 +1,483 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>65a9faeb1</b> · 2026-09-28 09:36</div><div>NB53-E item 2: progress_beat.py — BUILD beat (Telegram + report): done N/65, ten-block bar, pending N, engine/chunk/state, MEASURED rate (build-hrs/chunk from commit timestamps, never typed), ETA = now+pending×rate as date+hour or &#x27;ETA unmeasured&#x27;; complete_line for BUILD COMPLETE. post() sends best-effort. 5 tests GREEN</div><div class='sub h'>scripts/progress_beat.py    | 81 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_progress_beat.py | 36 ++++++++++++++++++++</div><pre>diff --git a/scripts/progress_beat.py b/scripts/progress_beat.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>8b0b1582c</b> · 2026-09-28 09:46</div><div>NB53-D item 4: Machine Factory (engine 5) BUILT — scripts/machine_factory.py. Nightly window gate (after close-done, before 04:30); builds candidate rulers, exams each through the reused Claude/Kabir court (engine2.search) WITH a Bonferroni luck correction over every candidate tried (§5.4); certified -&gt; new shelf version (§3 freeze). Research only, NO order path (§27b). 4 tests GREEN. Roster: Machine Factory BUILT</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md |  2 +-</div><div class='sub h'>scripts/machine_factory.py              | 97 +++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_machine_factory.py           | 52 ++++++++++++++++++</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
+index 902a8afd3..38b9ae1ce 100644
+--- a/docs/architecture/NB53-ENGINE-ROSTER.md
++++ b/docs/architecture/NB53-ENGINE-ROSTER.md
+@@ -48,7 +48,7 @@ exist, VERIFIED after an independent fresh-session pass, LIVE only under the cha
+ | 2 | Claude Price Engine | **BUILDING** | architecture on disk; chunk 1 (ruler shelf v1, families A/B/C/F/H) BUILT + tested; chunks 2-9 pending |
+ | 3 | YouTube Engine | **SCAFFOLD** | diary wrapper only; own evaluate not built |
+ | 4 | Calendar Trading | **SCAFFOLD** | diary wrapper + calendar_daily infra; own evaluate not built |
+-| 5 | Machine Factory | **SCAFFOLD** | design E6.md cited; build after engine 2 chunk 3 (NB53-D item 4) |
++| 5 | Machine Factory | **BUILT** | scripts/machine_factory.py — nightly candidate search + Bonferroni luck correction -&gt; new shelf version, research-only (no order path); 4 tests GREEN. Bus nightly-cadence register + nightly launch verify-gated |
+ | 6 | Arbitrage | **SCAFFOLD** | parity + NSE/BSE + Pairs code exists; own engine evaluate not built (no tick engine, NB53-C) |
+ | 7 | Copycat Roof | **SCAFFOLD** | E8 design + roof code; own evaluate not built |
+ | 8 | Deliverables | **SCAFFOLD** | two books (Nikhil index tests, Dubai); own evaluate not built |
+diff --git a/scripts/machine_factory.py b/scripts/machine_factory.py
+new file mode 100644
+index 000000000..9d5317a43
+--- /dev/null
++++ b/scripts/machine_factory.py
+@@ -0,0 +1,97 @@
++&quot;&quot;&quot;Machine Factory (engine 5) — NB53-D item 4; design ancestor docs/architecture/E6.md + ENGINE6_DECISIONS.md
++(&quot;no generator is an oracle; method selection is a counted search&quot;).
++
++Every night (after close-done, before 04:30) it builds candidate rulers from the open shelf, tests each on the
++sealed holdout through the SAME exam court the Claude Price Engine uses (engine2_claude_price.search, which reuses
++engine1_rebuild&#x27;s Wilson bounds + floor), WITH A LUCK CORRECTION over every candidate tried (Bonferroni multiple-
++testing, §5.4 &quot;counts every candidate ever tried&quot;). Certified rulers become a NEW SHELF VERSION for the Claude
++Price Engine under the §3 freeze rule (existing patterns keep their records; new rulers only enter new candidates).
++
++RESEARCH ONLY: it has no order path (§27b), posts a quiet diary line, and its output feeds the shelf — it never
++places, sizes or queues an order. It is a separate engine, one of the owner&#x27;s 8; the bus runs it on the nightly
++cadence, not the daily one.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++from statistics import NormalDist
++
++from engine2_claude_price import search as _search
++
++_NORM = NormalDist()
++_CLOSE_DONE_MIN = 15 * 60 + 46     # after the close-done boundary (matches market_hours_mode._CLOSE)
++_CUTOFF_MIN = 4 * 60 + 30          # before 04:30 (E6/NB53-D)
++
++
++def _ist(now=None):
++    return now or _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
++
++
++def in_window(now=None):
++    &quot;&quot;&quot;The nightly research window: after close-done (&gt;=15:46) OR before 04:30. Never during the trading/desk day.&quot;&quot;&quot;
++    now = _ist(now)
++    m = now.hour * 60 + now.minute
++    return m &gt;= _CLOSE_DONE_MIN or m &lt; _CUTOFF_MIN
++
++
++def luck_z(n_tried, alpha=0.05):
++    &quot;&quot;&quot;Bonferroni multiple-testing z: the two-sided z for level alpha/n_tried. More candidates tried -&gt; larger z
++    -&gt; a stricter bar (§5.4 luck correction &#x27;counts every candidate ever tried&#x27;). alpha is the family-wise rate,
++    not a tuned performance knob (§4.2).&quot;&quot;&quot;
++    n = max(1, int(n_tried))
++    return _NORM.inv_cdf(1.0 - (alpha / (2.0 * n)))
++
++
++def certify_with_luck(margin, base_rate, n, n_tried):
++    &quot;&quot;&quot;CERTIFY iff the margin clears the court&#x27;s floor INFLATED by the luck factor (luck_z/base_z). base_z=1.96 is
++    the 95% Wilson z the court&#x27;s floor already uses; inflating by luck_z/1.96 applies the Bonferroni correction to
++    the same floor without rewriting it.&quot;&quot;&quot;
++    from engine1_rebuild import final_exam, stats
++    if n &lt; stats.MIN_FIRES or base_rate &lt;= 0 or base_rate &gt;= 1:
++        return False
++    corrected_floor = final_exam.floor(base_rate, n) * (luck_z(n_tried) / 1.96)
++    return margin &gt;= corrected_floor
++
++
++def run(closes, candidates, now=None, use_holdout=True):
++    &quot;&quot;&quot;Run the factory. `candidates` = [(name, event_series, direction), ...]. Gate on the nightly window; exam each
++    through the reused court; apply the luck correction over the number tried; certified rulers form a new shelf
++    version. Returns a research record — NO order path, places_orders is always False.&quot;&quot;&quot;
++    if not in_window(now):
++        return {&quot;ran&quot;: False, &quot;certified&quot;: [], &quot;tried&quot;: 0, &quot;shelf_version&quot;: None, &quot;places_orders&quot;: False,
++                &quot;reason&quot;: &quot;outside the after-close-done .. 04:30 window&quot;}
++    tried = len(candidates)
++    certified = []
++    for name, events, direction in candidates:
++        r = _search.exam_candidate(closes, events, direction, use_holdout=use_holdout)
++        if certify_with_luck(r[&quot;margin&quot;], r[&quot;base_rate&quot;], r[&quot;n&quot;], tried):
++            certified.append({&quot;name&quot;: name, &quot;direction&quot;: direction, **r, &quot;verdict&quot;: &quot;CERTIFIED&quot;})
++    version = &quot;shelf-%s-c%d&quot; % (_ist(now).strftime(&quot;%Y%m%d&quot;), len(certified)) if certified else \
++              &quot;shelf-%s-c0&quot; % _ist(now).strftime(&quot;%Y%m%d&quot;)
++    return {&quot;ran&quot;: True, &quot;certified&quot;: certified, &quot;tried&quot;: tried, &quot;shelf_version&quot;: version,
++            &quot;places_orders&quot;: False}
++
++
++def _demo():
++    import numpy as np, pandas as pd
++    night = _dt.datetime(2026, 9, 29, 23, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
++    day = night.replace(hour=10)
++    assert in_window(night) and not in_window(day)
++    assert luck_z(1) &lt; luck_z(100) &lt; luck_z(10000)
++    assert certify_with_luck(0.10, 0.5, 100, 1) and not certify_with_luck(0.10, 0.5, 100, 100000)
++    n = 400; idx = pd.bdate_range(&quot;2022-01-01&quot;, periods=n); rng = np.random.default_rng(4)
++    ret = rng.normal(0, 0.01, n); good = np.zeros(n, dtype=bool); good[::3] = True
++    for i in np.where(good)[0]:
++        if i + 1 &lt; n:
++            ret[i + 1] = abs(rng.normal(0.008, 0.003)) if rng.random() &lt; 0.9 else -abs(rng.normal(0.008, 0.003))
++    closes = pd.Series(100 * np.exp(np.cumsum(ret)), index=idx)
++    out = run(closes, [(&quot;good&quot;, pd.Series(good, index=idx), +1)], now=night, use_holdout=False)
++    assert out[&quot;ran&quot;] and out[&quot;places_orders&quot;] is False and out[&quot;shelf_version&quot;]
++    print(&quot;machine_factory demo OK: nightly window gate; Bonferroni luck correction; certified -&gt; new shelf &quot;
++          &quot;version; research only (no order path).&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_machine_factory.py b/tests/test_machine_factory.py
+new file mode 100644
+index 000000000..ffecb4065
+--- /dev/null
++++ b/tests/test_machine_factory.py
+@@ -0,0 +1,52 @@
++&quot;&quot;&quot;NB53-D item 4 — Machine Factory (engine 5): nightly, it builds candidate rulers, tests each on the sealed
++holdout through the reused exam court WITH A LUCK CORRECTION over every candidate tried (multiple-testing, §5.4),
++and certified rulers become a NEW SHELF VERSION for the Claude Price Engine (§3 freeze). Research only — it places
++no orders, runs only after close-done and before 04:30 (E6.md ancestor; ENGINE6_DECISIONS philosophy).&quot;&quot;&quot;
++import os, sys, datetime as dt
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np, pandas as pd
++from scripts import machine_factory as mf
++
++
++def _ist(h, m, wd=1):
++    d = dt.datetime(2026, 9, 29, h, m, tzinfo=dt.timezone(dt.timedelta(hours=5, minutes=30)))
++    return d
++
++
++def test_runs_only_after_close_done_and_before_0430():
++    assert mf.in_window(_ist(23, 0)) is True          # night, ok
++    assert mf.in_window(_ist(3, 0)) is True            # before 04:30, ok
++    assert mf.in_window(_ist(10, 0)) is False          # market hours, no
++    assert mf.in_window(_ist(4, 45)) is False          # after 04:30, no
++
++
++def test_luck_correction_raises_the_bar_with_more_candidates():
++    assert mf.luck_z(1) &lt; mf.luck_z(100) &lt; mf.luck_z(10000)   # more tests -&gt; stricter z (Bonferroni)
++    # a candidate that clears the plain floor may FAIL the luck-corrected bar once many were tried
++    base, n, margin = 0.5, 100, 0.10
++    assert mf.certify_with_luck(margin, base, n, n_tried=1) is True
++    assert mf.certify_with_luck(margin, base, n, n_tried=100000) is False
++
++
++def test_run_certifies_strong_candidates_and_places_nothing():
++    n = 400
++    idx = pd.bdate_range(&quot;2022-01-01&quot;, periods=n)
++    rng = np.random.default_rng(4)
++    ret = rng.normal(0, 0.01, n)
++    good = np.zeros(n, dtype=bool); good[::3] = True
++    for i in np.where(good)[0]:
++        if i + 1 &lt; n:
++            ret[i + 1] = abs(rng.normal(0.008, 0.003)) if rng.random() &lt; 0.9 else -abs(rng.normal(0.008, 0.003))
++    closes = pd.Series(100 * np.exp(np.cumsum(ret)), index=idx)
++    candidates = [(&quot;good&quot;, pd.Series(good, index=idx), +1),
++                  (&quot;noise&quot;, pd.Series(rng.random(n) &lt; 0.3, index=idx), +1)]
++    out = mf.run(closes, candidates, now=_ist(23, 0), use_holdout=False)
++    assert out[&quot;ran&quot;] is True and out[&quot;tried&quot;] == 2
++    assert &quot;good&quot; in [c[&quot;name&quot;] for c in out[&quot;certified&quot;]]
++    assert out[&quot;shelf_version&quot;]                          # a new shelf version tag is produced
++    assert &quot;orders&quot; not in out and out.get(&quot;places_orders&quot;, False) is False   # research only
++
++
++def test_does_not_run_outside_the_window():
++    out = mf.run(pd.Series([1.0, 2.0]), [], now=_ist(10, 0))
++    assert out[&quot;ran&quot;] is False and out[&quot;certified&quot;] == []
+</pre></div><div class='c'><div class='h'><b>d16a30e47</b> · 2026-09-28 09:43</div><div>NB53-C/E: engine 2 CHUNK 3 — daily-cadence search scored through the SAME exam court as the Kabir engine (§5/§13 reference-don&#x27;t-rewrite: reuses stats.wilson_lower, final_exam.floor, MIN_FIRES, daily.holdout_slice_of). New: candidate generator (shelf ruler in an EXPANDING-quantile band -&gt; PIT event series) + per-candidate exam; CERTIFIED iff n&gt;=max(MIN_FIRES, n_min) and Wilson LB clears base by &gt;=floor, else DIARY. §5.4 n_min_for_edge. 4 GREEN; full 210-name sweep deferred (RAM)</div><div class='sub h'>engine2_claude_price/search.py    | 103 ++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_search.py |  55 ++++++++++++++++++++</div><pre>diff --git a/engine2_claude_price/search.py b/engine2_claude_price/search.py
+new file mode 100644
+index 000000000..064a852c8
+--- /dev/null
++++ b/engine2_claude_price/search.py
+@@ -0,0 +1,103 @@
++&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 3: the daily-cadence search, scored through the SAME exam court as the
++[redacted] Price Engine (§5, §13 reference-don&#x27;t-rewrite).
++
++New here: the candidate generator — a shelf ruler in an EXPANDING-quantile band becomes a point-in-time event
++series (§5.2 &quot;thresholds as bands, quantile bands of the ruler&#x27;s own history&quot;; the quantiles use only history up
++to t, so an event at t never sees the future). The exam REUSES the court, not a copy of it:
++  - engine1_rebuild.stats.wilson_lower / MIN_FIRES  (the Wilson lower bound and the &gt;=30-fires floor)
++  - engine1_rebuild.final_exam.floor(p0, n)         (the margin floor = z·SE, no typed constant)
++  - engine1_rebuild.daily.holdout_slice_of          (the sealed-holdout chronological split)
++A candidate is CERTIFIED when, on the certification slice, n &gt;= max(MIN_FIRES, n_min) AND its Wilson lower bound
++clears the target base rate by at least the floor (§5.4/§5.6). Everything else is a DIARY (scored, no orders).
++
++The full sweep over the 210 names × the open shelf is the heavy run (build_from_store-style, deferred on the
++0.6 GB box); this module is the tested search+exam logic it calls.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import numpy as np
++import pandas as pd
++
++from engine1_rebuild import stats, final_exam
++from engine1_rebuild import daily as _daily
++
++
++def event_band(values, lo_q, hi_q, min_history=20):
++    &quot;&quot;&quot;Boolean event series: True at t where the ruler value sits within its own EXPANDING quantile band
++    [lo_q, hi_q] (quantiles computed from values up to and including t — PIT, never full-sample). Before
++    min_history observations the band is undefined -&gt; False (fail-closed, no fabricated event).&quot;&quot;&quot;
++    v = pd.Series(values).astype(float)
++    lo = v.expanding(min_periods=min_history).quantile(lo_q)
++    hi = v.expanding(min_periods=min_history).quantile(hi_q)
++    return (v &gt;= lo) &amp; (v &lt;= hi) &amp; lo.notna() &amp; hi.notna()
++
++
++def _outcome(closes, direction, horizon):
++    &quot;&quot;&quot;1 when the forward `horizon`-day return goes the candidate&#x27;s way, else 0. Daily cadence: entry next open is
++    approximated here by the close-to-close forward return (the fill law&#x27;s exact next-open price is applied in the
++    paper loop, chunk 7).&quot;&quot;&quot;
++    fwd = closes.shift(-horizon) / closes - 1.0
++    return (np.sign(fwd) == np.sign(direction)).astype(float), fwd
++
++
++def n_min_for_edge(edge, z=1.96, p=0.5):
++    &quot;&quot;&quot;§5.4: the smallest n at which the Wilson half-interval width falls below `edge`. Half-width ~ z·sqrt(p(1-p)/n)
++    (widest at p=0.5, the conservative choice). Solve for n: n = (z^2 p(1-p)) / edge^2. Never a typed constant.&quot;&quot;&quot;
++    if edge &lt;= 0:
++        return 10 ** 9
++    return int(np.ceil((z ** 2) * p * (1 - p) / (edge ** 2)))
++
++
++def exam_candidate(closes, events, direction, horizon=1, use_holdout=True):
++    &quot;&quot;&quot;Score one candidate through the reused court. On the certification slice (the sealed holdout when
++    use_holdout, else the whole series for unit tests), compute the target base rate, the hit rate on event days,
++    the Wilson lower bound, the margin over base, and the floor; CERTIFIED iff n &gt;= max(MIN_FIRES, n_min(margin))
++    and margin &gt;= floor. Returns the full record row (§5.6).&quot;&quot;&quot;
++    closes = pd.Series(closes).astype(float)
++    events = pd.Series(events).reindex(closes.index).fillna(False).astype(bool)
++    outcome, _fwd = _outcome(closes, direction, horizon)
++    df = pd.concat([outcome.rename(&quot;o&quot;), events.rename(&quot;e&quot;)], axis=1).dropna()
++    if use_holdout:
++        df = _daily.holdout_slice_of(df)
++    base_rate = float(df[&quot;o&quot;].mean()) if len(df) else 0.0
++    ev = df[df[&quot;e&quot;]]
++    n = int(len(ev))
++    hits = int(ev[&quot;o&quot;].sum())
++    if n &lt; stats.MIN_FIRES or base_rate &lt;= 0 or base_rate &gt;= 1:
++        return {&quot;n&quot;: n, &quot;hits&quot;: hits, &quot;hit_rate&quot;: (hits / n if n else 0.0), &quot;base_rate&quot;: round(base_rate, 6),
++                &quot;wilson_lb&quot;: (stats.wilson_lower(hits, n) if n else 0.0), &quot;margin&quot;: 0.0,
++                &quot;floor&quot;: (final_exam.floor(base_rate, n) if n else 0.0), &quot;verdict&quot;: &quot;DIARY&quot;, &quot;reason&quot;: &quot;n&lt;MIN_FIRES&quot;}
++    lb = stats.wilson_lower(hits, n)
++    floor = final_exam.floor(base_rate, n)
++    margin = lb - base_rate
++    ok = (margin &gt;= floor) and (n &gt;= max(stats.MIN_FIRES, n_min_for_edge(max(margin, 1e-6))))
++    return {&quot;n&quot;: n, &quot;hits&quot;: hits, &quot;hit_rate&quot;: round(hits / n, 6), &quot;base_rate&quot;: round(base_rate, 6),
++            &quot;wilson_lb&quot;: lb, &quot;margin&quot;: margin, &quot;floor&quot;: floor,
++            &quot;verdict&quot;: (&quot;CERTIFIED&quot; if ok else &quot;DIARY&quot;)}
++
++
++def _demo():
++    n = 400
++    idx = pd.bdate_range(&quot;2022-01-01&quot;, periods=n)
++    rng = np.random.default_rng(4)
++    ret = rng.normal(0, 0.01, n)
++    events = np.zeros(n, dtype=bool); events[::3] = True
++    for i in np.where(events)[0]:
++        if i + 1 &lt; n:
++            ret[i + 1] = abs(rng.normal(0.008, 0.003)) if rng.random() &lt; 0.85 else -abs(rng.normal(0.008, 0.003))
++    closes = pd.Series(100 * np.exp(np.cumsum(ret)), index=idx)
++    r = exam_candidate(closes, pd.Series(events, index=idx), +1, use_holdout=False)
++    assert r[&quot;verdict&quot;] == &quot;CERTIFIED&quot; and r[&quot;wilson_lb&quot;] == stats.wilson_lower(r[&quot;hits&quot;], r[&quot;n&quot;])
++    assert abs(r[&quot;floor&quot;] - final_exam.floor(r[&quot;base_rate&quot;], r[&quot;n&quot;])) &lt; 1e-9
++    v = pd.Series(rng.normal(0, 1, 200), index=pd.bdate_range(&quot;2024-01-01&quot;, periods=200))
++    t = v.index[120]
++    assert bool(event_band(v, 0.8, 1.0).loc[t]) == bool(event_band(v.loc[:t], 0.8, 1.0).loc[t])   # PIT
++    assert n_min_for_edge(0.2) &lt; n_min_for_edge(0.05)
++    print(&quot;search (chunk 3) demo OK: PIT quantile-band events; exam REUSES the [redacted] court (wilson_lower + floor &quot;
++          &quot;+ MIN_FIRES) + §5.4 n_min; strong candidate CERTIFIED, noise -&gt; DIARY.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_claude_price_search.py b/tests/test_claude_price_search.py
+new file mode 100644
+index 000000000..c417fcd5f
+--- /dev/null
++++ b/tests/test_claude_price_search.py
+@@ -0,0 +1,55 @@
++&quot;&quot;&quot;NB53-C/E engine 2 CHUNK 3 — the daily-cadence search, scored through the SAME exam court as the [redacted] Price
++Engine (§5, §13 reference-don&#x27;t-rewrite): reuses engine1_rebuild.stats.wilson_lower, final_exam.floor and
++MIN_FIRES; the split is daily.holdout_slice_of. New here: the Claude-shelf candidate generator (a ruler in an
++EXPANDING-quantile band -&gt; a PIT event series) and the per-candidate exam. n_min (§5.4) is the sample size at
++which the Wilson width falls below the edge, on top of the court&#x27;s MIN_FIRES + margin&gt;=floor gate.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np, pandas as pd
++from engine2_claude_price import search as se
++from engine1_rebuild import stats, final_exam
++
++
++def test_event_band_is_pit():
++    rng = np.random.default_rng(1)
++    v = pd.Series(rng.normal(0, 1, 200), index=pd.bdate_range(&quot;2024-01-01&quot;, periods=200))
++    t = v.index[120]
++    full = se.event_band(v, 0.8, 1.0)          # top quintile of the ruler&#x27;s OWN expanding history
++    trunc = se.event_band(v.loc[:t], 0.8, 1.0)
++    assert bool(full.loc[t]) == bool(trunc.loc[t]), &quot;event membership at t used future data (leakage)&quot;
++
++
++def test_exam_uses_the_reused_court_primitives():
++    # a candidate that is right ~85% of the time on many fires must clear wilson_lower - base &gt;= floor(base, n)
++    n = 400
++    idx = pd.bdate_range(&quot;2022-01-01&quot;, periods=n)
++    rng = np.random.default_rng(4)
++    ret = rng.normal(0, 0.01, n)
++    events = np.zeros(n, dtype=bool); events[::3] = True                 # frequent events
++    # on event days, next-day return is positive 85% of the time
++    for i in np.where(events)[0]:
++        if i + 1 &lt; n:
++            ret[i + 1] = abs(rng.normal(0.008, 0.003)) if rng.random() &lt; 0.85 else -abs(rng.normal(0.008, 0.003))
++    closes = pd.Series(100 * np.exp(np.cumsum(ret)), index=idx)
++    r = se.exam_candidate(closes, pd.Series(events, index=idx), direction=+1, use_holdout=False)
++    assert r[&quot;n&quot;] &gt;= stats.MIN_FIRES
++    assert abs(r[&quot;floor&quot;] - final_exam.floor(r[&quot;base_rate&quot;], r[&quot;n&quot;])) &lt; 1e-9   # reuses the court&#x27;s floor
++    assert r[&quot;wilson_lb&quot;] == stats.wilson_lower(r[&quot;hits&quot;], r[&quot;n&quot;])             # reuses the court&#x27;s Wilson LB
++    assert r[&quot;verdict&quot;] == &quot;CERTIFIED&quot; and r[&quot;margin&quot;] &gt;= r[&quot;floor&quot;]
++
++
++def test_random_candidate_goes_to_diary():
++    n = 300
++    idx = pd.bdate_range(&quot;2022-01-01&quot;, periods=n)
++    rng = np.random.default_rng(9)
++    closes = pd.Series(100 * np.exp(np.cumsum(rng.normal(0, 0.01, n))), index=idx)
++    events = pd.Series(rng.random(n) &lt; 0.3, index=idx)                          # noise events
++    r = se.exam_candidate(closes, events, direction=+1, use_holdout=False)
++    assert r[&quot;verdict&quot;] == &quot;DIARY&quot; and r[&quot;margin&quot;] &lt; r[&quot;floor&quot;]
++
++
++def test_n_min_falls_below_edge():
++    # n_min(edge): smallest n where the Wilson half-width &lt; edge; larger edge -&gt; smaller n_min
++    assert se.n_min_for_edge(0.20) &lt; se.n_min_for_edge(0.05)
++    assert se.n_min_for_edge(0.10) &gt;= stats.MIN_FIRES or se.n_min_for_edge(0.10) &gt; 0
+</pre></div><div class='c'><div class='h'><b>bfdc3c147</b> · 2026-09-28 09:40</div><div>NB53-C/E: engine 2 CHUNK 2 (§5.1) forecast-ruler exam — HAR volatility forecast fit on chronological TRAIN, scored on TEST vs the naive (last-value) forecast; enters the shelf as FORECAST only if it beats naive by more than the measured SE of the loss difference, else kept as STATE (its inputs). Features trailing/PIT; numpy OLS, no new dep; too-few-cases -&gt; STATE (§5.4). 3 tests GREEN</div><div class='sub h'>engine2_claude_price/forecast.py    | 85 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_forecast.py | 38 +++++++++++++++++</div><pre>diff --git a/engine2_claude_price/forecast.py b/engine2_claude_price/forecast.py
+new file mode 100644
+index 000000000..7b32735f4
+--- /dev/null
++++ b/engine2_claude_price/forecast.py
+@@ -0,0 +1,85 @@
++&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 2 (§5.1): the forecast-ruler exam.
++
++A FORECAST ruler (here the HAR volatility forecast) must pass its own exam before it may sit on the shelf: fit on
++the chronological TRAIN split, score on TEST against the NAIVE forecast (yesterday&#x27;s value / random walk). It
++enters as a FORECAST ruler ONLY if it beats naive by MORE THAN the measured standard error of the loss difference
++(§5.1); otherwise it is kept as a STATE ruler (its inputs), never as a forecast. No look-ahead: the split is
++chronological and the fit sees only TRAIN.
++
++HAR lags (1 daily, 5 weekly, 22 monthly) are the model&#x27;s DEFINING structure, not tuned thresholds — passed as a
++parameter, documented, and the exam (not a typed number) decides whether the model is kept. numpy OLS, no new
++dependency.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import numpy as np
++import pandas as pd
++
++
++def har_features(rv, lags=(1, 5, 22)):
++    &quot;&quot;&quot;Trailing HAR features: for each t, the mean realised vol over the last `lag` observations (inclusive of t).
++    All trailing =&gt; PIT (a feature at t never uses rv after t). Returns a DataFrame aligned to rv.index.&quot;&quot;&quot;
++    d, w, m = lags
++    return pd.DataFrame({
++        &quot;rv_d&quot;: rv.rolling(int(d)).mean(),
++        &quot;rv_w&quot;: rv.rolling(int(w)).mean(),
++        &quot;rv_m&quot;: rv.rolling(int(m)).mean(),
++    })
++
++
++def _fit_ols(X, y):
++    A = np.column_stack([np.ones(len(X)), X])
++    coef, *_ = np.linalg.lstsq(A, y, rcond=None)
++    return coef
++
++
++def _predict(coef, X):
++    return np.column_stack([np.ones(len(X)), X]) @ coef
++
++
++def exam(rv, train_frac=0.7, lags=(1, 5, 22)):
++    &quot;&quot;&quot;Fit HAR on TRAIN, forecast next-day RV on TEST, compare to the naive (previous-value) forecast. Returns
++    har_rmse, naive_rmse, margin (naive-har mean squared-error gain), se (its standard error), beats_naive, and
++    decision FORECAST/STATE. beats_naive == margin &gt; se (beats naive by more than one measured SE, §5.1).&quot;&quot;&quot;
++    feats = har_features(rv, lags)
++    target = rv.shift(-1)                                   # predict next day&#x27;s RV
++    df = pd.concat([feats, target.rename(&quot;y&quot;), rv.rename(&quot;naive&quot;)], axis=1).dropna()
++    n = len(df)
++    if n &lt; 40:
++        return {&quot;har_rmse&quot;: None, &quot;naive_rmse&quot;: None, &quot;margin&quot;: None, &quot;se&quot;: None,
++                &quot;beats_naive&quot;: False, &quot;decision&quot;: &quot;STATE&quot;, &quot;n&quot;: n}
++    cut = int(n * train_frac)
++    Xtr, ytr = df[[&quot;rv_d&quot;, &quot;rv_w&quot;, &quot;rv_m&quot;]].iloc[:cut].values, df[&quot;y&quot;].iloc[:cut].values
++    Xte, yte = df[[&quot;rv_d&quot;, &quot;rv_w&quot;, &quot;rv_m&quot;]].iloc[cut:].values, df[&quot;y&quot;].iloc[cut:].values
++    naive_te = df[&quot;naive&quot;].iloc[cut:].values               # yesterday&#x27;s value as the forecast
++    coef = _fit_ols(Xtr, ytr)                               # fit sees ONLY train (PIT)
++    har_pred = _predict(coef, Xte)
++    har_se2 = (yte - har_pred) ** 2
++    naive_se2 = (yte - naive_te) ** 2
++    har_rmse = float(np.sqrt(har_se2.mean()))
++    naive_rmse = float(np.sqrt(naive_se2.mean()))
++    diff = naive_se2 - har_se2                              # per-obs loss gain of HAR over naive (&gt;0 = HAR better)
++    margin = float(diff.mean())
++    se = float(diff.std(ddof=1) / np.sqrt(len(diff))) if len(diff) &gt; 1 else float(&quot;inf&quot;)
++    beats = margin &gt; se                                     # beat naive by more than one measured SE (§5.1)
++    return {&quot;har_rmse&quot;: har_rmse, &quot;naive_rmse&quot;: naive_rmse, &quot;margin&quot;: margin, &quot;se&quot;: se,
++            &quot;beats_naive&quot;: bool(beats), &quot;decision&quot;: (&quot;FORECAST&quot; if beats else &quot;STATE&quot;), &quot;n&quot;: n}
++
++
++def _demo():
++    rng = np.random.default_rng(3)
++    s = pd.Series(np.abs(0.01 + rng.normal(0, 0.004, 600)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=600))
++    r = exam(s, 0.7)
++    assert r[&quot;decision&quot;] == &quot;FORECAST&quot; and r[&quot;margin&quot;] &gt; r[&quot;se&quot;] and r[&quot;har_rmse&quot;] &lt; r[&quot;naive_rmse&quot;]
++    short = pd.Series(np.abs(rng.normal(0.01, 0.003, 30)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=30))
++    assert exam(short, 0.7)[&quot;decision&quot;] == &quot;STATE&quot;         # too few cases to certify a forecast (§5.4)
++    t = s.index[40]
++    assert har_features(s, (1, 5, 22)).loc[t].equals(har_features(s.loc[:t], (1, 5, 22)).loc[t])   # PIT
++    print(&quot;forecast exam (chunk 2) demo OK: HAR beats naive on mean-reverting vol (FORECAST); too-few-cases &quot;
++          &quot;stays STATE; features trailing/PIT.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_claude_price_forecast.py b/tests/test_claude_price_forecast.py
+new file mode 100644
+index 000000000..5632a09d8
+--- /dev/null
++++ b/tests/test_claude_price_forecast.py
+@@ -0,0 +1,38 @@
++&quot;&quot;&quot;NB53-C/E engine 2 CHUNK 2 (§5.1) — the forecast-ruler exam: a HAR volatility forecast enters the shelf as a
++FORECAST ruler ONLY if it beats the naive forecast (yesterday&#x27;s value) on the TEST split by more than the measured
++standard error of the loss difference. Otherwise it is kept as a STATE ruler (its inputs), never as a forecast.
++Chronological split, fit on TRAIN only (PIT — no look-ahead).&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np, pandas as pd
++from engine2_claude_price import forecast as fc
++
++
++def _rv_mean_reverting(n=600, seed=3):
++    # vol fluctuating around a mean: the naive (last-value) forecast chases noise, so HAR (trailing means) wins.
++    rng = np.random.default_rng(seed)
++    return pd.Series(np.abs(0.01 + rng.normal(0, 0.004, n)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=n))
++
++
++def test_har_features_are_trailing_pit():
++    rv = _rv_mean_reverting(60)
++    f = fc.har_features(rv, lags=(1, 5, 22))
++    # the feature row at t must not use rv after t: recompute on a truncated series -&gt; identical row
++    t = rv.index[40]
++    assert f.loc[t].equals(fc.har_features(rv.loc[:t], lags=(1, 5, 22)).loc[t])
++
++
++def test_har_beats_naive_on_mean_reverting_vol():
++    rv = _rv_mean_reverting()
++    r = fc.exam(rv, train_frac=0.7, lags=(1, 5, 22))
++    assert r[&quot;har_rmse&quot;] &lt; r[&quot;naive_rmse&quot;]                 # naive chases noise; HAR wins on mean-reverting vol
++    assert r[&quot;beats_naive&quot;] is True and r[&quot;margin&quot;] &gt; r[&quot;se&quot;]
++    assert r[&quot;decision&quot;] == &quot;FORECAST&quot;
++
++
++def test_insufficient_data_keeps_it_as_state_not_forecast():
++    # a forecast ruler cannot be certified without enough cases (§5.4 n floor) -&gt; STATE, never a forecast on faith
++    rng = np.random.default_rng(2)
++    rv = pd.Series(np.abs(rng.normal(0.01, 0.003, 30)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=30))
++    r = fc.exam(rv, train_frac=0.7, lags=(1, 5, 22))
++    assert r[&quot;decision&quot;] == &quot;STATE&quot; and r[&quot;beats_naive&quot;] is False
+</pre></div><div class='c'><div class='h'><b>65a9faeb1</b> · 2026-09-28 09:36</div><div>NB53-E item 2: progress_beat.py — BUILD beat (Telegram + report): done N/65, ten-block bar, pending N, engine/chunk/state, MEASURED rate (build-hrs/chunk from commit timestamps, never typed), ETA = now+pending×rate as date+hour or &#x27;ETA unmeasured&#x27;; complete_line for BUILD COMPLETE. post() sends best-effort. 5 tests GREEN</div><div class='sub h'>scripts/progress_beat.py    | 81 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_progress_beat.py | 36 ++++++++++++++++++++</div><pre>diff --git a/scripts/progress_beat.py b/scripts/progress_beat.py
 new file mode 100644
 index 000000000..f46e1e942
 --- /dev/null
@@ -1627,329 +2106,4 @@ index 000000000..0ecb9072f
 +
 +def test_mark_records_disk_and_ram_per_step(monkeypatch):
 +    mr._lines.clear()
-+    monkeypatch.setattr(mr, &quot;_measure&quot;</pre></div><div class='c'><div class='h'><b>d79733220</b> · 2026-09-28 08:25</div><div>NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B</div><div class='sub h'>CLAUDE.md                            |  18 ++++++</div><div class='sub h'>docs/architecture/ENGINE-BUS.md      |  13 +++--</div><div class='sub h'>docs/architecture/LEAD_RULINGS.md    |   4 ++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-B.md |  22 ++++++++</div><div class='sub h'>scripts/engine_bus.py                | 104 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_engine_bus.py             |  45 +++++++++++++++</div><div class='sub h'>tests/test_engine_bus_wired.py       |  22 ++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
-index 84635caed..087d5a747 100644
---- a/CLAUDE.md
-+++ b/CLAUDE.md
-@@ -974,3 +974,21 @@ READ-ONLY (bar store, quote/depth stores, the fee model, Sizing Families); no en
- touches the order path; a non-chain engine&#x27;s failure is quiet (✅/⏱, never 🙋). The gates (§26 TDD, §18.1
- independent verify, no launch-path edit in market hours, 04:30 hard stop, per-day owner YES for a stack
- stop/start) are unchanged: a thing is &quot;built&quot; until a fresh session verifies it._
-+
-+## 29. Owner-minimum: one paste, one self-flag (owner dispatch NB53-B, 2026-09-28)
-+
-+**The owner&#x27;s job is ONE paste and the self-flag line — nothing else.** Every click, download, file move, typed
-+confirmation, or stack stop/start is absorbed by the builder or the lead wherever the harness allows. When a step
-+**truly** needs the owner&#x27;s hand (a real login/credential, a purchase, a signature, a stack stop/start the harness
-+blocks), the report says so in **ONE plain line with the reason**, and the lead **🚩-reviews whether it was
-+avoidable**. The owner pastes back **only on `LEAD RULING NEEDED`**.
-+
-+_This narrows §15 (never-block) and §21 (human-only work) to their true floor: those lists stand, but everything
-+NOT on them is the builder&#x27;s/lead&#x27;s to do, not the owner&#x27;s. Why: NB50→NB53 spent owner pastes on disk cleanup,
-+stack stops, and confirmations the builder could have absorbed. The measure of a good run is how little the owner
-+had to touch._
-+
-+- **A no-trade build day** (owner declares &quot;not logging in today&quot;): the desk stays exactly as it is — no token, so
-+  recorders idle and no order is possible — and the builder works in **full build mode beside it**, RAM measured,
-+  **without an owner click**. This is not a stack start (§14.10 is untouched: the builder still starts/stops nothing);
-+  it is building code beside an idle desk.
-diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
-index 712ec0002..dd27b42fe 100644
---- a/docs/architecture/ENGINE-BUS.md
-+++ b/docs/architecture/ENGINE-BUS.md
-@@ -6,10 +6,13 @@ existing constant/function — no new typed number (§4.1)._
- 
- ## 1. One scheduler, one name
- 
--- **The bus is `scripts/engine_bus.py`**, called ONCE per day from the existing evening scheduler
--  `scripts/run_evening.py::main` (run_evening.py:20) **after the morning bar** (the same place the Price Engine&#x27;s
--  conforming evaluator runs today — run_evening.py:60 `conform`, :79 `practice_counter`). There is exactly one
--  scheduler; the bus is a sequence step inside it, not a second loop (§27 isolation: one driver).
-+- **The bus is `scripts/engine_bus.py`**, run ONCE per day in the **after-close window from its OWN entry**
-+  (`python -m scripts.engine_bus`), launched by the after-close orchestrator (`scripts/supervisor.run_once`) —
-+  **NOT wired into `run_evening.main`**. `run_evening` is the protected [redacted]-chain evening evaluator, and §27a
-+  reserves the chain&#x27;s launch path to a chain item only; a non-chain scheduler editing it would breach isolation.
-+  The bus reads the same 08:15 READY signal and the day&#x27;s measured RAM, so it still runs &quot;after the morning bar&quot;
-+  — from outside the chain, not inside it. (LEAD RULING R47, NB53-B: corrects this doc&#x27;s first draft, which said
-+  &quot;called from run_evening.main&quot; before §27a&#x27;s chain-launch-path protection was fully applied.)
- - After the morning bar, the bus **evaluates each DAILY engine in sequence** (order = NB53 step 3). Each call is
-   wrapped in its own try/except so one engine&#x27;s fault never touches another or the chain (§27d quiet failures).
- 
-@@ -65,7 +68,7 @@ engine_bus.line(name, result) -&gt; &quot;&lt;✅|⏱|🙋&gt; &lt;engine&gt; — &lt;plain summary&gt;&quot;
- ```
- 
- Wiring test (§26 &quot;live&quot; is a test): a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not
--called from `run_evening.main`, and passes only when it is — committed RED where unwired (the honest state).
-+called from the after-close launcher (`scripts/supervisor.run_once`), and passes only when it is — committed RED where unwired (the honest state).
- 
- ## 6. What this doc does NOT decide (each engine&#x27;s own design doc does)
- 
-diff --git a/docs/architecture/LEAD_RULINGS.md b/docs/architecture/LEAD_RULINGS.md
-index f88522991..02d1164ef 100644
---- a/docs/architecture/LEAD_RULINGS.md
-+++ b/docs/architecture/LEAD_RULINGS.md
-@@ -9857,3 +9857,7 @@ _Applied — the sender REMOVED (not throttled):_
- &gt; LEAD RULING R-ORIGIN-TAGS (origin: **OWNER-SAID 2026-09-23**): every ruling archived in `docs/dispatches/` carries an origin tag — **OWNER-SAID / LEAD-PROPOSED / BUILDER-PROPOSED**. Anything that changes a law, a threshold, or the owner&#x27;s daily job needs an explicit owner **&quot;yes&quot; recorded in the archive before it runs**. A LEAD-PROPOSED or BUILDER-PROPOSED change to a law/threshold/daily-job that lacks a recorded owner &quot;yes&quot; does not run.
- 
- &gt; LEAD RULING R-CLOCK (origin: **OWNER-SAID 2026-09-23**): every time in every report and every pause/deadline decision comes from the **machine clock** (`date` / `Get-Date`), read at the moment it is quoted — **never estimated or extrapolated**. A run states a time only after reading the clock; a pause decision (e.g. the 08:30 stop) re-reads the clock rather than projecting from an earlier read. Estimated times presented as fact are a self-flag. _Why: on 2026-09-23 a run reported &quot;~08:10 IST&quot; (extrapolated from a 02:52 start) when the real time was 05:14 IST — a ~3-hour error that also mis-based the pause decision._
-+
-+---
-+
-+&gt; LEAD RULING R47 — ENGINE BUS RUNS FROM ITS OWN ENTRY, NOT run_evening (origin: **LEAD-PROPOSED**, NB53-B, paper-side design under §18.5/§21). The engine bus (`scripts/engine_bus.py`) is launched in the after-close window from its own entry by the after-close orchestrator (`scripts/supervisor.run_once`), reading the 08:15 READY signal and measured RAM — it is **not** wired into `scripts/run_evening.py::main`. **Why:** `run_evening` is the protected [redacted] Price Engine evening evaluator; §27a reserves the chain&#x27;s launch path to a chain item only, so a non-chain scheduler must not edit it. The first draft of `docs/architecture/ENGINE-BUS.md` (commit 952a8a6a6) said &quot;called from run_evening.main&quot; before §27a&#x27;s protection was fully applied; this ruling corrects that doc and the wiring test. **Doc edits caused:** ENGINE-BUS.md §1 + §5; `tests/test_engine_bus_wired.py` asserts the launcher is `supervisor`, not `run_evening`. Overturnable by one owner line (clean revert of those two edits).
-diff --git a/docs/dispatches/2026-09-28_NB53-B.md b/docs/dispatches/2026-09-28_NB53-B.md
-new file mode 100644
-index 000000000..ddb56a3b6
---- /dev/null
-+++ b/docs/dispatches/2026-09-28_NB53-B.md
-@@ -0,0 +1,22 @@
-+ID: NB53-B — BUILD DAY + CLAUDE PRICE ENGINE ARCHITECTURE (replaces NB53-A, never pasted) → BUILD
-+ORIGIN: OWNER-SAID (28 Sep ~08:30 IST): &quot;not logging in today; complete the build first&quot; and &quot;minimum stuff on my end — I only paste.&quot; LEAD-RULED: (a) today is a declared no-trade build day; the desk stays as it is (no token → recorders idle, no orders possible) and the builder works in FULL build mode beside it with RAM measured — no owner click; (b) the Claude Price Engine architecture is re-issued here by the lead (the 28 Sep file never reached the repo): write section C verbatim to docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md, then build it in NB53 order.
-+READ: NB53 checkpoint (08:06 desk up → docs-only; e8b0d64af laws; 952a8a6a6 ENGINE-BUS.md; survey 7/8, engine 2 MISSING; items 65 · done 37 · pending 28). ASSUMING: nothing about RAM — measure it. MISSING: nothing the lead can supply.
-+
-+A. STANDING LAW — OWNER-MINIMUM (write to CLAUDE.md as a dated amendment with this ID): the owner&#x27;s job is one paste and the self-flag line. Every click, download, file move, typed confirmation or stack stop/start is absorbed by the builder or the lead wherever the harness allows. When a step truly needs the owner&#x27;s hand, the report says so in ONE plain line with the reason, and the lead 🚩-reviews whether it was avoidable. The owner pastes back only on LEAD RULING NEEDED.
-+
-+B. BUILD MODE NOW: (1) measure free RAM, list desk processes; the desk stays up, untouched. (2) Full build mode: code, RED→GREEN tests, commits. Run the full suite only when free RAM ≥ the suite&#x27;s measured headroom (VERIFIER-BRAIN.md figure, cite); otherwise run the engine&#x27;s own tests now and queue the full suite for after close-done. (3) Order: engine bus code (scripts/engine_bus.py) → §H 70–73 → engine 2 chunk 1 as soon as section C is on disk → engines 3–8 → engine 2 chunks 2–7. (4) No owner pastes until a LEAD RULING NEEDED; ⏱ checkpoint line after each GREEN.
-+
-+C. CLAUDE PRICE ENGINE — ARCHITECTURE (LEAD-RULED, fixed; contents come from backtests)
-+C0 Identity: engine 2 of 8; own folder under the engine bus, own state, own paper ledger, own Telegram line &quot;Claude Price Engine&quot;. Same pipeline as the [redacted] Price Engine — bars → rulers → patterns → measured record → sizing → queue → paper ledger — only the ruler shelf differs. Reads shared stores READ-ONLY; never touches the [redacted] Price Engine&#x27;s rulers, queue or ledger. Absorbs Insurance (portfolio protection) and Context (regime) as chunks 5 and 6 — they are not separate engines.
-+C1 Money math (same functions as the Price Engine; cite each in the doc): fees COST_STATUTORY_RT + cost_readout (money.py:17, :189); fill bar + six checks liquidity_backtest.checklist (:185) + paper.simulate_trade; sizing engine_book.weight (Sizing Families) with the adaptive multiplier 0→1 on Kelly computed from the pattern&#x27;s measured record — never a fixed fraction; a pattern trades flat until n_min (the existing constant, cite — do not type a new one); starting capital NOTIONAL_CAPITAL (money.py:13); caps and exits from the ruler&#x27;s measured profile (chunk 3); failed rulers → probation via diary_engines.
-+C2 No typed numbers: every threshold is a percentile of a measured distribution on the training window, chosen by walk-forward backtest; the doc records percentile + window; the code reads them from the ruler&#x27;s record file, never from a literal.
-+CHUNK 1 — Data + context layer: point-in-time universe (build item 8 here, shared read-only), daily bars, index bars, realised-volatility and breadth series from those bars, and the expiry/holiday/event calendar (the Calendar engine&#x27;s file). Output: one context row per trading day, with a leakage test proving no row uses data after its own date. DONE = tests GREEN + the context file regenerates from the stores.
-+CHUNK 2 — Direction rulers (the shelf): candidate families, each must earn its place in walk-forward with cost_readout applied — trend continuation (close vs rolling reference), mean reversion (distance from reference in ATR units), range breakout, gap continuation vs gap fade at the open, volume expansion, relative strength vs the index. Index close-to-open is NOT here (it lives in the [redacted] Price Engine). A family enters the shelf only if its out-of-sample record clears the six checks with positive expectancy after costs at n ≥ n_min; else probation. Output: the ruler record file (family, percentile parameters, window, n, expectancy, fill bar).
-+CHUNK 3 — Horizon rulers: per shelf ruler, the holding horizon (to close, next open, or N sessions) with the best measured post-signal profile in the training window, capped by the existing exit rules; N read from the record, never typed.
-+CHUNK 4 — Vehicle rulers: cash equity by default; futures where the store has them (item 45&#x27;s lane when it exists); defined-risk options (debit spreads only, paper) ONLY when the measured expected move exceeds the measured premium. EXECUTION GAP stated now: no option quotes are recorded today → the option vehicle is designed, tested on synthetic chains, and DORMANT until a quote lane exists; the ledger never carries an option trade without recorded quotes.
-+CHUNK 5 — Insurance (absorbed): when the context row&#x27;s realised-vol or drawdown state is in its measured high-risk percentile, the Kelly multiplier scales down and, once chunk 4&#x27;s lane exists, a defined-risk hedge is bought on paper; hedge cost flows through cost_readout into the ledger. Output: a per-day protection state and its effect on size, tested.
-+CHUNK 6 — Context gating (absorbed): every shelf ruler&#x27;s record measured per context state (trend/vol/breadth buckets from chunk 1, bucket edges = percentiles); a ruler trades only in states where its own record clears the bar. Output: the ruler × state table in the record file.
-+CHUNK 7 — Live wiring: queue → engine bus → own ledger, Telegram line, probation, day-log entry, twin comparison versus the [redacted] Price Engine on the same days (same bar, same costs), and the nightly rehearsal path. &quot;Live&quot; only after a fresh-session verify.
-+DONE for engine 2 = all seven chunks GREEN, record files regenerate from the stores, one full paper day runs in REPLAY on recorded bars end to end.
-+
-+D. REPORT format unchanged: first line &quot;NB53 · engine &lt;name&gt; · &lt;state&gt;&quot;; count line; measured build-hours per engine; 🚩 rows; self-flag line last.
-diff --git a/scripts/engine_bus.py b/scripts/engine_bus.py
-new file mode 100644
-index 000000000..7f0d6f1a2
---- /dev/null
-+++ b/scripts/engine_bus.py
-@@ -0,0 +1,104 @@
-+&quot;&quot;&quot;NB53 — the ENGINE BUS: one scheduler over a registry of the 8 engines (design: docs/architecture/ENGINE-BUS.md).
-+
-+One name, one place. After the morning bar (in the after-close window, its OWN entry — NOT wired into the
-+protected chain&#x27;s run_evening, §27a), the bus evaluates each DAILY engine in sequence. Each call is wrapped in
-+its own try/except so one engine&#x27;s fault never touches another or the chain (§27d isolation). The §27c RAM gate
-+and the diary-only rule already live in scripts/diary_engine.DiaryEngine and are REUSED (register_diary_engines),
-+never rewritten here — the bus adds only the sequencing and the one tagged line per engine.
-+
-+An engine&#x27;s own money math (fees, fill bar + six checks, sizing, capital, exits, probation) lives in that
-+engine&#x27;s evaluate_fn and its design doc, cited there — the bus never invents one (see ENGINE-BUS.md §3).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+
-+# name -&gt; {&quot;fn&quot;: evaluate_fn(asof, reader) -&gt; {&quot;line&quot;: str, &quot;ledger_rows&quot;: list}, &quot;cadence&quot;: str}
-+_REGISTRY: dict = {}
-+_CADENCES = (&quot;daily&quot;, &quot;nightly&quot;, &quot;intraday&quot;, &quot;replay&quot;)
-+
-+
-+def clear():
-+    _REGISTRY.clear()
-+
-+
-+def register(name, evaluate_fn, cadence=&quot;daily&quot;):
-+    &quot;&quot;&quot;Add an engine to the bus. cadence in {daily, nightly, intraday, replay}. Re-registering a name is an
-+    error (two engines under one name would silently shadow — fail loud).&quot;&quot;&quot;
-+    if cadence not in _CADENCES:
-+        raise ValueError(&quot;bad cadence %r (want one of %s)&quot; % (cadence, _CADENCES))
-+    if name in _REGISTRY:
-+        raise ValueError(&quot;engine %r already registered&quot; % name)
-+    _REGISTRY[name] = {&quot;fn&quot;: evaluate_fn, &quot;cadence&quot;: cadence}
-+
-+
-+def registered(cadence=None):
-+    return sorted(n for n, e in _REGISTRY.items() if cadence is None or e[&quot;cadence&quot;] == cadence)
-+
-+
-+def run_daily(asof, reader=None):
-+    &quot;&quot;&quot;Run every DAILY engine once, in name order, each in its own try/except (§27d). Returns
-+    {name: {&quot;line&quot;: str, &quot;ledger_rows&quot;: list, &quot;error&quot;: None|&lt;ExcClassName&gt;}}. A fault is recorded, never raised.&quot;&quot;&quot;
-+    out = {}
-+    for name in registered(&quot;daily&quot;):
-+        try:
-+            r = _REGISTRY[name][&quot;fn&quot;](asof, reader) or {}
-+            out[name] = {&quot;line&quot;: r.get(&quot;line&quot;, &quot;&quot;), &quot;ledger_rows&quot;: r.get(&quot;ledger_rows&quot;, []), &quot;error&quot;: None}
-+        except Exception as e:                     # isolation: this engine&#x27;s fault stays this engine&#x27;s
-+            out[name] = {&quot;line&quot;: &quot;&quot;, &quot;ledger_rows&quot;: [], &quot;error&quot;: type(e).__name__}
-+    return out
-+
-+
-+def line(name, result, clock_fn=None):
-+    &quot;&quot;&quot;One tagged line per engine per day. ✅ on success, ⏱ on a caught fault — NEVER 🙋 for a non-chain engine
-+    (§27d: only the chain and owner-action signals may 🙋).&quot;&quot;&quot;
-+    ts = (clock_fn or (lambda: _dt.datetime.now().strftime(&quot;%H:%M:%S&quot;)))()
-+    if result.get(&quot;error&quot;):
-+        return &quot;⏱ %s %s — fault %s (diary-only, not an owner ping)&quot; % (name, ts, result[&quot;error&quot;])
-+    return &quot;✅ %s %s — %s&quot; % (name, ts, result.get(&quot;line&quot;) or &quot;no signal&quot;)
-+
-+
-+def register_diary_engines(ready_seen, free_gb, reopen_floor_gb=None):
-+    &quot;&quot;&quot;Reuse the existing §27-gated DiaryEngine wrappers (scripts/diary_engines) as daily bus engines — the RAM
-+    gate and quiet-fault rule come from them, not from here. Each becomes an evaluate_fn that runs one gated
-+    diary cycle. Called by the bus entry with the day&#x27;s measured RAM + READY state.&quot;&quot;&quot;
-+    from scripts import diary_engines
-+
-+    def _adapt(nm):
-+        def _fn(asof, reader):
-+            r = diary_engines.run_once(nm, ready_seen, free_gb, reopen_floor_gb) or {}
-+            return {&quot;line&quot;: r.get(&quot;line&quot;) or r.get(&quot;reason&quot;) or &quot;gated&quot;, &quot;ledger_rows&quot;: []}
-+        return _fn
-+    for nm in diary_engines.names():
-+        if nm not in _REGISTRY:
-+            register(nm, _adapt(nm), cadence=&quot;daily&quot;)
-+
-+
-+def _demo():
-+    clear()
-+    register(&quot;A&quot;, lambda asof, reader: {&quot;line&quot;: &quot;3 fired&quot;, &quot;ledger_rows&quot;: [1, 2, 3]}, cadence=&quot;daily&quot;)
-+    register(&quot;bad&quot;, lambda asof, reader: (_ for _ in ()).throw(RuntimeError(&quot;boom&quot;)), cadence=&quot;daily&quot;)
-+    register(&quot;night&quot;, lambda asof, reader: {&quot;line&quot;: &quot;research&quot;}, cadence=&quot;nightly&quot;)
-+    out = run_daily(&quot;2026-09-28&quot;)
-+    assert set(out) == {&quot;A&quot;, &quot;bad&quot;}, out                        # nightly not in the daily run
-+    assert out[&quot;A&quot;][&quot;error&quot;] is None and out[&quot;A&quot;][&quot;ledger_rows&quot;] == [1, 2, 3]
-+    assert out[&quot;bad&quot;][&quot;error&quot;] == &quot;RuntimeError&quot;                # fault caught, A still ran (isolation)
-+    assert &quot;\U0001f64b&quot; not in line(&quot;bad&quot;, out[&quot;bad&quot;])          # ⏱, never 🙋
-+    assert line(&quot;A&quot;, out[&quot;A&quot;], clock_fn=lambda: &quot;10:00:00&quot;) == &quot;✅ A 10:00:00 — 3 fired&quot;
-+    try:
-+        register(&quot;A&quot;, lambda asof, reader: {})
-+        assert False, &quot;double register must raise&quot;
-+    except ValueError:
-+        pass
-+    clear()
-+    print(&quot;engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-+    else:
-+        # the bus entry (§27: its OWN process, not run_evening). Real READY/RAM wiring is the after-close item;
-+        # here it reports what is registered so a launch script can confirm the bus is importable and armed.
-+        print(&quot;engine bus: %d engine(s) registered: %s&quot; % (len(_REGISTRY), &quot;, &quot;.join(registered()) or &quot;none&quot;))
-diff --git a/tests/test_engine_bus.py b/tests/test_engine_bus.py
-new file mode 100644
-index 000000000..1553528da
---- /dev/null
-+++ b/tests/test_engine_bus.py
-@@ -0,0 +1,45 @@
-+&quot;&quot;&quot;NB53 step 2 — the engine bus: one scheduler over a registry, isolation by construction.
-+
-+The bus&#x27;s whole job is (1) hold a registry of engines by cadence, (2) run each daily engine once in its own
-+try/except so one engine&#x27;s fault never touches another (§27d), (3) format one tagged line per engine. The §27c
-+RAM gate and diary-only rule live in DiaryEngine (reused, not rewritten); the bus adds only the sequencing.
-+&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+import pytest
-+from scripts import engine_bus
-+
-+
-+def setup_function(_):
-+    engine_bus.clear()
-+
-+
-+def test_register_and_run_daily_collects_one_result_per_daily_engine():
-+    engine_bus.register(&quot;A&quot;, lambda asof, reader: {&quot;line&quot;: &quot;A ok&quot;, &quot;ledger_rows&quot;: [1]}, cadence=&quot;daily&quot;)
-+    engine_bus.register(&quot;B&quot;, lambda asof, reader: {&quot;line&quot;: &quot;B ok&quot;, &quot;ledger_rows&quot;: []}, cadence=&quot;daily&quot;)
-+    engine_bus.register(&quot;N&quot;, lambda asof, reader: {&quot;line&quot;: &quot;nightly&quot;}, cadence=&quot;nightly&quot;)
-+    out = engine_bus.run_daily(&quot;2026-09-28&quot;, reader=None)
-+    assert set(out) == {&quot;A&quot;, &quot;B&quot;}                       # only daily engines run in run_daily
-+    assert out[&quot;A&quot;][&quot;error&quot;] is None and out[&quot;A&quot;][&quot;ledger_rows&quot;] == [1]
-+
-+
-+def t</pre></div><div class='c'><div class='h'><b>e7f93f5a0</b> · 2026-09-28 08:15</div><div>NB53 engine roster: map all 8 NB53 engine names to existing design docs + code packages, cite each source; flag 2 gaps as LEAD RULING (engine 2 Claude Price MISSING; engine 5 Machine Factory ambiguous vs superseded E6 ruler-factory). Docs only</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md | 37 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
-new file mode 100644
-index 000000000..0ab305a05
---- /dev/null
-+++ b/docs/architecture/NB53-ENGINE-ROSTER.md
-@@ -0,0 +1,37 @@
-+# NB53 engine roster — the 8 engines mapped to their design + code (2026-09-28)
-+
-+_The survey found that most engines already have a design doc and/or code, under names that do NOT map 1:1 to
-+NB53&#x27;s list. This roster is the map: each NB53 engine → its design source → its code → what the bus wiring needs.
-+The wiring is CODE (engine_bus + per-engine `evaluate_fn`) and lands after close-done (docs-only today). Two gaps
-+are flagged LEAD RULING NEEDED — I build neither on a guess (§4.4)._
-+
-+| # | NB53 engine | Design source (cite) | Code on disk | Bus wiring needed | Status |
-+|---|---|---|---|---|---|
-+| 1 | [redacted] Price Engine | docs/architecture/ENGINE_E1.md; the live chain | engine1_rebuild/ (book20_runner, conform, e13_depth) | none — it IS the bus&#x27;s morning-bar producer; only §H 70–73 (launch-path, verify-gated) | LIVE (protected §27a) |
-+| 2 | Claude Price Engine | **MISSING** — no CLAUDE-PRICE-ENGINE-ARCHITECTURE.md | none | reserve slot engine2_claude_price/ | **LEAD RULING** (design sheet written) |
-+| 3 | YouTube Engine | Desktop\yt-transcripts (9 channels) + engine_youtube/seed_strategies | engine_youtube/ (download, read, pipeline, pilot, seed_strategies); scripts/yt_pilot.py, youtube_seeds.py | register `engine_youtube` daily evaluate → its ledger; every rule cited (channel/video/line) | BUILT (needs bus register + verify) |
-+| 4 | Calendar Trading | docs/architecture/ENGINE_E3.md (&quot;structure / forced flows: trades known dates&quot;) | engine3_structure/; scripts/calendar_daily.py | needs an expiry/holiday/event calendar (trading_calendar exists — cite CAL); register daily evaluate → its ledger | BUILT-partial (needs bus register + verify) |
-+| 5 | Machine Factory | **AMBIGUOUS** — the ruler factory is docs/architecture/E6.md, marked &quot;SUPERSEDED — READ-ONLY ANCESTOR&quot;; the current ENGINE_E6.md is a DIFFERENT engine (&quot;ML-direct&quot;). NB53&#x27;s description (candidate rules generated + tested offline at night) = the ruler factory. | (research; E6 ruler-factory code, if present) | nightly cadence lane only (after close-done, before 04:30); outputs to its own reports, never a live queue | **LEAD RULING** (which design is Machine Factory?) |
-+| 6 | Arbitrage | docs/dispatches/2026-09-16_R-E1-ARB-DAY.md + reports/E7-ARB-PROOF.md (two-exchange, paper) | engine7_parity/ (tick_recorder, parity); engine12_xchange/ (xchange_recorder) | intraday lane — MEASURE its RAM floor first (memory_guard method); else REPLAY on recorded quotes → its ledger | BUILT-partial (needs RAM measure + bus register + verify) |
-+| 7 | Copycat Roof | docs/architecture/ENGINE_E8.md (&quot;the roof — one build, finished before the first rupee&quot;) | (roof combine code — roof_copycat, engine_book roof events) | it NETS engine signals + holds the single risk budget; register AFTER the daily engines in the bus sequence | BUILT-partial (needs bus register + verify) |
-+| 8 | Deliverables | Nikhil index tests: docs/dispatches/2026-09-18_R-INDEX-TESTS.md + reports/INDEX-TESTS.*; Dubai: reports/diaries/Dubai.* + reports/QUIET-BUYING.json | (index-test + Dubai/quiet-buying code behind those reports) | each its own paper account + ledger; register daily evaluate → the deliverables site | BUILT-partial (needs bus register + verify) |
-+
-+## What lands after close-done (the code, RED→GREEN→commit, one engine at a time)
-+
-+1. `scripts/engine_bus.py` (the bus contract from ENGINE-BUS.md) + `test_engine_bus_wired` (RED while unwired).
-+2. Per engine (3,4,6,7,8): a thin `evaluate_fn` adapter that calls the engine&#x27;s existing code, writes ONLY its
-+   own ledger, returns the bus line — registered on the bus. Each with a RED wiring test (fails until registered).
-+3. Engine 1&#x27;s §H 70–73 (day-log, rehearsal, market-hours mode, event blackout) — launch-path, so BUILT then LIVE
-+   only via the owner-run fresh-session verify with this session closed.
-+4. Engine 5 (Machine Factory) and engine 2 (Claude Price) wait on the two LEAD RULINGS below.
-+
-+## LEAD RULINGS NEEDED (two)
-+
-+- **Engine 2 (Claude Price):** architecture MISSING — fill docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md.
-+- **Engine 5 (Machine Factory):** is it the ruler factory (superseded E6.md), the current ENGINE_E6 &quot;ML-direct&quot;,
-+  or a new engine? I will not guess. Confirm which design is &quot;Machine Factory&quot; and I build it from that.
-+
-+## Isolation (§27) holds for all
-+
-+Every engine but E1 is diary-only, own folder/state/ledger, shared read-only inputs, RAM-gated, quiet failures
-+(✅/⏱, never 🙋). No engine but E1 touches the order path. Nothing here edits the Price Engine&#x27;s rulers or ledger.
-</pre></div><div class='c'><div class='h'><b>19faa6f64</b> · 2026-09-28 08:11</div><div>NB53 engine 2 (Claude Price): DESIGN SHEET — architecture MISSING from repo; chunk 1-7 rule questions for the lead, no rules invented (§4.4). Slot reserved. Docs only</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md            | 38 ++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
-new file mode 100644
-index 000000000..6891f7fbe
---- /dev/null
-+++ b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
-@@ -0,0 +1,38 @@
-+# Claude Price Engine — DESIGN SHEET (engine 2, NB53) — LEAD RULING NEEDED
-+
-+**Status: MISSING.** `CLAUDE-PRICE-ENGINE-ARCHITECTURE.md` is nowhere in the repo (searched
-+`find . -iname &quot;*CLAUDE-PRICE*&quot;` → nothing). NB53 step 3 says: never invent an engine&#x27;s rules — write the exact
-+rule questions the lead must answer, report LEAD RULING NEEDED, move on. This is that sheet. No code is written
-+for engine 2 until these are answered; the other engines proceed.
-+
-+## What is already known (so answers can reference it)
-+
-+- The **[redacted] Price Engine (E1)** is the live chain: daily price patterns → next-open fill → the six execution
-+  checks (`liquidity_backtest.checklist`) → 20-day book (`book20_runner`) → ledger. Its 35 rulers are
-+  untouchable (§27a). Sizing Families (E10/E11) are its sub-books.
-+- The bus (`docs/architecture/ENGINE-BUS.md`) gives engine 2, like every engine: its own folder/state/ledger,
-+  the shared read-only fee model + Sizing Families, starting capital `money.NOTIONAL_CAPITAL` (₹2,00,000).
-+
-+## The chunk 1–7 questions the lead must answer (fill each, then I build)
-+
-+1. **SIGNAL SOURCE — chunk 1.** What does the Claude Price Engine trade on that E1 does NOT? (a different
-+   feature set? a model over E1&#x27;s features? a different bar/horizon? news/text? cross-sectional ranking?) Name
-+   the on-disk store each input is read from (§13: metric · store · threshold · action).
-+2. **UNIVERSE + BAR — chunk 2.** Same 210-name daily universe and next-open fill as E1, or different? If
-+   different, cite the universe source (no invented membership, §4.4).
-+3. **THE RULE / MODEL — chunk 3.** Is it rule-based (like E1&#x27;s patterns) or a fitted model (meta-label,
-+   cross-sectional)? If a model: trained on what, walk-forward with what embargo (de Prado, §25 learning
-+   track), and where does the trained artifact live on disk?
-+4. **DIRECTION + ENTRY — chunk 4.** Long-only, or long/short? (Short needs the SHORT-VEHICLE-UNRESOLVED gate,
-+   §19.3.) Entry timing — next-day open like E1, or intraday?
-+5. **EXITS + CAPS — chunk 5.** Hold horizon, stop rule, target/trail (or fixed), position cap. Stated as
-+   numbers derived or cited (§4.1), not typed.
-+6. **SIZING + RISK — chunk 6.** Sizing via Sizing Families like E1 (weight × ₹1,000), or its own scheme? Total
-+   risk budget and how it composes with E1 under the Copycat Roof (E8).
-+7. **PROOF — chunk 7.** What exam certifies a Claude-Price rule before it trades (same six checks + real costs +
-+   luck correction as E1&#x27;s exam, or a different one)? Where do its diary/probation rows live?
-+
-+## Until answered
-+
-+Engine 2 is **not built**. The bus reserves its slot (`engine2_claude_price/`, own ledger) so wiring it later is
-+a drop-in. This sheet is the LEAD RULING; the rest of NB53&#x27;s engines proceed from their present sources.
-</pre></div></main></body></html>
++    monkeypatch.setattr(mr, &quot;_measure&quot;</pre></div></main></body></html>
