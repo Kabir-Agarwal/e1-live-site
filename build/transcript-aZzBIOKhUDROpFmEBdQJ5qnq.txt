@@ -1,85 +1,4 @@
- token file. Cite the token path/format post_login writes (file:line) and the path have_login() reads (file:line). If they differ, that is a second fault \u2014 report it, no fix tonight.\n4. NB50 item 3's additions are not in the count (60 = 69 \u2212 9 parked) and not in your pending list. If they exist unnumbered, number them; if absent, add them now (docs only): desk day-log \u00b7 nightly full-morning rehearsal on the real stack \u00b7 market-hours mode \u00b7 event blackout \u00b7 monthly fill calibration \u00b7 Claude Price Engine chunks 1\u20137 \u00b7 [redacted] Price Engine on the same architecture (35 rulers untouched). Print the new count.\n5. Read-only: from the watchdog/launch logs, which stack processes died over the weekend and when (cite). No restarts.\n6. After the owner's START: confirm one of each thin-stack process is up, meas
-tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-28_NB52.md (file state is current in your context — no need to Read it back)
-tool_use Bash {"command": "date +\"%H:%M:%S\"; echo \"=== free RAM GB ===\"; powershell -NoProfile -Command \"[math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB,2)\" 2>&1 | head -1; echo \"=== desk python processes (name + cmdline) ===\"; powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='pythonw.exe' OR Name='python.exe'\\\" | ForEach-Object { \\$_.CommandLine }\" 2>&1 | grep -iE \"token_ping|watchdog|site_loop|book20|run_live|recorder|e13_depth|evening|scan\" | head", "description": "Confirm stack stopped: clock, RAM, desk python procs"}
-tool_result: 07:46:23
-=== free RAM GB ===
-0.68
-=== desk python processes (name + cmdline) ===
-assistant: The clock reads **07:46** — hours have passed during the hold, so the 04:15 verify deadline is long gone, and the stack is stopped (0 desk procs) but free RAM is only **0.68 GB** — below the verify's ~1.0 GB floor. So the independent verify is impossible (deadline passed AND insufficient RAM), which per NB52 step 2 mandates the revert. Let me first cleanly confirm the stack is stopped:
-tool_use Bash {"command": "powershell -NoProfile -Command \"\\$p = Get-CimInstance Win32_Process -Filter \\\"Name='pythonw.exe' OR Name='python.exe'\\\"; Write-Output ('python procs: ' + \\$p.Count); \\$p | ForEach-Object { \\$c = \\$_.CommandLine; if (\\$c) { Write-Output \\$c } }\" 2>&1 | head -20", "description": "Clean process check \u2014 is the stack stopped?"}
-tool_result: python procs: 2
-"[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\python.exe" "[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\windows-mcp.exe" serve
-"[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\python.exe" "[redacted]\AppData\Local\uv\cache\archive-v0\kp2kFvTqPo6VipXfB75Kk\Scripts\windows-mcp.exe" serve
-assistant: Confirmed: **the desk stack is STOPPED** — the 2 python procs are `windows-mcp.exe` (a Claude MCP helper), not desk processes. RAM 0.68 GB. The verify is impossible (04:15 deadline long passed; RAM 0.68 < the ~1.0 GB floor), so per NB52 step 2 I revert the launch-path commits to the last PASS so the owner's START runs verified code. Executing the revert (keeping the dispatch archives):
-tool_use Bash {"command": "echo \"=== confirm only 5f62b21a9/f08c41e78 touched these 3 files since 86534e1d7 ===\"; git log --oneline 86534e1d7..HEAD -- scripts/e13_depth.py scripts/memory_guard.py scripts/preopen_gate.py\necho \"=== revert those 3 launch-path files to last PASS 86534e1d7 + drop their tests ===\"\ngit checkout 86534e1d7 -- scripts/e13_depth.py scripts/memory_guard.py scripts/preopen_gate.py && echo \"files reverted\"\ngit rm -q tests/test_recorder_token_wait.py tests/test_disk_floor.py && echo \"tests removed\"\ngit commit -q -m \"NB52: REVERT launch-path to last PASS 86534e1d7 \u2014 the independent verify could not run (harness refused STOP_E1_STACK.bat, then RAM 0.68 GB < the ~1.0 GB verify floor at 07:46, past the 04:15 deadline). Reverts e13_depth (Friday fix f08c41e78) + memory_guard/preopen_gate (disk floor 5f62b21a9) so the owner's START runs verified code. Fixes preserved in git history for a re-verify\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git rev-parse --short HEAD", "description": "Surgically revert launch-path files to last PASS + commit"}
-tool_result: === confirm only 5f62b21a9/f08c41e78 touched these 3 files since 86534e1d7 ===
-f08c41e78 NB51 Friday fix (TDD): depth recorder waits for a late-landing Kite token inside the market window instead of exiting at 0 rows (run_market_loop was 'while have_login()' -> no token = [redacted] records; Friday's E13 0-rows). RED->GREEN test_recorder_token_wait. No other edits. BUILT; live only on independent PASS on HEAD
-5f62b21a9 NB50-B phase 2: measured disk-free floor (memory_guard.DISK_FLOOR_GB = 0.076 measured daily write + 0.3 margin = 0.376 GB, no typed number per §4.1) + disk_free_gb/disk_ok (fail-closed); wired into the 08:15 self-check -> a below-floor morning leads the line with '🙋 DISK LOW: X GB free (floor Y)'. TDD red->green 4/4. BUILT; live via next dry-run+verify
-=== revert those 3 launch-path files to last PASS 86534e1d7 + drop their tests ===
-files reverted
-tests removed
-7b1ba9d81
-assistant: Revert committed (**7b1ba9d81**) — e13_depth.py:175 is back to `while have_login()` (verified code), disk floor gone, tests removed. The launch-path files now match the last PASS (86534e1d7), so the owner's START runs verified code. Now **step 3** — do the token write-path and read-path agree? Checking kite.py:
-tool_use Bash {"command": "echo \"=== kite.load_token (have_login reads) + exchange_token/save (post_login writes) ===\"; grep -nE \"def load_token|def exchange_token|def save|token_path|TOKEN|\\.json|access_token|def _token_file|open\\(\" data_acquisition/kite.py 2>/dev/null | head -25", "description": "Find token write path vs read path in kite.py"}
-tool_result: === kite.load_token (have_login reads) + exchange_token/save (post_login writes) ===
-30:                        ONLY to the gitignored `.kite_token.json`, and are NEVER printed,
-65:#: The daily access token. GITIGNORED (`.gitignore`: `.kite_token.json`). A value never
-67:TOKEN_FILE = os.path.join(REPO, ".kite_token.json")
-71:PROGRESS_FILE = os.path.join(HISTORY_DIR, "PROGRESS.json")
-228:def exchange_token(request_token, post=None, _user=None, today=None):
-245:    payload = resp.json()
-246:    if payload.get("status") != "success" or "access_token" not in payload.get("data", {}):
-252:    access_token = [redacted]["data"]["access_token"]
-253:    return save_token(api_key, access_token, today=today)
-256:def save_token(api_key, access_token, today=None):
-261:        "access_token": [redacted],   # the daily secret — gitignored file ONLY
-266:    os.makedirs(os.path.dirname(TOKEN_FILE) or ".", exist_ok=True)
-267:    with open(TOKEN_FILE, "w", encoding="utf-8", newline="\n") as fh:
-270:    return dict(record["provenance"], login_date=day, token_file=TOKEN_FILE)
-275:    (kite.trade/docs/connect/v3 — 'access_token ... valid until ... the next day'). Conservative
-280:def load_token(today=None):
-283:    if not os.path.exists(TOKEN_FILE):
-285:                      "(login_url -> exchange_token).".format(os.path.basename(TOKEN_FILE)))
-286:    with open(TOKEN_FILE, encoding="utf-8") as fh:
-299:    return {"Authorization": "[redacted] {}:{}".format(record["api_key"], record["access_token"]),
-331:        with open(PROGRESS_FILE, encoding="utf-8") as fh:
-340:    with open(PROGRESS_FILE, "w", encoding="utf-8", newline="\n") as fh:
-369:    path = os.path.join(HISTORY_DIR, key + ".json")
-370:    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-372:    with open(path + ".provenance.json", "w", encoding="utf-8", newline="\n") as fh:
-assistant: **Step 3 result: no second fault.** Write and read use the same `TOKEN_FILE` (kite.py:67 = `REPO/.kite_token.json`): post_login writes via `save_token` (kite.py:256 → :267), `have_login`→`load_token` reads it (kite.py:280 → :286). They agree.
-
-**Step 5** — which stack processes died over the weekend (read-only logs):
-tool_use Bash {"command": "echo \"=== log file mtimes (last write = when the proc last logged) ===\"; ls -la --time-style=+\"%Y-%m-%d_%H:%M\" \"C:[redacted]/Desktop/E1-DESK/logs/\" 2>/dev/null | grep -iE \"token_ping|watchdog|site_loop|book20|depth_recorder|chain_recorder|xchange|positioning\" | awk '{print $6, $7}'; echo \"=== watchdog.out tail (relaunch/death lines) ===\"; tail -20 \"C:[redacted]/Desktop/E1-DESK/logs/watchdog.out\" 2>/dev/null | grep -iE \"relaunch|died|dead|down|restart|resurrect|2026-09-2[67]\" | head", "description": "Weekend process deaths from log mtimes + watchdog lines"}
-tool_result: === log file mtimes (last write = when the proc last logged) ===
-2026-09-22_16:33 book20_runner.err
-2026-09-24_06:11 book20_runner.out
-2026-09-23_06:02 chain_recorder__E4_.err
-2026-09-23_15:32 chain_recorder__E4_.out
-2026-09-23_06:02 depth_recorder__E13_.err
-2026-09-25_21:56 depth_recorder__E13_.out
-2026-09-23_06:02 positioning_recorder__E14_.err
-2026-09-23_06:02 positioning_recorder__E14_.out
-2026-09-22_16:32 site_loop.err
-2026-09-22_16:32 site_loop.out
-2026-09-23_18:12 token_ping.err
-2026-09-22_16:32 token_ping.out
-2026-09-22_16:32 watchdog.err
-2026-09-22_16:32 watchdog.out
-=== watchdog.out tail (relaunch/death lines) ===
-assistant: **Step 5 finding:** the logs show no process activity after Fri 25 Sep 21:56 (depth E13's last write); **no weekend (26–27 Sep) log writes at all** for any process, and no death/relaunch lines in watchdog.out — consistent with the disk-full write-failures over the weekend. I cannot cite specific timestamped deaths because the logs stop before the weekend.
-
-**Step 4** — adding NB50 item-3's operational additions (docs only). Reading the checklist tail for the insertion point and max item number:
-tool_use Bash {"command": "echo \"=== last section headers + highest item number ===\"; grep -nE \"^## |^- \\[[A-Z0-9/-]+\\] [0-9]+\\.\" docs/MASTER-CHECKLIST.md | tail -8; echo \"=== total lines ===\"; wc -l docs/MASTER-CHECKLIST.md", "description": "Find checklist tail + highest item number"}
-tool_result: === last section headers + highest item number ===
-94:- [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
-95:- [AFTER-1545] 58. recorder keep-alive (NB16/NB17, §14.10 amendment) — the watchdog relaunches a DEAD recorder itself (token present + RAM above floor, logged); all 5 lanes (E4/E7/E12/E13/E14) in the watchdog keep-alive set; recorders start only AFTER the token lands; E4/E12 always in STATUS.json "streams" even when down so STREAM SILENT is never blind. Root cause: NB16 found E4/E12 dead since 06:02 with nothing to resurrect them. Launch-path wire-in tonight
-96:- [DONE] 59. lead-mistake ledger (NB19, OWNER-SAID) — **LIVE (NB31, dc2372b27/ad3ce9caf): the verifier append CALL is wired — a verifier FAIL logs a row + posts one read-only 🚩 (test isolates it to a temp ledger). CLOSE-DONE line wired into run_evening (posts after the post-close jobs). held_log rendered as the build-room held.html page (build_journal). All wiring tests GREEN.** — BUILT this session: docs/LEAD-MISTAKES.md (seeded with 5 rows for 2026-09-23) + scripts/lead_mistakes.py (machine-append + count_today, tested). Appended by the builder on an uncited-name refusal (CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed; daily close line ends "Lead mistakes today: N". Build-room page + the verifier/close append CALLS are the AFTER-1545 wire-in
-97:- [DONE] 62. evening pre-check (NB25 item 3) — **LIVE (NB31, dc2372b27): evening_precheck.line wired into scripts/run_evening.py BEFORE the evaluator; wiring test GREEN.** — BUILT: scripts/evening_precheck.py posts "✅ evening — today's bar in store, depth rows today N, RAM ok" or "🙋 evening — <gap> — send this to the lead" BEFORE the evaluator runs (the stale-bar lesson: on 2026-09-23 the evaluator ran on Tuesday's bar and re-produced expired signals). Pure/tested. Wire with the chain items
-98:- [DONE] 63. item-4 full-chain replay harness — BUILT + tested + RUN (NB25 continue). scripts/chain_dry_run.py: replays a fully-recorded day → 08:15 line → evaluate (six checks) → order gate → card to a dry-run log ONLY, twice; the mechanism proof is flag-present=HELD AND flag-absent=PLACED (a chain that PLACES under the flag FAILS). RAN on Tue 2026-09-22: 2 QUEUE (AUBANK,ETERNAL) → HELD with the flag, PLACED without → mechanism ok=True (reports/CHAIN-DRY-RUN.log). → **INDEPENDENT VERIFIER PASS (NB27, 2026-09-23 20:20)**: a separate fresh Claude (rung d, the 02:29 route via supervisor._invoke_claude) ruled VERDICT: PASS on the harness + reports/CHAIN-DRY-RUN.log with file:line cites (relayed, not self-judged). PASS marker written: reports/CHAIN-DRY-RUN-PASS.md. Item-4 dry-run DONE. The 06:00 🙋 becomes "lift the flag (owner deletes scheduler/.orders_held_R_HOLD_AND_FIX), then tap the login" — the flag-lift is the owner's hand (§21)
-99:- [DONE] 64. morning-bar rule (NB27 item 2) — BUILT: scripts/morning_bar.py — at the 06:00 login, if yesterday's daily bar is not in the store, run the built top-up fetcher (Kite has published it overnight), then the conforming evaluator (write=True) for today's next-open queue; the 08:15 line reports it (NONE fired = valid no-trade day). Pure/tested + IDEMPOTENT (already_queued_fn → skips if the evening already produced today's queue, so the login wire never duplicates rows). WIRE (deliberate launch-path step, not rushed into the login flow tonight): in kite_login.post_login after the top-up, an isolated try/except calls morning_bar.run(TODAY_ISO, CAL.previous_session(TODAY), store_latest_fn, topup_fn, lambda a: conform.queue_orders(asof=a, write=True)["decisions"], already_queued_fn=<ledger has queued rows for today>) then notify(r["line"]). Fixes the late-published-bar-costs-a-day gap. **LIVE (NB30): wired into kite_login.post_login (e56c7caaa); test_morning_bar_wired_into_login GREEN; independent rung-d verify PASS on a quiet box. test: green.** Runs at the 06:00 login
-100:- [AFTER-1545] 61. E1-only thin start (NB22-B) — BUILT: launch_e1 starts ONLY the Price Engine chain until one clean paper trade is on record (reports/CLEAN-TRADE-ON-RECORD). ON = watchdog · login ask (token_ping) · evening scan (run_evening) · site publisher · depth recorder (E13, the only lane the six checks read — conform.py:132) [+ book20_runner via login]. OFF = portfolio_card · calendar_daily · chain recorder (E4) · NSE/BSE (E12) · positioning (E14) · all heavy. plan()/e1_only() tested (--demo). Free RAM measured 0.36 GB before — this is the fix. LIVE via dry-run + restart (RAM measured after on the next start)
-101:- [DONE] 60. 🚩 lead-mistake signal (NB21) — **LIVE (NB31, ad3ce9caf): scripts/verifier.py verify() on a FAIL calls lead_mistakes.append(..., notify_fn=post_fn) → one read-only 🚩 line; the is_read_only guard rejects an action-carrying 🚩; wiring test GREEN.** — BUILT non-launch (scripts/lead_mistakes.py: flag_line, is_read_only guard, backfill_lines, append(notify_fn=), tested; docs/FLAG-BACKFILL-2026-09-23.md ready). WIRE-IN (launch-path, tonight's dry-run): pass notify.notify as append's notify_fn so every mistake posts one read-only 🚩 line; the notify guard rejects an action-carrying 🚩; close line ends "🚩 today: N", 08:15 line carries "🚩 yesterday: N"; post the 7 backfill lines
+tify_fn=), tested; docs/FLAG-BACKFILL-2026-09-23.md ready). WIRE-IN (launch-path, tonight's dry-run): pass notify.notify as append's notify_fn so every mistake posts one read-only 🚩 line; the notify guard rejects an action-carrying 🚩; close line ends "🚩 today: N", 08:15 line carries "🚩 yesterday: N"; post the 7 backfill lines
 === total lines ===
 101 docs/MASTER-CHECKLIST.md
 assistant: The numbering runs to 69 already. I'll add the 5 operational items as 70–74 (the two Price Engines are already §E items 1–2). Appending §H (docs only):
@@ -3550,3 +3469,208 @@ the NOW list is the only thing "what can be pasted now" means.** The beat's `lef
 assistant: No hand-edited count line exists — it's machine-derived (`scripts/master_checklist.py`); the 6 new V2 items flow through automatically. Now step 4: BUILD-STATE.json flag:
 tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "content": "{\n \"ruling\": \"V2-DOC-1 (2026-09-28, docs only). PRICE-ENGINE-V2.md written \u2014 governs both price engines and the judge every idea uses; v1 superseded where they differ. No code, no launch-path edit, no process stop/start.\",\n \"item\": \"V2-DOC-1: wrote docs/architecture/PRICE-ENGINE-V2.md (\u00a72.1-2.16 verbatim); added the V2 governance line as CLAUDE.md's first line; MASTER-CHECKLIST \u00a7E engine-2 = v1 chunk 1 DONE, v1 chunks 2-7 SUPERSEDED, added \u00a7E-V2 chunks 0-5; NB53 engines built earlier stay on disk (reuse-first per \u00a72.12).\",\n \"tests\": \"Docs only \u2014 no tests this run. Prior session: ~45 engine-module tests GREEN + 1 intentional RED (bus wiring). Full suite still queued (RAM).\",\n \"next\": \"V2 chunk 0 \u2014 data check + as-of stamps + point-in-time stock list (awaiting the block). Reuse-vs-replace list is in the V2-DOC-1 report. The audit is scheduled at V2 chunk 4 (independent session). No ETA until V2 chunk 3 measures speeds.\",\n \"flag\": \"V2 docs written \u00b7 next = V2 chunk 0 (awaiting block)\"\n}\n"}
 tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\BUILD-STATE.json has been updated successfully. (file state is current in your context — no need to Read it back)
+assistant: Step 5: commit the docs (BUILD-STATE.json separately per §23.4):
+tool_use Bash {"command": "git add docs/architecture/PRICE-ENGINE-V2.md docs/dispatches/2026-09-28_V2-DOC-1.md CLAUDE.md docs/MASTER-CHECKLIST.md && git commit -q -m \"V2-DOC-1 (docs): write docs/architecture/PRICE-ENGINE-V2.md (\u00a72.1-2.16 verbatim) \u2014 governs both price engines + the judge every idea uses; v1 superseded where they differ. Add the V2 governance line as CLAUDE.md first line. MASTER-CHECKLIST: engine-2 v1 chunk 1 DONE / chunks 2-7 SUPERSEDED, add \u00a7E-V2 chunks 0-5 (chunk 3+ HOLD lifted only by the replacing V2 chunk). Docs only\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git commit -q -m \"V2-DOC-1: BUILD-STATE.json flag = 'V2 docs written \u00b7 next = V2 chunk 0 (awaiting block)' (state file, separate commit \u00a723.4)\" -- reports/BUILD-STATE.json 2>&1 | tail -1; git log --oneline -2 | cut -c1-70", "description": "Commit docs, then BUILD-STATE.json separately"}
+tool_result: warning: in the working copy of 'CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture/PRICE-ENGINE-V2.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/dispatches/2026-09-28_V2-DOC-1.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
+5587d5299 V2-DOC-1: BUILD-STATE.json flag = 'V2 docs written · next =
+3e3c64c25 V2-DOC-1 (docs): write docs/architecture/PRICE-ENGINE-V2.md
+assistant: Both commits landed. Here is the V2-DOC-1 report.
+
+```
+V2-DOC-1 — PRICE-ENGINE-V2.md written (docs only)
+
+Commits: 3e3c64c25 (docs) · 5587d5299 (BUILD-STATE.json). No code, no launch-path edit,
+no process touched. Clock read at write; no ETA line (V2 §2.12 — none before chunk 3).
+
+items 71 · done 37 · pending 34   (+6: V2 chunks 0-5 added; v1 Claude-PE chunks 2-7
+  marked SUPERSEDED, chunk 1 stays DONE; nothing turned done this docs run)
+
+────────────────────────────────────────────────────────────────────────────────────
+PRICE-ENGINE-V2.md — IN FULL (as written to docs/architecture/PRICE-ENGINE-V2.md)
+────────────────────────────────────────────────────────────────────────────────────
+# PRICE ENGINE V2 — the design in plain words (28 Sep 2026)
+Governs both price engines and the judge used by every other idea. Origin: OWNER-SAID
+requirements + LEAD-RULED calls under the 28 Sep delegation. v1
+(CLAUDE-PRICE-ENGINE-ARCHITECTURE.md) is superseded where the two differ.
+
+2.1 Purpose. The machine looks for trading patterns in NSE stocks, proves or disproves
+each with real money maths, and trades only proven ones on paper, by itself, every day.
+Most days will say "0 promoted". That is the machine working.
+
+2.2 The grid (data). Rows = one stock at one minute, 2020 to today (~210 F&O stocks, plus
+NIFTY/BANKNIFTY futures bars); daily rows are stacked from minutes. Columns = rulers.
+Answer columns on the right = what happened after each row over the next hour / 1 day /
+3 days / 5 days, after real charges and worse-than-mid fills. Every cell is stamped with
+when it became knowable. The stock list is kept as it was on each date. Prices are adjusted
+for corporate actions with the factors kept separately. A bad-data gate freezes any stock
+with missing minutes or bad ticks that day. The free NSE daily files (FII/DII, delivery %,
+participant OI, corporate actions, results dates) are extra columns.
+
+2.3 Rulers. One number per stock per bar. [redacted]'s 35 stay exactly as they are; the Claude
+Price Engine adds wider families (price/trend, volume, volatility, flows, market state,
+calendar; options and order-book only once recorded). Reactive rulers describe now (RSI is
+28); predictive rulers are forecasts made now (tomorrow's range ~ 2%). A predictive ruler
+enters conditions only after its forecasts beat "tomorrow is like today" on data it never
+saw. New rulers come from the Machine Factory; rulers are never deleted; sanity checks use
+mathematical ranges only.
+
+2.4 A pattern = condition + direction + hold + exit.
+- Buckets: each ruler's readings are cut into a few equal-count slices from the stock's own
+  history (or across stocks on the day). Any slice can be the bucket — top, bottom or middle
+  — and two neighbouring slices may be merged. Edges are always computed; the number of
+  slices is a declared convention (reason + sensitivity stated), kept small.
+- Condition: one or two rulers each in a bucket, true in the same row. Any mix of reactive
+  and predictive rulers.
+- Fires: the rows where the condition is true. Their answer columns are the pattern's record.
+  Both directions are tested.
+- Hold: the pattern keeps the answer column where net profit is best above the cost floor;
+  nothing under an hour survives costs. Exits (fixed stop, time, trailing) are separate
+  patterns from the same condition. Patterns never become rulers.
+- Conditions are checked on finished bars: daily patterns at the close, intraday patterns
+  each finished bar.
+
+2.5 Two doors. Door A (trading): patterns stated before searching — the 35 rulers × buckets
+× holds (a few thousand), the Claude rulers likewise, the YouTube rules, the 323 Facts, the
+deliverables, one plain yardstick strategy. Door B (research): the brute-force millions and
+new rulers, scored every night, never deleted, never promoted directly; a Door-B pattern
+that keeps looking good is re-stated as a Door-A pattern and starts from zero. Reason: the
+luck bar rises with the number of patterns competing for promotion; thousands can be judged
+honestly on six years, millions cannot.
+
+2.6 Two bars. Admission (past data): the pattern's history split by years, fitted on some,
+tested on years it never saw, costs inside, near-copies merged — passing is permission to
+enter the paper desk at tiny size, a shortlist, not proof. Trust score (future data): each
+Door-A pattern starts with Rs 1 of pretend money; once per day after close it moves by the
+day's net result of the pattern's paper trades (fees and slippage taken out); twenty stocks
+bought the same afternoon are one bet, one move. A worthless pattern's pretend money cannot
+keep growing; when it crosses the bar the pattern is promoted. The bar is set from how many
+Door-A patterns compete (one shared luck allowance), so a worthless pattern almost never
+crosses it in its life however often you check — nightly checking is safe. Near-copies are
+merged and judged as one. Instances, not variety: a pattern rises or falls only on its own
+days of proof.
+
+2.7 The ladder. bench -> found -> testing -> paper (tiny) -> live (full) -> back down when
+the score falls under its floor. Nothing is ever deleted.
+
+2.8 Alpha decay. Live needs lifetime AND recent-window pretend money both positive (window
+derived from the pattern's own trade frequency); recent negative -> demoted. Losing days
+shrink the score; under the floor -> bench. Recency may shrink or suspend, never promote.
+Benched patterns keep being scored and climb back on their own if they recover. If promoted
+patterns decay systematically right after promotion, the judge itself is flagged wrong (fills
+too kind or near-copies unmerged) and promotions stop until fixed.
+
+2.9 One day. Morning: the owner's one login; yesterday's bars + NSE files pulled and checked;
+bad stocks frozen. Market: only paper and live patterns act, on finished bars at the next
+bar's open; P&L live; the laptop runs only the desk. Close: booked. Night: today's row added
+to every pattern ever created; every trust score updated; every status re-decided; new
+patterns admitted (Door A a few per night, limited by measured speed; Door B within the RAM
+floor); nothing deleted; one status line; the checker runs.
+
+2.10 Money. Rs 2,00,000 paper per engine, set once. Cash stocks only; shorts intraday only;
+futures are data; Overnight and the index tests are diaries in points and Rs per lot until a
+book big enough for one lot exists (a later money decision); options later, spreads with a
+fixed maximum loss only. Size from the trust score: tiny when new, bigger as trust grows;
+caps per stock, per family, per day; daily-loss breaker; KILL/RESUME. Every paper trade pays
+real Zerodha charges (delivery vs intraday, DP charge on sells, STT on futures 0.05% since
+1 Apr 2026) and worse-than-mid fills; a stop crossed by a gap fills at the real open; a
+halted stock cannot be exited until it trades. Real money stays closed.
+
+2.11 The checker. A separate program, not a Claude session, re-adds the money from raw fills
+every night and must match to the rupee. "Live" means the loop reproduces its own logs, not
+that a pattern makes money. Paper fills are estimates until months of depth recording exist;
+fills are re-calibrated monthly.
+
+2.12 Build order (each chunk ends with a measured report; no ETA before chunk 3): 0 data
+check + as-of stamps + the as-it-was stock list -> 1 cost model + paper broker matched to the
+rupee against Zerodha's calculator (gaps, halts, expiry) -> 2 the judge tested on fake data
+(worthless streams must almost never be promoted; real-edge streams must) -> 3 Door-A
+generator + near-copy merging + admission test + seconds-per-pattern-per-night and
+seconds-per-admission measured on this laptop (the first honest ETA) -> 4 nightly loop +
+checker + status line wired into the running desk, verify-gated by an independent session ->
+5 long paper run + monthly fill calibration + yardstick comparison. Reuse first (exam
+cost/fill functions, paper.simulate_trade, money.py, the liquidity checklist, the engine bus,
+the ruler shelf = Claude PE chunk 1); the builder lists reuse vs replace before touching
+anything. The 5 currently certified patterns stay on the paper desk at tiny size with trust
+scores starting at Rs 1.
+
+2.13 The eight engines under V2 (list unchanged): 1 [redacted] Price Engine = the 35-ruler family,
+Door A, this judge; 2 Claude Price Engine = wider rulers + yardstick + absorbed
+Overnight/Insurance/Context; 3 YouTube, 4 Calendar, 8 Deliverables = stated patterns under
+this judge, paper at tiny size from admission; 5 Machine Factory = Door B + new rulers,
+nightly, RAM-gated; 6 Arbitrage and 7 Copycat Roof unchanged.
+
+2.14 Superseded from v1: three fixed cadence classes; the 70/20/10 sealed holdout as proof;
+trades counted as independent proof; futures as vehicles on Rs 2L books; brute force as the
+trading family; any re-search slower than nightly.
+
+2.15 What only data can answer: whether any pattern's trust score grows on data that arrives
+after it was stated; whether paper fills match real fills; whether the search beats the
+yardstick. Nothing here promises an edge; it refuses to be fooled.
+
+2.16 LEAD-PROPOSED addendum (28 Sep, new lead chat) — the formulas the code implements. The
+plain words above govern; if a formula clashes with them the builder reports the clash
+instead of choosing.
+- Trust score T per Door-A pattern: T_0 = 1. Each trading day t after close: r_t = the day's
+  net rupee result of the pattern's combined paper bet / the rupees deployed that day (costs
+  and worse-than-mid fills already inside; all that day's fills are one bet; no trade ->
+  r_t = 0). T_{t+1} = T_t × (1 + r_t). For cash stocks r_t > -1, so T never reaches zero and
+  a benched pattern can climb back.
+- Why it is safe to check nightly: for a pattern with no edge after costs, T cannot drift up
+  on average, so the chance it EVER crosses a level 1/alpha is at most alpha, however often it
+  is checked.
+- The bar: B = N_A / alpha, where N_A = the number of ADMITTED Door-A patterns competing (past
+  the admission test, near-copies merged; the generator's whole family does NOT count) and
+  alpha = the shared luck allowance, a declared convention with reason and sensitivity stated
+  in this file, never a bare typed number. Total expected false promotions across all patterns
+  <= alpha.
+- Consequence to print, not hide: time-to-promotion is set by the pattern's real daily edge
+  and by B. Chunk 2's report prints, for fake streams of stated daily edge, the median days to
+  cross B at the chosen N_A and alpha, so the owner sees the number before chunk 3. "0
+  promoted" for a long time is the expected reading.
+- Floor F (bench below it) and recent window W (the number of days holding the pattern's last
+  k trades) are declared conventions with reasons; live needs T >= B and the product of
+  (1 + r_t) over the last W days >= 1.
+- Size from trust: m = clip((ln T - ln F) / (ln B - ln F), 0, 1) × the engine's maximum
+  fraction per position; tiny when new, full at the bar; caps per stock, family and day apply
+  after m.
+────────────────────────────────────────────────────────────────────────────────────
+
+REUSE vs REPLACE (everything built today, mapped to V2 chunks — §2.12 reuse-first)
+  REUSE (kept, wired into V2):
+   • money.py (NOTIONAL_CAPITAL, COST_STATUTORY_RT, cost_readout)  -> V2 chunk 1 cost model
+   • the liquidity six-check checklist (liquidity_backtest.checklist) -> V2 chunk 1 paper broker
+   • paper.simulate_trade                                          -> V2 chunk 1 / chunk 4 loop
+   • engine bus (engine_bus.py, owner-8 registry)                  -> V2 chunk 4 nightly loop
+   • ruler shelf (engine2_claude_price/shelf.py = Claude PE chunk 1) -> V2 chunk 0/1 grid columns
+   • forecast gate (v1 chunk 2, forecast.py: beats "tomorrow like today") -> V2 §2.3 predictive-ruler admission
+   • §H 70-73 (day-log, rehearsal, market-hours mode, event blackout) -> V2 §2.9 "one day" / chunk 4
+   • engine 3/4/6/8 wrappers (youtube/calendar/arbitrage/deliverables) -> V2 §2.13 stated patterns under this judge
+   • Machine Factory (machine_factory.py)                          -> V2 §2.13 Door B generator (nightly, RAM-gated)
+  PARTIAL (structure reused, verdict replaced):
+   • search.py (v1 chunk 3): candidate generator + near-copy/admission split REUSED as the
+     Door-A generator + admission test; its "CERTIFIED = Wilson-LB-on-holdout" verdict REPLACED
+     by the trust-score judge (V2 §2.6/§2.16). 70/20/10-holdout-as-proof is superseded (§2.14).
+   • accounts.py (v1 chunk 7): two books + own ledgers + capital REUSED; the Wilson-Kelly size
+     REPLACED by the trust-score size m (§2.16).
+   • Machine Factory's Bonferroni "certify" path: Door B is never promoted directly (§2.5) —
+     REPLACED by "re-state as Door A, start from zero"; the generator itself is reused.
+  REPLACE (superseded, §2.14): three fixed cadence classes; sealed-holdout-as-proof; trades
+     as independent proof; futures as vehicles on the Rs 2L books; brute force as a TRADING
+     family (moves to Door B); any re-search slower than nightly.
+
+🚩 rows (self-flag):
+  🚩 #1 — In the 09:58 checkpoint I printed a typed ETA "~+2.5h". That violates the no-typed-
+     time rule (R-CLOCK / §24.5) and V2 §2.12 ("no ETA before chunk 3"). Recorded here read-
+     only; no ETA line appears in this report, and none will until V2 chunk 3 measures the
+     real seconds-per-pattern on this laptop.
+
+NEXT: V2 chunk 0 (data check + as-of stamps + point-in-time stock list) on the next block.
+  Audit scheduled at V2 chunk 4 (independent session). BUILD-STATE flag set so the loop stops.
+
+NOTHING NEEDS THE LEAD
+```
+
+Done — see block above.
