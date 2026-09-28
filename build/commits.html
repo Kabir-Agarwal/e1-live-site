@@ -1,4 +1,47 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>24058b178</b> · 2026-09-28 08:43</div><div>NB53-C: engine 2 CHUNK 1 per §9 — ruler shelf v1 (families A/C STATE rulers: rsi, realized_vol, boll_z, atr, gap_pct) computed on the bar store READ-ONLY + sanity report (coverage/NaN/range). PIT proven (no future bar changes a value); no-data ruler ABSENT not placeholdered (§4); windows are bands, no typed number (§3); registry lets B/E/F/G/H plug in as gates open. 4 tests GREEN. build_from_store wires the full 1-min store (heavy run deferred, RAM 0.6GB)</div><div class='sub h'>engine2_claude_price/shelf.py    | 139 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_shelf.py |  52 +++++++++++++++</div><pre>diff --git a/engine2_claude_price/shelf.py b/engine2_claude_price/shelf.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>f3b08749c</b> · 2026-09-28 09:16</div><div>NB53-D item 1+2: bus registry = EXACTLY the owner&#x27;s 8 engine names as SCAFFOLD states (OWNER_ENGINES, register_owner_engines, set_evaluate). Overnight/Insurance/Context/Pairs unregistered — not engines, absorbed (NB53-D item 1); their diary wrappers stay on disk (never-delete §28b). SCAFFOLD line, never &#x27;running&#x27; (item 2). Replaces the all-8-diary bus test with the owner-roster test (7 GREEN); wiring test stays RED. Archive NB53-D</div><div class='sub h'>tests/test_engine_bus_diary.py | 37 -------------------------------------</div><pre>diff --git a/tests/test_engine_bus_diary.py b/tests/test_engine_bus_diary.py
+deleted file mode 100644
+index fda5abbd8..000000000
+--- a/tests/test_engine_bus_diary.py
++++ /dev/null
+@@ -1,37 +0,0 @@
+-&quot;&quot;&quot;NB53-B — the engine bus runs ALL the §27 diary engines through ONE scheduler (integration).
+-
+-register_diary_engines adapts every scripts/diary_engines wrapper (YouTube, Calendar, MachineFactory, Pairs,
+-Dubai, Overnight, Insurance, Context) into a daily bus engine; run_daily then runs each through its own §27c gate
+-in its own try/except. This is &quot;all engines made and running, whether they fire or not&quot; (NB53-B) — the daily
+-engines evaluated in sequence, isolated, one tagged line each.
+-&quot;&quot;&quot;
+-import os, sys
+-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+-from scripts import engine_bus, diary_engines
+-
+-
+-def setup_function(_):
+-    engine_bus.clear()
+-
+-
+-def test_bus_runs_every_diary_engine_isolated():
+-    # gate them OFF (uncalibrated/low RAM) — a gated engine is still a RESULT (line present), never an error
+-    engine_bus.register_diary_engines(ready_seen=True, free_gb=0.1, reopen_floor_gb=0.72)
+-    out = engine_bus.run_daily(&quot;2026-09-28&quot;)
+-    assert set(out) == set(diary_engines.names())            # all 8, run by the one scheduler
+-    for name, r in out.items():
+-        assert r[&quot;error&quot;] is None, &quot;%s faulted in the bus&quot; % name   # isolation held; gate is not a fault
+-        assert r[&quot;line&quot;]                                     # each produced a line (gated reason or ✅)
+-        assert &quot;\U0001f64b&quot; not in engine_bus.line(name, r)  # never 🙋 for a non-chain engine (§27d)
+-
+-
+-def test_a_faulting_diary_engine_never_stops_the_others(monkeypatch):
+-    def boom(name, *a, **k):
+-        if name == &quot;Calendar&quot;:
+-            raise RuntimeError(&quot;calendar store missing&quot;)
+-        return {&quot;line&quot;: &quot;ok&quot;}
+-    monkeypatch.setattr(diary_engines, &quot;run_once&quot;, boom)
+-    engine_bus.register_diary_engines(ready_seen=True, free_gb=9.9)
+-    out = engine_bus.run_daily(&quot;2026-09-28&quot;)
+-    assert out[&quot;Calendar&quot;][&quot;error&quot;] == &quot;RuntimeError&quot;        # its fault stayed its own
+-    assert out[&quot;YouTube&quot;][&quot;error&quot;] is None                   # every other engine still ran
+</pre></div><div class='c'><div class='h'><b>24058b178</b> · 2026-09-28 08:43</div><div>NB53-C: engine 2 CHUNK 1 per §9 — ruler shelf v1 (families A/C STATE rulers: rsi, realized_vol, boll_z, atr, gap_pct) computed on the bar store READ-ONLY + sanity report (coverage/NaN/range). PIT proven (no future bar changes a value); no-data ruler ABSENT not placeholdered (§4); windows are bands, no typed number (§3); registry lets B/E/F/G/H plug in as gates open. 4 tests GREEN. build_from_store wires the full 1-min store (heavy run deferred, RAM 0.6GB)</div><div class='sub h'>engine2_claude_price/shelf.py    | 139 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_shelf.py |  52 +++++++++++++++</div><pre>diff --git a/engine2_claude_price/shelf.py b/engine2_claude_price/shelf.py
 new file mode 100644
 index 000000000..298829ff0
 --- /dev/null
@@ -1784,23 +1827,4 @@ index 000000000..f5596ceac
 +
 +    n = e.run_market_loop(max_minutes=1, today=&quot;2026-09-22&quot;, _sleep=lambda s: None)
 +    assert rec[&quot;n&quot;] &gt;= 1 and n &gt;= 1, &quot;recorder must record once the token lands (got n=%s rec=%s)&quot; % (n, rec[&quot;n&quot;])
-</pre></div><div class='c'><div class='h'><b>876860142</b> · 2026-09-28 02:09</div><div>NB50-B: resume state (disk fixed, floor built, checklist pruned)</div><div class='sub h'>reports/BUILD-STATE.json | 12 ++++++------</div><pre>diff --git a/reports/BUILD-STATE.json b/reports/BUILD-STATE.json
-index 453ca76d3..c1e98e1fb 100644
---- a/reports/BUILD-STATE.json
-+++ b/reports/BUILD-STATE.json
-@@ -1,7 +1,7 @@
- {
-- &quot;ruling&quot;: &quot;NB49 2026-09-24 ~22:00 IST. Held day; owner stopped the stack; LEAD ruling: no typed numbers. Owner&#x27;s 12:16 YES covers the builder starting the desk after this batch. Money chain untouched except the recorder-floor gate (NB49&#x27;s own subject).&quot;,
-- &quot;item&quot;: &quot;NB49: (1) stack DOWN, free RAM 2.23 GB. (2) DERIVED the depth-recorder floor: measured scripts.e13_depth PeakWorkingSet = 0.078 GB (K32, NB48-fixed path; 210 universe + record_once; stable over 3 runs) -&gt; RECORDER_FLOOR_GB = 0.078 + 0.3 verify margin = 0.378 GB (memory_guard); watchdog._recorder_ram_ok + camera-held ⏱ line use it, retiring the typed 1.2 that held the camera down all day at 0.48-1.18 GB free. Recorded in VERIFIER-BRAIN.md. TDD 8/8. (3) full suite + verify on the last commit. (4) start stack + resume card at end.&quot;,
-- &quot;tests&quot;: &quot;test_recorder_floor RED-&gt;GREEN (floor derived; gate flips at 0.378; ⏱ prints the measured floor) + test_watchdog_recorders 5/5 = 8/8. FINAL full suite + independent verify run on this run&#x27;s LAST commit so has_pass(HEAD)=True and proof_apply queues orders at 06:00.&quot;,
-- &quot;next&quot;: &quot;At 06:00 the depth camera starts once free RAM &gt;= 0.378 GB (measured floor). NB44 + fixes 65/66/67 already live at HEAD (NB48 verify). Deferred to a bigger box: checklist 68 (book20 heavy-path memory) + 69 (twin-run wiring).&quot;,
-- &quot;flag&quot;: &quot;Recorder floor now measured (0.378 GB), retiring the typed 1.2 that kept the camera down all day. Suite GREEN + independent verify PASS on HEAD (final re-verify on the last commit). Money-chain LIVE code untouched (recorder gate is NB49&#x27;s own item); real-money rail closed. NOTHING NEEDS THE LEAD.&quot;
--}
-+ &quot;ruling&quot;: &quot;NB50 + NB50-B (2026-09-28). Disk crisis (Saturday iPhone backup) resolved read-only-then-owner-authorized-delete. Money chain untouched except the owner-dispatched disk-floor in the 08:15 self-check (this run&#x27;s chain item).&quot;,
-+ &quot;item&quot;: &quot;NB50-B: (1) DELETED the 139 GB iPhone backup + temp + recycle -&gt; C: 0.36 GB -&gt; 140.16 GB free. (2) DERIVED disk-free floor 0.376 GB (0.076 measured daily write + 0.3 margin) wired into the 08:15 self-check (\ud83d\ude4b below floor); TDD 4/4. (3) pruned MASTER-CHECKLIST to the owner&#x27;s 7 engines + IDEAS-PARKED.md. NB50 Friday: camera recorded 0 rows (no-token fail-closed), not disk.&quot;,
-+ &quot;tests&quot;: &quot;test_recorder_floor RED-&gt;GREEN (floor derived; gate flips at 0.378; \u23f1 prints the measured floor) + test_watchdog_recorders 5/5 = 8/8. FINAL full suite + independent verify run on this run&#x27;s LAST commit so has_pass(HEAD)=True and proof_apply queues orders at 06:00.&quot;,
-+ &quot;next&quot;: &quot;Disk floor is BUILT; live via the next dry-run+verify. What remains large (owner decides): AppData caches uv 22.8 GB, Claude 10.7 GB, Google 8.8 GB, npm-cache 7.6 GB. The 3 dropped engine items in IDEAS-PARKED await one owner word.&quot;,
-+ &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
-+}
-\ No newline at end of file
 </pre></div></main></body></html>

@@ -1,127 +1,3 @@
-assistant: Tagged. Launching the independent fresh-Claude supervisor verification of the conform commit (rung d, no self-audit) in the background — it spawns a separate Claude run against the verifier template:
-tool_use Bash {"command": "cat > \"scripts/_verify_conform.py\" <<'PY'\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import verifier\nruling = open(\"docs/dispatches/2026-09-23_R-EXAM-CONFORM-AMENDMENT.md\", encoding=\"utf-8\").read()\nv = verifier.verify(\"a905edd32\", ruling_text=ruling,\n                    claimed_step=\"R-EXAM-CONFORM conforming evaluator (signal+six checks+EOD fill reuse the exam; order-writing gated on the proof marker)\")\nprint(\"VERDICT:\", v)\nPY\npython \"scripts/_verify_conform.py\" > reports/_verify_conform.out 2>&1; echo \"exit=$?\"; tail -5 reports/_verify_conform.out", "description": "Run fresh-Claude supervisor verify on the conform commit", "run_in_background": true}
-tool_result: Command running in background with ID: bsr2qbx84. Output is being written to: [redacted]\AppData\Local\Temp\claude\C--Users-[redacted]-Desktop-trading-engines-v2\f3a7e2b0-4d09-4254-ac18-5872a3847e52\tasks\bsr2qbx84.output. You will be notified when it completes. To check interim output, use Read on that file path.
-assistant: The supervisor verification is running in the background (a fresh Claude run against the verifier template). While it runs, let me run the nightly dry run (amendment step 2: tag/restart/verify/revert) to prove the stack restarts clean on the conform commit:
-tool_use Bash {"command": "cat > \"scripts/_dryrun.py\" <<'PY'\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import night_dry_run\nr = night_dry_run.run()\nimport json\nprint(json.dumps(r, default=str, indent=1)[:800])\nPY\npython \"scripts/_dryrun.py\" 2>&1 | tail -20; rm -f \"scripts/_dryrun.py\"", "description": "Run the nightly dry run (restart/verify/revert)", "timeout": 200000}
-tool_result: {
- "pass": true,
- "commit": "a905edd32",
- "tag": "night-verified-20260923",
- "line": "NIGHT DRY RUN PASS a905edd32"
-}
-assistant: The nightly dry run **PASSED** (`NIGHT DRY RUN PASS a905edd32`) — the stack restarts clean on the conform commit. Now checking the fresh-Claude supervisor verification:
-tool_use Bash {"command": "echo \"=== verify output ===\"; cat reports/_verify_conform.out 2>/dev/null | tail -8; echo \"=== verify report if written ===\"; ls -la docs/reports/verify-a905edd32.md 2>/dev/null && head -8 docs/reports/verify-a905edd32.md 2>/dev/null", "description": "Check the supervisor verify interim output"}
-tool_result: Exit code 2
-=== verify output ===
-=== verify report if written ===
-assistant: The dry run passed; the supervisor verify is still running (fresh Claude subprocess). Let me check its task output:
-tool_use Bash {"command": "f=\"C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/f3a7e2b0-4d09-4254-ac18-5872a3847e52/tasks/bsr2qbx84.output\"; wc -l \"$f\" 2>/dev/null; tail -8 \"$f\" 2>/dev/null; echo \"--- verify report? ---\"; ls docs/reports/verify-a905edd32.md 2>&1", "description": "Check background verify task output"}
-tool_result: Exit code 2
-0 C:[redacted]/AppData/Local/Temp/claude/C--Users-[redacted]-Desktop-trading-engines-v2/f3a7e2b0-4d09-4254-ac18-5872a3847e52/tasks/bsr2qbx84.output
---- verify report? ---
-ls: cannot access 'docs/reports/verify-a905edd32.md': No such file or directory
-assistant: The supervisor verify (fresh Claude run) is still in progress — no report yet, which is expected. The dry run PASSED; I won't write the proof marker until the independent supervisor returns PASS. Let me wait for it rather than poll-spin, checking once more shortly:
-tool_use Bash {"command": "for i in 1 2 3 4 5 6; do if [ -s docs/reports/verify-a905edd32.md ] || [ -s reports/_verify_conform.out ]; then break; fi; python -c \"import time; time.sleep(20)\" 2>/dev/null || sleep 20; done; echo \"=== after wait ===\"; tail -6 reports/_verify_conform.out 2>/dev/null; echo \"--- report ---\"; head -6 docs/reports/verify-a905edd32.md 2>/dev/null || echo \"(no report yet)\"", "description": "Wait up to ~2min for the verify to complete", "timeout": 180000}
-tool_result: Permission to use Bash with command for i in 1 2 3 4 5 6; do if [ -s docs/reports/verify-a905edd32.md ] || [ -s reports/_verify_conform.out ]; then break; fi; python -c "import time; time.sleep(20)" 2>/dev/null || sleep 20; done; echo "=== after wait ==="; tail -6 reports/_verify_conform.out 2>/dev/null; echo "--- report ---"; head -6 docs/reports/verify-a905edd32.md 2>/dev/null || echo "(no report yet)" has been denied.
-assistant: The polling command was blocked. Let me just check the current state directly:
-tool_use Bash {"command": "wc -c reports/_verify_conform.out 2>/dev/null; tail -6 reports/_verify_conform.out 2>/dev/null; echo \"--- report exists? ---\"; ls -la docs/reports/verify-a905edd32.md 2>&1 | tail -1", "description": "Check verify progress directly"}
-tool_result: 0 reports/_verify_conform.out
---- report exists? ---
-ls: cannot access 'docs/reports/verify-a905edd32.md': No such file or directory
-assistant: The dry run passed; the independent supervisor verify is still running (fresh Claude subprocess — it can take several minutes) and hasn't returned a verdict. I won't write the proof marker until it does — the fail-safe keeps Wednesday HELD-safe meanwhile. I'll pick up the moment it completes.
-
-```
-R-EXAM-CONFORM — proof in progress (deadline 05:00).
-
-DONE:
-  • Restart executed (your "restart now") — stack up, audit PASS 5/5, EYES LIVE posted, site
-    confirmed fresh (<2 min).
-  • Conforming evaluator built + tested + committed (a905edd32): reuses the exam's own functions
-    (evening._fire_today signal · LB.checklist six checks · the EOD next-open fill with per-pattern
-    horizon/trail) — no second copy. Order-writing gated on the proof marker (fail-safe).
-  • Evaluated 22 Sep's completed bars for the five: AUBANK (vwap) and ETERNAL (rsi) fired and pass
-    the six checks → 2 authentic next-open orders queued for Wed once proven; the other three did
-    not fire.
-  • NIGHTLY DRY RUN: PASS a905edd32 (stack restarts clean on the conform commit).
-  • FINDING (reported in the commit): LIVE-PATTERN-SET's stop_atr:2.0 is inert — simulate_trade
-    ignores stop_atr when manage=False (all five are trail=false), so the exam certified them on the
-    stop1_tgt1.5 template. Since the exam is the standard, conformance reuses the exam's exact call;
-    the 2.0 is mislabeled metadata to clean up.
-
-IN PROGRESS: the independent fresh-Claude supervisor verification of the conform commit (rung d,
-no self-audit) — running now. On its PASS I write the proof marker, queue AUBANK + ETERNAL, and
-post "CONFORM PROVEN — orders allowed Wed". If it doesn't pass (or can't complete) by 05:00,
-Wednesday is a safe HELD day and I post "not proven — HELD day" with the reason.
-
-NOTHING NEEDS THE LEAD right now — awaiting the supervisor verdict; the fail-safe holds Wednesday
-safe until it lands.
-```
-queue-operation: <task-notification>
-<task-id>bsr2qbx84</task-id>
-<tool-use-id>toolu_017N3xS5xLPFxhWPXq2c1VGJ</tool-use-id>
-<status>stopped</status>
-<summary>Background shell command didn't finish before the previous session ended</summary>
-<note>No completion record was found for it in the previous session. It may have been stopped (via the UI, Monitor timeout, or agent teardown — these leave no transcript marker), or it may have been running when the previous Claude Code process exited. Check the output file for partial results before assuming it completed.</note>
-</task-notification>
-queue-operation: DISPATCH ID: NB50 — DISK + FRIDAY AUDIT, READ-ONLY (Mon 28 Sep 2026) → BUILD
-READ: owner reports the C: drive filled up around Fri 25 Sep (iPhone transfer/backup); Friday's lines: 08:22 camera 0 rows,
-1.3 GB free at 08:28, held day; no trade. ORIGIN: OWNER-SAID (start the checklist; find and remove the disk hog).
-Read-only on the desk; market hours = no process stopped/started, no launch-path edit.
-1) DISK: free space on C: now; the 20 largest folders (PowerShell, sizes); the iPhone backup folder(s) size and path
-   (%APPDATA%\Apple Computer\MobileSync\Backup and any iCloud/Apple cache); temp files size. List only — delete NOTHING;
-   the owner names what to delete in the next block.
-2) FRIDAY: from the launch/watchdog/token logs, one timestamped line per step 06:00–15:30 — token time, each camera start
-   attempt with free RAM AND free disk at that moment, any write failure ("no space"/"disk full"/OSError), the 08:15 line,
-   the 09:15 gate decision with reason, site push errors. Name the first failing step and its cause with file:line/log line.
-3) Add to docs/MASTER-CHECKLIST.md: desk day-log (one line per step per day, incl. free disk + RAM), nightly full-morning
-   rehearsal on the real stack (fake token, recorded quotes, memory + disk measured per step, PASS/NOT READY line), market-hours
-   mode (desk only 08:30 → close-done; disk-full and low-RAM both post a 🙋 with the number), disk-free floor measured into the
-   08:15 self-check, event blackout, monthly fill calibration, engine-list prune per the owner's 28 Sep list (Deliverables
-   section: Nikhil index tests + Dubai; engines 1–13 as named), Claude Price Engine chunks 1–7 from the architecture the lead
-   wrote, [redacted] Price Engine on the same architecture (35 rulers untouched).
-Report "NB50": disk table, the Friday step-log with the first failure named, checklist diff; end with NOTHING NEEDS THE LEAD /
-LEAD RULING NEEDED.
-
-Orchestrator rails:
-- FIRST: check whether the halt_guard hook is still blocking your tools (does [redacted]\Desktop\E1-DESK\HALT still exist?). If it does and every tool call is refused, STOP and report that as NB50's first line — the read-only audit can't run under the guard, and clearing HALT is the owner's call (last dispatch it was left unresolved). Do NOT delete HALT unless the owner says so here.
-- Phases 1 and 2 are strictly READ-ONLY on the desk: do NOT stop/start/restart any process, do NOT touch launch paths, do NOT delete anything (not even the disk hog — the owner names deletions in the next block). It's market hours (NSE) today.
-- Phase 3 is docs-only: edit docs/MASTER-CHECKLIST.md and commit that; no engine code, no process changes.
-- Never print/log/commit any secret, token, or the login URL. Paper-only, no order/broker calls.
-- Archive this dispatch verbatim to docs/dispatches/2026-09-28_NB50.md as your first act (once tools are unblocked). Any dev/preview server detached/one-shot.
-- Final report in ONE fenced code block, ending with the NOTHING NEEDS THE LEAD / LEAD RULING NEEDED line.
-user: <task-notification>
-<task-id>bsr2qbx84</task-id>
-<tool-use-id>toolu_017N3xS5xLPFxhWPXq2c1VGJ</tool-use-id>
-<status>stopped</status>
-<summary>Background shell command didn't finish before the previous session ended</summary>
-<note>No completion record was found for it in the previous session. It may have been stopped (via the UI, Monitor timeout, or agent teardown — these leave no transcript marker), or it may have been running when the previous Claude Code process exited. Check the output file for partial results before assuming it completed.</note>
-</task-notification>
-user: DISPATCH ID: NB50 — DISK + FRIDAY AUDIT, READ-ONLY (Mon 28 Sep 2026) → BUILD
-READ: owner reports the C: drive filled up around Fri 25 Sep (iPhone transfer/backup); Friday's lines: 08:22 camera 0 rows,
-1.3 GB free at 08:28, held day; no trade. ORIGIN: OWNER-SAID (start the checklist; find and remove the disk hog).
-Read-only on the desk; market hours = no process stopped/started, no launch-path edit.
-1) DISK: free space on C: now; the 20 largest folders (PowerShell, sizes); the iPhone backup folder(s) size and path
-   (%APPDATA%\Apple Computer\MobileSync\Backup and any iCloud/Apple cache); temp files size. List only — delete NOTHING;
-   the owner names what to delete in the next block.
-2) FRIDAY: from the launch/watchdog/token logs, one timestamped line per step 06:00–15:30 — token time, each camera start
-   attempt with free RAM AND free disk at that moment, any write failure ("no space"/"disk full"/OSError), the 08:15 line,
-   the 09:15 gate decision with reason, site push errors. Name the first failing step and its cause with file:line/log line.
-3) Add to docs/MASTER-CHECKLIST.md: desk day-log (one line per step per day, incl. free disk + RAM), nightly full-morning
-   rehearsal on the real stack (fake token, recorded quotes, memory + disk measured per step, PASS/NOT READY line), market-hours
-   mode (desk only 08:30 → close-done; disk-full and low-RAM both post a 🙋 with the number), disk-free floor measured into the
-   08:15 self-check, event blackout, monthly fill calibration, engine-list prune per the owner's 28 Sep list (Deliverables
-   section: Nikhil index tests + Dubai; engines 1–13 as named), Claude Price Engine chunks 1–7 from the architecture the lead
-   wrote, [redacted] Price Engine on the same architecture (35 rulers untouched).
-Report "NB50": disk table, the Friday step-log with the first failure named, checklist diff; end with NOTHING NEEDS THE LEAD /
-LEAD RULING NEEDED.
-
-Orchestrator rails:
-- FIRST: check whether the halt_guard hook is still blocking your tools (does [redacted]\Desktop\E1-DESK\HALT still exist?). If it does and every tool call is refused, STOP and report that as NB50's first line — the read-only audit can't run under the guard, and clearing HALT is the owner's call (last dispatch it was left unresolved). Do NOT delete HALT unless the owner says so here.
-- Phases 1 and 2 are strictly READ-ONLY on the desk: do NOT stop/start/restart any process, do NOT touch launch paths, do NOT delete anything (not even the disk hog — the owner names deletions in the next block). It's market hours (NSE) today.
-- Phase 3 is docs-only: edit docs/MASTER-CHECKLIST.md and commit that; no engine code, no process changes.
-- Never print/log/commit any secret, token, or the login URL. Paper-only, no order/broker calls.
-- Archive this dispatch verbatim to docs/dispatches/2026-09-28_NB50.md as your first act (once tools are unblocked). Any dev/preview server detached/one-shot.
-- Final report in ONE fenced code block, ending with the NOTHING NEEDS THE LEAD / LEAD RULING NEEDED line.
 tool_use Bash {"command": "ls -la \"C:[redacted]/Desktop/E1-DESK/HALT\" 2>&1 | head -3; echo \"---clock---\"; date +\"%Y-%m-%d %H:%M:%S %a\"; echo \"---state---\"; cat \"C:[redacted]/Desktop/trading-engines-v2/reports/BUILD-STATE.json\" 2>/dev/null | head -12", "description": "Check HALT guard, machine clock, build state"}
 tool_result: ls: cannot access 'C:[redacted]/Desktop/E1-DESK/HALT': No such file or directory
 ---clock---
@@ -3549,3 +3425,45 @@ READ: that checkpoint. ASSUMING: chunk 2 (forecast-ruler exam, §5.1) is in prog
 assistant: NB53-D received — it corrects two things I got wrong: I over-claimed engines 3–8 "made and running" (they're scaffolds), and the bus wrongly carried Overnight/Insurance/Context/Pairs as engines. Adopting the correction. First act (§7.1): archive it.
 tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\docs\\dispatches\\2026-09-28_NB53-D.md", "content": "ID: NB53-D \u2014 NAMES, SCAFFOLDS, SHELF COMPLETENESS, MACHINE FACTORY \u2192 BUILD\nORIGIN: LEAD-RULED, from your 08:43 checkpoint (d79733220, 97c7a249b, 887182bd3, 2da8823be, 24058b178; items 65 \u00b7 done 37 \u00b7 pending 28; RAM 0.6 GB; full suite queued). No owner action needed.\nREAD: that checkpoint. ASSUMING: chunk 2 (forecast-ruler exam, \u00a75.1) is in progress. MISSING: nothing.\n1. ONE NAME PER ENGINE (law): the bus registry carries exactly the owner's 8 names \u2014 [redacted] Price Engine, Claude Price Engine, YouTube Engine, Calendar Trading, Machine Factory, Arbitrage, Copycat Roof, Deliverables (two books inside it: Nikhil index tests, Dubai Strategies). Overnight, Insurance and Context are NOT engines: their work is inside the Claude Price Engine (close-to-open = \u00a79 chunk 4; Insurance = \u00a76 options vehicle + \u00a77.6 rails; Context = Family F regime buckets). Pairs is part of Arbitrage. Unregister those wrappers from the bus now; delete their code only in the commit that lands the verified replacement (amended never-delete). Register Copycat Roof and the Nikhil index-tests book.\n2. SCAFFOLD \u2260 ENGINE: a diary wrapper may never be called \"made\", \"running\" or \"live\" in any report, card or site line. Each engine's state is SCAFFOLD until its own evaluate is built from its cited design (rules, own ledger, own Telegram line, own exam); the checklist keeps one pending line per engine until then. Roster line per engine from now on: SCAFFOLD / BUILT / VERIFIED / LIVE.\n3. CHUNK 1 IS NOT DONE: \u00a79 chunk 1 = shelf v1 across every family whose data gate is open \u2014 A, B, C, F, H now; E where flows are on disk; D and G absent per \u00a74 \u2014 computed for the 210 + index futures, with the sanity report. Five sample rulers + a registry is a scaffold. Finish chunk 1 before chunk 3 (the daily search runs on the full open
 tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\docs\dispatches\2026-09-28_NB53-D.md (file state is current in your context — no need to Read it back)
+assistant: Now item 1+2: the bus must carry exactly the owner's 8 engine names as SCAFFOLD states, with Overnight/Insurance/Context/Pairs unregistered. TDD — rewriting the bus registry test RED first:
+tool_use Bash {"command": "git rm -q tests/test_engine_bus_diary.py && cat > tests/test_engine_bus_roster.py <<'EOF'\n\"\"\"NB53-D item 1+2 \u2014 the bus registry carries EXACTLY the owner's 8 engine names, each a SCAFFOLD until its own\nevaluate is built. Overnight/Insurance/Context/Pairs are NOT engines (absorbed into Claude Price / Arbitrage) and\nare never registered on the bus. A scaffold is never called \"running\" \u2014 its line says SCAFFOLD, isolated, no \ud83d\ude4b.\n\"\"\"\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import engine_bus\n\n\ndef setup_function(_):\n    engine_bus.clear()\n\n\ndef test_registry_is_exactly_the_owners_eight_names():\n    engine_bus.register_owner_engines()\n    assert engine_bus.registered() == sorted(engine_bus.OWNER_ENGINES)\n    assert len(engine_bus.OWNER_ENGINES) == 8\n    for absorbed in (\"Overnight\", \"Insurance\", \"Context\", \"Pairs\"):\n        assert absorbed not in engine_bus.registered(), \"%s is not an engine (NB53-D item 1)\" % absorbed\n    for must in (\"Copycat Roof\", \"Deliverables\", \"Claude Price Engine\"):\n        assert must in engine_bus.registered()\n\n\ndef test_scaffold_engines_run_isolated_and_never_9man():\n    engine_bus.register_owner_engines()\n    out = engine_bus.run_daily(\"2026-09-28\")\n    assert set(out) == set(engine_bus.OWNER_ENGINES)\n    for name, r in out.items():\n        assert r[\"error\"] is None\n        ln = engine_bus.line(name, r)\n        assert \"\\U0001f64b\" not in ln                      # never \ud83d\ude4b for a non-chain engine (\u00a727d)\n        assert \"SCAFFOLD\" in ln                             # a scaffold says SCAFFOLD, never \"running\" (item 2)\n\n\ndef test_a_real_evaluate_replaces_the_scaffold():\n    engine_bus.register_owner_engines()\n    engine_bus.set_evaluate(\"Claude Price Engine\",\n                            lambda asof, reader: {\"line\": \"shelf v1 computed\", \"ledger_rows\": []})\n
+tool_result: --- RED ---
+=========================== short test summary info ===========================
+FAILED tests/test_engine_bus_roster.py::test_registry_is_exactly_the_owners_eight_names
+FAILED tests/test_engine_bus_roster.py::test_scaffold_engines_run_isolated_and_never_9man
+FAILED tests/test_engine_bus_roster.py::test_a_real_evaluate_replaces_the_scaffold
+3 failed in 0.61s
+assistant: RED. Now updating `engine_bus.py` — replacing `register_diary_engines` with the owner-8 roster + scaffold + `set_evaluate`:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\engine_bus.py", "old_string": "def register_diary_engines(ready_seen, free_gb, reopen_floor_gb=None):\n    \"\"\"Reuse the existing \u00a727-gated DiaryEngine wrappers (scripts/diary_engines) as daily bus engines \u2014 the RAM\n    gate and quiet-fault rule come from them, not from here. Each becomes an evaluate_fn that runs one gated\n    diary cycle. Called by the bus entry with the day's measured RAM + READY state.\"\"\"\n    from scripts import diary_engines\n\n    def _adapt(nm):\n        def _fn(asof, reader):\n            r = diary_engines.run_once(nm, ready_seen, free_gb, reopen_floor_gb) or {}\n            return {\"line\": r.get(\"line\") or r.get(\"reason\") or \"gated\", \"ledger_rows\": []}\n        return _fn\n    for nm in diary_engines.names():\n        if nm not in _REGISTRY:\n            register(nm, _adapt(nm), cadence=\"daily\")", "new_string": "# NB53-D item 1 \u2014 the bus registry carries EXACTLY these 8 owner engine names, one name per engine.\nOWNER_ENGINES = [\n    \"[redacted] Price Engine\",     # the protected chain (\u00a727a) \u2014 runs on its own chain, not bus-driven; here for the roster\n    \"Claude Price Engine\",    # engine 2 (engine2_claude_price); absorbs Overnight/Insurance/Context (NB53-D item 1)\n    \"YouTube Engine\",\n    \"Calendar Trading\",\n    \"Machine Factory\",        # research only, after close-done before 04:30 (E6.md); cadence set when its evaluate lands\n    \"Arbitrage\",              # parity + NSE/BSE + Pairs (NB53-C item 3)\n    \"Copycat Roof\",           # E8: copies executed decisions, cancels exact opposites, never sizes/nets/places\n    \"Deliverables\",           # two books: Nikhil index tests, Dubai Strategies\n]\n# NOT engines \u2014 their work is absorbed elsewhere; never registered on the bus (NB53-D item 1). Their diary\n# wrappers stay on disk under amended never-delete (\u00a728b) until a verified re
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\engine_bus.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python -m pytest tests/test_engine_bus_roster.py tests/test_engine_bus.py -q 2>&1 | tail -5", "description": "Run roster + bus unit tests GREEN"}
+tool_result: .......                                                                  [100%]
+7 passed in 0.11s
+assistant: Now fix the wiring test's stale reference to `register_diary_engines` (still RED — correct):
+tool_use Bash {"command": "sed -i 's/register_diary_engines/register_owner_engines/' tests/test_engine_bus_wired.py && python -m pytest tests/test_engine_bus_wired.py -q 2>&1 | tail -2", "description": "Update wiring test message, confirm still RED"}
+tool_result: FAILED tests/test_engine_bus_wired.py::test_after_close_launcher_runs_the_bus
+1 failed in 0.98s
+assistant: Now update ENGINE-BUS.md's stale `register_diary_engines` reference and commit item 1+2:
+tool_use Bash {"command": "grep -n \"register_diary_engines\\|diary-engine wrappers\\|all 8\" docs/architecture/ENGINE-BUS.md | head", "description": "Check ENGINE-BUS.md for stale reference"}
+tool_result: 1:# ENGINE BUS — the one scheduler for all 8 engines (NB53 step 2, 2026-09-28)
+tool_use Bash {"command": "cat >> docs/architecture/ENGINE-BUS.md <<'EOF'\n\n## 7. One name per engine \u2014 the registry law (NB53-D item 1+2, 2026-09-28)\n\n`engine_bus.OWNER_ENGINES` is the whole registry: exactly the owner's 8 names \u2014 [redacted] Price Engine, Claude Price\nEngine, YouTube Engine, Calendar Trading, Machine Factory, Arbitrage, Copycat Roof, Deliverables (two books:\nNikhil index tests, Dubai Strategies). **Overnight, Insurance, Context and Pairs are NOT engines** \u2014 their work is\nabsorbed (Overnight = \u00a79 chunk 4 close-to-open; Insurance = \u00a76/\u00a77.6; Context = Family F regime; Pairs = part of\nArbitrage). They are never registered on the bus (`_NOT_ENGINES`); their diary wrappers stay on disk under amended\nnever-delete (\u00a728b) until a verified replacement lands.\n\n**SCAFFOLD \u2260 engine.** `register_owner_engines()` registers each of the 8 as a SCAFFOLD (`_scaffold`) whose line\nsays `SCAFFOLD \u2014 evaluate not built`; `set_evaluate(name, fn)` replaces a scaffold with the real evaluate once it\nis built from that engine's cited design. Until then the engine's state is SCAFFOLD \u2014 never \"made\", \"running\" or\n\"live\" in any report, card or site line. Roster state per engine: **SCAFFOLD / BUILT / VERIFIED / LIVE**.\nEOF\ngit add scripts/engine_bus.py tests/test_engine_bus_roster.py tests/test_engine_bus_diary.py tests/test_engine_bus_wired.py docs/architecture/ENGINE-BUS.md docs/dispatches/2026-09-28_NB53-D.md\ngit commit -q -m \"NB53-D item 1+2: bus registry = EXACTLY the owner's 8 engine names as SCAFFOLD states (OWNER_ENGINES, register_owner_engines, set_evaluate). Overnight/Insurance/Context/Pairs unregistered \u2014 not engines, absorbed (NB53-D item 1); their diary wrappers stay on disk (never-delete \u00a728b). SCAFFOLD line, never 'running' (item 2). Replaces the all-8-diary bus test with the owner-roster test (7 GREEN); wiring test stays RED. Archive NB53-D\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\"\n
+tool_result: fatal: pathspec 'tests/test_engine_bus_diary.py' did not match any files
+f3b08749c NB53-D item 1+2: bus registry = EXACTLY the owner's 8 engine names as
+assistant: The `git rm` had staged the deletion; the failed re-add was harmless. Verifying the commit:
+tool_use Bash {"command": "git show --stat HEAD | grep -E \"diary|roster|engine_bus|ENGINE-BUS|NB53-D\" ", "description": "Confirm item 1+2 commit contents"}
+tool_result:     NB53-D item 1+2: bus registry = EXACTLY the owner's 8 engine names as SCAFFOLD states (OWNER_ENGINES, register_owner_engines, set_evaluate). Overnight/Insurance/Context/Pairs unregistered — not engines, absorbed (NB53-D item 1); their diary wrappers stay on disk (never-delete §28b). SCAFFOLD line, never 'running' (item 2). Replaces the all-8-diary bus test with the owner-roster test (7 GREEN); wiring test stays RED. Archive NB53-D
+ tests/test_engine_bus_diary.py | 37 -------------------------------------
+tool_use Bash {"command": "git show --stat HEAD --format=\"\" | head -20", "description": "Full file list in item 1+2 commit"}
+tool_result:  tests/test_engine_bus_diary.py | 37 -------------------------------------
+ 1 file changed, 37 deletions(-)
+assistant: The `git add` aborted on the missing (already-deleted) path, so only the deletion landed. My actual changes are still unstaged. Committing them now:
+tool_use Bash {"command": "git add scripts/engine_bus.py tests/test_engine_bus_roster.py tests/test_engine_bus_wired.py docs/architecture/ENGINE-BUS.md docs/dispatches/2026-09-28_NB53-D.md && git status --short | grep -E \"engine_bus|roster|wired|ENGINE-BUS|NB53-D\"", "description": "Stage the actual NB53-D item 1+2 changes"}
+tool_result: warning: in the working copy of 'docs/architecture/ENGINE-BUS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus_wired.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/dispatches/2026-09-28_NB53-D.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus_roster.py', LF will be replaced by CRLF the next time Git touches it
+M  docs/architecture/ENGINE-BUS.md
+A  docs/dispatches/2026-09-28_NB53-D.md
+M  scripts/engine_bus.py
+A  tests/test_engine_bus_roster.py
+M  tests/test_engine_bus_wired.py
