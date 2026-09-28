@@ -1,4 +1,230 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>cd3aa38aa</b> · 2026-09-28 09:20</div><div>NB53-D item 2: roster states table (SCAFFOLD/BUILT/VERIFIED/LIVE) — engines 3-8 are SCAFFOLD (not &#x27;made/running&#x27;), engine 2 BUILDING (chunk 1 done), engine 1 LIVE. Corrects the earlier &#x27;engines 3-8 made and running&#x27; over-claim</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md | 22 +++++++++++++++++++++-</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>65a9faeb1</b> · 2026-09-28 09:36</div><div>NB53-E item 2: progress_beat.py — BUILD beat (Telegram + report): done N/65, ten-block bar, pending N, engine/chunk/state, MEASURED rate (build-hrs/chunk from commit timestamps, never typed), ETA = now+pending×rate as date+hour or &#x27;ETA unmeasured&#x27;; complete_line for BUILD COMPLETE. post() sends best-effort. 5 tests GREEN</div><div class='sub h'>scripts/progress_beat.py    | 81 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_progress_beat.py | 36 ++++++++++++++++++++</div><pre>diff --git a/scripts/progress_beat.py b/scripts/progress_beat.py
+new file mode 100644
+index 000000000..f46e1e942
+--- /dev/null
++++ b/scripts/progress_beat.py
+@@ -0,0 +1,81 @@
++&quot;&quot;&quot;NB53-E item 2 — the BUILD progress beat (Telegram + report), posted at every checkpoint and at least hourly.
++
++One plain line: done N/65, a ten-block bar, pending N, the current engine/chunk/state, a MEASURED rate
++(build-hours per chunk, from commit timestamps — never typed, §24.5), and an ETA = now + pending × rate as a
++date+hour, or &quot;ETA unmeasured&quot; when fewer than two chunk commits exist. When every build item is BUILT the beat is
++`complete_line()` and the caller ends its report with `LEAD RULING NEEDED: audit`.
++
++`post()` sends via scripts.notify (Telegram) and returns the line for the report; a demo/test never sends.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++
++_FULL = &quot;█&quot;   # █
++_EMPTY = &quot;░&quot;  # ░
++
++
++def bar(done, total, width=10):
++    &quot;&quot;&quot;A ten-block bar. Filled blocks = round(done/total × width), clamped to [0, width].&quot;&quot;&quot;
++    frac = 0.0 if not total else max(0.0, min(1.0, float(done) / float(total)))
++    n = int(round(frac * width))
++    return &quot;[&quot; + _FULL * n + _EMPTY * (width - n) + &quot;]&quot;
++
++
++def measured_rate_hrs(commit_times):
++    &quot;&quot;&quot;Build-hours per chunk = the mean gap between consecutive chunk-commit datetimes. None if &lt; 2 commits
++    (unmeasured — never a typed guess).&quot;&quot;&quot;
++    ts = sorted(commit_times)
++    if len(ts) &lt; 2:
++        return None
++    span = (ts[-1] - ts[0]).total_seconds() / 3600.0
++    return span / (len(ts) - 1)
++
++
++def _eta(pending, rate_hrs, now=None):
++    if rate_hrs is None or pending is None:
++        return &quot;ETA unmeasured&quot;
++    when = (now or _dt.datetime.now()) + _dt.timedelta(hours=float(pending) * float(rate_hrs))
++    return &quot;ETA &quot; + when.strftime(&quot;%a %d %b %H:00&quot;)
++
++
++def line(done, total, pending, engine, chunk, state, rate_hrs=None, now=None):
++    rate = (&quot;rate %.2gh/chunk&quot; % rate_hrs) if rate_hrs is not None else &quot;rate unmeasured&quot;
++    return &quot;BUILD · done %d/%d %s · pending %d · %s chunk %s %s · %s · %s&quot; % (
++        done, total, bar(done, total), pending, engine, chunk, state, rate, _eta(pending, rate_hrs, now))
++
++
++def complete_line():
++    return &quot;BUILD COMPLETE · pending 0&quot;
++
++
++def post(text, notifier=None):
++    &quot;&quot;&quot;Send the beat to Telegram (best-effort; never fatal) and return it for the report.&quot;&quot;&quot;
++    try:
++        if notifier is None:
++            from scripts.notify import notify as notifier
++        notifier(text)
++    except Exception:
++        pass
++    return text
++
++
++def _demo():
++    now = _dt.datetime(2026, 9, 28, 10, 0)
++    assert bar(65, 65).count(_FULL) == 10 and bar(0, 65).count(_FULL) == 0
++    base = _dt.datetime(2026, 9, 28, 8, 0)
++    assert abs(measured_rate_hrs([base, base + _dt.timedelta(hours=2), base + _dt.timedelta(hours=4)]) - 2.0) &lt; 1e-6
++    assert measured_rate_hrs([base]) is None
++    ln = line(37, 65, 28, &quot;Claude Price Engine&quot;, 2, &quot;BUILT&quot;, rate_hrs=2.0, now=now)
++    assert &quot;done 37/65&quot; in ln and &quot;pending 28&quot; in ln and &quot;ETA&quot; in ln and &quot;unmeasured&quot; not in ln
++    assert &quot;ETA unmeasured&quot; in line(37, 65, 28, &quot;X&quot;, 1, &quot;SCAFFOLD&quot;, rate_hrs=None)
++    assert complete_line() == &quot;BUILD COMPLETE · pending 0&quot;
++    posts = []
++    assert post(&quot;hi&quot;, notifier=posts.append) == &quot;hi&quot; and posts == [&quot;hi&quot;]
++    print(&quot;progress_beat demo OK: ten-block bar, measured rate/chunk, ETA date+hour or unmeasured, complete line.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_progress_beat.py b/tests/test_progress_beat.py
+new file mode 100644
+index 000000000..868a96835
+--- /dev/null
++++ b/tests/test_progress_beat.py
+@@ -0,0 +1,36 @@
++&quot;&quot;&quot;NB53-E item 2 — the BUILD progress beat: done N/65, a ten-block bar, pending, engine/chunk/state, a MEASURED
++rate (build-hours per chunk from commit timestamps), and an ETA = pending × rate as date+hour (never typed).&quot;&quot;&quot;
++import os, sys, datetime as dt
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import progress_beat as pb
++
++
++def test_bar_is_ten_blocks():
++    b = pb.bar(5, 10)
++    assert b.count(&quot;█&quot;) == 5 and len(b.strip(&quot;[]&quot;)) == 10
++    assert pb.bar(0, 65).strip(&quot;[]&quot;).count(&quot;█&quot;) == 0
++    assert pb.bar(65, 65).strip(&quot;[]&quot;).count(&quot;█&quot;) == 10
++
++
++def test_measured_rate_from_commit_times():
++    base = dt.datetime(2026, 9, 28, 8, 0)
++    times = [base, base + dt.timedelta(hours=2), base + dt.timedelta(hours=4)]   # 2h per chunk
++    assert abs(pb.measured_rate_hrs(times) - 2.0) &lt; 1e-6
++    assert pb.measured_rate_hrs([base]) is None                                   # &lt;2 commits -&gt; unmeasured
++
++
++def test_line_with_rate_has_eta_date_hour():
++    now = dt.datetime(2026, 9, 28, 10, 0)
++    ln = pb.line(done=37, total=65, pending=28, engine=&quot;Claude Price Engine&quot;, chunk=2,
++                 state=&quot;BUILT&quot;, rate_hrs=2.0, now=now)
++    assert &quot;BUILD · done 37/65&quot; in ln and &quot;pending 28&quot; in ln and &quot;Claude Price Engine chunk 2 BUILT&quot; in ln
++    assert &quot;rate 2&quot; in ln and &quot;ETA&quot; in ln and &quot;unmeasured&quot; not in ln
++
++
++def test_line_without_rate_says_eta_unmeasured():
++    ln = pb.line(done=37, total=65, pending=28, engine=&quot;X&quot;, chunk=1, state=&quot;SCAFFOLD&quot;, rate_hrs=None)
++    assert &quot;ETA unmeasured&quot; in ln
++
++
++def test_complete_line():
++    assert pb.complete_line() == &quot;BUILD COMPLETE · pending 0&quot;
+</pre></div><div class='c'><div class='h'><b>6039659fd</b> · 2026-09-28 09:35</div><div>NB53-E item 1: BUILD-DAY-&lt;date&gt; flag overrides the 08:30-&gt;close-done auto-continue pause, but ONLY when no Kite token exists for the day (a token present holds the lockout — real trading day never overridden). Dated flag expires at midnight. auto_continue._build_day_active + _token_present + _build_day_flag_path; wired into should_continue. 2 tests GREEN (incl. the token-holds-lockout RED case). Today&#x27;s flag written to E1-DESK (owner-said 28 Sep). Archive NB53-E</div><div class='sub h'>.claude/hooks/auto_continue.py       | 32 +++++++++++++++++++++++++++++++-</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-E.md |  7 +++++++</div><div class='sub h'>tests/test_auto_continue_buildday.py | 28 ++++++++++++++++++++++++++++</div><pre>diff --git a/.claude/hooks/auto_continue.py b/.claude/hooks/auto_continue.py
+index 85f7dc166..db9b3ff3c 100644
+--- a/.claude/hooks/auto_continue.py
++++ b/.claude/hooks/auto_continue.py
+@@ -26,6 +26,36 @@ def _load(p):
+         return {}
+ 
+ 
++def _today():
++    from datetime import datetime, timezone, timedelta
++    return datetime.now(timezone(timedelta(hours=5, minutes=30))).date().isoformat()
++
++
++def _build_day_flag_path(d=None):
++    base = os.environ.get(&quot;E1_BUILD_DAY_DIR&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
++    return os.path.join(base, &quot;BUILD-DAY-&quot; + (d or _today()))
++
++
++def _token_present(d=None):
++    &quot;&quot;&quot;True iff a Kite token for `d` (today) is on disk — a real trading day. Any read error -&gt; False (no token).&quot;&quot;&quot;
++    d = d or _today()
++    try:
++        sys.path.insert(0, REPO)
++        from data_acquisition import kite
++        rec = json.load(open(kite.TOKEN_FILE, encoding=&quot;utf-8&quot;))
++        return rec.get(&quot;login_date&quot;) == d
++    except Exception:
++        return False
++
++
++def _build_day_active(now=None):
++    &quot;&quot;&quot;NB53-E item 1: a declared BUILD-DAY-&lt;today&gt; flag overrides the 08:30-&gt;close-done pause lockout — but ONLY
++    when NO Kite token exists for today. A token present means a real trading day: the lockout holds regardless of
++    the flag. The flag is dated, so it expires by itself at midnight.&quot;&quot;&quot;
++    d = _today()
++    return os.path.exists(_build_day_flag_path(d)) and not _token_present(d)
++
++
+ def _building():
+     try:
+         sys.path.insert(0, REPO)
+@@ -44,7 +74,7 @@ def should_continue():
+     empty checklist AND empty backlog.&quot;&quot;&quot;
+     st = _load(STATE)
+     flag = (st.get(&quot;flag&quot;) or &quot;&quot;).strip()
+-    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not _building():
++    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not (_building() or _build_day_active()):
+         return False
+     remaining = [x for x in (_load(CHECKLIST).get(&quot;remaining&quot;) or []) if x]
+     if remaining:
+diff --git a/docs/dispatches/2026-09-28_NB53-E.md b/docs/dispatches/2026-09-28_NB53-E.md
+new file mode 100644
+index 000000000..1eee38aa7
+--- /dev/null
++++ b/docs/dispatches/2026-09-28_NB53-E.md
+@@ -0,0 +1,7 @@
++ID: NB53-E — BUILD-DAY AUTO-CONTINUE + PROGRESS BEAT → BUILD
++ORIGIN: LEAD-RULED from your 09:20 checkpoint (f3b08749c, 120ed6951, cd3aa38aa; items 65 · done 37 · pending 28; RAM 0.6 GB). OWNER-SAID: he wants to know from Telegram when a step is done, with a progress bar and an ETA. No owner action needed.
++READ: that checkpoint; the session stopped after it (auto-continue locked out 08:30 → close-done, NB45-A). ASSUMING: no Kite token file exists for today (declared build day). MISSING: nothing.
++1. BUILD-DAY FLAG: add to the auto-continue guard (the build loop, not the trading launch path) a dated flag file BUILD-DAY-&lt;date&gt;; when it exists AND no Kite token exists for that date, the market-hours lockout does not apply and the session keeps working through NB53 without waiting for a paste. It expires at midnight; with a token present it is ignored. RED test first: the lockout still holds when a token exists even if the flag exists. Then write today&#x27;s flag (owner-said 28 Sep).
++2. PROGRESS BEAT, Telegram + report, at every checkpoint and at least once per hour while working: &quot;BUILD · done N/65 [bar of ten blocks] · pending N · &lt;engine&gt; chunk &lt;k&gt; &lt;SCAFFOLD/BUILT/VERIFIED/LIVE&gt; · rate &lt;measured build-hours per chunk from commit timestamps&gt; · ETA &lt;pending chunks × rate, as date + hour&gt;&quot; or &quot;ETA unmeasured&quot; — never a typed ETA. When every build item is BUILT: &quot;BUILD COMPLETE · pending 0&quot; and the last line LEAD RULING NEEDED: audit.
++3. CONTINUE NB53 in order: engine 2 chunk 2 (§5.1) → chunk 3 (daily search on the full open shelf, exam) → Machine Factory per E6.md → engines 3, 4, 6, 7, 8 evaluates from their cited designs → engine 2 chunks 4–7 → bus launch wire-in (RED until a fresh-session verify). Full suite after close-done when RAM allows.
++4. REPORT format unchanged; roster line per engine; self-flag line last.
+diff --git a/tests/test_auto_continue_buildday.py b/tests/test_auto_continue_buildday.py
+new file mode 100644
+index 000000000..ffb465041
+--- /dev/null
++++ b/tests/test_auto_continue_buildday.py
+@@ -0,0 +1,28 @@
++&quot;&quot;&quot;NB53-E item 1 — the BUILD-DAY flag lets the build loop keep working through the 08:30-&gt;close-done pause, but
++ONLY when no Kite token exists for the day. RED requirement: a token present makes the lockout hold even if the
++flag exists (a real trading day is never overridden by a stale build-day flag).&quot;&quot;&quot;
++import os, sys, json
++sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;))
++import auto_continue as ac
++
++
++def test_flag_plus_no_token_is_active_but_token_holds_the_lockout(tmp_path, monkeypatch):
++    monkeypatch.setenv(&quot;E1_BUILD_DAY_DIR&quot;, str(tmp_path))
++    assert ac._build_day_active() is False                        # no flag -&gt; not active
++    open(os.path.join(str(tmp_path), &quot;BUILD-DAY-&quot; + ac._today()), &quot;w&quot;).close()
++    monkeypatch.setattr(ac, &quot;_token_present&quot;, lambda d=None: False)
++    assert ac._build_day_active() is True                         # flag + no token -&gt; override on
++    monkeypatch.setattr(ac, &quot;_token_present&quot;, lambda d=None: True)
++    assert ac._build_day_active() is False                        # token present -&gt; lockout HOLDS (the RED case)
++
++
++def test_should_continue_keeps_working_in_the_pause_when_build_day_active(tmp_path, monkeypatch):
++    # inside the pause window _building() is False; the build-day override must let should_continue return True
++    monkeypatch.setattr(ac, &quot;_building&quot;, lambda: False)
++    monkeypatch.setattr(ac, &quot;_load&quot;, lambda p: {&quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;} if p == ac.STATE
++                        else {&quot;remaining&quot;: [&quot;engine 2 chunk 2&quot;]})
++    monkeypatch.setattr(ac.os.path, &quot;exists&quot;, lambda p: False)    # no HALT
++    monkeypatch.setattr(ac, &quot;_build_day_active&quot;, lambda: True)
++    assert ac.should_continue() is True
++    monkeypatch.setattr(ac, &quot;_build_day_active&quot;, lambda: False)
++    assert ac.should_continue() is False                          # no override + pause -&gt; stop
+</pre></div><div class='c'><div class='h'><b>cd3aa38aa</b> · 2026-09-28 09:20</div><div>NB53-D item 2: roster states table (SCAFFOLD/BUILT/VERIFIED/LIVE) — engines 3-8 are SCAFFOLD (not &#x27;made/running&#x27;), engine 2 BUILDING (chunk 1 done), engine 1 LIVE. Corrects the earlier &#x27;engines 3-8 made and running&#x27; over-claim</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md | 22 +++++++++++++++++++++-</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
 index 0ab305a05..902a8afd3 100644
 --- a/docs/architecture/NB53-ENGINE-ROSTER.md
 +++ b/docs/architecture/NB53-ENGINE-ROSTER.md
@@ -1726,148 +1952,4 @@ index 000000000..6891f7fbe
 +
 +Engine 2 is **not built**. The bus reserves its slot (`engine2_claude_price/`, own ledger) so wiring it later is
 +a drop-in. This sheet is the LEAD RULING; the rest of NB53&#x27;s engines proceed from their present sources.
-</pre></div><div class='c'><div class='h'><b>952a8a6a6</b> · 2026-09-28 08:09</div><div>NB53 step 2: Engine Bus design doc (docs/architecture/ENGINE-BUS.md) — one scheduler (engine_bus.py called from run_evening after the morning bar), per-engine isolation (§27), money math cited to money.py/liquidity_backtest/engine_book/paper_account, cadence lanes, RAM-measured or REPLAY. Docs only; code+tests after close-done</div><div class='sub h'>docs/architecture/ENGINE-BUS.md | 74 +++++++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
-new file mode 100644
-index 000000000..712ec0002
---- /dev/null
-+++ b/docs/architecture/ENGINE-BUS.md
-@@ -0,0 +1,74 @@
-+# ENGINE BUS — the one scheduler for all 8 engines (NB53 step 2, 2026-09-28)
-+
-+_Design doc, written BEFORE code (§26 TDD, §13). Today (28 Sep) the desk is up → docs/design only; the
-+`scripts/engine_bus.py` module + its RED→GREEN tests land after close-done. Every number below is CITED to an
-+existing constant/function — no new typed number (§4.1)._
-+
-+## 1. One scheduler, one name
-+
-+- **The bus is `scripts/engine_bus.py`**, called ONCE per day from the existing evening scheduler
-+  `scripts/run_evening.py::main` (run_evening.py:20) **after the morning bar** (the same place the Price Engine&#x27;s
-+  conforming evaluator runs today — run_evening.py:60 `conform`, :79 `practice_counter`). There is exactly one
-+  scheduler; the bus is a sequence step inside it, not a second loop (§27 isolation: one driver).
-+- After the morning bar, the bus **evaluates each DAILY engine in sequence** (order = NB53 step 3). Each call is
-+  wrapped in its own try/except so one engine&#x27;s fault never touches another or the chain (§27d quiet failures).
-+
-+## 2. Isolation — each engine owns its lane (§27)
-+
-+| Concern | Rule |
-+|---|---|
-+| Folder | each engine in its own package `engineN_&lt;name&gt;/` (E1 stays where it is — the protected chain, §27a) |
-+| State | its own state files under its folder / `reports/&lt;engine&gt;/`; never another engine&#x27;s |
-+| Ledger | its own paper ledger `reports/books/&lt;ENGINE&gt;-LEDGER.csv` (the pattern `engine_book`/`paper_account` already use) |
-+| Inputs | shared inputs are **READ-ONLY**: the bar store (`engine1_rebuild/datastore`), the quote/depth stores (`E1-DESK/stores/e1_deriv_store/*`, e13_depth), the fee model (`engine1_rebuild/money`), Sizing Families (`engine1_rebuild/engine_book`) |
-+| Order path | **only the Price Engine (E1/E10/E11) places an order**; every other engine is diary-only until it earns the order path by a separate owner decision (§27b) |
-+| Telegram | one line per engine per day, tagged with the engine name, existing ⏱/✅/🙋 conventions; a non-chain engine NEVER 🙋 (§27d). Demos/tests never reach Telegram or any live ledger (§25). |
-+
-+## 3. Money math — identical to the Price Engine, cited (each engine restates this in its own doc BEFORE code)
-+
-+- **Fees:** `engine1_rebuild/money.py` — statutory round-trip `COST_STATUTORY_RT` (money.py:17, ~10 bps,
-+  Zerodha+NSE published rates) plus the measured spread via `money.cost_readout()` (money.py:189); the F&amp;O leg
-+  cost is `money._leg_cost` (money.py:40). No engine invents a cost.
-+- **Fill bar + cost gate:** identical to the Price Engine — entry at the **next daily open**
-+  (`engine1_rebuild/paper.simulate_trade`, the conforming fill `engine1_rebuild/conform`) gated by the **six
-+  execution checks** `scripts/liquidity_backtest.checklist` (liquidity_backtest.py:185). An engine reuses these
-+  functions; it does not copy them.
-+- **Sizing:** via **Sizing Families** — `engine1_rebuild/engine_book.weight(family)` (engine_book.py:4-5,
-+  `risk = weight(family) × PAPER_R_RUPEES`). Cold start = flat 1.0 (engine_book.py:13).
-+- **Starting paper capital:** the SAME figure the Price Engine uses — `engine1_rebuild/money.NOTIONAL_CAPITAL`
-+  (money.py:13 = ₹2,00,000; `paper_account.START_EQUITY = money.NOTIONAL_CAPITAL`, paper_account.py:25). No new
-+  number: each engine&#x27;s account reads this constant.
-+- **Positions / exits / caps:** from the engine&#x27;s OWN rules, stated in its design doc.
-+- **Failed strategies → probation:** the existing diary mechanism — `scripts/diary_engines.py` /
-+  `scripts/diaries.py` / `scripts/engine_accounts.py`. A strategy that loses after costs is written to its diary
-+  on probation with its reason; it never silently vanishes.
-+
-+## 4. Cadence lanes
-+
-+- **Daily engines** (Claude Price, YouTube, Calendar, Copycat Roof, Deliverables-daily): evaluated by the bus
-+  after the morning bar, once per day.
-+- **Machine Factory:** research only — runs **after close-done and before 04:30**, generates + tests candidate
-+  rules offline, writes to its own ledger/reports, **never to any live queue** (NB53 step 5 / §27b).
-+- **Intraday engines** (Arbitrage two-exchange, Nikhil&#x27;s index tests): run as **lanes in the existing recorder
-+  set** — but ONLY after the lane&#x27;s **RAM floor is MEASURED** the same way the depth camera&#x27;s was
-+  (`memory_guard.RECORDER_FLOOR_GB` = measured peak + 0.3 margin = 0.378 GB, NB49). If the box cannot hold a
-+  lane beside the desk (measured free RAM &lt; the lane&#x27;s measured floor), that engine runs in **REPLAY mode** on
-+  recorded quotes — the full paper loop against a recorded day, its own ledger — and the report says so. **No
-+  engine is skipped for RAM.**
-+
-+## 5. The bus contract (what `engine_bus.py` will expose — tested RED→GREEN after close-done)
-+
-+```
-+engine_bus.register(name, evaluate_fn, cadence)      # cadence in {daily, nightly, intraday, replay}
-+engine_bus.run_daily(asof, reader) -&gt; {name: {line, ledger_rows, error}}   # one entry per daily engine
-+engine_bus.line(name, result) -&gt; &quot;&lt;✅|⏱|🙋&gt; &lt;engine&gt; — &lt;plain summary&gt;&quot;    # never 🙋 for a non-chain engine
-+```
-+
-+Wiring test (§26 &quot;live&quot; is a test): a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not
-+called from `run_evening.main`, and passes only when it is — committed RED where unwired (the honest state).
-+
-+## 6. What this doc does NOT decide (each engine&#x27;s own design doc does)
-+
-+The bus is the plumbing. Each engine&#x27;s rules — its signal, positions, exits, caps — live in that engine&#x27;s
-+design doc (NB53 step 3), written before its code, every rule cited to a source. An engine whose rules exist
-+nowhere gets a DESIGN SHEET of questions and a LEAD RULING NEEDED, never an invented rule (§4.4).
-</pre></div><div class='c'><div class='h'><b>e8b0d64af</b> · 2026-09-28 08:06</div><div>NB53 step 1: CLAUDE.md §28 — all 8 engines built now (E1-only freeze retired); never-delete amended (dead code deleted only in the commit that lands its verified-live replacement, cited). Archive NB53. Docs only</div><div class='sub h'>CLAUDE.md                          | 24 ++++++++++++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53.md | 26 ++++++++++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
-index 4aff1dbcc..84635caed 100644
---- a/CLAUDE.md
-+++ b/CLAUDE.md
-@@ -950,3 +950,27 @@ Engine money chain is now PROTECTED BY ISOLATION, not by a freeze. Five rules bi
- _Why: the chain is proven LIVE + verified (32df791c4); the risk in unparking is a peripheral engine or a UI build
- regressing the money path. Isolation removes that risk by construction — the chain&#x27;s files/launch/processes are
- off-limits to everything else, and every other process is diary-only, RAM-gated, killed-first, and quiet._
-+
-+## 28. Complete the build — all 8 engines (owner dispatch NB53, 2026-09-28)
-+
-+The owner said (28 Sep ~08:05 IST): *&quot;all the engines made and running, whether they fire patterns or not;
-+complete the build now, even if it does not run today.&quot;* Two dated amendments carry this ID:
-+
-+**(a) ALL 8 ENGINES ARE BUILT NOW**, in the NB53 step-3 order: 1 [redacted] Price Engine (the protected chain,
-+§27a — only the §H 70–73 additions, launch-path, verify-gated), 2 Claude Price Engine, 3 YouTube, 4 Calendar,
-+5 Machine Factory, 6 Arbitrage, 7 Copycat Roof, 8 Deliverables (Nikhil index tests + Dubai Strategies). **The
-+23 Sep &quot;E1-only until 5 clean days&quot; freeze (§24) is RETIRED** — engines are built now, each isolated (§27),
-+diary-only, placing nothing, verified before it is called live. An engine whose design exists nowhere on the
-+laptop is NOT invented: a DESIGN SHEET of the rule questions is written and reported LEAD RULING NEEDED (§4.4).
-+
-+**(b) NEVER-DELETE, AMENDED.** The old repo `[redacted]\Desktop\trading-engines` stays READ-ONLY until the
-+twin run (MASTER-CHECKLIST item 6/69) MATCHes — unchanged. **Inside the rebuild**, dead code is no longer kept
-+forever: it is deleted **in the same commit that makes its verified-live replacement**, and that commit **cites
-+what it deletes and the replacement**. Deletion outside that pairing is still forbidden. This is the one
-+carve-out from the standing never-delete posture, and it is bounded to a replacement landing verified.
-+
-+_Isolation (§27) still governs every engine here: own folder, own state, own paper ledger; shared inputs are
-+READ-ONLY (bar store, quote/depth stores, the fee model, Sizing Families); no engine but the Price Engine
-+touches the order path; a non-chain engine&#x27;s failure is quiet (✅/⏱, never 🙋). The gates (§26 TDD, §18.1
-+independent verify, no launch-path edit in market hours, 04:30 hard stop, per-day owner YES for a stack
-+stop/start) are unchanged: a thing is &quot;built&quot; until a fresh session verifies it._
-diff --git a/docs/dispatches/2026-09-28_NB53.md b/docs/dispatches/2026-09-28_NB53.md
-new file mode 100644
-index 000000000..10a12e8a2
---- /dev/null
-+++ b/docs/dispatches/2026-09-28_NB53.md
-@@ -0,0 +1,26 @@
-+ID: NB53 — COMPLETE THE BUILD, ALL 8 ENGINES END TO END → BUILD
-+ORIGIN: OWNER-SAID (28 Sep ~08:05 IST): &quot;all the engines made and running, whether they fire patterns or not; complete the build now, even if it does not run today.&quot; LEAD-RULED (owner delegated execution): the 23 Sep &quot;E1-only until 5 clean days&quot; line is retired; never-delete amended (step 1b).
-+READ: NB52 report (items 65 · done 37 · pending 28; HEAD bcdf3b063; launch path reverted to 86534e1d7; Friday fix f08c41e78 and disk floor 5f62b21a9 kept in git, unverified; §H items 70–74 added; 0.68 GB free with the desk off while this session is open). ASSUMING: the owner did not start the desk today — step 0 checks. MISSING: whether CLAUDE-PRICE-ENGINE-ARCHITECTURE.md is in the repo; design docs on the laptop for YouTube, Calendar, Machine Factory, Arbitrage, Copycat Roof, Deliverables.
-+
-+0. STATE: machine clock; process list. If ANY desk process is up → market-hours mode until close-done: docs/design writing only, no code runs, no tests, no launch-path edits; resume the build after close-done. If none is up → build all day. Never start the desk yourself.
-+
-+1. LAW CHANGES, write into CLAUDE.md as dated amendments carrying this ID: (a) all 8 engines are built now, in the order of step 3. (b) never-delete: the old repo stays read-only until the twin run (item 6) MATCHes; inside the rebuild, dead code is deleted in the same commit that makes its replacement verified-live — cite what you delete and the replacement.
-+
-+2. ENGINE BUS first (isolation law §27, TDD §26): one scheduler, one name, cite the file. After the morning bar it evaluates each daily engine in sequence; each engine in its own folder, own state, own paper ledger; shared READ-ONLY inputs only: bar store, quote/depth stores, the fee model with the verified Zerodha 2026 costs, Sizing Families. Money math per engine, written in its design doc BEFORE code: fees + fill bar + cost gate identical to the Price Engine&#x27;s (cite the functions); sizing via Sizing Families; starting paper capital = the same figure the Price Engine&#x27;s paper ledger uses (cite where it is set — no new typed numbers); positions, exits, caps from the engine&#x27;s own rules; failed strategies → probation (existing mechanism, cite). Telegram: one line per engine per day, tagged with the engine&#x27;s name, existing ⏱/✅/🙋 conventions; demos/tests never reach Telegram or any live ledger. Machine Factory runs only after close-done and before 04:30. Intraday engines (Arbitrage, Nikhil&#x27;s index tests) run as lanes in the existing recorder set with their RAM floor MEASURED before adding (same method as the depth camera&#x27;s 0.378 GB); if the box cannot hold a lane beside the desk, that engine runs in REPLAY mode on recorded quotes — full paper loop, own ledger — and the report says so. No engine is skipped for RAM.
-+
-+3. ORDER — one engine at a time; each = design doc → RED tests → code → GREEN → commit → checklist line:
-+   1 [redacted] Price Engine: rulers untouched (35 untouchable). Only §H items 70–73: desk day-log (one line per step per day incl. free RAM + disk), nightly full-morning rehearsal on the real stack (fake token, recorded quotes, RAM + disk measured per step, PASS / NOT READY line), market-hours mode, event blackout. These touch the launch path: build them, but they go LIVE only via the fresh-session verify the owner runs with this session closed.
-+   2 Claude Price Engine: chunks 1–7 per CLAUDE-PRICE-ENGINE-ARCHITECTURE.md. If the file is not in the repo: report MISSING for this engine and continue.
-+   3 YouTube Engine: rules from the strategy library and the Desktop\yt-transcripts corpus, every rule with its source (channel, video, line); a rule without a citation is not built.
-+   4 Calendar Trading: rules from the existing design (cite). Needs an expiry/holiday/event calendar; if none exists, build it first from the exchange&#x27;s published list and cite the file.
-+   5 Machine Factory: research engine — candidate rules generated and tested offline at night; outputs to its own ledger/reports only, never to any live queue.
-+   6 Arbitrage: the 15–16 Sep arbitrage-paper rules (cite) — two-exchange spread, paper only.
-+   7 Copycat Roof: from the existing design (cite).
-+   8 Deliverables: Nikhil&#x27;s index tests (index-only, intraday index; cite the request record) and Dubai Strategies (delivery/accumulation; cite) — each its own paper account and ledger.
-+   If an engine&#x27;s design exists nowhere on the laptop: write a DESIGN SHEET listing exactly the rule questions the lead must answer, report LEAD RULING NEEDED for that engine, and move to the next engine. Never invent a rule.
-+
-+4. HALTS: after each engine&#x27;s GREEN post the ⏱ line and the count, then keep going. Stop only for an ambiguous or missing rule (cite), a launch-path change beyond §H 70–73, or anything that would touch the Price Engine&#x27;s rulers or ledger (never do it).
-+
-+5. GATES unchanged: &quot;built&quot; until a fresh session verifies it; no session audits its own work; no launch-path edit in market hours; 04:30 hard stop for launch-path edits; per-day owner YES for any stack stop/start.
-+
-+6. REPORT at every checkpoint, first line &quot;NB53 · engine &lt;name&gt; · &lt;state&gt;&quot;: files, tests RED→GREEN, commit; design gaps; RAM measured for any lane; &quot;items N · done N · pending N&quot;; your MEASURED rate (build-hours per engine so far) so the lead computes the ETA; 🚩 rows; last line NOTHING NEEDS THE LEAD / LEAD RULING NEEDED: &lt;question&gt;.
 </pre></div></main></body></html>
