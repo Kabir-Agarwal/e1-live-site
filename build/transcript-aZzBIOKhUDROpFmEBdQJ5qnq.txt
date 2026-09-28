@@ -1,265 +1,3 @@
-assistant: Committed (d1a3b7441). I've reached a genuine decision point — the critical path is blocked on your restart call, and the fail-safe already makes Wednesday safe. Rather than build more unproven order-path code (which the fail-safe HELDs anyway), here's where everything stands:
-
-```
-CHECKPOINT — the safety net is in; one decision unblocks the rest.
-
-DONE AND SAFE tonight:
-  • R-EXAM-CONFORM FAIL-SAFE is live in code (0aa11e331): book20_runner HELDs every fire
-    "awaiting R-EXAM-CONFORM proof" — ZERO orders under the old 20d/1×ATR/trail management.
-    Wednesday is HELD-safe by construction unless the full conformance is proven.
-  • Site "emergency" resolved: the push was NEVER dead (continuous 2-min commits all evening;
-    cache-busted fetch 42s fresh). It was CDN/browser cache. Cold-fetch redirect fix committed
-    (d32291a47), live at the 06:00 login.
-  • END-TO-END BUNDLE: Part 1 (Codex UNAVAILABLE → verifier on rung d), Part 2 (restart-proof),
-    Part 3 (3 watchers), Part 5 (lead files), Part 4 framework (verifier launcher + gate + brain
-    ladder + template + verify-map) — all built, tested, committed.
-  • The AUDIT that started this: line-cited proof the live loop is a different strategy from the
-    certified patterns — which is what your R-EXAM-CONFORM ruling now fixes.
-
-THE ONE DECISION (blocks the Wednesday conformance proof):
-  Your amendment's proof = nightly dry run, and step (ii) says it needs A's restart to have
-  worked. I HELD that restart because the push was proven alive (R-NIGHT-CLOSE: restart is human;
-  the 06:00 login is itself the restart). So the dry-run proof can't run until you either say
-  "restart now" or the 06:00 login happens — and 06:00 is past the 05:00 cutoff, i.e. a HELD day.
-
-QUEUED (archived, not built): the full R-EXAM-CONFORM + R-LIVE-GATE order-path rewire, R-TWIN-TEST,
-R-EYE-EMOJI, Part 6, the record store. The rewire is a re-architecture of the fill/exit model
-(intraday touch → next-day-open daily bar) — worth a careful, proven build, not a blind midnight
-rush into the single order path the fail-safe already protects.
-
-LEAD RULING NEEDED: reply "restart now" and I run restart_stack → dry run → fresh-Claude supervisor
-proof and push for CONFORM PROVEN before 05:00. Otherwise Wednesday is a safe HELD day and I build
-the rewire carefully next session. Which do you want?
-```
-user: Stop hook feedback:
-continue in order
-assistant: A genuine LEAD RULING blocks the order-path work, and I won't rush unproven code into the single order path. But R-EYE-EMOJI is safe, independent, doesn't need the restart, and directly serves the owner's recurring site-freshness concern — exactly the kind of proven plug-in to build now. Adding the public-freshness eye helper to watchers:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\watchers.py", "old_string": "def _notify(msg):\n    from scripts import notify\n    notify.notify(msg)", "new_string": "EYE_FRESH_S = 120                                   # R-EYE-EMOJI: public page under 2 min old = \ud83d\udc40, else \ud83d\ude48\nEYE_STREAK = os.path.join(REPO, \"scheduler\", \".eye_streak\")   # gitignored: consecutive \ud83d\ude48 count\n\n\ndef public_eye(now=None, fetch_fn=None):\n    \"\"\"R-EYE-EMOJI: fetch the PUBLIC status page (never the local file) and return the freshness eye.\n    Returns {emoji, hhmm, fresh, streak, blocked}: \ud83d\udc40 when the public written time is under 2 min old, else\n    \ud83d\ude48 with that time. A failed fetch is \ud83d\ude48 (fail toward the owner's view, never a false \ud83d\udc40). `blocked` is True\n    once \ud83d\ude48 has held 3 lines in a row \u2014 the caller then makes fixing the page the only work.\"\"\"\n    now = now or _ist_now()\n    fetch_fn = fetch_fn or (lambda: _fetch_json(STATUS_JSON_URL))\n    hhmm, fresh = \"?\", False\n    try:\n        gen = _parse_iso((fetch_fn() or {}).get(\"generated\", \"\"))\n        if gen is not None:\n            hhmm = gen.strftime(\"%H:%M\")\n            fresh = (now - gen).total_seconds() < EYE_FRESH_S\n    except Exception:\n        pass\n    try:\n        streak = 0 if fresh else int(open(EYE_STREAK, encoding=\"utf-8\").read().strip() or \"0\")\n        streak = 0 if fresh else streak + 1\n        os.makedirs(os.path.dirname(EYE_STREAK), exist_ok=True)\n        open(EYE_STREAK, \"w\", encoding=\"utf-8\").write(str(streak))\n    except Exception:\n        streak = 0 if fresh else 1\n    return {\"emoji\": \"\ud83d\udc40\" if fresh else \"\ud83d\ude48\", \"hhmm\": hhmm, \"fresh\": fresh,\n            \"streak\": streak, \"blocked\": (not fresh) and streak >= 3}\n\n\ndef eye_prefix(now=None, fetch_fn=None):\n    \"\"\"The short prefix for a BUILD / READY line: '
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\watchers.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Let me test the eye helper and wire it into the BUILD beat. First adding the gitignore entry and a test:
-tool_use Bash {"command": "printf 'scheduler/.eye_streak\\n' >> .gitignore\ncat >> tests/test_watchers.py <<'PY'\n\n\ndef test_public_eye_fresh_vs_stale(tmp_path):\n    import datetime as _dt\n    w.EYE_STREAK = str(tmp_path / \"streak\")\n    now = w._ist_now()\n    fresh = w.public_eye(now, fetch_fn=lambda: {\"generated\": (now - _dt.timedelta(seconds=30)).isoformat()})\n    assert fresh[\"emoji\"] == \"\ud83d\udc40\" and fresh[\"fresh\"] and fresh[\"streak\"] == 0 and not fresh[\"blocked\"]\n    stale_iso = (now - _dt.timedelta(minutes=10)).isoformat()\n    for i in range(1, 4):\n        s = w.public_eye(now, fetch_fn=lambda: {\"generated\": stale_iso})\n        assert s[\"emoji\"] == \"\ud83d\ude48\" and not s[\"fresh\"] and s[\"streak\"] == i\n    assert s[\"blocked\"] is True                       # 3 in a row -> fixing the page is the only work\n    # a failed fetch is \ud83d\ude48, never a false \ud83d\udc40\n    assert w.public_eye(now, fetch_fn=lambda: (_ for _ in ()).throw(IOError()))[\"emoji\"] == \"\ud83d\ude48\"\n    px, _e = w.eye_prefix(now, fetch_fn=lambda: {\"generated\": (now - _dt.timedelta(seconds=10)).isoformat()})\n    assert px == \"\ud83d\udc40 \"\nPY\npython -m pytest tests/test_watchers.py -q -p no:cacheprovider 2>&1 | tail -4", "description": "Gitignore streak, add + run eye test"}
-tool_result: ....                                                                     [100%]
-4 passed in 0.30s
-assistant: Eye test passes. Now wiring `eye_prefix` into the BUILD beat line. Let me find where build_beat assembles the line:
-tool_use Bash {"command": "grep -n \"def maybe_post\\|def _line\\|BUILD \\|return .*BUILD\\|line = \\|def _compose\\|def post\" scripts/build_beat.py | head", "description": "Find build_beat line construction"}
-tool_result: 105:    """R-NOW-LINE §4: every BUILD line ends with the status link; when halted, a second line = supervisor's last."""
-116:    label = "BUILD %s" % now.strftime("%H:%M")
-194:    return "BUILD %s — HALT in force: %s" % (now.strftime("%H:%M"), reason)
-197:def maybe_post(notifier=None, now=None):
-tool_use Bash {"command": "sed -n '110,120p' scripts/build_beat.py", "description": "Read build_beat label/line construction"}
-tool_result: def line(now=None):
-    now = now or _now()
-    commits = _commits_since(SLOT_MIN)
-    ruling, item = _journal_state()
-    label = "BUILD %s" % now.strftime("%H:%M")
-    since = (now - timedelta(minutes=SLOT_MIN)).strftime("%H:%M")
-    sup = _supervisor_state()
-    # journal-vs-git honesty check: the journal's ruling vs the latest commit's ruling prefix
-    head_subj = _git("log", "-1", "--format=%s")
-assistant: Wiring the eye prefix into the BUILD line (rule 2). Editing build_beat:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\build_beat.py", "old_string": "def line(now=None):\n    now = now or _now()\n    commits = _commits_since(SLOT_MIN)\n    ruling, item = _journal_state()\n    label = \"BUILD %s\" % now.strftime(\"%H:%M\")", "new_string": "def _eye():\n    \"\"\"R-EYE-EMOJI: \ud83d\udc40/\ud83d\ude48 prefix from the PUBLIC status page (fetched, never the local file). Best-effort \u2014\n    a failure returns '' rather than a false \ud83d\udc40.\"\"\"\n    try:\n        from scripts import watchers\n        px, _e = watchers.eye_prefix()\n        return px\n    except Exception:\n        return \"\"\n\n\ndef line(now=None):\n    now = now or _now()\n    commits = _commits_since(SLOT_MIN)\n    ruling, item = _journal_state()\n    label = \"%sBUILD %s\" % (_eye(), now.strftime(\"%H:%M\"))"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\build_beat.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Let me wire the READY line prefix (rule 2) and verify build_beat compiles:
-tool_use Bash {"command": "python -m py_compile scripts/build_beat.py && echo \"build_beat compiles\"\ngrep -n \"def ready_line\" scripts/vitals.py", "description": "Compile build_beat, find vitals.ready_line"}
-tool_result: build_beat compiles
-237:def ready_line(s=None):
-tool_use Bash {"command": "sed -n '237,252p' scripts/vitals.py", "description": "Read vitals.ready_line"}
-tool_result: def ready_line(s=None):
-    """R-VITALS: the 08:30 READY line derived from the status file. Login + a green room = READY."""
-    s = s or build(write=False)
-    if not s["token"].get("valid"):
-        return "NOT READY YET — waiting for the login."
-    recorders = sum(1 for p in s["processes"] if p["name"] in
-                    ("e13_depth", "chain_recorder", "xchange_recorder", "positioning_recorder"))
-    runner = any(p["name"] == "book20_runner" for p in s["processes"])
-    if recorders >= 1 and runner and s["moment_light_green_count"] > 0:
-        return "READY — %d recorders + runner up, %d stocks ready, orders %s." % (
-            recorders, s["moment_light_green_count"], "allowed" if s["orders_allowed_now"] else "arming")
-    return "NOT READY — %s" % (s.get("plain") or _plain(s))
-
-
-NOW_FILE = os.environ.get("E1_NOW_FILE") or os.path.join(os.path.expanduser("~"), "Desktop", "E1-DESK", "now.txt")
-STATUS_CYCLE_S = 120                              # the status writer's cadence; 3 cycles stale (R-NOW-LINE §2)
-assistant: Let me find where the READY line is posted (to prefix it there, not inside the status-build path):
-tool_use Bash {"command": "grep -rn \"ready_line\" scripts/*.py | grep -v \"def ready_line\" | head", "description": "Find ready_line callers"}
-tool_result: scripts/live_bar.py:96:    step3 = str(s.get("ready_line", "")).startswith("READY")
-scripts/preopen_gate.py:197:        vline = vitals.ready_line()                      # derived from the live STATUS.json
-scripts/vitals.py:215:    status["ready_line"] = ready_line(status)
-scripts/vitals.py:315:            "<p class='sub'>" + _h.escape(s["ready_line"]) + " · updated " + _h.escape(s["generated"]) +
-scripts/vitals.py:337:    assert set(s) >= {"token", "processes", "streams", "gates", "orders_allowed_now", "audit", "ready_line", "plain"}
-scripts/vitals.py:338:    assert s["ready_line"].startswith(("READY", "NOT READY"))
-assistant: `ready_line` is used inside the status build (vitals:215) and rendered into status.html — I must NOT add a network fetch there. The "08:30 READY line" to prefix is at its Telegram-post site (preopen_gate:197). Reading it:
-tool_use Bash {"command": "sed -n '193,202p' scripts/preopen_gate.py", "description": "Read preopen_gate READY post site"}
-tool_result:     st = gate()
-    msg = st["line"]
-    try:
-        from scripts import vitals
-        vline = vitals.ready_line()                      # derived from the live STATUS.json
-        if msg.startswith("READY") and not vline.startswith("READY"):
-            msg = vline                                  # the room is not actually up — do not claim READY
-    except Exception:
-        pass
-    try:
-assistant: Prefixing the posted READY line with the eye (rule 2), best-effort:
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\preopen_gate.py", "old_string": "    st = gate()\n    msg = st[\"line\"]\n    try:\n        from scripts import vitals\n        vline = vitals.ready_line()                      # derived from the live STATUS.json\n        if msg.startswith(\"READY\") and not vline.startswith(\"READY\"):\n            msg = vline                                  # the room is not actually up \u2014 do not claim READY\n    except Exception:\n        pass", "new_string": "    st = gate()\n    msg = st[\"line\"]\n    try:\n        from scripts import vitals\n        vline = vitals.ready_line()                      # derived from the live STATUS.json\n        if msg.startswith(\"READY\") and not vline.startswith(\"READY\"):\n            msg = vline                                  # the room is not actually up \u2014 do not claim READY\n    except Exception:\n        pass\n    try:                                                 # R-EYE-EMOJI: \ud83d\udc40/\ud83d\ude48 from the PUBLIC page (fetched)\n        from scripts import watchers\n        px, _e = watchers.eye_prefix()\n        msg = px + msg\n    except Exception:\n        pass"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\preopen_gate.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Now the restart line (rule 1). Let me read restart_stack's post line to convert it to the EYES-LIVE format gated on a fresh public fetch:
-tool_use Bash {"command": "grep -n \"STACK: restarted\\|line = \\|(notifier or _notify)\" scripts/restart_stack.py | head", "description": "Find restart_stack post line"}
-tool_result: 171:    line = ("STACK: restarted %s — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, "
-175:        (notifier or _notify)(line)                          # (5)
-tool_use Bash {"command": "sed -n '168,178p' scripts/restart_stack.py", "description": "Read restart_stack line construction + post"}
-tool_result:     au = audit()                                              # (4)
-    hhmm = _now().strftime("%H:%M")
-    all_up = all(up[n]["up"] and up[n]["py310"] for n in UP_NAMES)
-    line = ("STACK: restarted %s — token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, "
-            "08:15 gate armed, audit %s" % (hhmm, "PASS" if au["pass"] else "FAIL")) if all_up else \
-           ("STACK: restart %s — NOT all up: %s" % (hhmm, {n: up[n]["up"] for n in UP_NAMES}))
-    try:
-        (notifier or _notify)(line)                          # (5)
-    except Exception:
-        pass
-    return {"killed": killed, "remaining_after_stop": remaining, "up": up, "armed": armed,
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\restart_stack.py", "old_string": "    line = (\"STACK: restarted %s \u2014 token_ping/watchdog/site_loop/supervisor up, 06:00 link armed, \"\n            \"08:15 gate armed, audit %s\" % (hhmm, \"PASS\" if au[\"pass\"] else \"FAIL\")) if all_up else \\\n           (\"STACK: restart %s \u2014 NOT all up: %s\" % (hhmm, {n: up[n][\"up\"] for n in UP_NAMES}))\n    try:\n        (notifier or _notify)(line)                          # (5)\n    except Exception:\n        pass", "new_string": "    # R-EYE-EMOJI (1): announce the restart ONLY after the laptop confirms the PUBLIC page is under 2 min old;\n    # until then post NOTHING about the restart (a local read could show fresh while the owner sees a frozen page).\n    line = None\n    if all_up:\n        try:\n            from scripts import watchers\n            eye = watchers.public_eye()                       # fetches the PUBLIC status page\n            if eye[\"fresh\"]:\n                rooms = _build_rooms()\n                line = \"\ud83d\udc40 EYES LIVE \u2014 status written %s \u00b7 build room %d rooms \u00b7 send \u2192 AUDIT check the mirror end to end\" % (\n                    eye[\"hhmm\"], rooms)\n        except Exception:\n            line = None\n    else:\n        line = \"STACK: restart %s \u2014 NOT all up: %s\" % (hhmm, {n: up[n][\"up\"] for n in UP_NAMES})\n    try:\n        if line:\n            (notifier or _notify)(line)                       # (5) \u2014 silent until the public page is fresh\n    except Exception:\n        pass"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\restart_stack.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Adding the `_build_rooms()` helper (real count from the build room on disk, not hardcoded):
-tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\restart_stack.py", "old_string": "def run(notifier=None, now=None):", "new_string": "def _build_rooms():\n    \"\"\"The real number of mirror rooms \u2014 the .html pages in the built /build/ room (never a typed count).\"\"\"\n    try:\n        d = os.path.join(REPO, \"site\", \"build\")\n        return sum(1 for f in os.listdir(d) if f.endswith(\".html\"))\n    except Exception:\n        return 0\n\n\ndef run(notifier=None, now=None):"}
-tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\restart_stack.py has been updated successfully. (file state is current in your context — no need to Read it back)
-assistant: Let me compile all three touched files and run the relevant tests:
-tool_use Bash {"command": "python -m py_compile scripts/restart_stack.py scripts/preopen_gate.py scripts/build_beat.py scripts/watchers.py && echo \"all compile\"\npython -m pytest tests/test_watchers.py -q -p no:cacheprovider 2>&1 | tail -3\npython -m scripts.restart_stack --demo 2>&1 | tail -2", "description": "Compile + test the R-EYE-EMOJI wiring"}
-tool_result: all compile
-....                                                                     [100%]
-4 passed in 0.24s
-restart_stack demo OK: guard refuses before 15:30; proofs shape intact.
-assistant: All compile, tests green. Committing R-EYE-EMOJI and recording it in EYES.md:
-tool_use Bash {"command": "cat >> docs/EYES.md <<'MD'\n\n## R-EYE-EMOJI (2026-09-23) \u2014 the freshness eye on every desk line\n\nEvery BUILD line, the 08:30 READY line, and the restart announcement carry a \ud83d\udc40/\ud83d\ude48 read from the **public** status page (fetched over the URL, never the local file \u2014 a local read could show \ud83d\udc40 while the owner sees a frozen page). \ud83d\udc40 = public written time under 2 min old; \ud83d\ude48 = older, with that time shown. A failed fetch is \ud83d\ude48, never a false \ud83d\udc40. Three \ud83d\ude48 in a row sets `blocked` (fixing the page becomes the only work). The restart line stays silent until the public page is confirmed under 2 min old, then posts \"\ud83d\udc40 EYES LIVE \u2014 status written HH:MM \u00b7 build room N rooms \u00b7 send \u2192 AUDIT\u2026\". Helper: `watchers.public_eye` / `watchers.eye_prefix`.\nMD\ngit add scripts/watchers.py scripts/build_beat.py scripts/preopen_gate.py scripts/restart_stack.py tests/test_watchers.py docs/EYES.md .gitignore && git commit -q -m \"R-EYE-EMOJI: \ud83d\udc40/\ud83d\ude48 freshness eye (from the PUBLIC page, fetched) on every BUILD line + 08:30 READY line; restart line becomes 'EYES LIVE' posted only after the public page is confirmed <2min; 3x\ud83d\ude48 blocks. Tested\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1", "description": "Record in EYES.md and commit R-EYE-EMOJI"}
-tool_result: warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/EYES.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/build_beat.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/preopen_gate.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/restart_stack.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'scripts/watchers.py', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tests/test_watchers.py', LF will be replaced by CRLF the next time Git touches it
-daf38692a R-EYE-EMOJI: 👀/🙈 freshness eye (from the PUBLIC page, fetched) on every BUILD line + 08:30 READY line; restart line becomes 'EYES LIVE' posted only after the public page is confirmed <2min; 3x🙈 blocks. Tested
-assistant: R-EYE-EMOJI is committed (daf38692a). This is a natural stopping point after an enormous stretch of work, and the critical path genuinely waits on your decision.
-
-```
-CHECKPOINT — R-EYE-EMOJI done; the order-path work waits on your restart call.
-
-JUST BUILT (daf38692a): the 👀/🙈 freshness eye — read from the PUBLIC page (fetched, never the
-local file) — now leads every BUILD line and the 08:30 READY line; the restart announcement stays
-silent until the public page is confirmed under 2 min old, then posts "👀 EYES LIVE — status
-written HH:MM · build room N rooms · send → AUDIT…"; three 🙈 in a row blocks. Tested.
-
-WHERE EVERYTHING STANDS (this session's arc):
-  • R-EXAM-CONFORM fail-safe LIVE (0aa11e331) — every fire HELD "awaiting R-EXAM-CONFORM proof",
-    zero orders under the old management. Wednesday is HELD-safe by construction.
-  • Site "emergency" resolved — push was never dead (CDN cache); cold-fetch redirect fix committed,
-    live at the 06:00 login.
-  • END-TO-END BUNDLE Parts 1,2,3,5 + Part 4 framework (verifier launcher/gate/brain-ladder/
-    template/verify-map) all built, tested, committed.
-  • The live-vs-exam AUDIT delivered — the finding your R-EXAM-CONFORM ruling now fixes.
-  • ~15 rulings archived + acted on this session.
-
-THE ONE OPEN DECISION (unchanged, and it gates the rest):
-  The full R-EXAM-CONFORM + R-LIVE-GATE order-path rewire needs to be PROVEN via the nightly dry
-  run, which your amendment (step ii) says needs A's restart — and I held that restart because the
-  push was proven alive (R-NIGHT-CLOSE: restart is human; 06:00 login is the restart).
-
-LEAD RULING NEEDED: reply "restart now" and I run restart_stack → dry run → fresh-Claude supervisor
-proof, pushing for CONFORM PROVEN before 05:00. Otherwise Wednesday is a safe HELD day (the fail-safe
-enforces it) and I build the order-path rewire carefully next session. Everything downstream
-(R-LIVE-GATE, R-TWIN-TEST, Part 6, the record store) queues behind that call.
-```
-user: Stop hook feedback:
-continue in order
-assistant: The loop keeps firing, but the next work in order — the order-path rewire and its proof — is genuinely blocked on your restart decision, and I won't rush an unproven re-architecture into the single order path. The honest state is a pending lead ruling, so I'll set the loop's own flag to reflect that rather than keep spinning. Let me find the state writer:
-tool_use Bash {"command": "grep -rn \"def set_state\\|\\\"flag\\\"\\|'flag'\\|BUILD-STATE\\|BUILD_STATE\" scripts/build_journal.py | head; echo \"=== current BUILD-STATE ===\"; cat reports/BUILD-STATE.json 2>/dev/null | head -20", "description": "Find the BUILD-STATE flag writer and current state"}
-tool_result: 34:STATE_FILE = os.path.join(REPO, "reports", "BUILD-STATE.json")     # header fields the session sets
-116:def set_state(**kw):
-299:    flag = st.get("flag", "NOTHING NEEDS THE LEAD")
-366:           _html.escape(st.get("flag", "NOTHING NEEDS THE LEAD"))))
-=== current BUILD-STATE ===
-{
- "ruling": "R-EYES-COMPLETE done (built)",
- "item": "R-V2-EXACT remaining pages",
- "tests": "all C-series + tabs + fixes tested; full suite last 244 green",
- "next": "R-V2-EXACT verbatim /v2/ page rebuild (Main, Engine, Stocks, etc.)",
- "flag": "NOTHING NEEDS THE LEAD"
-}
-assistant: The flag is stale ("NOTHING NEEDS THE LEAD" pointing at old items). Let me set it to the true current state so the loop pauses for your restart decision rather than spinning:
-tool_use Bash {"command": "cat > \"scripts/_setflag.py\" <<'PY'\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import build_journal\nbuild_journal.set_state(\n    ruling=\"R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done\",\n    item=\"R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks)\",\n    next=\"BLOCKED \u2014 the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile\",\n    flag=\"LEAD RULING NEEDED: reply 'restart now' to prove R-EXAM-CONFORM before 05:00, else Wednesday is a safe HELD day\",\n)\nimport json\nprint(json.dumps(json.load(open(\"reports/BUILD-STATE.json\", encoding=\"utf-8\")), indent=1))\nPY\npython \"scripts/_setflag.py\" && rm \"scripts/_setflag.py\"", "description": "Set BUILD-STATE flag to LEAD RULING NEEDED"}
-tool_result: {
- "ruling": "R-EXAM-CONFORM fail-safe live; site emergency resolved (push alive/CDN cache); bundle Parts 1-5 + Part 4 framework + R-EYE-EMOJI done",
- "item": "R-EXAM-CONFORM full order-path rewire (per-pattern management + next-open fill + 6 shared checks)",
- "tests": "all C-series + tabs + fixes tested; full suite last 244 green",
- "next": "BLOCKED \u2014 the conformance proof (nightly dry run) needs A's held restart; fail-safe keeps Wednesday HELD-safe meanwhile",
- "flag": "LEAD RULING NEEDED: reply 'restart now' to prove R-EXAM-CONFORM before 05:00, else Wednesday is a safe HELD day"
-}
-assistant: The BUILD-STATE flag now reflects the true state — the loop will pause here for your decision rather than spin. This is the honest checkpoint after an exceptionally long, productive session.
-
-**Where it rests:**
-
-- **Wednesday is safe by construction.** The R-EXAM-CONFORM fail-safe is live in code (`0aa11e331`): every fire is HELD "awaiting R-EXAM-CONFORM proof", zero orders under the old 20d/1×ATR/trail management. Nothing can place a wrong trade.
-- **The site is fine.** The push was never dead — that was CDN/browser cache; the cold-fetch redirect fix ships at the 06:00 login, and the new 👀/🙈 eye (from the *public* fetch) now leads every BUILD/READY line so you'll see freshness at a glance.
-- **Everything buildable-and-safe is built and tested** — the fail-safe, the site fix, END-TO-END BUNDLE Parts 1/2/3/5 + the Part 4 verifier framework, R-EYE-EMOJI, watchers, cost-ledger, analyst-drops, the ten /v2/ pages, and the live-vs-exam audit that prompted R-EXAM-CONFORM.
-
-**The one thing I need from you** (it gates all remaining order-path work):
-
-The full R-EXAM-CONFORM + R-LIVE-GATE rewire must be *proven* via the nightly dry run, which your amendment (step ii) says needs A's restart — and I held that restart because the push was proven alive (R-NIGHT-CLOSE: restart is human; the 06:00 login is itself the restart).
-
-- **Reply "restart now"** → I run restart_stack → dry run → fresh-Claude supervisor proof and push for CONFORM PROVEN before 05:00.
-- **Otherwise** → Wednesday is a safe HELD day (the fail-safe enforces it), and I build the order-path re-architecture carefully next session rather than rushing it blind into the single order path overnight.
-
-I'll pick up the moment you decide.
-queue-operation: → BUILD  restart now — lead ruling, overrides R-NIGHT-CLOSE for tonight only. Order: restart_stack → fetch the PUBLIC status page and post the 👀 EYES LIVE line (nothing else until it posts) → dry run → fresh-Claude supervisor proof of R-EXAM-CONFORM + R-LIVE-GATE → CONFORM PROVEN or HELD day by 05:00, one Telegram line either way → then Part 4, R-TWIN-TEST, Part 6. Nothing touches launch files after 05:00.
-user: → BUILD  restart now — lead ruling, overrides R-NIGHT-CLOSE for tonight only. Order: restart_stack → fetch the PUBLIC status page and post the 👀 EYES LIVE line (nothing else until it posts) → dry run → fresh-Claude supervisor proof of R-EXAM-CONFORM + R-LIVE-GATE → CONFORM PROVEN or HELD day by 05:00, one Telegram line either way → then Part 4, R-TWIN-TEST, Part 6. Nothing touches launch files after 05:00.
-assistant: Restart authorized (overrides R-NIGHT-CLOSE for tonight). Executing the owner's order: restart_stack first, then the EYES LIVE line only once the public page is fresh. Let me verify the guard passes, then run it:
-tool_use Bash {"command": "cat > \"scripts/_guard.py\" <<'PY'\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import restart_stack as rs\nnow = rs._now()\nprint(\"after_1530:\", rs.after_1530(now), \"| launch_path_touched(HEAD):\", rs.launch_path_touched(), \"| guard:\", rs.guard(now))\nprint(\"UP_NAMES:\", rs.UP_NAMES)\nPY\npython \"scripts/_guard.py\" && rm \"scripts/_guard.py\"", "description": "Verify restart_stack guard passes before running"}
-tool_result: after_1530: True | launch_path_touched(HEAD): True | guard: True
-UP_NAMES: ['token_ping', 'watchdog', 'site_loop', 'supervisor']
-assistant: Guard passes. Running the restart (kills the desk, relaunches token_ping/watchdog/site_loop/supervisor):
-tool_use Bash {"command": "python -m scripts.restart_stack --run 2>&1 | tail -30", "description": "Execute restart_stack.run()", "timeout": 120000}
-tool_result:   "watchdog": {
-   "up": true,
-   "count": 1,
-   "py310": true,
-   "pid": 20236
-  },
-  "site_loop": {
-   "up": true,
-   "count": 1,
-   "py310": true,
-   "pid": 25176
-  },
-  "supervisor": {
-   "up": true,
-   "count": 1,
-   "py310": true,
-   "pid": 25832
-  }
- },
- "armed": {
-  "06:00 link": true,
-  "08:15 gate": true,
-  "post_login self-check": true
- },
- "audit": {
-  "pass": true,
-  "line": "AUDIT: PASS \u2014 5/5 checks, trading path sound (daf38692a)"
- },
- "line": "\ud83d\udc40 EYES LIVE \u2014 status written 00:16 \u00b7 build room 9 rooms \u00b7 send \u2192 AUDIT check the mirror end to end"
-}
-assistant: The restart succeeded — token_ping/watchdog/site_loop/supervisor all up on Py310, **audit PASS 5/5 "trading path sound"**, and the EYES LIVE line posted ("status written 00:16 · build room 9 rooms"). Since that line's freshness was checked right after relaunch, let me confirm the *new* site_loop is actually pushing fresh and verify the public page over the URL:
-tool_use Bash {"command": "date +\"laptop %H:%M:%S\"; echo \"=== local status write ===\"; grep -oE '\"generated\": \"[^\"]+\"' reports/STATUS.json | head -1; echo \"=== newest site pushes ===\"; git -C ../e1-live-site log -3 --format=\"%ci %s\" 2>&1 | head -3", "description": "Confirm new site_loop is writing/pushing fresh after restart"}
-tool_result: laptop 00:18:12
-=== local status write ===
-"generated": "2026-09-23T00:16:45.218978+05:30"
-=== newest site pushes ===
-2026-09-23 00:16:49 +0530 status refresh
-2026-09-23 00:15:23 +0530 status refresh
-2026-09-23 00:13:16 +0530 status refresh
-assistant: The restart worked and the site is genuinely fresh (local write 00:16:45, latest push 00:16:49, laptop 00:18 — ~1.5 min, under 2). EYES LIVE posted correctly. Now the conforming rewire + proof. The key architecture per the amendment: **the exam is the standard, one shared function, no second copy** — so the live path should reuse the exam's evaluation/fill/checks rather than a parallel copy. Let me read how the exam implements the six execution checks and the certified evaluation:
-tool_use Bash {"command": "wc -l scripts/exams_real.py engine1_rebuild/paper.py; echo \"=== exams_real: checks + cost + sim ===\"; grep -nE \"def |check|spread|depth|cost|fill|warm|_cost_R|simulate_trade|stop_atr|trail|horizon|SIX|gate\" scripts/exams_real.py | head -40", "description": "Map exam checks and evaluation entry points"}
 tool_result:   279 scripts/exams_real.py
   322 engine1_rebuild/paper.py
   601 total
@@ -3279,3 +3017,375 @@ tool_use Bash {"command": "python - <<'PY'\nimport io\np = \"scripts/engine_bus.
 tool_result: patched
 engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.
 engine bus: 0 engine(s) registered: none
+assistant: Both green. Per §26 the bus needs a wiring test that's RED until something in the after-close launch path actually runs it. Let me find the after-close launcher to name as the integration point:
+tool_use Bash {"command": "echo \"=== who calls diary_engines / calibrate / after-close launches ===\" && grep -rlE \"diary_engines|calibrate\\(|run_once\\(\" scripts/ --include=*.py | grep -v test | head; echo \"=== close_done / after-close runner refs ===\"; grep -rlE \"close_done|after.close|after_close|post.close\" scripts/*.py | head; echo \"=== site_loop / supervisor launch scripts ===\"; ls scripts/ | grep -iE \"loop|superv|launch|watchdog|after\" ", "description": "Find after-close launcher for bus wiring"}
+tool_result: === who calls diary_engines / calibrate / after-close launches ===
+scripts/calendar_daily.py
+scripts/diary_engine.py
+scripts/diary_engines.py
+scripts/engine_bus.py
+scripts/monday_rehearsal.py
+scripts/run_audit.py
+scripts/supervisor.py
+=== close_done / after-close runner refs ===
+scripts/close_done.py
+scripts/deliverables_page.py
+scripts/diary_engine.py
+scripts/diary_engines.py
+scripts/engine_bus.py
+scripts/kite_login.py
+scripts/recording_page.py
+scripts/rehearsal.py
+scripts/rehearsal_day1.py
+scripts/restart_stack.py
+=== site_loop / supervisor launch scripts ===
+launch_e1.py
+site_loop.py
+supervisor.py
+watchdog.py
+assistant: `supervisor.py` references both `diary_engines` and `close_done` — the after-close orchestrator. Let me see how it runs the diary engines, so the bus wires in the same place:
+tool_use Bash {"command": "grep -n \"diary_engines\\|close_done\\|calibrate\\|run_once\\|def main\\|after.*close\\|READY\\|ready\" scripts/supervisor.py | head -30", "description": "How supervisor uses diary engines"}
+tool_result: 230:def run_once(invoke_fn=None, notifier=None):
+324:def main():
+329:                run_once()
+337:        print(run_once())
+tool_use Bash {"command": "grep -n \"diary_engines\" scripts/supervisor.py; echo \"---context around each---\"; grep -n \"diary\" scripts/supervisor.py", "description": "Locate diary_engines use in supervisor"}
+tool_result: ---context around each---
+assistant: Confirmed: nothing launches the diary engines or the bus yet — they're BUILT-not-LIVE by design ("switched on in the after-close window"). So the bus's wiring test is honestly RED. Writing it per §26 (RED = the to-do marker, flips GREEN only when a launcher runs the bus):
+tool_use Bash {"command": "cat > tests/test_engine_bus_wired.py <<'EOF'\n\"\"\"NB53 \u00a726 WIRING TEST \u2014 RED while the engine bus is not launched by the after-close path.\n\n\u00a726: \"a wiring integration test that FAILS while the module is unwired from that path and passes only when it\nis wired \u2014 committed RED where the module is unwired (the honest state, and the to-do list).\"\n\nThe engine bus runs as its OWN entry in the after-close window (NOT wired into the protected chain run_evening,\n\u00a727a). It is LIVE only when the after-close launcher (scripts/supervisor.run_once, the meta-orchestrator) actually\ninvokes engine_bus.run_daily so the registered engines run once per day. Until that launcher calls it, this test\nis RED \u2014 the bus is BUILT (its unit tests pass) but not LIVE. Flipping it GREEN is a launch-path edit and goes\nlive only via the owner-run fresh-session verify (\u00a724.2 / NB53-B B).\n\"\"\"\nimport os, sys, inspect\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nimport pytest\n\n\ndef test_after_close_launcher_runs_the_bus():\n    from scripts import supervisor\n    src = inspect.getsource(supervisor)\n    assert \"engine_bus\" in src and \"run_daily\" in src, (\n        \"engine bus not yet launched by the after-close path (scripts/supervisor) \u2014 BUILT-not-LIVE. \"\n        \"Wire supervisor.run_once to register_diary_engines + run_daily, then this flips GREEN (via verify).\")\nEOF\necho \"--- RED expected ---\"\npython -m pytest tests/test_engine_bus_wired.py -q 2>&1 | tail -6", "description": "Write RED wiring test for the bus"}
+tool_result: --- RED expected ---
+E       assert ('engine_bus' in '"""R-EYES-FULL (2) � the independent supervisor. Every 10 minutes during build hours (15:30�09:00 IST) a\nFRESH Opus ...\n\n\nif __name__ == "__main__":\n    if "--once" in sys.argv:\n        print(run_once())\n    else:\n        main()\n')
+
+tests\test_engine_bus_wired.py:20: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_engine_bus_wired.py::test_after_close_launcher_runs_the_bus
+1 failed in 0.97s
+assistant: RED confirmed — the honest "built, not live" marker. Now I'll fix ENGINE-BUS.md's §1 to match the §27a-correct design (own entry, not run_evening) and record the lead ruling. Checking the latest ruling number:
+tool_use Bash {"command": "grep -oE \"^### R[0-9]+|^## R[0-9]+|R[0-9]+ \" docs/architecture/LEAD_RULINGS.md | grep -oE \"R[0-9]+\" | sort -t R -k2 -n | tail -3; echo \"--- tail of file ---\"; tail -20 docs/architecture/LEAD_RULINGS.md", "description": "Find latest R-number in LEAD_RULINGS"}
+tool_result: R45
+R46
+R46
+--- tail of file ---
+_Applied — the sender REMOVED (not throttled):_
+
+- **The sender was `scripts/watchdog.py` line 153: `(notify_fn or notify)(line)`** inside `progress_tick()` — the one periodic ⏱ progress line, paced by `PROGRESS_EVERY_S = 5*60`. That Telegram send is DELETED. `progress_tick` still runs on the same cadence for the LOCAL proof-of-work signature, the frozen-streak detection, and the heartbeat the alarm page reads, and it still 🙋s the owner when the build is genuinely frozen — but it sends no ⏱ line to Telegram. `PROGRESS_EVERY_S` is relabelled a local-only cadence; the demo now asserts `progress_tick` sends nothing (`ticks == []`).
+- **The running watchdog was restarted onto the new code** (old PID killed, fresh hidden instance) so the 5-minute ⏱ stops immediately.
+
+**No other PERIODIC Telegram progress sender remains** (audited):
+- `watchdog.progress_tick` ⏱ (5-min) was the ONLY periodic progress sender — removed.
+- The other ⏱ lines are EVENT-driven, not periodic: `scripts/rescan.py:89` (an `except` block — fires only if the blotter rebuild errors) and `scripts/watchdog.py:510` `RESCAN_RELAUNCHED` (fires only on a >60-min stall relaunch). Neither is a timer.
+- The remaining periodic timer-senders are DISTINCT owner-ruled outputs, NOT hunt progress: the 30-minute portfolio card (`scripts/portfolio_card.py`, R-30MIN-CARD), the daily 06:00 login ask (`scripts/token_ping.py`), and the daily 07:00 calendar pull (`scripts/calendar_daily.py`). `scripts/run_e7_live.py` is dormant (E7 removed, not launched).
+- `scripts/status_reports.py` uses `progress.compose()` only to WRITE a local status page — it never sends to Telegram.
+
+**Nothing was sent to Telegram to "test" this** — the change was verified with stubbed notifiers and the demo only.
+
+---
+
+> LEAD RULING R-PROVEN-BY-SE (origin: **LEAD-PROPOSED; OWNER-SAID "yes" 2026-09-23 04:40**, recorded before it ran per §5): every typed live-trade count is removed from docs and code. This repo had typed **"30 live trades to validate"** in `scripts/v8_engine_data.py` (4 countdowns + 4 PT rows) and `design/v8/Engine.dc.html`; both are now replaced with the promotion rule in words. **An engine's live record is "proven" when it beats flat by more than 2× its measured standard error** — the existing promotion rule. **This judges the RECORD only; it never gates a trade.** No numeric trade-count threshold governs anything. (`engine_page.countdown_to_verdict` was already un-typed — it counts accumulated live trades and reports depth, gating nothing — so it needed no change.)
+
+> LEAD RULING R-ORIGIN-TAGS (origin: **OWNER-SAID 2026-09-23**): every ruling archived in `docs/dispatches/` carries an origin tag — **OWNER-SAID / LEAD-PROPOSED / BUILDER-PROPOSED**. Anything that changes a law, a threshold, or the owner's daily job needs an explicit owner **"yes" recorded in the archive before it runs**. A LEAD-PROPOSED or BUILDER-PROPOSED change to a law/threshold/daily-job that lacks a recorded owner "yes" does not run.
+
+> LEAD RULING R-CLOCK (origin: **OWNER-SAID 2026-09-23**): every time in every report and every pause/deadline decision comes from the **machine clock** (`date` / `Get-Date`), read at the moment it is quoted — **never estimated or extrapolated**. A run states a time only after reading the clock; a pause decision (e.g. the 08:30 stop) re-reads the clock rather than projecting from an earlier read. Estimated times presented as fact are a self-flag. _Why: on 2026-09-23 a run reported "~08:10 IST" (extrapolated from a 02:52 start) when the real time was 05:14 IST — a ~3-hour error that also mis-based the pause decision._
+assistant: R46 is the latest numbered. Adding R47 (bus own-entry) and fixing ENGINE-BUS.md §1:
+tool_use Bash {"command": "python - <<'PY'\np = \"docs/architecture/ENGINE-BUS.md\"\ns = open(p, encoding=\"utf-8\").read()\nold = \"\"\"- **The bus is `scripts/engine_bus.py`**, called ONCE per day from the existing evening scheduler\n  `scripts/run_evening.py::main` (run_evening.py:20) **after the morning bar** (the same place the Price Engine's\n  conforming evaluator runs today \u2014 run_evening.py:60 `conform`, :79 `practice_counter`). There is exactly one\n  scheduler; the bus is a sequence step inside it, not a second loop (\u00a727 isolation: one driver).\"\"\"\nnew = \"\"\"- **The bus is `scripts/engine_bus.py`**, run ONCE per day in the **after-close window from its OWN entry**\n  (`python -m scripts.engine_bus`), launched by the after-close orchestrator (`scripts/supervisor.run_once`) \u2014\n  **NOT wired into `run_evening.main`**. `run_evening` is the protected [redacted]-chain evening evaluator, and \u00a727a\n  reserves the chain's launch path to a chain item only; a non-chain scheduler editing it would breach isolation.\n  The bus reads the same 08:15 READY signal and the day's measured RAM, so it still runs \"after the morning bar\"\n  \u2014 from outside the chain, not inside it. (LEAD RULING R47, NB53-B: corrects this doc's first draft, which said\n  \"called from run_evening.main\" before \u00a727a's chain-launch-path protection was fully applied.)\"\"\"\nassert old in s, \"anchor not found\"\ns = s.replace(old, new)\n# fix the \u00a75 wiring-test sentence too\ns = s.replace(\n \"a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not\\ncalled from `run_evening.main`, and passes only when it is\",\n \"a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not\\ncalled from the after-close launcher (`scripts/supervisor.run_once`), and passes only when it is\")\nopen(p, \"w\", encoding=\"utf-8\").write(s)\nprint(\"ENGINE-BUS.md updated\")\nPY\ncat >> docs/architecture/LEAD_RULINGS.md <<'EOF'\n\n---\n\n> LEAD RULING R47 \u2014 ENGINE BU
+tool_result: ENGINE-BUS.md updated
+R47 appended
+assistant: Now the §29 OWNER-MINIMUM law (NB53-B section A). Finding where §28 ends in CLAUDE.md:
+tool_use Bash {"command": "grep -n \"^## 2[0-9]\\|^## \u00a72[0-9]\\|^## 29\\|^## 28\" CLAUDE.md | tail; echo \"--- tail ---\"; tail -6 CLAUDE.md", "description": "Locate \u00a728 end in CLAUDE.md"}
+tool_result: 712:## 20. Laws from external-review passes 3–5 (owner decree 2026-08-01)
+745:## 21. THE DELEGATION DECREE (owner decree 2026-08-01) — who decides what, finally
+782:## 22. The record-vs-repo check (ROADMAP G1, owner dispatch 2026-08-03 "PLAN-INSTALL")
+814:## 23. Resume + one-item-per-session discipline (owner dispatches NB13 #1, NB14, 2026-09-23)
+853:## 24. Core-chain first: feature freeze, "live" defined, uncited names refused (owner dispatch NB19, 2026-09-23)
+887:## 25. AUTO-ADVANCE through the checklist (owner dispatch NB20, 2026-09-23)
+913:## 26. Test-driven, no exceptions (owner dispatch NB30, 2026-09-23 — owner's senior: TDD)
+929:## 27. The isolation law (owner dispatch NB39, 2026-09-24 — the feature freeze becomes isolation)
+954:## 28. Complete the build — all 8 engines (owner dispatch NB53, 2026-09-28)
+--- tail ---
+
+_Isolation (§27) still governs every engine here: own folder, own state, own paper ledger; shared inputs are
+READ-ONLY (bar store, quote/depth stores, the fee model, Sizing Families); no engine but the Price Engine
+touches the order path; a non-chain engine's failure is quiet (✅/⏱, never 🙋). The gates (§26 TDD, §18.1
+independent verify, no launch-path edit in market hours, 04:30 hard stop, per-day owner YES for a stack
+stop/start) are unchanged: a thing is "built" until a fresh session verifies it._
+tool_use Bash {"command": "cat >> CLAUDE.md <<'EOF'\n\n## 29. Owner-minimum: one paste, one self-flag (owner dispatch NB53-B, 2026-09-28)\n\n**The owner's job is ONE paste and the self-flag line \u2014 nothing else.** Every click, download, file move, typed\nconfirmation, or stack stop/start is absorbed by the builder or the lead wherever the harness allows. When a step\n**truly** needs the owner's hand (a real login/credential, a purchase, a signature, a stack stop/start the harness\nblocks), the report says so in **ONE plain line with the reason**, and the lead **\ud83d\udea9-reviews whether it was\navoidable**. The owner pastes back **only on `LEAD RULING NEEDED`**.\n\n_This narrows \u00a715 (never-block) and \u00a721 (human-only work) to their true floor: those lists stand, but everything\nNOT on them is the builder's/lead's to do, not the owner's. Why: NB50\u2192NB53 spent owner pastes on disk cleanup,\nstack stops, and confirmations the builder could have absorbed. The measure of a good run is how little the owner\nhad to touch._\n\n- **A no-trade build day** (owner declares \"not logging in today\"): the desk stays exactly as it is \u2014 no token, so\n  recorders idle and no order is possible \u2014 and the builder works in **full build mode beside it**, RAM measured,\n  **without an owner click**. This is not a stack start (\u00a714.10 is untouched: the builder still starts/stops nothing);\n  it is building code beside an idle desk.\nEOF\necho \"\u00a729 added\"; git add scripts/engine_bus.py tests/test_engine_bus.py tests/test_engine_bus_wired.py docs/architecture/ENGINE-BUS.md docs/architecture/LEAD_RULINGS.md CLAUDE.md docs/dispatches/2026-09-28_NB53-B.md && git status --short | grep -vE \"^ M (reports|site|STATUS|engine1_rebuild/paper|docs/RESUME)\" | head -20", "description": "Add \u00a729, stage engine-bus step files"}
+tool_result: §29 added
+warning: in the working copy of 'CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture/LEAD_RULINGS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/dispatches/2026-09-28_NB53-B.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus_wired.py', LF will be replaced by CRLF the next time Git touches it
+M  CLAUDE.md
+M  docs/architecture/ENGINE-BUS.md
+M  docs/architecture/LEAD_RULINGS.md
+A  docs/dispatches/2026-09-28_NB53-B.md
+A  scripts/engine_bus.py
+A  tests/test_engine_bus.py
+A  tests/test_engine_bus_wired.py
+?? .codex/
+?? .playwright-mcp/
+?? AGENTS.md
+?? _poll2.py
+?? _poll3.py
+?? _poll4.py
+?? _poll5.py
+?? docs/dispatches/2026-09-21_DEPTH-FAULT.md
+?? docs/dispatches/2026-09-21_R-MORNING-FIX-EMERGENCY-WRONG-KEY.md
+?? docs/dispatches/2026-09-21_R-WHY-NO-PAPER-2_TONIGHT-PLAN.md
+?? docs/dispatches/2026-09-23_NIGHT-BUNDLE-28.md
+?? docs/dispatches/2026-09-23_NIGHT-BUNDLE-3.md
+?? docs/reports/2026-09-22-213120-audit.md
+assistant: Only my 7 intended files staged. Committing the engine-bus step:
+tool_use Bash {"command": "git commit -m \"NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) \u2014 registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine \u00a727 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, \u00a726). \u00a727a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md \u00a729 owner-minimum law. Archive NB53-B\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" -- scripts/engine_bus.py tests/test_engine_bus.py tests/test_engine_bus_wired.py docs/architecture/ENGINE-BUS.md docs/architecture/LEAD_RULINGS.md CLAUDE.md docs/dispatches/2026-09-28_NB53-B.md && git log --oneline -1", "description": "Commit engine-bus step"}
+tool_result: warning: in the working copy of 'CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture/LEAD_RULINGS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/dispatches/2026-09-28_NB53-B.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_engine_bus_wired.py', LF will be replaced by CRLF the next time Git touches it
+[master d79733220] NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B
+ 7 files changed, 223 insertions(+), 5 deletions(-)
+ create mode 100644 docs/dispatches/2026-09-28_NB53-B.md
+ create mode 100644 scripts/engine_bus.py
+ create mode 100644 tests/test_engine_bus.py
+ create mode 100644 tests/test_engine_bus_wired.py
+d79733220 NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B
+assistant: Step 1 committed. `⏱ NB53 · engine BUS · engine_bus.py GREEN (4 unit), wiring RED (built-not-live) · d79733220`
+
+Next in order: §H 70–73 (engine 1's day-log, rehearsal, market-hours mode, event blackout). Reading their spec + checking for existing partials:
+tool_use Bash {"command": "sed -n '/## \u00a7H\\|## H\\.\\|^## .*\u00a7H/,/^## /p' docs/MASTER-CHECKLIST.md 2>/dev/null | head -60; echo \"=== grep items 70-74 ===\"; grep -nE \"\\b7[0-4]\\b|day.log|rehearsal|market.hours mode|event blackout|blackout|fill calibration\" docs/MASTER-CHECKLIST.md | head -30", "description": "Read MASTER-CHECKLIST H items 70-74"}
+tool_result: ## H. Resume + session discipline (NB14) and final sweep (NB15)
+- [DONE] 49. resume card (CLAUDE.md §23.2) — **LIVE (NB32): PreCompact hook (.claude/settings.json -> scripts/resume_card.py) writes docs/RESUME-CARD.md, proven by dry-run (card ts 2026-09-23 23:33:49); SessionStart hook (.claude/hooks/session_start.py) writes scheduler/.owner_active + prints the card. Wiring tests GREEN.** — PreCompact hook writes docs/RESUME-CARD.md (item/step, files, git status, open questions, next 3 steps, clock); SessionStart hook reads it + NEXT-PASTE + MASTER-CHECKLIST + BUILD-STATE.json; first line after resume is "resuming #N, step X". Rule RECORDED; the resume-card writer script + hook wiring in .claude/settings.json is the build (doable now, non-launch) — see NEXT-PASTE
+- [AFTER-1545] 50. one item per session (CLAUDE.md §23.3) — session ends cleanly on item done, next item starts fresh; enabled by item 44's watchdog relaunch (the one §14.7 exception, OWNER-SAID); wire with item 44
+- [DONE] 51. commit-small pre-commit check (CLAUDE.md §23.4) — **LIVE (NB32, ca5dd78c8): .git/hooks/pre-commit installed (fail-OPEN on missing python, blocks only on an explicit REFUSED) runs scripts/precommit_guard.py; refuses a mixed code+generated commit; tests/test_precommit_guard.py GREEN; PROVEN — a mixed stage (test + reports/BUILD-STATE.json) was REFUSED. NB: .git/hooks/ is untracked, so a fresh clone reinstalls via the guard's docstring INSTALL line; state-json (reports/*.json) commits SEPARATELY from docs.** — never `git commit -a`
+- [DONE] 52. state in files, not context (CLAUDE.md §23.5) — every decision/ruling/finding written to its file the moment made; in force this run (dispatches archived first, checklist/NEXT-PASTE updated per step)
+- [DONE] 53. 08:15 self-check line (NB19, OWNER-SAID) — **LIVE (NB31, dc2372b27): preopen_line wired into scripts/day_report.preopen() (replaces the 09:00 pre-open line; status built from vitals — depth freshness + real gate + queue-loaded); wiring test GREEN; independent verify PASS.** — at 08:15 the machine checks itself (each recorder has rows in the last 10 min via the status page's own measure; the real order gate is open; tomorrow's queue is loaded) and posts EXACTLY ONE of "✅ READY — N cameras up, gate open, N orders queued" or "🙋 NOT READY — <which camera/gate, plain words> — send this to the lead". READY only after every check passes. REPLACES the 09:00 pre-open line. BUILT: scripts/preopen_line.py (the pure READY/NOT-READY line — cameras-fresh + gate-open + queue-loaded, NOT-READY names the gap and ends "send this to the lead"; tested). Runtime wiring (vitals build → freshness/queue → post at 08:15) is the launch-path wire-in, LIVE via dry-run + restart
+- [DONE] 54. "data its gates need" line — **DONE:** the ARMING RULE is in ENGINE_CATALOGUE.md (top, NB15) + each engine's Data line names its stores; **NB34 added the E1 gate→store map** (2026-09-24 section): every E1 gate (hold flag, two-key, moment-light spread ceiling → E1-DESK/.../depth5/SPREADS.csv, 20-cap + loss guard → paper/ledger.csv, kill/breaker) mapped to its exact on-disk store, verified against the code (§13 metric·store·threshold·action). Ruling-template field 9 already DONE.
+- [DAYS] 55. one exam per cadence class — intraday engines (Gap Timer, Pairs tick lane) get their own exam with intraday fills (DESIGN-LATER, the lead writes it)
+- [DAYS] 56. cost-efficiency size floor in adaptive sizing (DESIGN-LATER, the lead writes it)
+- [NEEDS-OWNER] 57. before real money: a second machine or cloud, and a PRIVATE mirror (the public site currently publishes pattern rules) — not before 5/5
+- [AFTER-1545] 58. recorder keep-alive (NB16/NB17, §14.10 amendment) — the watchdog relaunches a DEAD recorder itself (token present + RAM above floor, logged); all 5 lanes (E4/E7/E12/E13/E14) in the watchdog keep-alive set; recorders start only AFTER the token lands; E4/E12 always in STATUS.json "streams" even when down so STREAM SILENT is never blind. Root cause: NB16 found E4/E12 dead since 06:02 with nothing to resurrect them. Launch-path wire-in tonight
+- [DONE] 59. lead-mistake ledger (NB19, OWNER-SAID) — **LIVE (NB31, dc2372b27/ad3ce9caf): the verifier append CALL is wired — a verifier FAIL logs a row + posts one read-only 🚩 (test isolates it to a temp ledger). CLOSE-DONE line wired into run_evening (posts after the post-close jobs). held_log rendered as the build-room held.html page (build_journal). All wiring tests GREEN.** — BUILT this session: docs/LEAD-MISTAKES.md (seeded with 5 rows for 2026-09-23) + scripts/lead_mistakes.py (machine-append + count_today, tested). Appended by the builder on an uncited-name refusal (CLAUDE.md §24), by the verifier on FAIL, and by the close job when a required order was not placed; daily close line ends "Lead mistakes today: N". Build-room page + the verifier/close append CALLS are the AFTER-1545 wire-in
+- [DONE] 62. evening pre-check (NB25 item 3) — **LIVE (NB31, dc2372b27): evening_precheck.line wired into scripts/run_evening.py BEFORE the evaluator; wiring test GREEN.** — BUILT: scripts/evening_precheck.py posts "✅ evening — today's bar in store, depth rows today N, RAM ok" or "🙋 evening — <gap> — send this to the lead" BEFORE the evaluator runs (the stale-bar lesson: on 2026-09-23 the evaluator ran on Tuesday's bar and re-produced expired signals). Pure/tested. Wire with the chain items
+- [DONE] 63. item-4 full-chain replay harness — BUILT + tested + RUN (NB25 continue). scripts/chain_dry_run.py: replays a fully-recorded day → 08:15 line → evaluate (six checks) → order gate → card to a dry-run log ONLY, twice; the mechanism proof is flag-present=HELD AND flag-absent=PLACED (a chain that PLACES under the flag FAILS). RAN on Tue 2026-09-22: 2 QUEUE (AUBANK,ETERNAL) → HELD with the flag, PLACED without → mechanism ok=True (reports/CHAIN-DRY-RUN.log). → **INDEPENDENT VERIFIER PASS (NB27, 2026-09-23 20:20)**: a separate fresh Claude (rung d, the 02:29 route via supervisor._invoke_claude) ruled VERDICT: PASS on the harness + reports/CHAIN-DRY-RUN.log with file:line cites (relayed, not self-judged). PASS marker written: reports/CHAIN-DRY-RUN-PASS.md. Item-4 dry-run DONE. The 06:00 🙋 becomes "lift the flag (owner deletes scheduler/.orders_held_R_HOLD_AND_FIX), then tap the login" — the flag-lift is the owner's hand (§21)
+- [DONE] 64. morning-bar rule (NB27 item 2) — BUILT: scripts/morning_bar.py — at the 06:00 login, if yesterday's daily bar is not in the store, run the built top-up fetcher (Kite has published it overnight), then the conforming evaluator (write=True) for today's next-open queue; the 08:15 line reports it (NONE fired = valid no-trade day). Pure/tested + IDEMPOTENT (already_queued_fn → skips if the evening already produced today's queue, so the login wire never duplicates rows). WIRE (deliberate launch-path step, not rushed into the login flow tonight): in kite_login.post_login after the top-up, an isolated try/except calls morning_bar.run(TODAY_ISO, CAL.previous_session(TODAY), store_latest_fn, topup_fn, lambda a: conform.queue_orders(asof=a, write=True)["decisions"], already_queued_fn=<ledger has queued rows for today>) then notify(r["line"]). Fixes the late-published-bar-costs-a-day gap. **LIVE (NB30): wired into kite_login.post_login (e56c7caaa); test_morning_bar_wired_into_login GREEN; independent rung-d verify PASS on a quiet box. test: green.** Runs at the 06:00 login
+- [AFTER-1545] 61. E1-only thin start (NB22-B) — BUILT: launch_e1 starts ONLY the Price Engine chain until one clean paper trade is on record (reports/CLEAN-TRADE-ON-RECORD). ON = watchdog · login ask (token_ping) · evening scan (run_evening) · site publisher · depth recorder (E13, the only lane the six checks read — conform.py:132) [+ book20_runner via login]. OFF = portfolio_card · calendar_daily · chain recorder (E4) · NSE/BSE (E12) · positioning (E14) · all heavy. plan()/e1_only() tested (--demo). Free RAM measured 0.36 GB before — this is the fix. LIVE via dry-run + restart (RAM measured after on the next start)
+- [DONE] 60. 🚩 lead-mistake signal (NB21) — **LIVE (NB31, ad3ce9caf): scripts/verifier.py verify() on a FAIL calls lead_mistakes.append(..., notify_fn=post_fn) → one read-only 🚩 line; the is_read_only guard rejects an action-carrying 🚩; wiring test GREEN.** — BUILT non-launch (scripts/lead_mistakes.py: flag_line, is_read_only guard, backfill_lines, append(notify_fn=), tested; docs/FLAG-BACKFILL-2026-09-23.md ready). WIRE-IN (launch-path, tonight's dry-run): pass notify.notify as append's notify_fn so every mistake posts one read-only 🚩 line; the notify guard rejects an action-carrying 🚩; close line ends "🚩 today: N", 08:15 line carries "🚩 yesterday: N"; post the 7 backfill lines
+
+## H. Desk operations (NB50 item 3, added NB52 2026-09-28 — docs only)
+=== grep items 70-74 ===
+43:- [DAYS] 69. twin-run RUN for a recorded day (NB48 item 4). The harness + BOTH safety nets are BUILT + proven (scripts/twin_run.py, 12 tests: writes routed to a temp dir; every live ledger hashed before/after → FAILED-SAFETY on any change). Recorded 2026-09-22 data is present (E1-DESK/stores/e1_deriv_store/depth5|live_chains|xchange/2026-09-22). **STILL TO WIRE:** real_live_loop + real_exam are NotImplementedError stubs; a faithful (non-tautological) twin needs book20_runner.run_once fed the recorded day with a 2026-09-22 depth→quotes adapter (live._quotes_for is live-only) + rehearsal-redirected ledgers, vs the exam engine (paper.simulate_trade over the 5 live patterns). Not run this session — a rushed wiring would produce a misleading MATCH (§4.4); it is a defined integration, not a "run the built thing".
+106:- [AFTER-1545] 70. desk day-log — one line per step per day (token time · 08:15 line · 09:15 gate decision · close-done), each carrying the measured free DISK and free RAM at that step. The single artifact the Friday/Saturday audits lacked.
+107:- [AFTER-1545] 71. nightly full-morning rehearsal on the real stack — fake token + recorded quotes, memory AND disk measured per step, ends in a PASS / NOT READY line. Proves the whole 06:00→08:15 chain before the real morning.
+108:- [AFTER-1545] 72. market-hours mode — the desk runs desk-only 08:30 → close-done; disk-full AND low-RAM each post a 🙋 with the measured number (the disk-free floor feeds the 08:15 self-check, item reverted NB52 pending a verify).
+109:- [DAYS] 73. event blackout — no new orders around named events (earnings/index dates from the Calendar engine, §E engine 4); dates from the store, never typed.
+110:- [DAYS] 74. monthly fill calibration — publish the shadow re-settle delta in R once a month (FILL-LAW-UNVERIFIED badge, D1); clears the badge only when the delta is measured.
+assistant: Items 70–73 are engine-1/desk operational. NB53-B's no-trade build day overrides their AFTER-1545 deferral, but they touch the launch path → I build each as a module+tests (**built-not-live**; the calls from live launch steps are the verify-gated wire-in). Starting with **70 (desk day-log)** — the artifact the Friday audit lacked. TDD, RED first:
+tool_use Bash {"command": "cat > tests/test_desk_day_log.py <<'EOF'\n\"\"\"NB53-B item 70 \u2014 desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.\n\nThe single artifact the Friday/Saturday audits lacked (nothing recorded the disk/RAM at each morning step). Pure\nwriter: the launch steps (token / 08:15 / 09:15 gate / close-done) call log_step; the module measures disk+RAM and\nappends. No typed number \u2014 disk from shutil.disk_usage, RAM from memory_guard (\u00a74.1).\n\"\"\"\nimport os, sys, tempfile\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import desk_day_log as ddl\n\n\ndef test_logs_a_line_per_step_with_disk_and_ram(tmp_path, monkeypatch):\n    monkeypatch.setattr(ddl, \"LOG\", str(tmp_path / \"DESK-DAY-LOG.md\"))\n    monkeypatch.setattr(ddl, \"_disk_free_gb\", lambda: 12.3)\n    monkeypatch.setattr(ddl, \"_ram_free_gb\", lambda: 1.4)\n    ddl.log_step(\"token\", \"login landed\", clock=\"06:01:02\", date=\"2026-09-28\")\n    ddl.log_step(\"08:15\", \"READY\", clock=\"08:15:00\", date=\"2026-09-28\")\n    lines = ddl.today_lines(\"2026-09-28\")\n    assert len(lines) == 2\n    assert \"step=token\" in lines[0] and \"disk=12.3GB\" in lines[0] and \"ram=1.4GB\" in lines[0]\n    assert \"step=08:15\" in lines[1] and \"READY\" in lines[1]\n\n\ndef test_unreadable_measure_is_recorded_not_crashed(tmp_path, monkeypatch):\n    monkeypatch.setattr(ddl, \"LOG\", str(tmp_path / \"d.md\"))\n    monkeypatch.setattr(ddl, \"_disk_free_gb\", lambda: None)   # unreadable\n    monkeypatch.setattr(ddl, \"_ram_free_gb\", lambda: None)\n    ddl.log_step(\"close-done\", clock=\"15:46:00\", date=\"2026-09-28\")\n    ln = ddl.today_lines(\"2026-09-28\")[0]\n    assert \"disk=?GB\" in ln and \"ram=?GB\" in ln          # honest \"?\" not a fabricated 0\nEOF\necho \"--- RED ---\"; python -m pytest tests/test_desk_day_log.py -q 2>&1 | tail -5", "description": "Write desk_day_log test, run RED"}
+tool_result: --- RED ---
+E   ImportError: cannot import name 'desk_day_log' from 'scripts' (unknown location)
+=========================== short test summary info ===========================
+ERROR tests/test_desk_day_log.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.36s
+tool_use Bash {"command": "cat > scripts/desk_day_log.py <<'EOF'\n\"\"\"NB53-B item 70 \u2014 desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.\n\nThe single artifact the Friday/Saturday audits lacked: nothing recorded disk/RAM at each morning step, so a fill\nthat ran out of disk (Sat 26 Sep) or a recorder that died on low RAM left no trail. Each launch step (token /\n08:15 / 09:15 gate / close-done) calls log_step; the module measures and appends. No typed number (\u00a74.1): disk\nfrom shutil.disk_usage, RAM from memory_guard.free_gb; an unreadable measure is written \"?\", never a fabricated 0.\n\nThe module is pure and fully tested now; the CALLS from the live launch steps are the launch-path wire-in\n(built-not-live until the owner-run fresh-session verify \u2014 \u00a724.2).\n\"\"\"\nfrom __future__ import annotations\n\nimport datetime as _dt\nimport os\nimport shutil\n\n_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\nLOG = os.path.join(_REPO, \"reports\", \"DESK-DAY-LOG.md\")\n\n\ndef _disk_free_gb():\n    try:\n        return round(shutil.disk_usage(_REPO).free / (1024 ** 3), 1)\n    except Exception:\n        return None\n\n\ndef _ram_free_gb():\n    try:\n        from scripts import memory_guard\n        return memory_guard.free_gb()\n    except Exception:\n        return None\n\n\ndef _num(x):\n    return \"?\" if x is None else (\"%g\" % x)\n\n\ndef log_step(step, note=\"\", clock=None, date=None):\n    \"\"\"Append one day-log line for a step, with the free disk + RAM measured now. Never raises.\"\"\"\n    now = _dt.datetime.now()\n    clock = clock or now.strftime(\"%H:%M:%S\")\n    date = date or now.strftime(\"%Y-%m-%d\")\n    line = \"%s %s | step=%s | disk=%sGB | ram=%sGB%s\" % (\n        date, clock, step, _num(_disk_free_gb()), _num(_ram_free_gb()),\n        (\" | \" + note) if note else \"\")\n    try:\n        os.makedirs(os.path.dirname(LOG), exist_ok=True)\n        with open(LOG, \"a\", encoding=\"
+tool_result: --- GREEN ---
+..                                                                       [100%]
+2 passed in 0.09s
+desk_day_log demo OK: one line/step with measured disk+RAM; unreadable -> '?', never a fake 0.
+assistant: Item 70 GREEN. `⏱ NB53-B · item 70 desk day-log · GREEN (2)`. Now **item 72 (market-hours mode)** — the desk-only window + the two measured-number 🙋 guards (disk-full, low-RAM). Floors passed in (no typed number; reverted disk floor stays out of the chain per NB52). RED first:
+tool_use Bash {"command": "cat > tests/test_market_hours_mode.py <<'EOF'\n\"\"\"NB53-B item 72 \u2014 market-hours mode: desk runs desk-only 08:30 -> close-done; disk-full AND low-RAM each post\nONE \ud83d\ude4b with the MEASURED number. Floors are passed in (measured, cited by the caller \u2014 \u00a74.1), never typed here.\n\"\"\"\nimport os, sys, datetime as dt\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import market_hours_mode as mhm\n\n\ndef _ist(h, m, wd=0):\n    # a Monday (wd=0) at h:m IST\n    base = dt.datetime(2026, 9, 28, h, m, tzinfo=dt.timezone(dt.timedelta(hours=5, minutes=30)))\n    return base\n\n\ndef test_desk_only_window_is_0830_to_close_done():\n    assert mhm.desk_only(_ist(8, 30)) is True\n    assert mhm.desk_only(_ist(15, 45)) is True\n    assert mhm.desk_only(_ist(8, 29)) is False        # before 08:30 -> build ok\n    assert mhm.desk_only(_ist(15, 46)) is False        # after close-done -> build ok\n    sat = _ist(10, 0); sat = sat.replace(day=26)       # Saturday\n    assert mhm.desk_only(sat) is False                 # not a weekday\n\n\ndef test_guards_emit_one_9man_per_breach_with_the_measured_number():\n    g = mhm.guards(free_ram_gb=0.2, free_disk_gb=0.1, ram_floor_gb=0.378, disk_floor_gb=0.376)\n    assert len(g) == 2\n    assert any(\"\\U0001f64b\" in x and \"0.2\" in x and \"RAM\" in x for x in g)\n    assert any(\"\\U0001f64b\" in x and \"0.1\" in x and \"DISK\" in x for x in g)\n\n\ndef test_guards_quiet_when_above_floors():\n    assert mhm.guards(free_ram_gb=2.0, free_disk_gb=50.0, ram_floor_gb=0.378, disk_floor_gb=0.376) == []\n\n\ndef test_unreadable_measure_fails_closed_to_a_9man():\n    g = mhm.guards(free_ram_gb=None, free_disk_gb=None, ram_floor_gb=0.378, disk_floor_gb=0.376)\n    assert len(g) == 2 and all(\"\\U0001f64b\" in x and \"unreadable\" in x for x in g)\nEOF\necho \"--- RED ---\"; python -m pytest tests/test_market_hours_mode.py -q 2>&1 | tail -5", "description": "Write marke
+tool_result: --- RED ---
+E   ImportError: cannot import name 'market_hours_mode' from 'scripts' (unknown location)
+=========================== short test summary info ===========================
+ERROR tests/test_market_hours_mode.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.35s
+tool_use Bash {"command": "cat > scripts/market_hours_mode.py <<'EOF'\n\"\"\"NB53-B item 72 \u2014 market-hours mode.\n\nDuring the desk-only window (08:30 -> close-done ~15:46 on a trading weekday) the desk runs desk-only: heavy build\njobs stand down (memory_guard already throttles them), and two safety guards each post ONE \ud83d\ude4b with the MEASURED\nnumber when they breach \u2014 disk-full and low-RAM. Both floors are passed in by the caller (measured + cited, \u00a74.1);\nthis module types no floor. An unreadable measure fails closed to a \ud83d\ude4b (a missing reading is the state in which the\nleast is known).\n\nBuilt + tested here; the CALLS (the 08:15 self-check / desk loop posting these guard lines, and gating heavy jobs\non desk_only) are the launch-path wire-in \u2014 built-not-live until the owner-run fresh-session verify (\u00a724.2). The\nreverted disk floor (NB52) is NOT reintroduced into the chain here; it arrives as disk_floor_gb from the caller.\n\"\"\"\nfrom __future__ import annotations\n\nimport datetime as _dt\n\n_OPEN = (8, 30)          # desk-only starts (heavy build stands down)\n_CLOSE = (15, 46)        # close-done boundary (after this, building resumes)\n\n\ndef _ist(now=None):\n    return now or _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=5, minutes=30)))\n\n\ndef desk_only(now=None):\n    \"\"\"True during 08:30 -> close-done on a trading weekday: the desk runs desk-only, heavy build waits.\"\"\"\n    now = _ist(now)\n    if now.weekday() >= 5:\n        return False\n    hm = (now.hour, now.minute)\n    return _OPEN <= hm < _CLOSE\n\n\ndef guards(free_ram_gb, free_disk_gb, ram_floor_gb, disk_floor_gb):\n    \"\"\"Return the \ud83d\ude4b lines that should post now \u2014 one per breach, each carrying the measured number. Empty when\n    both are above their floors. Unreadable (None) fails closed to a \ud83d\ude4b. Floors are the caller's measured values.\"\"\"\n    out = []\n    if free_ram_gb is None:\n        out.append(\"\\U0001f64b RA
+tool_result: --- GREEN ---
+....                                                                     [100%]
+4 passed in 0.07s
+market_hours_mode demo OK: 08:30->close-done desk-only window; one ?/breach with the measured GB; unreadable fails closed.
+assistant: Item 72 GREEN. `⏱ NB53-B · item 72 market-hours mode · GREEN (4)`. Now 71 (rehearsal) likely overlaps existing scripts — checking before duplicating:
+tool_use Bash {"command": "for f in rehearsal monday_rehearsal rehearsal_day1 chain_dry_run; do echo \"=== $f.py (head) ===\"; head -12 scripts/$f.py 2>/dev/null; done", "description": "Inspect existing rehearsal scripts"}
+tool_result: === rehearsal.py (head) ===
+"""NB40 item 3 — the twin-run REHEARSAL ROOT.
+
+Redirect every LIVE store/ledger/notify path the order path writes, so a replay of a recorded day cannot touch a
+live file. Built + tested here; the actual Tuesday replay runs after close in the isolated clone (twin_run).
+
+Two independent layers, matching twin_run's design, so a miss in either still fails closed:
+  PREVENTIVE — `redirect(root)` monkeypatches the known write-target module constants (paper.LEDGER,
+    book20_runner.LEDGER, book20_runner.READOUT) to files UNDER `root`, and swaps notify.notify for a capture that
+    posts nothing, for the duration of the replay; everything is restored on exit.
+  DETECTIVE  — `no_live_writes(fn)` hashes every live ledger/store (twin_run's guarded set, which since NB38
+    includes the MAIN paper ledger) before and after fn, and reports any path that changed. A change is the loud
+    failure — so even a write path `redirect` forgot is caught.
+=== monday_rehearsal.py (head) ===
+"""R-MONDAY-REHEARSAL: run the whole Monday-morning chain end to end against a FAKE token in a TEMP
+environment, market closed. Every step prints PASS <timestamp> or FAIL. No Telegram leaves this run — it
+runs under a demo context, so scripts.notify drops (and logs) every send; the ONE ✅ is sent separately
+after this passes. Nothing here touches the real token, the real KILL flag, the real breaker day-flag, or
+the real order-hold state — those are redirected to a temp dir or only read.
+
+Run:  python -m scripts.monday_rehearsal --demo
+"""
+from __future__ import annotations
+
+import json
+import os
+=== rehearsal_day1.py (head) ===
+"""R-DAY1-BUNDLE B3: the end-to-end REHEARSAL on today's recorded data. Walks the whole pipeline the
+06:00 login launches — login landing -> recorders -> SPREADS.csv -> per-stock lock -> one paper fill in
+each of E1/E10/E11 -> one card each — and writes every step (with its file:line in the real loop) plus the
+three cards to a LOG, never Telegram. Uses TEMP ledgers for the fills so the production books are untouched,
+and lifts the R-HOLD-AND-FIX hold ONLY inside this rehearsal process (nothing here places a real order or
+sends anything). If any step fails it writes FAIL and stops. RECORD-ONLY, offline.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+=== chain_dry_run.py (head) ===
+"""NB25 item 63 — the item-4 FULL-CHAIN dry-run harness.
+
+Replays one fully-recorded market day through the chain the login launches and writes a CARD to a dry-run log
+ONLY — never Telegram, never the live ledger:
+    08:15 self-check line  →  evaluate the day (six checks)  →  for each QUEUE, the order gate decides:
+      flag PRESENT  → HELD  (order_ok is fail-closed under R-HOLD-AND-FIX)
+      flag ABSENT   → PLACED to the dry-run log (in a copy — the real flag is never removed)
+
+Run twice (flag present / absent) and the two outcomes must be HELD then PLACED — that is the mechanism proof.
+The INDEPENDENT verifier (scripts/verifier.py, a separate session) rules PASS/FAIL on the log and only then is a
+PASS marker written; this harness NEVER writes the marker itself (a run does not verify itself). Every heavy dep
+is injectable, so the logic is unit-tested without the store, the gate, or any ledger.
+assistant: Item 71 is largely built (`monday_rehearsal.py` runs the whole chain PASS/FAIL per step). Its one new requirement is **per-step memory+disk measurement** — which item 70 now provides. Checking whether the rehearsal already measures it:
+tool_use Bash {"command": "grep -nE \"free_gb|disk|memory_guard|day_log|PASS|def .*step|NOT READY|not ready\" scripts/monday_rehearsal.py | head -20; echo \"=== lines ===\"; wc -l scripts/monday_rehearsal.py", "description": "Check monday_rehearsal for per-step RAM/disk measurement"}
+tool_result: 2:environment, market closed. Every step prints PASS <timestamp> or FAIL. No Telegram leaves this run — it
+36:def _mark(ok, step, detail=""):
+37:    tag = "PASS" if ok else "FAIL"
+44:def _step(step, fn):
+98:    """Each recording lane STARTS on the fake token and self-gates (records off disk / fails closed; no fabrication)."""
+237:    from scripts.memory_guard import free_gb
+238:    free_before = free_gb()
+254:    free_after = free_gb()
+264:        f.write("\n**RESULT: %s**\n" % ("ALL PASS" if ok else "FAIL — see the lines above"))
+266:    print("RESULT:", "ALL PASS" if ok else "FAIL")
+=== lines ===
+273 scripts/monday_rehearsal.py
+assistant: `monday_rehearsal` measures RAM only globally and no disk. Item 71's delta: **per-step** disk+RAM + a READY/NOT-READY line. Let me see `_step`/`_mark` and the result tail to make the minimal edit:
+tool_use Bash {"command": "sed -n '30,55p' scripts/monday_rehearsal.py; echo \"=== tail 230-273 ===\"; sed -n '230,273p' scripts/monday_rehearsal.py", "description": "Read monday_rehearsal _step/_mark and result tail"}
+tool_result: def _ist():
+    return datetime.now(timezone.utc).astimezone(IST)
+
+
+def _mark(ok, step, detail=""):
+    tag = "PASS" if ok else "FAIL"
+    line = "%s %s — %s%s" % (tag, _ist().strftime("%H:%M:%S"), step, (" · " + detail) if detail else "")
+    print(line)
+    _lines.append((ok, line))
+    return ok
+
+
+def _step(step, fn):
+    try:
+        ok, detail = fn()
+        return _mark(bool(ok), step, detail)
+    except Exception as e:
+        return _mark(False, step, "%s: %s" % (type(e).__name__, str(e)[:160]))
+
+
+# --------------------------------------------------------------------------- the steps
+def _catcher_and_token(tmp, kite):
+    """START_E1_KITE.bat → kite_catcher on 127.0.0.1 → request_token → token stored (all fake, temp file)."""
+    import http.server
+=== tail 230-273 ===
+def _summary(tmp):
+    from scripts import day_report
+    day_report.summary()                               # reads the real ledger; notify dropped under --demo
+    return True, "15:40 summary generated (log only)"
+
+
+def run():
+    from scripts.memory_guard import free_gb
+    free_before = free_gb()
+    from data_acquisition import kite
+    from engine1_rebuild import gate, book20_runner as book20
+    tmp = tempfile.mkdtemp(prefix="monday_rehearsal_")
+
+    _step("1. START_E1_KITE → catcher on 127.0.0.1 → token stored", lambda: _catcher_and_token(tmp, kite))
+    _step("2. verify call", lambda: _verify(tmp, kite))
+    _step("3. recorders start (chains, ticks, NSE/BSE, depth, positioning)", lambda: _recorders(tmp, kite))
+    _step("4. book20 runner up, gate.order_ok per poll", lambda: _book20_poll_held(book20, gate))
+    _step("5. KILL and RESUME", lambda: _kill_resume(tmp, gate))
+    _step("6. breaker trip on a synthetic streak", lambda: _breaker(tmp))
+    _step("7. trade cards written to log only", lambda: _trade_card_to_log(book20, gate))
+    _step("8. site build and publish", lambda: _site(tmp))
+    _step("9. 15:40 summary", lambda: _summary(tmp))
+    _step("10. ROOF executor path (R-ROOF-EXECUTOR): desk book via the single order path", lambda: _roof_executor(gate))
+
+    free_after = free_gb()
+    ok = all(o for o, _ in _lines)
+    hold_state = "HELD (R-HOLD-AND-FIX flag present, no AUDIT-3 pass)" if gate.held() else "NOT HELD"
+    with open(OUT_MD, "w", encoding="utf-8") as f:
+        f.write("# Monday-morning rehearsal (R-MONDAY-REHEARSAL) — %s IST\n\n" % _ist().strftime("%Y-%m-%d %H:%M"))
+        f.write("_Fake token, temp environment, market closed. No Telegram left this run (demo context drops "
+                "every send). The real token, KILL flag, breaker day-flag and order-hold were untouched._\n\n")
+        f.write("Free RAM: **%s GB before → %s GB after**.\n\n" % (free_before, free_after))
+        f.write("Order-hold state (unchanged by the rehearsal): **%s** — the state SMOKE-3E left.\n\n" % hold_state)
+        f.write("```\n" + "\n".join(l for _, l in _lines) + "\n```\n")
+        f.write("\n**RESULT: %s**\n" % ("ALL PASS" if ok else "FAIL — see the lines above"))
+    print("\nfree RAM: %s GB before -> %s GB after | hold: %s" % (free_before, free_after, hold_state))
+    print("RESULT:", "ALL PASS" if ok else "FAIL")
+    return ok
+
+
+if __name__ == "__main__":
+    if "--demo" in sys.argv or "--run" in sys.argv:
+        sys.exit(0 if run() else 1)
+    print("run with --demo (keeps every send off Telegram):  python -m scripts.monday_rehearsal --demo")
+assistant: Item 71's delta is small: per-step disk+RAM in `_mark`, and a READY/NOT-READY result. TDD RED first:
+tool_use Bash {"command": "cat > tests/test_rehearsal_measure.py <<'EOF'\n\"\"\"NB53-B item 71 \u2014 the nightly full-morning rehearsal records DISK and RAM per step and ends READY / NOT READY.\n\nThe rehearsal (scripts/monday_rehearsal) already walks the whole 06:00->08:15 chain PASS/FAIL per step; item 71's\naddition is the per-step measurement (memory AND disk, item 70's measure) and a READY/NOT-READY verdict word.\n\"\"\"\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import monday_rehearsal as mr\n\n\ndef test_mark_records_disk_and_ram_per_step(monkeypatch):\n    mr._lines.clear()\n    monkeypatch.setattr(mr, \"_measure\", lambda: (12.0, 1.5))\n    mr._mark(True, \"step X\")\n    _, line = mr._lines[-1]\n    assert \"disk=12GB\" in line and \"ram=1.5GB\" in line and \"PASS\" in line\n\n\ndef test_result_word_is_ready_or_not_ready():\n    assert mr._result_word(True) == \"READY\"\n    assert mr._result_word(False) == \"NOT READY\"\nEOF\necho \"--- RED ---\"; python -m pytest tests/test_rehearsal_measure.py -q 2>&1 | tail -6", "description": "Write rehearsal-measure test, RED"}
+tool_result: --- RED ---
+
+tests\test_rehearsal_measure.py:20: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_rehearsal_measure.py::test_mark_records_disk_and_ram_per_step
+FAILED tests/test_rehearsal_measure.py::test_result_word_is_ready_or_not_ready
+2 failed in 0.51s
+assistant: RED. Now the minimal edit to `monday_rehearsal.py`:
+tool_use Edit {"replace_all": false, "file_path": "[redacted]\\Desktop\\trading-engines-v2\\scripts\\monday_rehearsal.py", "old_string": "def _mark(ok, step, detail=\"\"):\n    tag = \"PASS\" if ok else \"FAIL\"\n    line = \"%s %s \u2014 %s%s\" % (tag, _ist().strftime(\"%H:%M:%S\"), step, (\" \u00b7 \" + detail) if detail else \"\")\n    print(line)\n    _lines.append((ok, line))\n    return ok", "new_string": "def _measure():\n    \"\"\"(free disk GB, free RAM GB) measured now \u2014 item 70's measure, reused. None on an unreadable read.\"\"\"\n    from scripts import desk_day_log\n    return desk_day_log._disk_free_gb(), desk_day_log._ram_free_gb()\n\n\ndef _result_word(ok):\n    return \"READY\" if ok else \"NOT READY\"\n\n\ndef _mark(ok, step, detail=\"\"):\n    tag = \"PASS\" if ok else \"FAIL\"\n    disk, ram = _measure()                              # item 71: memory AND disk measured PER STEP\n    d = \"?\" if disk is None else (\"%g\" % disk)\n    r = \"?\" if ram is None else (\"%g\" % ram)\n    line = \"%s %s \u2014 %s%s | disk=%sGB ram=%sGB\" % (\n        tag, _ist().strftime(\"%H:%M:%S\"), step, (\" \u00b7 \" + detail) if detail else \"\", d, r)\n    print(line)\n    _lines.append((ok, line))\n    return ok"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\scripts\monday_rehearsal.py has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python - <<'PY'\np=\"scripts/monday_rehearsal.py\"\ns=open(p,encoding=\"utf-8\").read()\ns=s.replace('f.write(\"\\\\n**RESULT: %s**\\\\n\" % (\"ALL PASS\" if ok else \"FAIL \u2014 see the lines above\"))',\n            'f.write(\"\\\\n**RESULT: %s** (%s)\\\\n\" % (\"ALL PASS\" if ok else \"FAIL \u2014 see the lines above\", _result_word(ok)))')\ns=s.replace('print(\"RESULT:\", \"ALL PASS\" if ok else \"FAIL\")',\n            'print(\"RESULT:\", (\"ALL PASS\" if ok else \"FAIL\"), \"->\", _result_word(ok))')\nopen(p,\"w\",encoding=\"utf-8\").write(s)\nprint(\"patched RESULT lines\")\nPY\necho \"--- GREEN ---\"; python -m pytest tests/test_rehearsal_measure.py -q 2>&1 | tail -4", "description": "Patch RESULT lines to READY/NOT READY, run GREEN"}
+tool_result: patched RESULT lines
+--- GREEN ---
+..                                                                       [100%]
+2 passed in 0.09s
+assistant: Items 70–72 GREEN. `⏱ NB53-B · item 71 rehearsal per-step disk+RAM + READY/NOT-READY · GREEN (2)`. Now **item 73 (event blackout)** — [DAYS], depends on engine 4's event store. I build the pure logic now (blackout = the named event day itself; a wider window is a lead ruling when engine 4 supplies events), DORMANT when no store. RED first:
+tool_use Bash {"command": "cat > tests/test_event_blackout.py <<'EOF'\n\"\"\"NB53-B item 73 \u2014 event blackout: no NEW orders on a named event day. Dates come from the Calendar engine's\nstore (engine 4), never typed. DORMANT (blackout never trips) while no event store exists \u2014 fail-open on data is\ncorrect here: an ABSENT calendar must not silently freeze all trading; a present one blacks out its named days.\n\"\"\"\nimport os, sys, datetime as dt\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nfrom scripts import event_blackout as eb\n\n\ndef test_named_event_day_is_blacked_out():\n    events = {\"2026-10-15\": \"RELIANCE earnings\", \"2026-10-30\": \"index reconstitution\"}\n    assert eb.in_blackout(\"2026-10-15\", events) is True\n    assert eb.in_blackout(\"2026-10-16\", events) is False        # window_days default 0 -> the day itself only\n    assert eb.reason(\"2026-10-30\", events) == \"index reconstitution\"\n    assert eb.reason(\"2026-10-16\", events) is None\n\n\ndef test_window_widens_symmetrically_when_set():\n    events = {\"2026-10-15\": \"earnings\"}\n    assert eb.in_blackout(\"2026-10-14\", events, window_days=1) is True\n    assert eb.in_blackout(\"2026-10-16\", events, window_days=1) is True\n    assert eb.in_blackout(\"2026-10-13\", events, window_days=1) is False\n\n\ndef test_dormant_when_no_event_store():\n    assert eb.in_blackout(\"2026-10-15\", {}) is False            # empty store -> never blacks out (fail-open)\n    assert eb.in_blackout(\"2026-10-15\", None) is False\nEOF\necho \"--- RED ---\"; python -m pytest tests/test_event_blackout.py -q 2>&1 | tail -5", "description": "Write event_blackout test, RED"}
+tool_result: --- RED ---
+E   ImportError: cannot import name 'event_blackout' from 'scripts' (unknown location)
+=========================== short test summary info ===========================
+ERROR tests/test_event_blackout.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.36s
+tool_use Bash {"command": "cat > scripts/event_blackout.py <<'EOF'\n\"\"\"NB53-B item 73 \u2014 event blackout: no NEW orders on a named event day (earnings / index-reconstitution dates).\n\nDates come from the Calendar engine's store (NB53 engine 4), never typed here (\u00a74.1 / \u00a724.5). The blackout window\ndefaults to the named day ITSELF (window_days=0) \u2014 the one non-arbitrary choice that needs no derivation. A wider\nwindow (\"the session before/after\") is a threshold and therefore a LEAD RULING to be set when engine 4 supplies a\nmeasured/exchange-published event list; until then the caller passes window_days explicitly or takes the day-only\ndefault.\n\nDORMANT while no event store exists: an empty/absent calendar returns False (never blacks out). This is the\ncorrect fail direction \u2014 an absent calendar must NOT silently freeze all trading; only a present, dated calendar\nblacks out its own named days. This composes with engine 4: engine 4 writes the event dict, this reads it.\n\"\"\"\nfrom __future__ import annotations\n\nimport datetime as _dt\n\n\ndef _d(s):\n    return _dt.date.fromisoformat(s) if isinstance(s, str) else s\n\n\ndef in_blackout(asof, event_dates, window_days=0):\n    \"\"\"True if `asof` (ISO str or date) is within `window_days` of any named event date. event_dates is a\n    {iso_date: reason} dict from the Calendar engine. Empty/None -> False (DORMANT).\"\"\"\n    if not event_dates:\n        return False\n    a = _d(asof)\n    for ev in event_dates:\n        if abs((a - _d(ev)).days) <= window_days:\n            return True\n    return False\n\n\ndef reason(asof, event_dates, window_days=0):\n    \"\"\"The reason string for the nearest event within the window, or None. Names why an order is blocked.\"\"\"\n    if not event_dates:\n        return None\n    a = _d(asof)\n    hits = [(abs((a - _d(ev)).days), event_dates[ev]) for ev in event_dates if abs((a - _d(ev)).days) <= window_days]\n    return min(hits)[1] if hits else None\n\n\ndef
+tool_result: --- GREEN ---
+...                                                                      [100%]
+3 passed in 0.06s
+event_blackout demo OK: named day blocked; window widens on request; DORMANT (fail-open) with no store.
+assistant: All of §H 70–73 GREEN. Running the four together and updating the checklist:
+tool_use Bash {"command": "python -m pytest tests/test_desk_day_log.py tests/test_market_hours_mode.py tests/test_rehearsal_measure.py tests/test_event_blackout.py -q 2>&1 | tail -4\npython - <<'PY'\np=\"docs/MASTER-CHECKLIST.md\"\ns=open(p,encoding=\"utf-8\").read()\nreps={\n\"- [AFTER-1545] 70. desk day-log\":\"- [AFTER-1545] 70. desk day-log \u2014 **BUILT-not-LIVE (NB53-B, d?): scripts/desk_day_log.py + tests GREEN (2); one line/step with measured free disk+RAM, unreadable->'?'. Wire-in (calls from token/08:15/09:15/close-done steps) is verify-gated.**\",\n\"- [AFTER-1545] 71. nightly full-morning rehearsal\":\"- [AFTER-1545] 71. nightly full-morning rehearsal \u2014 **BUILT-not-LIVE (NB53-B): monday_rehearsal already walks the chain PASS/FAIL; added per-step disk+RAM (_measure) + READY/NOT-READY (_result_word); tests GREEN (2).**\",\n\"- [AFTER-1545] 72. market-hours mode\":\"- [AFTER-1545] 72. market-hours mode \u2014 **BUILT-not-LIVE (NB53-B): scripts/market_hours_mode.py + tests GREEN (4); desk_only(08:30->close-done) window + one \ud83d\ude4b/breach (disk-full, low-RAM) with the measured GB, floors passed in (reverted disk floor stays out of the chain). Wire-in verify-gated.**\",\n\"- [DAYS] 73. event blackout\":\"- [DAYS] 73. event blackout \u2014 **BUILT-DORMANT (NB53-B): scripts/event_blackout.py + tests GREEN (3); named event day blocked, window_days param (>0 = LEAD RULING when engine 4 supplies events), DORMANT/fail-open with no store. Composes with engine 4's event dict.**\",\n}\nn=0\nfor k,v in reps.items():\n    # replace only the leading label part up to the em dash on that line\n    import re\n    pat=re.escape(k)+r\"[^\\n]*\"\n    s2=re.sub(pat, v, s, count=1)\n    if s2!=s: n+=1\n    s=s2\nopen(p,\"w\",encoding=\"utf-8\").write(s)\nprint(\"checklist lines updated:\",n)\nPY", "description": "Run 4 tests together, update checklist 70-73"}
+tool_result: ...........                                                              [100%]
+11 passed in 0.27s
+checklist lines updated: 4
+tool_use Bash {"command": "git add scripts/desk_day_log.py tests/test_desk_day_log.py scripts/market_hours_mode.py tests/test_market_hours_mode.py scripts/monday_rehearsal.py tests/test_rehearsal_measure.py scripts/event_blackout.py tests/test_event_blackout.py docs/MASTER-CHECKLIST.md && git commit -q -m \"NB53-B step 2: \u00a7H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB \ud83d\ude4b guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1", "description": "Commit \u00a7H 70-73 block"}
+tool_result: warning: in the working copy of 'scripts/desk_day_log.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/event_blackout.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/market_hours_mode.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_desk_day_log.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_event_blackout.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_market_hours_mode.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_rehearsal_measure.py', LF will be replaced by CRLF the next time Git touches it
+97c7a249b NB53-B step 2: §H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB 🙋 guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated

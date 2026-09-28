@@ -1,4 +1,650 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>e7f93f5a0</b> · 2026-09-28 08:15</div><div>NB53 engine roster: map all 8 NB53 engine names to existing design docs + code packages, cite each source; flag 2 gaps as LEAD RULING (engine 2 Claude Price MISSING; engine 5 Machine Factory ambiguous vs superseded E6 ruler-factory). Docs only</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md | 37 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>97c7a249b</b> · 2026-09-28 08:31</div><div>NB53-B step 2: §H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB 🙋 guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated</div><div class='sub h'>docs/MASTER-CHECKLIST.md        |  8 ++--</div><div class='sub h'>scripts/desk_day_log.py         | 84 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/event_blackout.py       | 55 +++++++++++++++++++++++++++</div><div class='sub h'>scripts/market_hours_mode.py    | 66 ++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/monday_rehearsal.py     | 18 ++++++++-</div><div class='sub h'>tests/test_desk_day_log.py      | 30 +++++++++++++++</div><div class='sub h'>tests/test_event_blackout.py    | 27 +++++++++++++</div><div class='sub h'>tests/test_market_hours_mode.py | 37 ++++++++++++++++++</div><div class='sub h'>tests/test_rehearsal_measure.py | 21 +++++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+index 4e74e4efc..d45b4787a 100644
+--- a/docs/MASTER-CHECKLIST.md
++++ b/docs/MASTER-CHECKLIST.md
+@@ -103,8 +103,8 @@ _PRUNED 2026-09-28 (NB50-B) to the owner&#x27;s seven engines. Six ideas + three drop
+ ## H. Desk operations (NB50 item 3, added NB52 2026-09-28 — docs only)
+ _The Claude Price Engine (chunks 1–7) and the [redacted] Price Engine (35 rulers untouched) are already §E engines 2 and 1; these are the operational additions NB50 item 3 named that were not yet on the list._
+ 
+-- [AFTER-1545] 70. desk day-log — one line per step per day (token time · 08:15 line · 09:15 gate decision · close-done), each carrying the measured free DISK and free RAM at that step. The single artifact the Friday/Saturday audits lacked.
+-- [AFTER-1545] 71. nightly full-morning rehearsal on the real stack — fake token + recorded quotes, memory AND disk measured per step, ends in a PASS / NOT READY line. Proves the whole 06:00→08:15 chain before the real morning.
+-- [AFTER-1545] 72. market-hours mode — the desk runs desk-only 08:30 → close-done; disk-full AND low-RAM each post a 🙋 with the measured number (the disk-free floor feeds the 08:15 self-check, item reverted NB52 pending a verify).
+-- [DAYS] 73. event blackout — no new orders around named events (earnings/index dates from the Calendar engine, §E engine 4); dates from the store, never typed.
++- [AFTER-1545] 70. desk day-log — **BUILT-not-LIVE (NB53-B, d?): scripts/desk_day_log.py + tests GREEN (2); one line/step with measured free disk+RAM, unreadable-&gt;&#x27;?&#x27;. Wire-in (calls from token/08:15/09:15/close-done steps) is verify-gated.**
++- [AFTER-1545] 71. nightly full-morning rehearsal — **BUILT-not-LIVE (NB53-B): monday_rehearsal already walks the chain PASS/FAIL; added per-step disk+RAM (_measure) + READY/NOT-READY (_result_word); tests GREEN (2).**
++- [AFTER-1545] 72. market-hours mode — **BUILT-not-LIVE (NB53-B): scripts/market_hours_mode.py + tests GREEN (4); desk_only(08:30-&gt;close-done) window + one 🙋/breach (disk-full, low-RAM) with the measured GB, floors passed in (reverted disk floor stays out of the chain). Wire-in verify-gated.**
++- [DAYS] 73. event blackout — **BUILT-DORMANT (NB53-B): scripts/event_blackout.py + tests GREEN (3); named event day blocked, window_days param (&gt;0 = LEAD RULING when engine 4 supplies events), DORMANT/fail-open with no store. Composes with engine 4&#x27;s event dict.**
+ - [DAYS] 74. monthly fill calibration — publish the shadow re-settle delta in R once a month (FILL-LAW-UNVERIFIED badge, D1); clears the badge only when the delta is measured.
+diff --git a/scripts/desk_day_log.py b/scripts/desk_day_log.py
+new file mode 100644
+index 000000000..d6e8cb72f
+--- /dev/null
++++ b/scripts/desk_day_log.py
+@@ -0,0 +1,84 @@
++&quot;&quot;&quot;NB53-B item 70 — desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.
++
++The single artifact the Friday/Saturday audits lacked: nothing recorded disk/RAM at each morning step, so a fill
++that ran out of disk (Sat 26 Sep) or a recorder that died on low RAM left no trail. Each launch step (token /
++08:15 / 09:15 gate / close-done) calls log_step; the module measures and appends. No typed number (§4.1): disk
++from shutil.disk_usage, RAM from memory_guard.free_gb; an unreadable measure is written &quot;?&quot;, never a fabricated 0.
++
++The module is pure and fully tested now; the CALLS from the live launch steps are the launch-path wire-in
++(built-not-live until the owner-run fresh-session verify — §24.2).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++import os
++import shutil
++
++_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++LOG = os.path.join(_REPO, &quot;reports&quot;, &quot;DESK-DAY-LOG.md&quot;)
++
++
++def _disk_free_gb():
++    try:
++        return round(shutil.disk_usage(_REPO).free / (1024 ** 3), 1)
++    except Exception:
++        return None
++
++
++def _ram_free_gb():
++    try:
++        from scripts import memory_guard
++        return memory_guard.free_gb()
++    except Exception:
++        return None
++
++
++def _num(x):
++    return &quot;?&quot; if x is None else (&quot;%g&quot; % x)
++
++
++def log_step(step, note=&quot;&quot;, clock=None, date=None):
++    &quot;&quot;&quot;Append one day-log line for a step, with the free disk + RAM measured now. Never raises.&quot;&quot;&quot;
++    now = _dt.datetime.now()
++    clock = clock or now.strftime(&quot;%H:%M:%S&quot;)
++    date = date or now.strftime(&quot;%Y-%m-%d&quot;)
++    line = &quot;%s %s | step=%s | disk=%sGB | ram=%sGB%s&quot; % (
++        date, clock, step, _num(_disk_free_gb()), _num(_ram_free_gb()),
++        (&quot; | &quot; + note) if note else &quot;&quot;)
++    try:
++        os.makedirs(os.path.dirname(LOG), exist_ok=True)
++        with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
++            f.write(line + &quot;\n&quot;)
++    except Exception:
++        pass
++    return line
++
++
++def today_lines(date=None):
++    date = date or _dt.datetime.now().strftime(&quot;%Y-%m-%d&quot;)
++    try:
++        return [ln.rstrip(&quot;\n&quot;) for ln in open(LOG, encoding=&quot;utf-8&quot;) if ln.startswith(date)]
++    except Exception:
++        return []
++
++
++def _demo():
++    import tempfile
++    global LOG, _disk_free_gb, _ram_free_gb
++    LOG = os.path.join(tempfile.mkdtemp(), &quot;d.md&quot;)
++    _disk_free_gb = lambda: 9.0
++    _ram_free_gb = lambda: 1.1
++    log_step(&quot;token&quot;, &quot;login landed&quot;, clock=&quot;06:00:00&quot;, date=&quot;2026-09-28&quot;)
++    log_step(&quot;08:15&quot;, &quot;READY&quot;, clock=&quot;08:15:00&quot;, date=&quot;2026-09-28&quot;)
++    ls = today_lines(&quot;2026-09-28&quot;)
++    assert len(ls) == 2 and &quot;disk=9GB&quot; in ls[0] and &quot;ram=1.1GB&quot; in ls[0] and &quot;step=08:15&quot; in ls[1]
++    _disk_free_gb = lambda: None
++    log_step(&quot;close-done&quot;, clock=&quot;15:46:00&quot;, date=&quot;2026-09-28&quot;)
++    assert &quot;disk=?GB&quot; in today_lines(&quot;2026-09-28&quot;)[2]
++    print(&quot;desk_day_log demo OK: one line/step with measured disk+RAM; unreadable -&gt; &#x27;?&#x27;, never a fake 0.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/scripts/event_blackout.py b/scripts/event_blackout.py
+new file mode 100644
+index 000000000..06e437d47
+--- /dev/null
++++ b/scripts/event_blackout.py
+@@ -0,0 +1,55 @@
++&quot;&quot;&quot;NB53-B item 73 — event blackout: no NEW orders on a named event day (earnings / index-reconstitution dates).
++
++Dates come from the Calendar engine&#x27;s store (NB53 engine 4), never typed here (§4.1 / §24.5). The blackout window
++defaults to the named day ITSELF (window_days=0) — the one non-arbitrary choice that needs no derivation. A wider
++window (&quot;the session before/after&quot;) is a threshold and therefore a LEAD RULING to be set when engine 4 supplies a
++measured/exchange-published event list; until then the caller passes window_days explicitly or takes the day-only
++default.
++
++DORMANT while no event store exists: an empty/absent calendar returns False (never blacks out). This is the
++correct fail direction — an absent calendar must NOT silently freeze all trading; only a present, dated calendar
++blacks out its own named days. This composes with engine 4: engine 4 writes the event dict, this reads it.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++
++
++def _d(s):
++    return _dt.date.fromisoformat(s) if isinstance(s, str) else s
++
++
++def in_blackout(asof, event_dates, window_days=0):
++    &quot;&quot;&quot;True if `asof` (ISO str or date) is within `window_days` of any named event date. event_dates is a
++    {iso_date: reason} dict from the Calendar engine. Empty/None -&gt; False (DORMANT).&quot;&quot;&quot;
++    if not event_dates:
++        return False
++    a = _d(asof)
++    for ev in event_dates:
++        if abs((a - _d(ev)).days) &lt;= window_days:
++            return True
++    return False
++
++
++def reason(asof, event_dates, window_days=0):
++    &quot;&quot;&quot;The reason string for the nearest event within the window, or None. Names why an order is blocked.&quot;&quot;&quot;
++    if not event_dates:
++        return None
++    a = _d(asof)
++    hits = [(abs((a - _d(ev)).days), event_dates[ev]) for ev in event_dates if abs((a - _d(ev)).days) &lt;= window_days]
++    return min(hits)[1] if hits else None
++
++
++def _demo():
++    ev = {&quot;2026-10-15&quot;: &quot;RELIANCE earnings&quot;, &quot;2026-10-30&quot;: &quot;index reconstitution&quot;}
++    assert in_blackout(&quot;2026-10-15&quot;, ev) and not in_blackout(&quot;2026-10-16&quot;, ev)
++    assert reason(&quot;2026-10-30&quot;, ev) == &quot;index reconstitution&quot; and reason(&quot;2026-10-16&quot;, ev) is None
++    assert in_blackout(&quot;2026-10-14&quot;, ev, window_days=1) and in_blackout(&quot;2026-10-16&quot;, ev, window_days=1)
++    assert not in_blackout(&quot;2026-10-15&quot;, {}) and not in_blackout(&quot;2026-10-15&quot;, None)   # DORMANT
++    print(&quot;event_blackout demo OK: named day blocked; window widens on request; DORMANT (fail-open) with no store.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/scripts/market_hours_mode.py b/scripts/market_hours_mode.py
+new file mode 100644
+index 000000000..c58376f86
+--- /dev/null
++++ b/scripts/market_hours_mode.py
+@@ -0,0 +1,66 @@
++&quot;&quot;&quot;NB53-B item 72 — market-hours mode.
++
++During the desk-only window (08:30 -&gt; close-done ~15:46 on a trading weekday) the desk runs desk-only: heavy build
++jobs stand down (memory_guard already throttles them), and two safety guards each post ONE 🙋 with the MEASURED
++number when they breach — disk-full and low-RAM. Both floors are passed in by the caller (measured + cited, §4.1);
++this module types no floor. An unreadable measure fails closed to a 🙋 (a missing reading is the state in which the
++least is known).
++
++Built + tested here; the CALLS (the 08:15 self-check / desk loop posting these guard lines, and gating heavy jobs
++on desk_only) are the launch-path wire-in — built-not-live until the owner-run fresh-session verify (§24.2). The
++reverted disk floor (NB52) is NOT reintroduced into the chain here; it arrives as disk_floor_gb from the caller.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++
++_OPEN = (8, 30)          # desk-only starts (heavy build stands down)
++_CLOSE = (15, 46)        # close-done boundary (after this, building resumes)
++
++
++def _ist(now=None):
++    return now or _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
++
++
++def desk_only(now=None):
++    &quot;&quot;&quot;True during 08:30 -&gt; close-done on a trading weekday: the desk runs desk-only, heavy build waits.&quot;&quot;&quot;
++    now = _ist(now)
++    if now.weekday() &gt;= 5:
++        return False
++    hm = (now.hour, now.minute)
++    return _OPEN &lt;= hm &lt; _CLOSE
++
++
++def guards(free_ram_gb, free_disk_gb, ram_floor_gb, disk_floor_gb):
++    &quot;&quot;&quot;Return the 🙋 lines that should post now — one per breach, each carrying the measured number. Empty when
++    both are above their floors. Unreadable (None) fails closed to a 🙋. Floors are the caller&#x27;s measured values.&quot;&quot;&quot;
++    out = []
++    if free_ram_gb is None:
++        out.append(&quot;\U0001f64b RAM unreadable — cannot confirm headroom; treat as low. Send this to the lead&quot;)
++    elif float(free_ram_gb) &lt; float(ram_floor_gb):
++        out.append(&quot;\U0001f64b LOW RAM: %g GB free (floor %g GB) — desk-only, heavy jobs held. Send this to the lead&quot;
++                   % (free_ram_gb, ram_floor_gb))
++    if free_disk_gb is None:
++        out.append(&quot;\U0001f64b DISK unreadable — cannot confirm space; treat as full. Send this to the lead&quot;)
++    elif float(free_disk_gb) &lt; float(disk_floor_gb):
++        out.append(&quot;\U0001f64b DISK FULL: %g GB free (floor %g GB) — clear space before trading. Send this to the lead&quot;
++                   % (free_disk_gb, disk_floor_gb))
++    return out
++
++
++def _demo():
++    on = _dt.datetime(2026, 9, 28, 9, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
++    off = on.replace(hour=16)
++    assert desk_only(on) is True and desk_only(off) is False
++    assert guards(2.0, 50.0, 0.378, 0.376) == []
++    g = guards(0.2, 0.1, 0.378, 0.376)
++    assert len(g) == 2 and any(&quot;LOW RAM&quot; in x for x in g) and any(&quot;DISK FULL&quot; in x for x in g)
++    assert all(&quot;unreadable&quot; in x for x in guards(None, None, 0.378, 0.376))
++    print(&quot;market_hours_mode demo OK: 08:30-&gt;close-done desk-only window; one 🙋/breach with the measured GB; &quot;
++          &quot;unreadable fails closed.&quot;.encode(&quot;ascii&quot;, &quot;replace&quot;).decode())
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/scripts/monday_rehearsal.py b/scripts/monday_rehearsal.py
+index 2d5237fca..0f2ab5ab3 100644
+--- a/scripts/monday_rehearsal.py
++++ b/scripts/monday_rehearsal.py
+@@ -33,9 +33,23 @@ def _ist():
+     return datetime.now(timezone.utc).astimezone(IST)
+ 
+ 
++def _measure():
++    &quot;&quot;&quot;(free disk GB, free RAM GB) measured now — item 70&#x27;s measure, reused. None on an unreadable read.&quot;&quot;&quot;
++    from scripts import desk_day_log
++    return desk_day_log._disk_free_gb(), desk_day_log._ram_free_gb()
++
++
++def _result_word(ok):
++    return &quot;READY&quot; if ok else &quot;NOT READY&quot;
++
++
+ def _mark(ok, step, detail=&quot;&quot;):
+     tag = &quot;PASS&quot; if ok else &quot;FAIL&quot;
+-    line = &quot;%s %s — %s%s&quot; % (tag, _ist().strftime(&quot;%H:%M:%S&quot;), step, (&quot; · &quot; + detail) if detail else &quot;&quot;)
++    disk, ram = _measure()                              # item 71: memory AND disk measured PER STEP
++    d = &quot;?&quot; if disk is None else (&quot;%g&quot; % disk)
++    r = &quot;?&quot; if ram is None else (&quot;%g&quot; % ram)
++    line = &quot;%s %s — %s%s | disk=%sGB ram=%sGB&quot; % (
++        tag, _ist().strftime(&quot;%H:%M:%S&quot;), step, (&quot; · &quot; + detail) if detail else &quot;&quot;, d, r)
+     print(line)
+     _lines.append((ok, line))
+     return ok
+@@ -263,7 +277,7 @@ def run():
+         f.write(&quot;```\n&quot; + &quot;\n&quot;.join(l for _, l in _lines) + &quot;\n```\n&quot;)
+         f.write(&quot;\n**RESULT: %s**\n&quot; % (&quot;ALL PASS&quot; if ok else &quot;FAIL — see the lines above&quot;))
+     print(&quot;\nfree RAM: %s GB before -&gt; %s GB after | hold: %s&quot; % (free_before, free_after, hold_state))
+-    print(&quot;RESULT:&quot;, &quot;ALL PASS&quot; if ok else &quot;FAIL&quot;)
++    print(&quot;RESULT:&quot;, (&quot;ALL PASS&quot; if ok else &quot;FAIL&quot;), &quot;-&gt;&quot;, _result_word(ok))
+     return ok
+ 
+ 
+diff --git a/tests/test_desk_day_log.py b/tests/test_desk_day_log.py
+new file mode 100644
+index 000000000..d3d5a17db
+--- /dev/null
++++ b/tests/test_desk_day_log.py
+@@ -0,0 +1,30 @@
++&quot;&quot;&quot;NB53-B item 70 — desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.
++
++The single artifact the Friday/Saturday audits lacked (nothing recorded the disk/RAM at each morning step). Pure
++writer: the launch steps (token / 08:15 / 09:15 gate / close-done) call log_step; the module measures disk+RAM and
++appends. No typed number — disk from shutil.disk_usage, RAM from memory_guard (§4.1).
++&quot;&quot;&quot;
++import os, sys, tempfile
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import desk_day_log as ddl
++
++
++def test_logs_a_line_per_step_with_disk_and_ram(tmp_path, monkeypatch):
++    monkeypatch.setattr(ddl, &quot;LOG&quot;, str(tmp_path / &quot;DESK-DAY-LOG.md&quot;))
++    monkeypatch.setattr(ddl, &quot;_disk_free_gb&quot;, lambda: 12.3)
++    monkeypatch.setattr(ddl, &quot;_ram_free_gb&quot;, lambda: 1.4)
++    ddl.log_step(&quot;token&quot;, &quot;login landed&quot;, clock=&quot;06:01:02&quot;, date=&quot;2026-09-28&quot;)
++    ddl.log_step(&quot;08:15&quot;, &quot;READY&quot;, clock=&quot;08:15:00&quot;, date=&quot;2026-09-28&quot;)
++    lines = ddl.today_lines(&quot;2026-09-28&quot;)
++    assert len(lines) == 2
++    assert &quot;step=token&quot; in lines[0] and &quot;disk=12.3GB&quot; in lines[0] and &quot;ram=1.4GB&quot; in lines[0]
++    assert &quot;step=08:15&quot; in lines[1] and &quot;READY&quot; in lines[1]
++
++
++def test_unreadable_measure_is_recorded_not_crashed(tmp_path, monkeypatch):
++    monkeypatch.setattr(ddl, &quot;LOG&quot;, str(tmp_path / &quot;d.md&quot;))
++    monkeypatch.setattr(ddl, &quot;_disk_free_gb&quot;, lambda: None)   # unreadable
++    monkeypatch.setattr(ddl, &quot;_ram_free_gb&quot;, lambda: None)
++    ddl.log_step(&quot;close-done&quot;, clock=&quot;15:46:00&quot;, date=&quot;2026-09-28&quot;)
++    ln = ddl.today_lines(&quot;2026-09-28&quot;)[0]
++    assert &quot;disk=?GB&quot; in ln and &quot;ram=?GB&quot; in ln          # honest &quot;?&quot; not a fabricated 0
+diff --git a/tests/test_event_blackout.py b/tests/test_event_blackout.py
+new file mode 100644
+index 000000000..8f73e4243
+--- /dev/null
++++ b/tests/test_event_blackout.py
+@@ -0,0 +1,27 @@
++&quot;&quot;&quot;NB53-B item 73 — event blackout: no NEW orders on a named event day. Dates come from the Calendar engine&#x27;s
++store (engine 4), never typed. DORMANT (blackout never trips) while no event store exists — fail-open on data is
++correct here: an ABSENT calendar must not silently freeze all trading; a present one blacks out its named days.
++&quot;&quot;&quot;
++import os, sys, datetime as dt
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import event_blackout as eb
++
++
++def test_named_event_day_is_blacked_out():
++    events = {&quot;2026-10-15&quot;: &quot;RELIANCE earnings&quot;, &quot;2026-10-30&quot;: &quot;index reconstitution&quot;}
++    assert eb.in_blackout(&quot;2026-10-15&quot;, events) is True
++    assert eb.in_blackout(&quot;2026-10-16&quot;, events) is False        # window_days default 0 -&gt; the day itself only
++    assert eb.reason(&quot;2026-10-30&quot;, events) == &quot;index reconstitution&quot;
++    assert eb.reason(&quot;2026-10-16&quot;, events) is None
++
++
++def test_window_widens_symmetrically_when_set():
++    events = {&quot;2026-10-15&quot;: &quot;earnings&quot;}
++    assert eb.in_blackout(&quot;2026-10-14&quot;, events, window_days=1) is True
++    assert eb.in_blackout(&quot;2026-10-16&quot;, events, window_days=1) is True
++    assert eb.in_blackout(&quot;2026-10-13&quot;, events, window_days=1) is False
++
++
++def test_dormant_when_no_event_store():
++    assert eb.in_blackout(&quot;2026-10-15&quot;, {}) is False            # empty store -&gt; never blacks out (fail-open)
++    assert eb.in_blackout(&quot;2026-10-15&quot;, None) is False
+diff --git a/tests/test_market_hours_mode.py b/tests/test_market_hours_mode.py
+new file mode 100644
+index 000000000..d95a071bf
+--- /dev/null
++++ b/tests/test_market_hours_mode.py
+@@ -0,0 +1,37 @@
++&quot;&quot;&quot;NB53-B item 72 — market-hours mode: desk runs desk-only 08:30 -&gt; close-done; disk-full AND low-RAM each post
++ONE 🙋 with the MEASURED number. Floors are passed in (measured, cited by the caller — §4.1), never typed here.
++&quot;&quot;&quot;
++import os, sys, datetime as dt
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import market_hours_mode as mhm
++
++
++def _ist(h, m, wd=0):
++    # a Monday (wd=0) at h:m IST
++    base = dt.datetime(2026, 9, 28, h, m, tzinfo=dt.timezone(dt.timedelta(hours=5, minutes=30)))
++    return base
++
++
++def test_desk_only_window_is_0830_to_close_done():
++    assert mhm.desk_only(_ist(8, 30)) is True
++    assert mhm.desk_only(_ist(15, 45)) is True
++    assert mhm.desk_only(_ist(8, 29)) is False        # before 08:30 -&gt; build ok
++    assert mhm.desk_only(_ist(15, 46)) is False        # after close-done -&gt; build ok
++    sat = _ist(10, 0); sat = sat.replace(day=26)       # Saturday
++    assert mhm.desk_only(sat) is False                 # not a weekday
++
++
++def test_guards_emit_one_9man_per_breach_with_the_measured_number():
++    g = mhm.guards(free_ram_gb=0.2, free_disk_gb=0.1, ram_floor_gb=0.378, disk_floor_gb=0.376)
++    assert len(g) == 2
++    assert any(&quot;\U0001f64b&quot; in x and &quot;0.2&quot; in x and &quot;RAM&quot; in x for x in g)
++    assert any(&quot;\U0001f64b&quot; in x and &quot;0.1&quot; in x and &quot;DISK&quot; in x for x in g)
++
++
++def test_guards_quiet_when_above_floors():
++    assert mhm.guards(free_ram_gb=2.0, free_disk_gb=50.0, ram_floor_gb=0.378, disk_floor_gb=0.376) == []
++
++
++def test_unreadable_measure_fails_closed_to_a_9man():
++    g = mhm.guards(free_ram_gb=None, free_disk_gb=None, ram_floor_gb=0.378, disk_floor_gb=0.376)
++    assert len(g) == 2 and all(&quot;\U0001f64b&quot; in x and &quot;unreadable&quot; in x for x in g)
+diff --git a/tests/test_rehearsal_measure.py b/tests/test_rehearsal_measure.py
+new file mode 100644
+index 000000000..0ecb9072f
+--- /dev/null
++++ b/tests/test_rehearsal_measure.py
+@@ -0,0 +1,21 @@
++&quot;&quot;&quot;NB53-B item 71 — the nightly full-morning rehearsal records DISK and RAM per step and ends READY / NOT READY.
++
++The rehearsal (scripts/monday_rehearsal) already walks the whole 06:00-&gt;08:15 chain PASS/FAIL per step; item 71&#x27;s
++addition is the per-step measurement (memory AND disk, item 70&#x27;s measure) and a READY/NOT-READY verdict word.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import monday_rehearsal as mr
++
++
++def test_mark_records_disk_and_ram_per_step(monkeypatch):
++    mr._lines.clear()
++    monkeypatch.setattr(mr, &quot;_measure&quot;</pre></div><div class='c'><div class='h'><b>d79733220</b> · 2026-09-28 08:25</div><div>NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B</div><div class='sub h'>CLAUDE.md                            |  18 ++++++</div><div class='sub h'>docs/architecture/ENGINE-BUS.md      |  13 +++--</div><div class='sub h'>docs/architecture/LEAD_RULINGS.md    |   4 ++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-B.md |  22 ++++++++</div><div class='sub h'>scripts/engine_bus.py                | 104 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_engine_bus.py             |  45 +++++++++++++++</div><div class='sub h'>tests/test_engine_bus_wired.py       |  22 ++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
+index 84635caed..087d5a747 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -974,3 +974,21 @@ READ-ONLY (bar store, quote/depth stores, the fee model, Sizing Families); no en
+ touches the order path; a non-chain engine&#x27;s failure is quiet (✅/⏱, never 🙋). The gates (§26 TDD, §18.1
+ independent verify, no launch-path edit in market hours, 04:30 hard stop, per-day owner YES for a stack
+ stop/start) are unchanged: a thing is &quot;built&quot; until a fresh session verifies it._
++
++## 29. Owner-minimum: one paste, one self-flag (owner dispatch NB53-B, 2026-09-28)
++
++**The owner&#x27;s job is ONE paste and the self-flag line — nothing else.** Every click, download, file move, typed
++confirmation, or stack stop/start is absorbed by the builder or the lead wherever the harness allows. When a step
++**truly** needs the owner&#x27;s hand (a real login/credential, a purchase, a signature, a stack stop/start the harness
++blocks), the report says so in **ONE plain line with the reason**, and the lead **🚩-reviews whether it was
++avoidable**. The owner pastes back **only on `LEAD RULING NEEDED`**.
++
++_This narrows §15 (never-block) and §21 (human-only work) to their true floor: those lists stand, but everything
++NOT on them is the builder&#x27;s/lead&#x27;s to do, not the owner&#x27;s. Why: NB50→NB53 spent owner pastes on disk cleanup,
++stack stops, and confirmations the builder could have absorbed. The measure of a good run is how little the owner
++had to touch._
++
++- **A no-trade build day** (owner declares &quot;not logging in today&quot;): the desk stays exactly as it is — no token, so
++  recorders idle and no order is possible — and the builder works in **full build mode beside it**, RAM measured,
++  **without an owner click**. This is not a stack start (§14.10 is untouched: the builder still starts/stops nothing);
++  it is building code beside an idle desk.
+diff --git a/docs/architecture/ENGINE-BUS.md b/docs/architecture/ENGINE-BUS.md
+index 712ec0002..dd27b42fe 100644
+--- a/docs/architecture/ENGINE-BUS.md
++++ b/docs/architecture/ENGINE-BUS.md
+@@ -6,10 +6,13 @@ existing constant/function — no new typed number (§4.1)._
+ 
+ ## 1. One scheduler, one name
+ 
+-- **The bus is `scripts/engine_bus.py`**, called ONCE per day from the existing evening scheduler
+-  `scripts/run_evening.py::main` (run_evening.py:20) **after the morning bar** (the same place the Price Engine&#x27;s
+-  conforming evaluator runs today — run_evening.py:60 `conform`, :79 `practice_counter`). There is exactly one
+-  scheduler; the bus is a sequence step inside it, not a second loop (§27 isolation: one driver).
++- **The bus is `scripts/engine_bus.py`**, run ONCE per day in the **after-close window from its OWN entry**
++  (`python -m scripts.engine_bus`), launched by the after-close orchestrator (`scripts/supervisor.run_once`) —
++  **NOT wired into `run_evening.main`**. `run_evening` is the protected [redacted]-chain evening evaluator, and §27a
++  reserves the chain&#x27;s launch path to a chain item only; a non-chain scheduler editing it would breach isolation.
++  The bus reads the same 08:15 READY signal and the day&#x27;s measured RAM, so it still runs &quot;after the morning bar&quot;
++  — from outside the chain, not inside it. (LEAD RULING R47, NB53-B: corrects this doc&#x27;s first draft, which said
++  &quot;called from run_evening.main&quot; before §27a&#x27;s chain-launch-path protection was fully applied.)
+ - After the morning bar, the bus **evaluates each DAILY engine in sequence** (order = NB53 step 3). Each call is
+   wrapped in its own try/except so one engine&#x27;s fault never touches another or the chain (§27d quiet failures).
+ 
+@@ -65,7 +68,7 @@ engine_bus.line(name, result) -&gt; &quot;&lt;✅|⏱|🙋&gt; &lt;engine&gt; — &lt;plain summary&gt;&quot;
+ ```
+ 
+ Wiring test (§26 &quot;live&quot; is a test): a `test_engine_bus_wired` that FAILS while `engine_bus.run_daily` is not
+-called from `run_evening.main`, and passes only when it is — committed RED where unwired (the honest state).
++called from the after-close launcher (`scripts/supervisor.run_once`), and passes only when it is — committed RED where unwired (the honest state).
+ 
+ ## 6. What this doc does NOT decide (each engine&#x27;s own design doc does)
+ 
+diff --git a/docs/architecture/LEAD_RULINGS.md b/docs/architecture/LEAD_RULINGS.md
+index f88522991..02d1164ef 100644
+--- a/docs/architecture/LEAD_RULINGS.md
++++ b/docs/architecture/LEAD_RULINGS.md
+@@ -9857,3 +9857,7 @@ _Applied — the sender REMOVED (not throttled):_
+ &gt; LEAD RULING R-ORIGIN-TAGS (origin: **OWNER-SAID 2026-09-23**): every ruling archived in `docs/dispatches/` carries an origin tag — **OWNER-SAID / LEAD-PROPOSED / BUILDER-PROPOSED**. Anything that changes a law, a threshold, or the owner&#x27;s daily job needs an explicit owner **&quot;yes&quot; recorded in the archive before it runs**. A LEAD-PROPOSED or BUILDER-PROPOSED change to a law/threshold/daily-job that lacks a recorded owner &quot;yes&quot; does not run.
+ 
+ &gt; LEAD RULING R-CLOCK (origin: **OWNER-SAID 2026-09-23**): every time in every report and every pause/deadline decision comes from the **machine clock** (`date` / `Get-Date`), read at the moment it is quoted — **never estimated or extrapolated**. A run states a time only after reading the clock; a pause decision (e.g. the 08:30 stop) re-reads the clock rather than projecting from an earlier read. Estimated times presented as fact are a self-flag. _Why: on 2026-09-23 a run reported &quot;~08:10 IST&quot; (extrapolated from a 02:52 start) when the real time was 05:14 IST — a ~3-hour error that also mis-based the pause decision._
++
++---
++
++&gt; LEAD RULING R47 — ENGINE BUS RUNS FROM ITS OWN ENTRY, NOT run_evening (origin: **LEAD-PROPOSED**, NB53-B, paper-side design under §18.5/§21). The engine bus (`scripts/engine_bus.py`) is launched in the after-close window from its own entry by the after-close orchestrator (`scripts/supervisor.run_once`), reading the 08:15 READY signal and measured RAM — it is **not** wired into `scripts/run_evening.py::main`. **Why:** `run_evening` is the protected [redacted] Price Engine evening evaluator; §27a reserves the chain&#x27;s launch path to a chain item only, so a non-chain scheduler must not edit it. The first draft of `docs/architecture/ENGINE-BUS.md` (commit 952a8a6a6) said &quot;called from run_evening.main&quot; before §27a&#x27;s protection was fully applied; this ruling corrects that doc and the wiring test. **Doc edits caused:** ENGINE-BUS.md §1 + §5; `tests/test_engine_bus_wired.py` asserts the launcher is `supervisor`, not `run_evening`. Overturnable by one owner line (clean revert of those two edits).
+diff --git a/docs/dispatches/2026-09-28_NB53-B.md b/docs/dispatches/2026-09-28_NB53-B.md
+new file mode 100644
+index 000000000..ddb56a3b6
+--- /dev/null
++++ b/docs/dispatches/2026-09-28_NB53-B.md
+@@ -0,0 +1,22 @@
++ID: NB53-B — BUILD DAY + CLAUDE PRICE ENGINE ARCHITECTURE (replaces NB53-A, never pasted) → BUILD
++ORIGIN: OWNER-SAID (28 Sep ~08:30 IST): &quot;not logging in today; complete the build first&quot; and &quot;minimum stuff on my end — I only paste.&quot; LEAD-RULED: (a) today is a declared no-trade build day; the desk stays as it is (no token → recorders idle, no orders possible) and the builder works in FULL build mode beside it with RAM measured — no owner click; (b) the Claude Price Engine architecture is re-issued here by the lead (the 28 Sep file never reached the repo): write section C verbatim to docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md, then build it in NB53 order.
++READ: NB53 checkpoint (08:06 desk up → docs-only; e8b0d64af laws; 952a8a6a6 ENGINE-BUS.md; survey 7/8, engine 2 MISSING; items 65 · done 37 · pending 28). ASSUMING: nothing about RAM — measure it. MISSING: nothing the lead can supply.
++
++A. STANDING LAW — OWNER-MINIMUM (write to CLAUDE.md as a dated amendment with this ID): the owner&#x27;s job is one paste and the self-flag line. Every click, download, file move, typed confirmation or stack stop/start is absorbed by the builder or the lead wherever the harness allows. When a step truly needs the owner&#x27;s hand, the report says so in ONE plain line with the reason, and the lead 🚩-reviews whether it was avoidable. The owner pastes back only on LEAD RULING NEEDED.
++
++B. BUILD MODE NOW: (1) measure free RAM, list desk processes; the desk stays up, untouched. (2) Full build mode: code, RED→GREEN tests, commits. Run the full suite only when free RAM ≥ the suite&#x27;s measured headroom (VERIFIER-BRAIN.md figure, cite); otherwise run the engine&#x27;s own tests now and queue the full suite for after close-done. (3) Order: engine bus code (scripts/engine_bus.py) → §H 70–73 → engine 2 chunk 1 as soon as section C is on disk → engines 3–8 → engine 2 chunks 2–7. (4) No owner pastes until a LEAD RULING NEEDED; ⏱ checkpoint line after each GREEN.
++
++C. CLAUDE PRICE ENGINE — ARCHITECTURE (LEAD-RULED, fixed; contents come from backtests)
++C0 Identity: engine 2 of 8; own folder under the engine bus, own state, own paper ledger, own Telegram line &quot;Claude Price Engine&quot;. Same pipeline as the [redacted] Price Engine — bars → rulers → patterns → measured record → sizing → queue → paper ledger — only the ruler shelf differs. Reads shared stores READ-ONLY; never touches the [redacted] Price Engine&#x27;s rulers, queue or ledger. Absorbs Insurance (portfolio protection) and Context (regime) as chunks 5 and 6 — they are not separate engines.
++C1 Money math (same functions as the Price Engine; cite each in the doc): fees COST_STATUTORY_RT + cost_readout (money.py:17, :189); fill bar + six checks liquidity_backtest.checklist (:185) + paper.simulate_trade; sizing engine_book.weight (Sizing Families) with the adaptive multiplier 0→1 on Kelly computed from the pattern&#x27;s measured record — never a fixed fraction; a pattern trades flat until n_min (the existing constant, cite — do not type a new one); starting capital NOTIONAL_CAPITAL (money.py:13); caps and exits from the ruler&#x27;s measured profile (chunk 3); failed rulers → probation via diary_engines.
++C2 No typed numbers: every threshold is a percentile of a measured distribution on the training window, chosen by walk-forward backtest; the doc records percentile + window; the code reads them from the ruler&#x27;s record file, never from a literal.
++CHUNK 1 — Data + context layer: point-in-time universe (build item 8 here, shared read-only), daily bars, index bars, realised-volatility and breadth series from those bars, and the expiry/holiday/event calendar (the Calendar engine&#x27;s file). Output: one context row per trading day, with a leakage test proving no row uses data after its own date. DONE = tests GREEN + the context file regenerates from the stores.
++CHUNK 2 — Direction rulers (the shelf): candidate families, each must earn its place in walk-forward with cost_readout applied — trend continuation (close vs rolling reference), mean reversion (distance from reference in ATR units), range breakout, gap continuation vs gap fade at the open, volume expansion, relative strength vs the index. Index close-to-open is NOT here (it lives in the [redacted] Price Engine). A family enters the shelf only if its out-of-sample record clears the six checks with positive expectancy after costs at n ≥ n_min; else probation. Output: the ruler record file (family, percentile parameters, window, n, expectancy, fill bar).
++CHUNK 3 — Horizon rulers: per shelf ruler, the holding horizon (to close, next open, or N sessions) with the best measured post-signal profile in the training window, capped by the existing exit rules; N read from the record, never typed.
++CHUNK 4 — Vehicle rulers: cash equity by default; futures where the store has them (item 45&#x27;s lane when it exists); defined-risk options (debit spreads only, paper) ONLY when the measured expected move exceeds the measured premium. EXECUTION GAP stated now: no option quotes are recorded today → the option vehicle is designed, tested on synthetic chains, and DORMANT until a quote lane exists; the ledger never carries an option trade without recorded quotes.
++CHUNK 5 — Insurance (absorbed): when the context row&#x27;s realised-vol or drawdown state is in its measured high-risk percentile, the Kelly multiplier scales down and, once chunk 4&#x27;s lane exists, a defined-risk hedge is bought on paper; hedge cost flows through cost_readout into the ledger. Output: a per-day protection state and its effect on size, tested.
++CHUNK 6 — Context gating (absorbed): every shelf ruler&#x27;s record measured per context state (trend/vol/breadth buckets from chunk 1, bucket edges = percentiles); a ruler trades only in states where its own record clears the bar. Output: the ruler × state table in the record file.
++CHUNK 7 — Live wiring: queue → engine bus → own ledger, Telegram line, probation, day-log entry, twin comparison versus the [redacted] Price Engine on the same days (same bar, same costs), and the nightly rehearsal path. &quot;Live&quot; only after a fresh-session verify.
++DONE for engine 2 = all seven chunks GREEN, record files regenerate from the stores, one full paper day runs in REPLAY on recorded bars end to end.
++
++D. REPORT format unchanged: first line &quot;NB53 · engine &lt;name&gt; · &lt;state&gt;&quot;; count line; measured build-hours per engine; 🚩 rows; self-flag line last.
+diff --git a/scripts/engine_bus.py b/scripts/engine_bus.py
+new file mode 100644
+index 000000000..7f0d6f1a2
+--- /dev/null
++++ b/scripts/engine_bus.py
+@@ -0,0 +1,104 @@
++&quot;&quot;&quot;NB53 — the ENGINE BUS: one scheduler over a registry of the 8 engines (design: docs/architecture/ENGINE-BUS.md).
++
++One name, one place. After the morning bar (in the after-close window, its OWN entry — NOT wired into the
++protected chain&#x27;s run_evening, §27a), the bus evaluates each DAILY engine in sequence. Each call is wrapped in
++its own try/except so one engine&#x27;s fault never touches another or the chain (§27d isolation). The §27c RAM gate
++and the diary-only rule already live in scripts/diary_engine.DiaryEngine and are REUSED (register_diary_engines),
++never rewritten here — the bus adds only the sequencing and the one tagged line per engine.
++
++An engine&#x27;s own money math (fees, fill bar + six checks, sizing, capital, exits, probation) lives in that
++engine&#x27;s evaluate_fn and its design doc, cited there — the bus never invents one (see ENGINE-BUS.md §3).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import datetime as _dt
++
++# name -&gt; {&quot;fn&quot;: evaluate_fn(asof, reader) -&gt; {&quot;line&quot;: str, &quot;ledger_rows&quot;: list}, &quot;cadence&quot;: str}
++_REGISTRY: dict = {}
++_CADENCES = (&quot;daily&quot;, &quot;nightly&quot;, &quot;intraday&quot;, &quot;replay&quot;)
++
++
++def clear():
++    _REGISTRY.clear()
++
++
++def register(name, evaluate_fn, cadence=&quot;daily&quot;):
++    &quot;&quot;&quot;Add an engine to the bus. cadence in {daily, nightly, intraday, replay}. Re-registering a name is an
++    error (two engines under one name would silently shadow — fail loud).&quot;&quot;&quot;
++    if cadence not in _CADENCES:
++        raise ValueError(&quot;bad cadence %r (want one of %s)&quot; % (cadence, _CADENCES))
++    if name in _REGISTRY:
++        raise ValueError(&quot;engine %r already registered&quot; % name)
++    _REGISTRY[name] = {&quot;fn&quot;: evaluate_fn, &quot;cadence&quot;: cadence}
++
++
++def registered(cadence=None):
++    return sorted(n for n, e in _REGISTRY.items() if cadence is None or e[&quot;cadence&quot;] == cadence)
++
++
++def run_daily(asof, reader=None):
++    &quot;&quot;&quot;Run every DAILY engine once, in name order, each in its own try/except (§27d). Returns
++    {name: {&quot;line&quot;: str, &quot;ledger_rows&quot;: list, &quot;error&quot;: None|&lt;ExcClassName&gt;}}. A fault is recorded, never raised.&quot;&quot;&quot;
++    out = {}
++    for name in registered(&quot;daily&quot;):
++        try:
++            r = _REGISTRY[name][&quot;fn&quot;](asof, reader) or {}
++            out[name] = {&quot;line&quot;: r.get(&quot;line&quot;, &quot;&quot;), &quot;ledger_rows&quot;: r.get(&quot;ledger_rows&quot;, []), &quot;error&quot;: None}
++        except Exception as e:                     # isolation: this engine&#x27;s fault stays this engine&#x27;s
++            out[name] = {&quot;line&quot;: &quot;&quot;, &quot;ledger_rows&quot;: [], &quot;error&quot;: type(e).__name__}
++    return out
++
++
++def line(name, result, clock_fn=None):
++    &quot;&quot;&quot;One tagged line per engine per day. ✅ on success, ⏱ on a caught fault — NEVER 🙋 for a non-chain engine
++    (§27d: only the chain and owner-action signals may 🙋).&quot;&quot;&quot;
++    ts = (clock_fn or (lambda: _dt.datetime.now().strftime(&quot;%H:%M:%S&quot;)))()
++    if result.get(&quot;error&quot;):
++        return &quot;⏱ %s %s — fault %s (diary-only, not an owner ping)&quot; % (name, ts, result[&quot;error&quot;])
++    return &quot;✅ %s %s — %s&quot; % (name, ts, result.get(&quot;line&quot;) or &quot;no signal&quot;)
++
++
++def register_diary_engines(ready_seen, free_gb, reopen_floor_gb=None):
++    &quot;&quot;&quot;Reuse the existing §27-gated DiaryEngine wrappers (scripts/diary_engines) as daily bus engines — the RAM
++    gate and quiet-fault rule come from them, not from here. Each becomes an evaluate_fn that runs one gated
++    diary cycle. Called by the bus entry with the day&#x27;s measured RAM + READY state.&quot;&quot;&quot;
++    from scripts import diary_engines
++
++    def _adapt(nm):
++        def _fn(asof, reader):
++            r = diary_engines.run_once(nm, ready_seen, free_gb, reopen_floor_gb) or {}
++            return {&quot;line&quot;: r.get(&quot;line&quot;) or r.get(&quot;reason&quot;) or &quot;gated&quot;, &quot;ledger_rows&quot;: []}
++        return _fn
++    for nm in diary_engines.names():
++        if nm not in _REGISTRY:
++            register(nm, _adapt(nm), cadence=&quot;daily&quot;)
++
++
++def _demo():
++    clear()
++    register(&quot;A&quot;, lambda asof, reader: {&quot;line&quot;: &quot;3 fired&quot;, &quot;ledger_rows&quot;: [1, 2, 3]}, cadence=&quot;daily&quot;)
++    register(&quot;bad&quot;, lambda asof, reader: (_ for _ in ()).throw(RuntimeError(&quot;boom&quot;)), cadence=&quot;daily&quot;)
++    register(&quot;night&quot;, lambda asof, reader: {&quot;line&quot;: &quot;research&quot;}, cadence=&quot;nightly&quot;)
++    out = run_daily(&quot;2026-09-28&quot;)
++    assert set(out) == {&quot;A&quot;, &quot;bad&quot;}, out                        # nightly not in the daily run
++    assert out[&quot;A&quot;][&quot;error&quot;] is None and out[&quot;A&quot;][&quot;ledger_rows&quot;] == [1, 2, 3]
++    assert out[&quot;bad&quot;][&quot;error&quot;] == &quot;RuntimeError&quot;                # fault caught, A still ran (isolation)
++    assert &quot;\U0001f64b&quot; not in line(&quot;bad&quot;, out[&quot;bad&quot;])          # ⏱, never 🙋
++    assert line(&quot;A&quot;, out[&quot;A&quot;], clock_fn=lambda: &quot;10:00:00&quot;) == &quot;✅ A 10:00:00 — 3 fired&quot;
++    try:
++        register(&quot;A&quot;, lambda asof, reader: {})
++        assert False, &quot;double register must raise&quot;
++    except ValueError:
++        pass
++    clear()
++    print(&quot;engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
++    else:
++        # the bus entry (§27: its OWN process, not run_evening). Real READY/RAM wiring is the after-close item;
++        # here it reports what is registered so a launch script can confirm the bus is importable and armed.
++        print(&quot;engine bus: %d engine(s) registered: %s&quot; % (len(_REGISTRY), &quot;, &quot;.join(registered()) or &quot;none&quot;))
+diff --git a/tests/test_engine_bus.py b/tests/test_engine_bus.py
+new file mode 100644
+index 000000000..1553528da
+--- /dev/null
++++ b/tests/test_engine_bus.py
+@@ -0,0 +1,45 @@
++&quot;&quot;&quot;NB53 step 2 — the engine bus: one scheduler over a registry, isolation by construction.
++
++The bus&#x27;s whole job is (1) hold a registry of engines by cadence, (2) run each daily engine once in its own
++try/except so one engine&#x27;s fault never touches another (§27d), (3) format one tagged line per engine. The §27c
++RAM gate and diary-only rule live in DiaryEngine (reused, not rewritten); the bus adds only the sequencing.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import pytest
++from scripts import engine_bus
++
++
++def setup_function(_):
++    engine_bus.clear()
++
++
++def test_register_and_run_daily_collects_one_result_per_daily_engine():
++    engine_bus.register(&quot;A&quot;, lambda asof, reader: {&quot;line&quot;: &quot;A ok&quot;, &quot;ledger_rows&quot;: [1]}, cadence=&quot;daily&quot;)
++    engine_bus.register(&quot;B&quot;, lambda asof, reader: {&quot;line&quot;: &quot;B ok&quot;, &quot;ledger_rows&quot;: []}, cadence=&quot;daily&quot;)
++    engine_bus.register(&quot;N&quot;, lambda asof, reader: {&quot;line&quot;: &quot;nightly&quot;}, cadence=&quot;nightly&quot;)
++    out = engine_bus.run_daily(&quot;2026-09-28&quot;, reader=None)
++    assert set(out) == {&quot;A&quot;, &quot;B&quot;}                       # only daily engines run in run_daily
++    assert out[&quot;A&quot;][&quot;error&quot;] is None and out[&quot;A&quot;][&quot;ledger_rows&quot;] == [1]
++
++
++def t</pre></div><div class='c'><div class='h'><b>e7f93f5a0</b> · 2026-09-28 08:15</div><div>NB53 engine roster: map all 8 NB53 engine names to existing design docs + code packages, cite each source; flag 2 gaps as LEAD RULING (engine 2 Claude Price MISSING; engine 5 Machine Factory ambiguous vs superseded E6 ruler-factory). Docs only</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md | 37 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
 new file mode 100644
 index 000000000..0ab305a05
 --- /dev/null
