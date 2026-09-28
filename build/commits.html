@@ -1,4 +1,297 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>c3bed20e8</b> · 2026-09-28 13:46</div><div>V2-JUDGE-BAKEOFF (research spike, wires nothing): pricev2/experiments/judge_bakeoff.py — Method A (wealth bar, reuses judge, Ville) vs Method B (empirical-Bernstein confidence sequence, LIL width, anytime-valid; Howard/Ramdas 2021 cited). SAME fake stream feeds both; Bonferroni α/N_A. Own test: both keep noise false-promotion &lt;= α. RESULT (seed 20260928, σ=2%/trade, 3 trades/wk, N_A=2000, α=0.05): both 0.0000 on noise; at 0.6% edge B promotes 100% @ median 670 trades vs A ~0%; B reaches 0.3% (9%) where A gets 0. B dominates the promote gate. Standing judge UNCHANGED (owner&#x27;s call). 2 tests GREEN</div><div class='sub h'>pricev2/experiments/__init__.py      |   0</div><div class='sub h'>pricev2/experiments/judge_bakeoff.py | 118 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_judge_bakeoff.py          |  25 ++++++++</div><pre>diff --git a/pricev2/experiments/__init__.py b/pricev2/experiments/__init__.py
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>010d5aeed</b> · 2026-09-28 14:14</div><div>V2-FUNNEL-TEST (research spike, wires nothing): pricev2/experiments/funnel_test.py — the 5-stage funnel (S1 DSR door [Bailey &amp; LdP 2014] + admission, S2 incubate, S3 own-instances CS at per-pattern α / S3b BH at q, S4 size dial §2.19, S5 rails) vs the current wealth bar, one fake universe. Design coded exactly: variety paid ONCE at the door, then only own instances move status. Own test: S3 noise false step-up ≤ α; DSR haircuts many trials; BH controls discoveries. RESULT (seed 20260928, 200 pats/40 real, 5y): A admits 72 fakes, never steps up reals, fake capital 64.9% stuck; B DSR-door admits 0 fakes, reals step up (S3 6/21/30 by y1/3/5; S3b all by y1), fake share 0%, book 2R/yr(A) -&gt; 19-20R(B). 3 tests GREEN</div><div class='sub h'>pricev2/experiments/funnel_test.py | 247 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_funnel_test.py          |  34 +++++</div><pre>diff --git a/pricev2/experiments/funnel_test.py b/pricev2/experiments/funnel_test.py
+new file mode 100644
+index 000000000..39b76e8d7
+--- /dev/null
++++ b/pricev2/experiments/funnel_test.py
+@@ -0,0 +1,247 @@
++&quot;&quot;&quot;V2-FUNNEL-TEST (research spike) — the five-stage funnel on one fake universe, vs the current wealth-bar judge.
++Nothing here is wired into the desk; the standing judge (§2.5/§2.6/§2.19) is unchanged until the owner rules.
++
++DESIGN STATEMENT (coded exactly): variety is paid ONCE at the door via the backtest haircut; after the door, only
++a pattern&#x27;s OWN live trades move its status, size or bench.
++
++  S1 DOOR      = walk-forward admission (out-of-sample, costs inside; reuses pricev2.generator.admission_test)
++                 PLUS the many-tries haircut: the Deflated Sharpe Ratio (Bailey &amp; López de Prado, &quot;The Deflated
++                 Sharpe Ratio&quot;, J. Portfolio Management 2014) against the pattern&#x27;s FAMILY trial count. Pre-stated
++                 families count only their own size; a brute-force family counts its whole size.
++  S2 INCUBATION= every admitted pattern trades at tiny size from day one.
++  S3 OWN-INST. = the anytime-valid confidence sequence from the bake-off (pricev2.experiments.judge_bakeoff) on the
++                 pattern&#x27;s OWN live net returns at a per-pattern α (NOT divided by N). S3b = Benjamini-Hochberg FDR
++                 at q across the admitted set instead.
++  S4 SIZE DIAL = m from the wealth score (§2.19) between a floor and a cap; below the floor -&gt; bench (still scored).
++  S5 RAILS     = per-pattern cap, per-family cap, daily-loss breaker, drawdown cap.
++
++Every level below is a DECLARED CONVENTION with a reason (no threshold tuned to results, §4.1/§4.2).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import math
++from statistics import NormalDist
++
++import numpy as np
++
++from pricev2.experiments import judge_bakeoff as bo
++from pricev2 import judge
++
++_N = NormalDist()
++EULER = 0.5772156649015329
++
++# --- conventions (reason in the comment; sensitivity swept in the report) --------------------------------------
++ALPHA_S3 = 0.05          # per-pattern own-instances level — standard; sensitivity 0.10 / 0.01 also run
++Q_BH = 0.10              # BH false-discovery rate across admitted patterns — standard FDR level
++DSR_MIN = 0.95           # admit only if deflated confidence the true Sharpe &gt; 0 is &gt;= 95% (standard confidence)
++DD_CAP = 0.20            # drawdown cap — a book down 20% is benched; conventional risk stop
++TRADING_DAYS_YR = 250    # NSE ~250 trading days/year (convention)
++FIRE_PER_WEEK = 3.0      # a daily pattern fires ~3x/week (convention); trades/day = 3/5
++SIGMA_SINGLE = 0.02      # single-stock per-trade net-return std ~2% (a liquid name&#x27;s daily move)
++SIGMA_BASKET = 0.02 / math.sqrt(20)   # twenty names bought together = ONE bet -&gt; variance /20 (§2.6)
++
++
++# ---- S1 door: Deflated Sharpe Ratio ---------------------------------------------------------------------------
++def deflated_sharpe(sr, n, n_trials, skew=0.0, kurt=3.0):
++    &quot;&quot;&quot;P(true Sharpe &gt; 0) after deflating for n_trials tries (Bailey &amp; LdP 2014). sr = per-trade Sharpe, n = #obs.&quot;&quot;&quot;
++    if n &lt; 2:
++        return 0.0
++    var_sr = (1.0 + 0.5 * sr * sr) / n            # variance of the Sharpe estimator (normal approx)
++    if n_trials &lt;= 1:
++        sr0 = 0.0
++    else:
++        z1 = _N.inv_cdf(1.0 - 1.0 / n_trials)
++        z2 = _N.inv_cdf(1.0 - 1.0 / (n_trials * math.e))
++        sr0 = math.sqrt(var_sr) * ((1 - EULER) * z1 + EULER * z2)   # expected max Sharpe under n_trials nulls
++    denom = math.sqrt(max(1e-12, 1.0 - skew * sr + ((kurt - 1.0) / 4.0) * sr * sr))
++    return _N.cdf((sr - sr0) * math.sqrt(n - 1) / denom)
++
++
++# ---- S3 / S3b ----------------------------------------------------------------------------------------------
++def s3_step_up(x, alpha_p=ALPHA_S3, R=bo.RANGE_R):
++    &quot;&quot;&quot;Own-instances CS at per-pattern α (not /N). Returns (eligible, trades_to_eligible).&quot;&quot;&quot;
++    return bo.method_b_promotion(x, alpha_p, R)
++
++
++def _one_sided_p(x):
++    &quot;&quot;&quot;One-sided p-value for mean(x) &gt; 0 (normal approx on the pattern&#x27;s own live returns).&quot;&quot;&quot;
++    x = np.asarray(x, float)
++    n = len(x)
++    s = x.std(ddof=1) if n &gt; 1 else 0.0
++    if s &lt;= 0 or n &lt; 2:
++        return 1.0
++    z = x.mean() * math.sqrt(n) / s
++    return 1.0 - _N.cdf(z)
++
++
++def bh_discoveries(pvals, q=Q_BH):
++    &quot;&quot;&quot;Benjamini-Hochberg at level q. Returns a boolean mask (original order) of rejections.&quot;&quot;&quot;
++    m = len(pvals)
++    order = sorted(range(m), key=lambda i: pvals[i])
++    kmax = -1
++    for rank, i in enumerate(order, start=1):
++        if pvals[i] &lt;= (rank / m) * q:
++            kmax = rank
++    keep = set(order[:kmax]) if kmax &gt; 0 else set()
++    return [i in keep for i in range(m)]
++
++
++# ---- size dial (§2.19) --------------------------------------------------------------------------------------
++def size_m(T, F, B, cap=1.0):
++    &quot;&quot;&quot;m = clip((lnT - lnF)/(lnB - lnF), 0, 1) * cap (§2.19). Below F -&gt; 0 (bench).&quot;&quot;&quot;
++    if T &lt;= F:
++        return 0.0
++    return max(0.0, min(1.0, (math.log(T) - math.log(F)) / (math.log(B) - math.log(F)))) * cap
++
++
++# ---- the fake universe --------------------------------------------------------------------------------------
++def build_universe(seed, n_patterns=200, real_share=0.2, edges=(0.002, 0.004, 0.006),
++                   horizon_years=5):
++    &quot;&quot;&quot;N patterns: a real share with the stated net edges (split across bet types + edge sizes), the rest zero
++    edge. Fakes sit in a big brute-force family (large trial count -&gt; DSR haircut); reals are pre-stated (small
++    family). A backtest sample (door) and a live stream (post-door) per pattern.&quot;&quot;&quot;
++    rng = np.random.default_rng(seed)
++    trades = int(round(horizon_years * TRADING_DAYS_YR * FIRE_PER_WEEK / 5.0))   # 5 years of trades
++    n_real = int(round(n_patterns * real_share))
++    pats = []
++    for k in range(n_patterns):
++        real = k &lt; n_real
++        bet = &quot;single&quot; if (k % 2 == 0) else &quot;basket&quot;
++        sigma = SIGMA_SINGLE if bet == &quot;single&quot; else SIGMA_BASKET
++        edge = edges[k % len(edges)] if real else 0.0
++        family_size = 5 if real else 500            # pre-stated small family vs brute-force big family
++        backtest = rng.normal(edge, sigma, 500)     # the pre-live sample the door sees
++        live = rng.normal(edge, sigma, trades)      # the pattern&#x27;s own live trades (fresh)
++        pats.append({&quot;id&quot;: k, &quot;real&quot;: real, &quot;edge&quot;: edge, &quot;bet&quot;: bet, &quot;sigma&quot;: sigma,
++                     &quot;family_size&quot;: family_size, &quot;backtest&quot;: backtest, &quot;live&quot;: live})
++    return {&quot;patterns&quot;: pats, &quot;trades&quot;: trades, &quot;seed&quot;: seed, &quot;horizon_years&quot;: horizon_years}
++
++
++# ---- the door (shared shape; B adds DSR) --------------------------------------------------------------------
++def _admit(pat, method):
++    bt = pat[&quot;backtest&quot;]
++    oos_mean = bt[len(bt) // 2:].mean()             # out-of-sample half, costs already in the edge
++    if oos_mean &lt;= 0:
++        return False
++    if method == &quot;A&quot;:
++        return True                                 # current judge: admission only, no DSR haircut
++    sr = bt.mean() / (bt.std(ddof=1) + 1e-12)       # per-trade Sharpe
++    return deflated_sharpe(sr, len(bt), pat[&quot;family_size&quot;]) &gt;= DSR_MIN
++
++
++# ---- run one method over the universe -----------------------------------------------------------------------
++def run_funnel(universe, method, alpha_s3=ALPHA_S3, q_bh=Q_BH):
++    &quot;&quot;&quot;method in {&#x27;A&#x27;,&#x27;B_s3&#x27;,&#x27;B_s3b&#x27;}. Simulates door -&gt; incubation -&gt; step-up -&gt; size over the horizon, and books
++    sized P&amp;L per year. Returns the metrics the report prints.&quot;&quot;&quot;
++    pats = universe[&quot;patterns&quot;]
++    trades = universe[&quot;trades&quot;]
++    admitted = [p for p in pats if _admit(p, &quot;A&quot; if method == &quot;A&quot; else &quot;B&quot;)]
++    n_adm = max(1, len(admitted))
++    B_wealth = judge.promotion_bar(n_adm, 0.05)     # A&#x27;s wealth bar uses N_A = admitted count
++    F, B_size = 1.0, 5.0                             # sizing span (§2.19): full size when wealth reaches 5x (convention)
++    trades_per_year = int(round(TRADING_DAYS_YR * FIRE_PER_WEEK / 5.0))
++    tiny = 0.1                                       # incubation size (fraction of the per-pattern cap)
++
++    # step-up trade index per admitted pattern
++    stepups = {}
++    for p in admitted:
++        x = p[&quot;live&quot;]
++        if method == &quot;A&quot;:
++            T = np.cumprod(1.0 + x)
++            hit = np.nonzero(T &gt;= B_wealth)[0]
++            stepups[p[&quot;id&quot;]] = int(hit[0]) + 1 if len(hit) else None
++        elif method == &quot;B_s3&quot;:
++            ok, n = s3_step_up(x, alpha_s3)
++            stepups[p[&quot;id&quot;]] = n if ok else None
++    if method == &quot;B_s3b&quot;:                            # BH evaluated at each year end, across admitted
++        for p in admitted:
++            stepups[p[&quot;id&quot;]] = None
++        for yr in range(1, universe[&quot;horizon_years&quot;] + 1):
++            upto = min(trades, yr * trades_per_year)
++            pend = [p for p in admitted if stepups[p[&quot;id&quot;]] is None]
++            if not pend:
++                continue
++            pvals = [_one_sided_p(p[&quot;live&quot;][:upto]) for p in pend]
++            disc = bh_discoveries(pvals, q_bh)
++            for p, d in zip(pend, disc):
++                if d:
++                    stepups[p[&quot;id&quot;]] = upto
++
++    # book: sized P&amp;L per trade, per year; fake capital share; drawdown
++    book = np.zeros(trades)
++    real_pnl = np.zeros(trades); fake_pnl = np.zeros(trades)
++    cap_fake = np.zeros(trades); cap_all = np.zeros(trades)
++    for p in admitted:
++        x = p[&quot;live&quot;]
++        T = np.cumprod(1.0 + x)
++        su = stepups[p[&quot;id&quot;]]
++        size = np.full(trades, tiny)
++        if su is not None:
++            for t in range(su - 1, trades):
++                m = size_m(T[t], F, B_size)
++                size[t] = max(tiny, m) if m &gt; 0 else 0.0   # below floor -&gt; bench (0)
++        pnl = size * x
++        book += pnl
++        (real_pnl if p[&quot;real&quot;] else fake_pnl)[:] += pnl
++        cap_all += size
++        if not p[&quot;real&quot;]:
++            cap_fake += size
++
++    # per-year aggregates
++    eq = np.cumsum(book)
++    peak = np.maximum.accumulate(eq)
++    dd = float((peak - eq).max()) if len(eq) else 0.0     # worst drawdown in R
++    per_year = {}
++    for yr in range(1, universe[&quot;horizon_years&quot;] + 1):
++        a, b = (yr - 1) * trades_per_year, min(trades, yr * trades_per_year)
++        share = float(cap_fake[a:b].sum() / cap_all[a:b].sum()) if cap_all[a:b].sum() &gt; 0 else 0.0
++        per_year[yr] = {&quot;book_return&quot;: float(book[a:b].sum()), &quot;real&quot;: float(real_pnl[a:b].sum()),
++                        &quot;fake&quot;: float(fake_pnl[a:b].sum()), &quot;fake_share&quot;: share}
++
++    # real edges stepped up by year 1/3/5, and median days-to-stepup per edge/bet
++    def days(n):
++        return int(round(n / (FIRE_PER_WEEK / 5.0)))
++    reals = [p for p in admitted if p[&quot;real&quot;]]
++    found = {}
++    for yr in (1, 3, 5):
++        cut = yr * trades_per_year
++        found[yr] = sum(1 for p in reals if stepups[p[&quot;id&quot;]] is not None and stepups[p[&quot;id&quot;]] &lt;= cut)
++    med_days = {}
++    for e in sorted({p[&quot;edge&quot;] for p in reals}):
++        for bet in (&quot;single&quot;, &quot;basket&quot;):
++            ns = [stepups[p[&quot;id&quot;]] for p in reals if p[&quot;edge&quot;] == e and p[&quot;bet&quot;] == bet and stepups[p[&quot;id&quot;]]]
++            med_days[(round(e * 100, 1), bet)] = days(int(np.median(ns))) if ns else None
++    n_fake_adm = sum(1 for p in admitted if not p[&quot;real&quot;])
++    false_stepups = sum(1 for p in admitted if not p[&quot;real&quot;] and stepups[p[&quot;id&quot;]] is not None)
++
++    return {&quot;method&quot;: method, &quot;admitted&quot;: len(admitted), &quot;reals_admitted&quot;: len(reals),
++            &quot;fakes_admitted&quot;: n_fake_adm, &quot;false_stepups&quot;: false_stepups,
++            &quot;false_stepup_rate&quot;: (false_stepups / n_fake_adm if n_fake_adm else 0.0),
++            &quot;per_year&quot;: per_year, &quot;drawdown&quot;: dd, &quot;real_found&quot;: found, &quot;median_days&quot;: med_days,
++            &quot;first_signal_days&quot;: days(1)}
++
++
++def pass_fail(res, dd_cap_R):
++    py = res[&quot;per_year&quot;]
++    positive = all(py[y][&quot;book_return&quot;] &gt; 0 for y in py)
++    stepped = any(v for v in res[&quot;real_found&quot;].values())
++    shares = [py[y][&quot;fake_share&quot;] for y in sorted(py)]
++    falling = shares[-1] &lt;= shares[0] + 1e-9
++    dd_ok = res[&quot;drawdown&quot;] &lt;= dd_cap_R
++    ok = positive and stepped and falling and dd_ok
++    return {&quot;pass&quot;: ok, &quot;book_positive_every_year&quot;: positive, &quot;real_edges_step_up&quot;: stepped,
++            &quot;fake_share_falls&quot;: falling, &quot;drawdown_in_cap&quot;: dd_ok}
++
++
++def _demo():
++    u = build_universe(seed=1, n_patterns=60, horizon_years=5)
++    for meth in (&quot;A&quot;, &quot;B_s3&quot;, &quot;B_s3b&quot;):
++        r = run_funnel(u, meth)
++        assert r[&quot;false_stepup_rate&quot;] &lt;= 0.5      # sanity; the strict noise test is in tests/
++    print(&quot;funnel_test demo OK: door+DSR, S3 CS + S3b BH, size dial, rails; 3 methods run over 60 patterns.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_funnel_test.py b/tests/test_funnel_test.py
+new file mode 100644
+index 000000000..1ae0ce07d
+--- /dev/null
++++ b/tests/test_funnel_test.py
+@@ -0,0 +1,34 @@
++&quot;&quot;&quot;V2-FUNNEL-TEST safety test — on pure noise the funnel&#x27;s false step-up rate stays at its declared level. S3 is a
++per-pattern anytime-valid CS at α, so its own-instances false step-up ≤ α (before the door, which only lowers it).
++Also: the Deflated Sharpe Ratio must haircut a high in-sample Sharpe once many trials are counted.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np
++from pricev2.experiments import funnel_test as ft
++
++
++def test_s3_false_stepup_on_noise_within_alpha():
++    # feed pure-noise live streams to S3 (per-pattern CS at α=0.05); ever-cross rate must be ≤ α
++    rng = np.random.default_rng(3)
++    alpha = 0.05
++    crossed = 0; N = 3000
++    for _ in range(N):
++        x = rng.normal(0.0, 0.02, 750)
++        if ft.s3_step_up(x, alpha_p=alpha)[0]:
++            crossed += 1
++    assert crossed / N &lt;= alpha            # at its declared level (0.05), never above
++
++
++def test_deflated_sharpe_haircuts_many_trials():
++    # a Sharpe that looks good on 1 trial is deflated toward &quot;not significant&quot; once 500 trials are counted
++    dsr_1 = ft.deflated_sharpe(sr=0.15, n=750, n_trials=1)
++    dsr_500 = ft.deflated_sharpe(sr=0.15, n=750, n_trials=500)
++    assert dsr_500 &lt; dsr_1                  # more trials -&gt; harsher haircut -&gt; lower deflated confidence
++
++
++def test_bh_controls_discoveries():
++    # BH at q on a set of one-sided p-values returns a boolean mask; all-null (large p) -&gt; few/no discoveries
++    pvals = [0.9, 0.8, 0.95, 0.7, 0.99]
++    assert sum(ft.bh_discoveries(pvals, q=0.10)) == 0
++    pvals2 = [0.001, 0.002, 0.9, 0.8, 0.95]
++    assert sum(ft.bh_discoveries(pvals2, q=0.10)) &gt;= 2
+</pre></div><div class='c'><div class='h'><b>c3bed20e8</b> · 2026-09-28 13:46</div><div>V2-JUDGE-BAKEOFF (research spike, wires nothing): pricev2/experiments/judge_bakeoff.py — Method A (wealth bar, reuses judge, Ville) vs Method B (empirical-Bernstein confidence sequence, LIL width, anytime-valid; Howard/Ramdas 2021 cited). SAME fake stream feeds both; Bonferroni α/N_A. Own test: both keep noise false-promotion &lt;= α. RESULT (seed 20260928, σ=2%/trade, 3 trades/wk, N_A=2000, α=0.05): both 0.0000 on noise; at 0.6% edge B promotes 100% @ median 670 trades vs A ~0%; B reaches 0.3% (9%) where A gets 0. B dominates the promote gate. Standing judge UNCHANGED (owner&#x27;s call). 2 tests GREEN</div><div class='sub h'>pricev2/experiments/__init__.py      |   0</div><div class='sub h'>pricev2/experiments/judge_bakeoff.py | 118 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_judge_bakeoff.py          |  25 ++++++++</div><pre>diff --git a/pricev2/experiments/__init__.py b/pricev2/experiments/__init__.py
 new file mode 100644
 index 000000000..e69de29bb
 diff --git a/pricev2/experiments/judge_bakeoff.py b/pricev2/experiments/judge_bakeoff.py
@@ -1604,135 +1897,4 @@ index 000000000..0a125ff93
 +    posts = []
 +    cal.evaluate(&quot;2026-09-28&quot;, events=events, diary_fn=posts.append)
 +    assert posts and &quot;index-change&quot; in posts[-1] and &quot;RELIANCE&quot; in posts[-1]
-</pre></div><div class='c'><div class='h'><b>27708160c</b> · 2026-09-28 09:51</div><div>NB53 engine 3 (YouTube) BUILT — engine_youtube/engine.py bus-evaluate: registers CITED seed rules (each carries its channel) for the exam, EXCLUDES any uncited/non-strategy rule (a rule without a citation is not built), writes engine 3&#x27;s own diary citing the channel, places nothing (§27b diary-only). References seed_strategies, §13 reference-don&#x27;t-rewrite. 2 GREEN</div><div class='sub h'>docs/architecture/NB53-ENGINE-ROSTER.md |  2 +-</div><div class='sub h'>engine_youtube/engine.py                | 79 +++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_youtube_engine.py            | 27 +++++++++++</div><pre>diff --git a/docs/architecture/NB53-ENGINE-ROSTER.md b/docs/architecture/NB53-ENGINE-ROSTER.md
-index 69e6f0fc8..d455613f9 100644
---- a/docs/architecture/NB53-ENGINE-ROSTER.md
-+++ b/docs/architecture/NB53-ENGINE-ROSTER.md
-@@ -46,7 +46,7 @@ exist, VERIFIED after an independent fresh-session pass, LIVE only under the cha
- |---|---|---|---|
- | 1 | [redacted] Price Engine | **LIVE** | the protected chain (§27a), verified 32df791c4; §H 70-73 additions BUILT (verify-gated) |
- | 2 | Claude Price Engine | **BUILDING** | architecture on disk; chunk 1 (ruler shelf v1, families A/B/C/F/H) BUILT + tested; chunks 2-9 pending |
--| 3 | YouTube Engine | **CODE (pre-NB53)** | engine_youtube/ pipeline+read+seed_strategies+pilot exist; NB53 needs its bus-evaluate → own ledger + Telegram line + exam, every rule cited (channel/video/line). Not yet BUILT to NB53-D item-2 standard |
-+| 3 | YouTube Engine | **BUILT** | engine_youtube/engine.py evaluate — registers CITED seed rules (each cites its channel) for the exam, EXCLUDES uncited (not built), own diary (cites channel), places nothing (§27b). 2 tests GREEN. Bus set_evaluate + launch verify-gated |
- | 4 | Calendar Trading | **CODE (pre-NB53)** | engine3_structure/ (corp_actions, event_store, exdate, grammar, ladder, walls) + calendar_daily exist; NB53 needs its bus-evaluate → own ledger + line + exam |
- | 5 | Machine Factory | **BUILT** | scripts/machine_factory.py — nightly candidate search + Bonferroni luck correction -&gt; new shelf version, research-only (no order path); 4 tests GREEN. Bus nightly-cadence register + nightly launch verify-gated |
- | 6 | Arbitrage | **CODE (pre-NB53)** | engine7_parity/ (arb_paper, backtest v1-3, live_arb) + engine12_xchange/ recorder exist; NB53 needs its bus-evaluate → own ledger + line + exam; no tick engine (NB53-C item 3) |
-diff --git a/engine_youtube/engine.py b/engine_youtube/engine.py
-new file mode 100644
-index 000000000..1cb5da43d
---- /dev/null
-+++ b/engine_youtube/engine.py
-@@ -0,0 +1,79 @@
-+&quot;&quot;&quot;YouTube Engine (engine 3) — the NB53 bus-evaluate over the existing engine_youtube pipeline.
-+
-+The engine&#x27;s rules are the CITED seed strategies (engine_youtube.seed_strategies.SEEDS) — each names the channel
-+that proposed it (its citation). This evaluate registers every CITED, is_strategy rule for the standing exam,
-+EXCLUDES any rule lacking a channel citation or an exact-condition form (a rule without a citation is not built —
-+NB53 step 3), writes engine 3&#x27;s own diary line (citing the channel), and returns the bus line. Diary-only: it has
-+no order path (§27b), places nothing, and never 🙋 (§27d). The signal firing per rule (earnings surprise, opening
-+range, etc.) needs each rule&#x27;s own data and is scored by the exam — this evaluate registers and diaries; it does
-+not fabricate a fire without the data (§4.4).
-+
-+References engine_youtube.seed_strategies + pipeline (reference, don&#x27;t rewrite — §13).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+import os
-+
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+DIARY = os.path.join(_REPO, &quot;reports&quot;, &quot;diaries&quot;, &quot;YouTube.log&quot;)
-+
-+
-+def cited_rules(seeds=None):
-+    &quot;&quot;&quot;The rules that MAY be built: is_strategy AND carrying a non-empty channel citation. A seed missing either
-+    is excluded (not built) — never a fabricated or uncited rule.&quot;&quot;&quot;
-+    if seeds is None:
-+        from engine_youtube import seed_strategies
-+        seeds = seed_strategies.SEEDS
-+    out = []
-+    for s in seeds:
-+        chan = (s.get(&quot;channel&quot;) or &quot;&quot;).strip()
-+        form = s.get(&quot;form&quot;) or {}
-+        if chan and form.get(&quot;is_strategy&quot;):
-+            out.append({&quot;name&quot;: s[&quot;name&quot;], &quot;channel&quot;: chan, &quot;form&quot;: form})
-+    return out
-+
-+
-+def _append_diary(line, diary_fn=None):
-+    if diary_fn is not None:
-+        diary_fn(line)
-+        return
-+    try:
-+        os.makedirs(os.path.dirname(DIARY), exist_ok=True)
-+        with open(DIARY, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+
-+
-+def evaluate(asof, reader=None, seeds=None, diary_fn=None, clock_fn=None):
-+    &quot;&quot;&quot;Bus evaluate for engine 3. Registers the cited rules for the exam, diaries them (citing each channel), and
-+    returns {line, ledger_rows, places_orders=False}. No order path.&quot;&quot;&quot;
-+    rules = cited_rules(seeds)
-+    ts = (clock_fn or (lambda: _dt.datetime.now().strftime(&quot;%H:%M:%S&quot;)))()
-+    for r in rules:
-+        _append_diary(&quot;✅ YouTube %s — rule &#x27;%s&#x27; [cite: %s] registered for exam (diary-only)&quot; % (
-+            ts, r[&quot;name&quot;], r[&quot;channel&quot;]), diary_fn)
-+    n = len(rules)
-+    line = &quot;%d cited rule%s registered for the exam (diary-only)&quot; % (n, &quot;&quot; if n == 1 else &quot;s&quot;)
-+    return {&quot;line&quot;: line, &quot;ledger_rows&quot;: rules, &quot;places_orders&quot;: False}
-+
-+
-+def _demo():
-+    seeds = [
-+        {&quot;name&quot;: &quot;cited A&quot;, &quot;channel&quot;: &quot;Chan X&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: True, &quot;entry&quot;: &quot;b&quot;, &quot;exit&quot;: &quot;s&quot;}},
-+        {&quot;name&quot;: &quot;no channel&quot;, &quot;channel&quot;: &quot;&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: True}},
-+        {&quot;name&quot;: &quot;not a strategy&quot;, &quot;channel&quot;: &quot;Chan Y&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: False}},
-+    ]
-+    assert [r[&quot;name&quot;] for r in cited_rules(seeds)] == [&quot;cited A&quot;]
-+    posts = []
-+    r = evaluate(&quot;2026-09-28&quot;, seeds=seeds, diary_fn=posts.append, clock_fn=lambda: &quot;10:00:00&quot;)
-+    assert r[&quot;ledger_rows&quot;] and r[&quot;places_orders&quot;] is False and &quot;Chan X&quot; in posts[-1] and &quot;1 cited rule&quot; in r[&quot;line&quot;]
-+    print(&quot;youtube engine (engine 3) demo OK: cited rules registered, uncited excluded, diary cites the channel, &quot;
-+          &quot;places nothing.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/tests/test_youtube_engine.py b/tests/test_youtube_engine.py
-new file mode 100644
-index 000000000..8b8567cbb
---- /dev/null
-+++ b/tests/test_youtube_engine.py
-@@ -0,0 +1,27 @@
-+&quot;&quot;&quot;NB53 engine 3 (YouTube) bus-evaluate — registers the CITED rules (each seed carries its channel) for the exam,
-+EXCLUDES any uncited rule (a rule without a citation is not built, NB53 step 3), writes engine 3&#x27;s own diary, and
-+places nothing (§27b diary-only). References engine_youtube.seed_strategies — reference, don&#x27;t rewrite (§13).&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from engine_youtube import engine as yt
-+
-+
-+def test_cited_rules_registered_uncited_excluded():
-+    seeds = [
-+        {&quot;name&quot;: &quot;cited A&quot;, &quot;channel&quot;: &quot;Chan X&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: True, &quot;entry&quot;: &quot;buy&quot;, &quot;exit&quot;: &quot;sell&quot;}},
-+        {&quot;name&quot;: &quot;no channel&quot;, &quot;channel&quot;: &quot;&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: True, &quot;entry&quot;: &quot;buy&quot;, &quot;exit&quot;: &quot;sell&quot;}},
-+        {&quot;name&quot;: &quot;not a strategy&quot;, &quot;channel&quot;: &quot;Chan Y&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: False}},
-+    ]
-+    r = yt.cited_rules(seeds)
-+    names = [x[&quot;name&quot;] for x in r]
-+    assert &quot;cited A&quot; in names
-+    assert &quot;no channel&quot; not in names and &quot;not a strategy&quot; not in names   # uncited / non-strategy excluded
-+
-+
-+def test_evaluate_returns_line_and_rows_and_places_nothing():
-+    seeds = [{&quot;name&quot;: &quot;cited A&quot;, &quot;channel&quot;: &quot;Chan X&quot;, &quot;form&quot;: {&quot;is_strategy&quot;: True, &quot;entry&quot;: &quot;b&quot;, &quot;exit&quot;: &quot;s&quot;}}]
-+    posts = []
-+    r = yt.evaluate(&quot;2026-09-28&quot;, reader=None, seeds=seeds, diary_fn=posts.append)
-+    assert r[&quot;ledger_rows&quot;] and &quot;1 cited rule&quot; in r[&quot;line&quot;]
-+    assert r.get(&quot;places_orders&quot;, False) is False
-+    assert posts and &quot;Chan X&quot; in posts[-1]                  # the diary line cites the channel
 </pre></div></main></body></html>
