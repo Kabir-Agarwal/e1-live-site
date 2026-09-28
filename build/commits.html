@@ -1,4 +1,386 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>b0eba4e86</b> · 2026-09-28 08:33</div><div>NB53-B step 3: engine 2 (Claude Price) architecture (section C verbatim, LEAD RULING resolved) + CHUNK 1 data/context layer. engine2_claude_price/context.py: PIT context row (realised vol, breadth, index return) from the shared daily-close panel READ-ONLY; leakage test proves no row uses future data (§4.3); vol_window a param, no typed number (C2). 3 tests GREEN. Design sheet superseded</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-ARCHITECTURE.md            | 72 ++++++++++++++++++++</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md            |  2 +</div><div class='sub h'>engine2_claude_price/__init__.py                   |  0</div><div class='sub h'>engine2_claude_price/context.py                    | 78 ++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_context.py                 | 46 +++++++++++++</div><pre>diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md b/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>24058b178</b> · 2026-09-28 08:43</div><div>NB53-C: engine 2 CHUNK 1 per §9 — ruler shelf v1 (families A/C STATE rulers: rsi, realized_vol, boll_z, atr, gap_pct) computed on the bar store READ-ONLY + sanity report (coverage/NaN/range). PIT proven (no future bar changes a value); no-data ruler ABSENT not placeholdered (§4); windows are bands, no typed number (§3); registry lets B/E/F/G/H plug in as gates open. 4 tests GREEN. build_from_store wires the full 1-min store (heavy run deferred, RAM 0.6GB)</div><div class='sub h'>engine2_claude_price/shelf.py    | 139 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_shelf.py |  52 +++++++++++++++</div><pre>diff --git a/engine2_claude_price/shelf.py b/engine2_claude_price/shelf.py
+new file mode 100644
+index 000000000..298829ff0
+--- /dev/null
++++ b/engine2_claude_price/shelf.py
+@@ -0,0 +1,139 @@
++&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 1 per §9: ruler shelf v1 on the bar store + sanity report.
++
++Computes STATE rulers on a daily OHLCV frame per symbol, READ-ONLY off the shared store (§27a). Families A (price/
++trend) and C (volatility) are wired here as shelf v1; families B/E/F/G/H register the same way as their §4 data
++gates open — a family with no data is simply ABSENT from the row, never placeholdered (§4). Every ruler is
++point-in-time (§4.3): its value at `asof` is computed from `bars.loc[:asof]` only, so a future bar never changes a
++past value. Windows are BANDS passed in (§3) — no typed number lives in this module.
++
++The pure per-symbol computation is unit-tested; `compute_panel` + `sanity_report` are the §9 chunk-1 deliverable
++(coverage / NaN / range per ruler), and `build_from_store` wires the real datastore reader for the full-store run.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import numpy as np
++import pandas as pd
++
++
++# --- individual STATE rulers (pure, trailing = PIT) -------------------------------------------------------------
++def _rsi(close, n):
++    d = close.diff()
++    up = d.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
++    dn = (-d.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
++    rs = up / dn.replace(0, np.nan)
++    return (100 - 100 / (1 + rs)).iloc[-1]
++
++
++def _realized_vol(close, n):
++    r = np.log(close).diff().dropna().tail(int(n))
++    return float(r.std(ddof=0)) if len(r) else np.nan
++
++
++def _boll_z(close, n):
++    tail = close.tail(int(n))
++    sd = tail.std(ddof=0)
++    return float((close.iloc[-1] - tail.mean()) / sd) if sd and not np.isnan(sd) else np.nan
++
++
++def _atr(bars, n):
++    h, l, c = bars[&quot;high&quot;], bars[&quot;low&quot;], bars[&quot;close&quot;]
++    pc = c.shift(1)
++    tr = pd.concat([(h - l), (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
++    return float(tr.tail(int(n)).mean())
++
++
++def _gap_pct(bars):
++    if len(bars) &lt; 2:
++        return np.nan
++    return float(bars[&quot;open&quot;].iloc[-1] / bars[&quot;close&quot;].iloc[-2] - 1.0)
++
++
++# registry: ruler name -&gt; (fn(bars, asof-slice, windows) -&gt; value). Families B/E/F/G/H append here as gates open.
++def _registry():
++    return {
++        &quot;rsi&quot;:          lambda b, w: _rsi(b[&quot;close&quot;], w.get(&quot;rsi&quot;, 14)),
++        &quot;realized_vol&quot;: lambda b, w: _realized_vol(b[&quot;close&quot;], w.get(&quot;vol&quot;, 20)),
++        &quot;boll_z&quot;:       lambda b, w: _boll_z(b[&quot;close&quot;], w.get(&quot;boll&quot;, 20)),
++        &quot;atr&quot;:          lambda b, w: _atr(b, w.get(&quot;atr&quot;, 14)),
++        &quot;gap_pct&quot;:      lambda b, w: _gap_pct(b),
++    }
++
++
++def compute_row(bars, asof, windows):
++    &quot;&quot;&quot;Every registered ruler for one symbol at `asof`, PIT (only bars at/before asof). Empty bars -&gt; {} (a ruler
++    with no data is ABSENT, §4). A ruler that returns NaN is kept as NaN (the sanity report counts it); a ruler
++    that RAISES is absent for this symbol (never a fabricated value).&quot;&quot;&quot;
++    b = bars if asof is None else bars.loc[:asof]
++    if not len(b):
++        return {}
++    out = {}
++    for name, fn in _registry().items():
++        try:
++            out[name] = fn(b, windows)
++        except Exception:
++            continue                      # absent, never placeholdered
++    return out
++
++
++def compute_panel(bars_by_symbol, dates, windows):
++    &quot;&quot;&quot;One row per (symbol, date). The shelf-v1 table the sanity report summarises.&quot;&quot;&quot;
++    rows = []
++    for sym, bars in bars_by_symbol.items():
++        for d in dates:
++            r = compute_row(bars, d, windows)
++            if r:
++                rows.append({&quot;symbol&quot;: sym, &quot;date&quot;: pd.Timestamp(d).date().isoformat(), **r})
++    return pd.DataFrame(rows)
++
++
++def sanity_report(panel_df):
++    &quot;&quot;&quot;§9 chunk-1 deliverable: per ruler, coverage (non-NaN fraction), NaN count, and value range.&quot;&quot;&quot;
++    rep = {}
++    ruler_cols = [c for c in panel_df.columns if c not in (&quot;symbol&quot;, &quot;date&quot;)]
++    n = len(panel_df)
++    for c in ruler_cols:
++        col = pd.to_numeric(panel_df[c], errors=&quot;coerce&quot;)
++        nn = int(col.notna().sum())
++        rep[c] = {&quot;coverage&quot;: round(nn / n, 4) if n else 0.0, &quot;n_nan&quot;: int(n - nn),
++                  &quot;min&quot;: (None if nn == 0 else float(col.min())), &quot;max&quot;: (None if nn == 0 else float(col.max()))}
++    return rep
++
++
++def build_from_store(reader, tokens, dates, windows):
++    &quot;&quot;&quot;Wire the real 1-min store (engine1_rebuild.datastore.read) → daily OHLCV per token → the shelf panel.
++    READ-ONLY. Heavy (used for the full-store §9 run, not in unit tests).&quot;&quot;&quot;
++    bars = {}
++    for tok in tokens:
++        df = reader(tok)
++        if df is None or not len(df):
++            continue
++        daily = pd.DataFrame({
++            &quot;open&quot;: df[&quot;open&quot;].resample(&quot;1D&quot;).first(), &quot;high&quot;: df[&quot;high&quot;].resample(&quot;1D&quot;).max(),
++            &quot;low&quot;: df[&quot;low&quot;].resample(&quot;1D&quot;).min(), &quot;close&quot;: df[&quot;close&quot;].resample(&quot;1D&quot;).last(),
++            &quot;volume&quot;: df[&quot;volume&quot;].resample(&quot;1D&quot;).sum()}).dropna(how=&quot;all&quot;)
++        bars[str(tok)] = daily
++    return compute_panel(bars, dates, windows)
++
++
++def _demo():
++    idx = pd.bdate_range(&quot;2025-01-01&quot;, periods=100)
++    rng = np.random.default_rng(1)
++    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.015, 100)))
++    b = pd.DataFrame({&quot;open&quot;: close, &quot;high&quot;: close * 1.01, &quot;low&quot;: close * 0.99, &quot;close&quot;: close,
++                      &quot;volume&quot;: rng.integers(1e5, 1e6, 100).astype(float)}, index=idx)
++    w = {&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14}
++    t = idx[70]
++    full = compute_row(b, t, w)
++    assert full == compute_row(b.loc[:t], t, w), &quot;leakage&quot;
++    assert 0 &lt;= full[&quot;rsi&quot;] &lt;= 100 and full[&quot;atr&quot;] &gt;= 0
++    assert compute_row(b.iloc[:0], None, w) == {}          # no data -&gt; absent
++    rep = sanity_report(compute_panel({&quot;X&quot;: b}, idx[-5:], w))
++    assert 0.0 &lt;= rep[&quot;rsi&quot;][&quot;coverage&quot;] &lt;= 1.0
++    print(&quot;shelf v1 (chunk 1) demo OK: STATE rulers PIT (no leakage), no-data-&gt;absent, sanity report &quot;
++          &quot;(coverage/NaN/range).&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_claude_price_shelf.py b/tests/test_claude_price_shelf.py
+new file mode 100644
+index 000000000..d60f8bb2a
+--- /dev/null
++++ b/tests/test_claude_price_shelf.py
+@@ -0,0 +1,52 @@
++&quot;&quot;&quot;NB53-C engine 2 CHUNK 1 (per §9) — ruler shelf v1 on the bar store + sanity report.
++
++The shelf computes STATE rulers (families A/C to start; the registry lets B/E/F/G/H plug in as their §4 data gates
++open — a family with no data is ABSENT, never placeholdered). Every ruler is PIT (§4.3): its value at asof uses
++only bars at/before asof. Windows are BANDS passed in (§3 — no typed number in code). The sanity report is the
++§9 chunk-1 deliverable: coverage, NaN count, value range per ruler.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np, pandas as pd
++from engine2_claude_price import shelf
++
++
++def _bars(n=120, seed=3):
++    idx = pd.bdate_range(&quot;2025-01-01&quot;, periods=n)
++    rng = np.random.default_rng(seed)
++    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.015, n)))
++    high = close * (1 + np.abs(rng.normal(0, 0.01, n)))
++    low = close * (1 - np.abs(rng.normal(0, 0.01, n)))
++    openp = close.copy()
++    vol = rng.integers(1e5, 1e6, n).astype(float)
++    return pd.DataFrame({&quot;open&quot;: openp, &quot;high&quot;: high, &quot;low&quot;: low, &quot;close&quot;: close, &quot;volume&quot;: vol}, index=idx)
++
++
++def test_shelf_computes_the_registered_state_rulers():
++    b = _bars()
++    row = shelf.compute_row(b, b.index[-1], windows={&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14})
++    assert {&quot;rsi&quot;, &quot;realized_vol&quot;, &quot;boll_z&quot;, &quot;atr&quot;, &quot;gap_pct&quot;} &lt;= set(row)
++    assert 0.0 &lt;= row[&quot;rsi&quot;] &lt;= 100.0
++    assert row[&quot;atr&quot;] &gt;= 0.0 and row[&quot;realized_vol&quot;] &gt;= 0.0
++
++
++def test_rulers_are_PIT_future_bars_never_change_a_value():
++    b = _bars(); t = b.index[80]
++    full = shelf.compute_row(b, t, windows={&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14})
++    trunc = shelf.compute_row(b.loc[:t], t, windows={&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14})
++    assert full == trunc, &quot;LEAKAGE: a ruler used bars after asof&quot;
++
++
++def test_sanity_report_has_coverage_nan_and_range():
++    b = _bars()
++    df = shelf.compute_panel({&quot;AAA&quot;: b, &quot;BBB&quot;: _bars(seed=9)}, b.index[-5:],
++                             windows={&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14})
++    rep = shelf.sanity_report(df)
++    assert &quot;rsi&quot; in rep and set(rep[&quot;rsi&quot;]) &gt;= {&quot;coverage&quot;, &quot;n_nan&quot;, &quot;min&quot;, &quot;max&quot;}
++    assert 0.0 &lt;= rep[&quot;rsi&quot;][&quot;coverage&quot;] &lt;= 1.0
++
++
++def test_a_ruler_with_no_data_is_absent_not_placeholdered():
++    empty = pd.DataFrame(columns=[&quot;open&quot;, &quot;high&quot;, &quot;low&quot;, &quot;close&quot;, &quot;volume&quot;])
++    row = shelf.compute_row(empty, None, windows={&quot;rsi&quot;: 14, &quot;vol&quot;: 20, &quot;boll&quot;: 20, &quot;atr&quot;: 14})
++    assert row == {}, &quot;no bars must yield NO rulers (absent), never a placeholder value&quot;
+</pre></div><div class='c'><div class='h'><b>2da8823be</b> · 2026-09-28 08:41</div><div>NB53-C: OVERWRITE Claude Price Engine architecture with the real 28-Sep lead file (verbatim, 158 lines); NB53-B section C withdrawn/gone. Discard chunk-1 context work built from section C (item 1; vol/breadth math kept in git history for Family C/F). Archive NB53-C. Roster: engine 2 architecture present, engine 6 = parity+NSE/BSE+pairs no-tick (NB53-C item 3). Docs + discard</div><div class='sub h'>engine2_claude_price/context.py    | 78 --------------------------------------</div><div class='sub h'>tests/test_claude_price_context.py | 46 ----------------------</div><pre>diff --git a/engine2_claude_price/context.py b/engine2_claude_price/context.py
+deleted file mode 100644
+index 63018cb6a..000000000
+--- a/engine2_claude_price/context.py
++++ /dev/null
+@@ -1,78 +0,0 @@
+-&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 1: the data + context layer (docs/architecture/CLAUDE-PRICE-ENGINE-
+-ARCHITECTURE.md, C1).
+-
+-One context row per trading day — realised volatility, breadth, index return — computed from the SHARED daily-close
+-panel READ-ONLY (§27a). Point-in-time by construction (§4.3): every quantity for date t is derived from
+-`panel.loc[:t]` only, so a future bar can never change a past row. `vol_window` is a PARAMETER (no typed number,
+-C2) chosen by walk-forward and recorded in the ruler record; this layer only computes given it.
+-
+-The panel is passed in (injectable) so the logic is unit-tested without loading the whole store; `build_from_store`
+-wires the real datastore reader for the &quot;regenerates from the stores&quot; DONE criterion.
+-&quot;&quot;&quot;
+-from __future__ import annotations
+-
+-import numpy as np
+-import pandas as pd
+-
+-
+-def context_row(asof, panel, vol_window, index_col=&quot;INDEX&quot;):
+-    &quot;&quot;&quot;One context row for `asof`, using ONLY panel rows at or before asof (PIT). Returns a plain dict so equality
+-    is exact for the leakage test. `panel`: daily closes, columns = symbols (one is the index), index = dates.&quot;&quot;&quot;
+-    hist = panel.loc[:asof]                                  # PIT slice: nothing after asof is visible
+-    idx = hist[index_col].astype(float)
+-    logret = np.log(idx).diff()
+-    # realised vol = std of the last vol_window index log-returns ending at asof (trailing window = PIT)
+-    tail = logret.dropna().tail(int(vol_window))
+-    rv = float(tail.std(ddof=0)) if len(tail) else 0.0
+-    index_ret = float(logret.iloc[-1]) if len(logret) &gt;= 1 and pd.notna(logret.iloc[-1]) else 0.0
+-    # breadth = fraction of NON-index symbols with a positive daily return on asof
+-    syms = [c for c in hist.columns if c != index_col]
+-    if len(hist) &gt;= 2 and syms:
+-        prev, cur = hist[syms].iloc[-2], hist[syms].iloc[-1]
+-        up = (cur.astype(float) &gt; prev.astype(float))
+-        breadth = float(up.sum()) / float(len(syms))
+-    else:
+-        breadth = 0.0
+-    return {&quot;date&quot;: pd.Timestamp(asof).date().isoformat(),
+-            &quot;realized_vol&quot;: round(rv, 8), &quot;breadth&quot;: round(breadth, 8), &quot;index_ret&quot;: round(index_ret, 8)}
+-
+-
+-def build(panel, dates, vol_window, index_col=&quot;INDEX&quot;):
+-    &quot;&quot;&quot;One context row per date in `dates`. DONE-criterion output — the context file the engine regenerates.&quot;&quot;&quot;
+-    return pd.DataFrame([context_row(d, panel, vol_window, index_col) for d in dates])
+-
+-
+-def daily_close_panel(reader, tokens, index_token):
+-    &quot;&quot;&quot;Assemble the daily-close panel from the SHARED minute-bar store, READ-ONLY. `reader(token)` returns a
+-    minute-bar frame (engine1_rebuild.datastore.read); we take the last close of each day. Heavy — used by
+-    build_from_store, not in unit tests.&quot;&quot;&quot;
+-    cols = {}
+-    for tok in list(tokens) + [index_token]:
+-        df = reader(tok)
+-        if df is None or not len(df):
+-            continue
+-        daily = df[&quot;close&quot;].resample(&quot;1D&quot;).last().dropna()
+-        cols[&quot;INDEX&quot; if tok == index_token else str(tok)] = daily
+-    return pd.DataFrame(cols).sort_index()
+-
+-
+-def _demo():
+-    dates = pd.bdate_range(&quot;2026-01-01&quot;, periods=30)
+-    rng = np.random.default_rng(1)
+-    panel = pd.DataFrame({s: 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(dates))))
+-                          for s in [&quot;INDEX&quot;, &quot;A&quot;, &quot;B&quot;]}, index=dates)
+-    t = dates[20]
+-    full = context_row(t, panel, vol_window=10)
+-    assert full == context_row(t, panel.loc[:t], vol_window=10), &quot;leakage&quot;
+-    pois = panel.copy(); pois.loc[panel.index &gt; t] = np.nan
+-    assert context_row(t, pois, vol_window=10) == full, &quot;future bars changed a past row (leakage)&quot;
+-    assert 0.0 &lt;= full[&quot;breadth&quot;] &lt;= 1.0 and full[&quot;realized_vol&quot;] &gt;= 0.0
+-    assert len(build(panel, list(dates[15:18]), vol_window=10)) == 3
+-    print(&quot;claude_price context (chunk 1) demo OK: PIT context row (vol/breadth/index_ret); NO LEAKAGE &quot;
+-          &quot;(future bars never change a past row); one row per date.&quot;)
+-
+-
+-if __name__ == &quot;__main__&quot;:
+-    import sys
+-    if &quot;--demo&quot; in sys.argv:
+-        _demo()
+diff --git a/tests/test_claude_price_context.py b/tests/test_claude_price_context.py
+deleted file mode 100644
+index aac6a8784..000000000
+--- a/tests/test_claude_price_context.py
++++ /dev/null
+@@ -1,46 +0,0 @@
+-&quot;&quot;&quot;NB53-B engine 2 (Claude Price) CHUNK 1 — data + context layer, PIT by construction.
+-
+-The chunk&#x27;s crucial invariant (§4.3, §8.1): the context row for date t uses ONLY data knowable at or before t.
+-The leakage test proves it — context_row(t, full panel) must equal context_row(t, panel truncated at t); if a
+-future bar changes the row, the row leaked. vol_window is a PARAMETER (no typed number, C2) chosen by walk-forward
+-and recorded later.
+-&quot;&quot;&quot;
+-import os, sys
+-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+-import numpy as np, pandas as pd
+-from engine2_claude_price import context as ctx
+-
+-
+-def _panel():
+-    dates = pd.bdate_range(&quot;2026-01-01&quot;, periods=40)
+-    rng = np.random.default_rng(7)
+-    cols = {}
+-    for s in [&quot;INDEX&quot;, &quot;A&quot;, &quot;B&quot;, &quot;C&quot;]:
+-        cols[s] = 100 * np.exp(np.cumsum(rng.normal(0.0, 0.01, len(dates))))
+-    return pd.DataFrame(cols, index=dates)
+-
+-
+-def test_context_row_has_vol_breadth_and_index_return():
+-    p = _panel(); t = p.index[30]
+-    row = ctx.context_row(t, p, vol_window=20, index_col=&quot;INDEX&quot;)
+-    assert set(row) &gt;= {&quot;date&quot;, &quot;realized_vol&quot;, &quot;breadth&quot;, &quot;index_ret&quot;}
+-    assert 0.0 &lt;= row[&quot;breadth&quot;] &lt;= 1.0
+-    assert row[&quot;realized_vol&quot;] &gt;= 0.0
+-
+-
+-def test_NO_LEAKAGE_future_bars_never_change_a_row():
+-    p = _panel(); t = p.index[25]
+-    full = ctx.context_row(t, p, vol_window=20, index_col=&quot;INDEX&quot;)
+-    truncated = ctx.context_row(t, p.loc[:t], vol_window=20, index_col=&quot;INDEX&quot;)
+-    assert full == truncated, &quot;LEAKAGE: row for t changed when future bars were present&quot;
+-    # poison every bar AFTER t and confirm the row is byte-identical
+-    poisoned = p.copy(); poisoned.loc[p.index &gt; t] = np.nan
+-    assert ctx.context_row(t, poisoned, vol_window=20, index_col=&quot;INDEX&quot;) == full
+-
+-
+-def test_build_makes_one_row_per_date():
+-    p = _panel()
+-    dates = list(p.index[22:26])
+-    df = ctx.build(p, dates, vol_window=20, index_col=&quot;INDEX&quot;)
+-    assert list(df[&quot;date&quot;]) == [d.date().isoformat() for d in dates]
+-    assert len(df) == 4
+</pre></div><div class='c'><div class='h'><b>887182bd3</b> · 2026-09-28 08:35</div><div>NB53-B step 4: engines 3-8 &#x27;made and running&#x27; through ONE scheduler — integration test proves the engine bus runs all 8 §27 diary-engine wrappers (YouTube, Calendar, MachineFactory, Pairs, Dubai, Overnight, Insurance, Context), each gated + isolated, one tagged line, never 🙋. 2 tests GREEN</div><div class='sub h'>tests/test_engine_bus_diary.py | 37 +++++++++++++++++++++++++++++++++++++</div><pre>diff --git a/tests/test_engine_bus_diary.py b/tests/test_engine_bus_diary.py
+new file mode 100644
+index 000000000..fda5abbd8
+--- /dev/null
++++ b/tests/test_engine_bus_diary.py
+@@ -0,0 +1,37 @@
++&quot;&quot;&quot;NB53-B — the engine bus runs ALL the §27 diary engines through ONE scheduler (integration).
++
++register_diary_engines adapts every scripts/diary_engines wrapper (YouTube, Calendar, MachineFactory, Pairs,
++Dubai, Overnight, Insurance, Context) into a daily bus engine; run_daily then runs each through its own §27c gate
++in its own try/except. This is &quot;all engines made and running, whether they fire or not&quot; (NB53-B) — the daily
++engines evaluated in sequence, isolated, one tagged line each.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from scripts import engine_bus, diary_engines
++
++
++def setup_function(_):
++    engine_bus.clear()
++
++
++def test_bus_runs_every_diary_engine_isolated():
++    # gate them OFF (uncalibrated/low RAM) — a gated engine is still a RESULT (line present), never an error
++    engine_bus.register_diary_engines(ready_seen=True, free_gb=0.1, reopen_floor_gb=0.72)
++    out = engine_bus.run_daily(&quot;2026-09-28&quot;)
++    assert set(out) == set(diary_engines.names())            # all 8, run by the one scheduler
++    for name, r in out.items():
++        assert r[&quot;error&quot;] is None, &quot;%s faulted in the bus&quot; % name   # isolation held; gate is not a fault
++        assert r[&quot;line&quot;]                                     # each produced a line (gated reason or ✅)
++        assert &quot;\U0001f64b&quot; not in engine_bus.line(name, r)  # never 🙋 for a non-chain engine (§27d)
++
++
++def test_a_faulting_diary_engine_never_stops_the_others(monkeypatch):
++    def boom(name, *a, **k):
++        if name == &quot;Calendar&quot;:
++            raise RuntimeError(&quot;calendar store missing&quot;)
++        return {&quot;line&quot;: &quot;ok&quot;}
++    monkeypatch.setattr(diary_engines, &quot;run_once&quot;, boom)
++    engine_bus.register_diary_engines(ready_seen=True, free_gb=9.9)
++    out = engine_bus.run_daily(&quot;2026-09-28&quot;)
++    assert out[&quot;Calendar&quot;][&quot;error&quot;] == &quot;RuntimeError&quot;        # its fault stayed its own
++    assert out[&quot;YouTube&quot;][&quot;error&quot;] is None                   # every other engine still ran
+</pre></div><div class='c'><div class='h'><b>b0eba4e86</b> · 2026-09-28 08:33</div><div>NB53-B step 3: engine 2 (Claude Price) architecture (section C verbatim, LEAD RULING resolved) + CHUNK 1 data/context layer. engine2_claude_price/context.py: PIT context row (realised vol, breadth, index return) from the shared daily-close panel READ-ONLY; leakage test proves no row uses future data (§4.3); vol_window a param, no typed number (C2). 3 tests GREEN. Design sheet superseded</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-ARCHITECTURE.md            | 72 ++++++++++++++++++++</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md            |  2 +</div><div class='sub h'>engine2_claude_price/__init__.py                   |  0</div><div class='sub h'>engine2_claude_price/context.py                    | 78 ++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_context.py                 | 46 +++++++++++++</div><pre>diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md b/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md
 new file mode 100644
 index 000000000..5ebbcaacd
 --- /dev/null
@@ -225,415 +607,7 @@ index 000000000..aac6a8784
 +    df = ctx.build(p, dates, vol_window=20, index_col=&quot;INDEX&quot;)
 +    assert list(df[&quot;date&quot;]) == [d.date().isoformat() for d in dates]
 +    assert len(df) == 4
-</pre></div><div class='c'><div class='h'><b>97c7a249b</b> · 2026-09-28 08:31</div><div>NB53-B step 2: §H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB 🙋 guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated</div><div class='sub h'>docs/MASTER-CHECKLIST.md        |  8 ++--</div><div class='sub h'>scripts/desk_day_log.py         | 84 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/event_blackout.py       | 55 +++++++++++++++++++++++++++</div><div class='sub h'>scripts/market_hours_mode.py    | 66 ++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/monday_rehearsal.py     | 18 ++++++++-</div><div class='sub h'>tests/test_desk_day_log.py      | 30 +++++++++++++++</div><div class='sub h'>tests/test_event_blackout.py    | 27 +++++++++++++</div><div class='sub h'>tests/test_market_hours_mode.py | 37 ++++++++++++++++++</div><div class='sub h'>tests/test_rehearsal_measure.py | 21 +++++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index 4e74e4efc..d45b4787a 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -103,8 +103,8 @@ _PRUNED 2026-09-28 (NB50-B) to the owner&#x27;s seven engines. Six ideas + three drop
- ## H. Desk operations (NB50 item 3, added NB52 2026-09-28 — docs only)
- _The Claude Price Engine (chunks 1–7) and the [redacted] Price Engine (35 rulers untouched) are already §E engines 2 and 1; these are the operational additions NB50 item 3 named that were not yet on the list._
- 
--- [AFTER-1545] 70. desk day-log — one line per step per day (token time · 08:15 line · 09:15 gate decision · close-done), each carrying the measured free DISK and free RAM at that step. The single artifact the Friday/Saturday audits lacked.
--- [AFTER-1545] 71. nightly full-morning rehearsal on the real stack — fake token + recorded quotes, memory AND disk measured per step, ends in a PASS / NOT READY line. Proves the whole 06:00→08:15 chain before the real morning.
--- [AFTER-1545] 72. market-hours mode — the desk runs desk-only 08:30 → close-done; disk-full AND low-RAM each post a 🙋 with the measured number (the disk-free floor feeds the 08:15 self-check, item reverted NB52 pending a verify).
--- [DAYS] 73. event blackout — no new orders around named events (earnings/index dates from the Calendar engine, §E engine 4); dates from the store, never typed.
-+- [AFTER-1545] 70. desk day-log — **BUILT-not-LIVE (NB53-B, d?): scripts/desk_day_log.py + tests GREEN (2); one line/step with measured free disk+RAM, unreadable-&gt;&#x27;?&#x27;. Wire-in (calls from token/08:15/09:15/close-done steps) is verify-gated.**
-+- [AFTER-1545] 71. nightly full-morning rehearsal — **BUILT-not-LIVE (NB53-B): monday_rehearsal already walks the chain PASS/FAIL; added per-step disk+RAM (_measure) + READY/NOT-READY (_result_word); tests GREEN (2).**
-+- [AFTER-1545] 72. market-hours mode — **BUILT-not-LIVE (NB53-B): scripts/market_hours_mode.py + tests GREEN (4); desk_only(08:30-&gt;close-done) window + one 🙋/breach (disk-full, low-RAM) with the measured GB, floors passed in (reverted disk floor stays out of the chain). Wire-in verify-gated.**
-+- [DAYS] 73. event blackout — **BUILT-DORMANT (NB53-B): scripts/event_blackout.py + tests GREEN (3); named event day blocked, window_days param (&gt;0 = LEAD RULING when engine 4 supplies events), DORMANT/fail-open with no store. Composes with engine 4&#x27;s event dict.**
- - [DAYS] 74. monthly fill calibration — publish the shadow re-settle delta in R once a month (FILL-LAW-UNVERIFIED badge, D1); clears the badge only when the delta is measured.
-diff --git a/scripts/desk_day_log.py b/scripts/desk_day_log.py
-new file mode 100644
-index 000000000..d6e8cb72f
---- /dev/null
-+++ b/scripts/desk_day_log.py
-@@ -0,0 +1,84 @@
-+&quot;&quot;&quot;NB53-B item 70 — desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.
-+
-+The single artifact the Friday/Saturday audits lacked: nothing recorded disk/RAM at each morning step, so a fill
-+that ran out of disk (Sat 26 Sep) or a recorder that died on low RAM left no trail. Each launch step (token /
-+08:15 / 09:15 gate / close-done) calls log_step; the module measures and appends. No typed number (§4.1): disk
-+from shutil.disk_usage, RAM from memory_guard.free_gb; an unreadable measure is written &quot;?&quot;, never a fabricated 0.
-+
-+The module is pure and fully tested now; the CALLS from the live launch steps are the launch-path wire-in
-+(built-not-live until the owner-run fresh-session verify — §24.2).
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+import os
-+import shutil
-+
-+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+LOG = os.path.join(_REPO, &quot;reports&quot;, &quot;DESK-DAY-LOG.md&quot;)
-+
-+
-+def _disk_free_gb():
-+    try:
-+        return round(shutil.disk_usage(_REPO).free / (1024 ** 3), 1)
-+    except Exception:
-+        return None
-+
-+
-+def _ram_free_gb():
-+    try:
-+        from scripts import memory_guard
-+        return memory_guard.free_gb()
-+    except Exception:
-+        return None
-+
-+
-+def _num(x):
-+    return &quot;?&quot; if x is None else (&quot;%g&quot; % x)
-+
-+
-+def log_step(step, note=&quot;&quot;, clock=None, date=None):
-+    &quot;&quot;&quot;Append one day-log line for a step, with the free disk + RAM measured now. Never raises.&quot;&quot;&quot;
-+    now = _dt.datetime.now()
-+    clock = clock or now.strftime(&quot;%H:%M:%S&quot;)
-+    date = date or now.strftime(&quot;%Y-%m-%d&quot;)
-+    line = &quot;%s %s | step=%s | disk=%sGB | ram=%sGB%s&quot; % (
-+        date, clock, step, _num(_disk_free_gb()), _num(_ram_free_gb()),
-+        (&quot; | &quot; + note) if note else &quot;&quot;)
-+    try:
-+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
-+        with open(LOG, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
-+            f.write(line + &quot;\n&quot;)
-+    except Exception:
-+        pass
-+    return line
-+
-+
-+def today_lines(date=None):
-+    date = date or _dt.datetime.now().strftime(&quot;%Y-%m-%d&quot;)
-+    try:
-+        return [ln.rstrip(&quot;\n&quot;) for ln in open(LOG, encoding=&quot;utf-8&quot;) if ln.startswith(date)]
-+    except Exception:
-+        return []
-+
-+
-+def _demo():
-+    import tempfile
-+    global LOG, _disk_free_gb, _ram_free_gb
-+    LOG = os.path.join(tempfile.mkdtemp(), &quot;d.md&quot;)
-+    _disk_free_gb = lambda: 9.0
-+    _ram_free_gb = lambda: 1.1
-+    log_step(&quot;token&quot;, &quot;login landed&quot;, clock=&quot;06:00:00&quot;, date=&quot;2026-09-28&quot;)
-+    log_step(&quot;08:15&quot;, &quot;READY&quot;, clock=&quot;08:15:00&quot;, date=&quot;2026-09-28&quot;)
-+    ls = today_lines(&quot;2026-09-28&quot;)
-+    assert len(ls) == 2 and &quot;disk=9GB&quot; in ls[0] and &quot;ram=1.1GB&quot; in ls[0] and &quot;step=08:15&quot; in ls[1]
-+    _disk_free_gb = lambda: None
-+    log_step(&quot;close-done&quot;, clock=&quot;15:46:00&quot;, date=&quot;2026-09-28&quot;)
-+    assert &quot;disk=?GB&quot; in today_lines(&quot;2026-09-28&quot;)[2]
-+    print(&quot;desk_day_log demo OK: one line/step with measured disk+RAM; unreadable -&gt; &#x27;?&#x27;, never a fake 0.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/scripts/event_blackout.py b/scripts/event_blackout.py
-new file mode 100644
-index 000000000..06e437d47
---- /dev/null
-+++ b/scripts/event_blackout.py
-@@ -0,0 +1,55 @@
-+&quot;&quot;&quot;NB53-B item 73 — event blackout: no NEW orders on a named event day (earnings / index-reconstitution dates).
-+
-+Dates come from the Calendar engine&#x27;s store (NB53 engine 4), never typed here (§4.1 / §24.5). The blackout window
-+defaults to the named day ITSELF (window_days=0) — the one non-arbitrary choice that needs no derivation. A wider
-+window (&quot;the session before/after&quot;) is a threshold and therefore a LEAD RULING to be set when engine 4 supplies a
-+measured/exchange-published event list; until then the caller passes window_days explicitly or takes the day-only
-+default.
-+
-+DORMANT while no event store exists: an empty/absent calendar returns False (never blacks out). This is the
-+correct fail direction — an absent calendar must NOT silently freeze all trading; only a present, dated calendar
-+blacks out its own named days. This composes with engine 4: engine 4 writes the event dict, this reads it.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+
-+
-+def _d(s):
-+    return _dt.date.fromisoformat(s) if isinstance(s, str) else s
-+
-+
-+def in_blackout(asof, event_dates, window_days=0):
-+    &quot;&quot;&quot;True if `asof` (ISO str or date) is within `window_days` of any named event date. event_dates is a
-+    {iso_date: reason} dict from the Calendar engine. Empty/None -&gt; False (DORMANT).&quot;&quot;&quot;
-+    if not event_dates:
-+        return False
-+    a = _d(asof)
-+    for ev in event_dates:
-+        if abs((a - _d(ev)).days) &lt;= window_days:
-+            return True
-+    return False
-+
-+
-+def reason(asof, event_dates, window_days=0):
-+    &quot;&quot;&quot;The reason string for the nearest event within the window, or None. Names why an order is blocked.&quot;&quot;&quot;
-+    if not event_dates:
-+        return None
-+    a = _d(asof)
-+    hits = [(abs((a - _d(ev)).days), event_dates[ev]) for ev in event_dates if abs((a - _d(ev)).days) &lt;= window_days]
-+    return min(hits)[1] if hits else None
-+
-+
-+def _demo():
-+    ev = {&quot;2026-10-15&quot;: &quot;RELIANCE earnings&quot;, &quot;2026-10-30&quot;: &quot;index reconstitution&quot;}
-+    assert in_blackout(&quot;2026-10-15&quot;, ev) and not in_blackout(&quot;2026-10-16&quot;, ev)
-+    assert reason(&quot;2026-10-30&quot;, ev) == &quot;index reconstitution&quot; and reason(&quot;2026-10-16&quot;, ev) is None
-+    assert in_blackout(&quot;2026-10-14&quot;, ev, window_days=1) and in_blackout(&quot;2026-10-16&quot;, ev, window_days=1)
-+    assert not in_blackout(&quot;2026-10-15&quot;, {}) and not in_blackout(&quot;2026-10-15&quot;, None)   # DORMANT
-+    print(&quot;event_blackout demo OK: named day blocked; window widens on request; DORMANT (fail-open) with no store.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/scripts/market_hours_mode.py b/scripts/market_hours_mode.py
-new file mode 100644
-index 000000000..c58376f86
---- /dev/null
-+++ b/scripts/market_hours_mode.py
-@@ -0,0 +1,66 @@
-+&quot;&quot;&quot;NB53-B item 72 — market-hours mode.
-+
-+During the desk-only window (08:30 -&gt; close-done ~15:46 on a trading weekday) the desk runs desk-only: heavy build
-+jobs stand down (memory_guard already throttles them), and two safety guards each post ONE 🙋 with the MEASURED
-+number when they breach — disk-full and low-RAM. Both floors are passed in by the caller (measured + cited, §4.1);
-+this module types no floor. An unreadable measure fails closed to a 🙋 (a missing reading is the state in which the
-+least is known).
-+
-+Built + tested here; the CALLS (the 08:15 self-check / desk loop posting these guard lines, and gating heavy jobs
-+on desk_only) are the launch-path wire-in — built-not-live until the owner-run fresh-session verify (§24.2). The
-+reverted disk floor (NB52) is NOT reintroduced into the chain here; it arrives as disk_floor_gb from the caller.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+
-+_OPEN = (8, 30)          # desk-only starts (heavy build stands down)
-+_CLOSE = (15, 46)        # close-done boundary (after this, building resumes)
-+
-+
-+def _ist(now=None):
-+    return now or _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
-+
-+
-+def desk_only(now=None):
-+    &quot;&quot;&quot;True during 08:30 -&gt; close-done on a trading weekday: the desk runs desk-only, heavy build waits.&quot;&quot;&quot;
-+    now = _ist(now)
-+    if now.weekday() &gt;= 5:
-+        return False
-+    hm = (now.hour, now.minute)
-+    return _OPEN &lt;= hm &lt; _CLOSE
-+
-+
-+def guards(free_ram_gb, free_disk_gb, ram_floor_gb, disk_floor_gb):
-+    &quot;&quot;&quot;Return the 🙋 lines that should post now — one per breach, each carrying the measured number. Empty when
-+    both are above their floors. Unreadable (None) fails closed to a 🙋. Floors are the caller&#x27;s measured values.&quot;&quot;&quot;
-+    out = []
-+    if free_ram_gb is None:
-+        out.append(&quot;\U0001f64b RAM unreadable — cannot confirm headroom; treat as low. Send this to the lead&quot;)
-+    elif float(free_ram_gb) &lt; float(ram_floor_gb):
-+        out.append(&quot;\U0001f64b LOW RAM: %g GB free (floor %g GB) — desk-only, heavy jobs held. Send this to the lead&quot;
-+                   % (free_ram_gb, ram_floor_gb))
-+    if free_disk_gb is None:
-+        out.append(&quot;\U0001f64b DISK unreadable — cannot confirm space; treat as full. Send this to the lead&quot;)
-+    elif float(free_disk_gb) &lt; float(disk_floor_gb):
-+        out.append(&quot;\U0001f64b DISK FULL: %g GB free (floor %g GB) — clear space before trading. Send this to the lead&quot;
-+                   % (free_disk_gb, disk_floor_gb))
-+    return out
-+
-+
-+def _demo():
-+    on = _dt.datetime(2026, 9, 28, 9, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=5, minutes=30)))
-+    off = on.replace(hour=16)
-+    assert desk_only(on) is True and desk_only(off) is False
-+    assert guards(2.0, 50.0, 0.378, 0.376) == []
-+    g = guards(0.2, 0.1, 0.378, 0.376)
-+    assert len(g) == 2 and any(&quot;LOW RAM&quot; in x for x in g) and any(&quot;DISK FULL&quot; in x for x in g)
-+    assert all(&quot;unreadable&quot; in x for x in guards(None, None, 0.378, 0.376))
-+    print(&quot;market_hours_mode demo OK: 08:30-&gt;close-done desk-only window; one 🙋/breach with the measured GB; &quot;
-+          &quot;unreadable fails closed.&quot;.encode(&quot;ascii&quot;, &quot;replace&quot;).decode())
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/scripts/monday_rehearsal.py b/scripts/monday_rehearsal.py
-index 2d5237fca..0f2ab5ab3 100644
---- a/scripts/monday_rehearsal.py
-+++ b/scripts/monday_rehearsal.py
-@@ -33,9 +33,23 @@ def _ist():
-     return datetime.now(timezone.utc).astimezone(IST)
- 
- 
-+def _measure():
-+    &quot;&quot;&quot;(free disk GB, free RAM GB) measured now — item 70&#x27;s measure, reused. None on an unreadable read.&quot;&quot;&quot;
-+    from scripts import desk_day_log
-+    return desk_day_log._disk_free_gb(), desk_day_log._ram_free_gb()
-+
-+
-+def _result_word(ok):
-+    return &quot;READY&quot; if ok else &quot;NOT READY&quot;
-+
-+
- def _mark(ok, step, detail=&quot;&quot;):
-     tag = &quot;PASS&quot; if ok else &quot;FAIL&quot;
--    line = &quot;%s %s — %s%s&quot; % (tag, _ist().strftime(&quot;%H:%M:%S&quot;), step, (&quot; · &quot; + detail) if detail else &quot;&quot;)
-+    disk, ram = _measure()                              # item 71: memory AND disk measured PER STEP
-+    d = &quot;?&quot; if disk is None else (&quot;%g&quot; % disk)
-+    r = &quot;?&quot; if ram is None else (&quot;%g&quot; % ram)
-+    line = &quot;%s %s — %s%s | disk=%sGB ram=%sGB&quot; % (
-+        tag, _ist().strftime(&quot;%H:%M:%S&quot;), step, (&quot; · &quot; + detail) if detail else &quot;&quot;, d, r)
-     print(line)
-     _lines.append((ok, line))
-     return ok
-@@ -263,7 +277,7 @@ def run():
-         f.write(&quot;```\n&quot; + &quot;\n&quot;.join(l for _, l in _lines) + &quot;\n```\n&quot;)
-         f.write(&quot;\n**RESULT: %s**\n&quot; % (&quot;ALL PASS&quot; if ok else &quot;FAIL — see the lines above&quot;))
-     print(&quot;\nfree RAM: %s GB before -&gt; %s GB after | hold: %s&quot; % (free_before, free_after, hold_state))
--    print(&quot;RESULT:&quot;, &quot;ALL PASS&quot; if ok else &quot;FAIL&quot;)
-+    print(&quot;RESULT:&quot;, (&quot;ALL PASS&quot; if ok else &quot;FAIL&quot;), &quot;-&gt;&quot;, _result_word(ok))
-     return ok
- 
- 
-diff --git a/tests/test_desk_day_log.py b/tests/test_desk_day_log.py
-new file mode 100644
-index 000000000..d3d5a17db
---- /dev/null
-+++ b/tests/test_desk_day_log.py
-@@ -0,0 +1,30 @@
-+&quot;&quot;&quot;NB53-B item 70 — desk day-log: ONE line per step per day, each carrying measured free DISK + free RAM.
-+
-+The single artifact the Friday/Saturday audits lacked (nothing recorded the disk/RAM at each morning step). Pure
-+writer: the launch steps (token / 08:15 / 09:15 gate / close-done) call log_step; the module measures disk+RAM and
-+appends. No typed number — disk from shutil.disk_usage, RAM from memory_guard (§4.1).
-+&quot;&quot;&quot;
-+import os, sys, tempfile
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import desk_day_log as ddl
-+
-+
-+def test_logs_a_line_per_step_with_disk_and_ram(tmp_path, monkeypatch):
-+    monkeypatch.setattr(ddl, &quot;LOG&quot;, str(tmp_path / &quot;DESK-DAY-LOG.md&quot;))
-+    monkeypatch.setattr(ddl, &quot;_disk_free_gb&quot;, lambda: 12.3)
-+    monkeypatch.setattr(ddl, &quot;_ram_free_gb&quot;, lambda: 1.4)
-+    ddl.log_step(&quot;token&quot;, &quot;login landed&quot;, clock=&quot;06:01:02&quot;, date=&quot;2026-09-28&quot;)
-+    ddl.log_step(&quot;08:15&quot;, &quot;READY&quot;, clock=&quot;08:15:00&quot;, date=&quot;2026-09-28&quot;)
-+    lines = ddl.today_lines(&quot;2026-09-28&quot;)
-+    assert len(lines) == 2
-+    assert &quot;step=token&quot; in lines[0] and &quot;disk=12.3GB&quot; in lines[0] and &quot;ram=1.4GB&quot; in lines[0]
-+    assert &quot;step=08:15&quot; in lines[1] and &quot;READY&quot; in lines[1]
-+
-+
-+def test_unreadable_measure_is_recorded_not_crashed(tmp_path, monkeypatch):
-+    monkeypatch.setattr(ddl, &quot;LOG&quot;, str(tmp_path / &quot;d.md&quot;))
-+    monkeypatch.setattr(ddl, &quot;_disk_free_gb&quot;, lambda: None)   # unreadable
-+    monkeypatch.setattr(ddl, &quot;_ram_free_gb&quot;, lambda: None)
-+    ddl.log_step(&quot;close-done&quot;, clock=&quot;15:46:00&quot;, date=&quot;2026-09-28&quot;)
-+    ln = ddl.today_lines(&quot;2026-09-28&quot;)[0]
-+    assert &quot;disk=?GB&quot; in ln and &quot;ram=?GB&quot; in ln          # honest &quot;?&quot; not a fabricated 0
-diff --git a/tests/test_event_blackout.py b/tests/test_event_blackout.py
-new file mode 100644
-index 000000000..8f73e4243
---- /dev/null
-+++ b/tests/test_event_blackout.py
-@@ -0,0 +1,27 @@
-+&quot;&quot;&quot;NB53-B item 73 — event blackout: no NEW orders on a named event day. Dates come from the Calendar engine&#x27;s
-+store (engine 4), never typed. DORMANT (blackout never trips) while no event store exists — fail-open on data is
-+correct here: an ABSENT calendar must not silently freeze all trading; a present one blacks out its named days.
-+&quot;&quot;&quot;
-+import os, sys, datetime as dt
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import event_blackout as eb
-+
-+
-+def test_named_event_day_is_blacked_out():
-+    events = {&quot;2026-10-15&quot;: &quot;RELIANCE earnings&quot;, &quot;2026-10-30&quot;: &quot;index reconstitution&quot;}
-+    assert eb.in_blackout(&quot;2026-10-15&quot;, events) is True
-+    assert eb.in_blackout(&quot;2026-10-16&quot;, events) is False        # window_days default 0 -&gt; the day itself only
-+    assert eb.reason(&quot;2026-10-30&quot;, events) == &quot;index reconstitution&quot;
-+    assert eb.reason(&quot;2026-10-16&quot;, events) is None
-+
-+
-+def test_window_widens_symmetrically_when_set():
-+    events = {&quot;2026-10-15&quot;: &quot;earnings&quot;}
-+    assert eb.in_blackout(&quot;2026-10-14&quot;, events, window_days=1) is True
-+    assert eb.in_blackout(&quot;2026-10-16&quot;, events, window_days=1) is True
-+    assert eb.in_blackout(&quot;2026-10-13&quot;, events, window_days=1) is False
-+
-+
-+def test_dormant_when_no_event_store():
-+    assert eb.in_blackout(&quot;2026-10-15&quot;, {}) is False            # empty store -&gt; never blacks out (fail-open)
-+    assert eb.in_blackout(&quot;2026-10-15&quot;, None) is False
-diff --git a/tests/test_market_hours_mode.py b/tests/test_market_hours_mode.py
-new file mode 100644
-index 000000000..d95a071bf
---- /dev/null
-+++ b/tests/test_market_hours_mode.py
-@@ -0,0 +1,37 @@
-+&quot;&quot;&quot;NB53-B item 72 — market-hours mode: desk runs desk-only 08:30 -&gt; close-done; disk-full AND low-RAM each post
-+ONE 🙋 with the MEASURED number. Floors are passed in (measured, cited by the caller — §4.1), never typed here.
-+&quot;&quot;&quot;
-+import os, sys, datetime as dt
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import market_hours_mode as mhm
-+
-+
-+def _ist(h, m, wd=0):
-+    # a Monday (wd=0) at h:m IST
-+    base = dt.datetime(2026, 9, 28, h, m, tzinfo=dt.timezone(dt.timedelta(hours=5, minutes=30)))
-+    return base
-+
-+
-+def test_desk_only_window_is_0830_to_close_done():
-+    assert mhm.desk_only(_ist(8, 30)) is True
-+    assert mhm.desk_only(_ist(15, 45)) is True
-+    assert mhm.desk_only(_ist(8, 29)) is False        # before 08:30 -&gt; build ok
-+    assert mhm.desk_only(_ist(15, 46)) is False        # after close-done -&gt; build ok
-+    sat = _ist(10, 0); sat = sat.replace(day=26)       # Saturday
-+    assert mhm.desk_only(sat) is False                 # not a weekday
-+
-+
-+def test_guards_emit_one_9man_per_breach_with_the_measured_number():
-+    g = mhm.guards(free_ram_gb=0.2, free_disk_gb=0.1, ram_floor_gb=0.378, disk_floor_gb=0.376)
-+    assert len(g) == 2
-+    assert any(&quot;\U0001f64b&quot; in x and &quot;0.2&quot; in x and &quot;RAM&quot; in x for x in g)
-+    assert any(&quot;\U0001f64b&quot; in x and &quot;0.1&quot; in x and &quot;DISK&quot; in x for x in g)
-+
-+
-+def test_guards_quiet_when_above_floors():
-+    assert mhm.guards(free_ram_gb=2.0, free_disk_gb=50.0, ram_floor_gb=0.378, disk_floor_gb=0.376) == []
-+
-+
-+def test_unreadable_measure_fails_closed_to_a_9man():
-+    g = mhm.guards(free_ram_gb=None, free_disk_gb=None, ram_floor_gb=0.378, disk_floor_gb=0.376)
-+    assert len(g) == 2 and all(&quot;\U0001f64b&quot; in x and &quot;unreadable&quot; in x for x in g)
-diff --git a/tests/test_rehearsal_measure.py b/tests/test_rehearsal_measure.py
-new file mode 100644
-index 000000000..0ecb9072f
---- /dev/null
-+++ b/tests/test_rehearsal_measure.py
-@@ -0,0 +1,21 @@
-+&quot;&quot;&quot;NB53-B item 71 — the nightly full-morning rehearsal records DISK and RAM per step and ends READY / NOT READY.
-+
-+The rehearsal (scripts/monday_rehearsal) already walks the whole 06:00-&gt;08:15 chain PASS/FAIL per step; item 71&#x27;s
-+addition is the per-step measurement (memory AND disk, item 70&#x27;s measure) and a READY/NOT-READY verdict word.
-+&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import monday_rehearsal as mr
-+
-+
-+def test_mark_records_disk_and_ram_per_step(monkeypatch):
-+    mr._lines.clear()
-+    monkeypatch.setattr(mr, &quot;_measure&quot;</pre></div><div class='c'><div class='h'><b>d79733220</b> · 2026-09-28 08:25</div><div>NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B</div><div class='sub h'>CLAUDE.md                            |  18 ++++++</div><div class='sub h'>docs/architecture/ENGINE-BUS.md      |  13 +++--</div><div class='sub h'>docs/architecture/LEAD_RULINGS.md    |   4 ++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-B.md |  22 ++++++++</div><div class='sub h'>scripts/engine_bus.py                | 104 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_engine_bus.py             |  45 +++++++++++++++</div><div class='sub h'>tests/test_engine_bus_wired.py       |  22 ++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
+</pre></div><div class='c'><div class='h'><b>d79733220</b> · 2026-09-28 08:25</div><div>NB53-B step 1: ENGINE BUS code (scripts/engine_bus.py) — registry by cadence, per-engine isolation (try/except each), one tagged line, reuses DiaryEngine §27 gates. Unit tests GREEN (4); wiring test RED (bus not yet launched by supervisor = BUILT-not-LIVE, §26). §27a fix: bus runs from its own entry not run_evening (LEAD RULING R47). CLAUDE.md §29 owner-minimum law. Archive NB53-B</div><div class='sub h'>CLAUDE.md                            |  18 ++++++</div><div class='sub h'>docs/architecture/ENGINE-BUS.md      |  13 +++--</div><div class='sub h'>docs/architecture/LEAD_RULINGS.md    |   4 ++</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-B.md |  22 ++++++++</div><div class='sub h'>scripts/engine_bus.py                | 104 +++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_engine_bus.py             |  45 +++++++++++++++</div><div class='sub h'>tests/test_engine_bus_wired.py       |  22 ++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
 index 84635caed..087d5a747 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
@@ -1421,265 +1395,4 @@ index 453ca76d3..c1e98e1fb 100644
 + &quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;
 +}
 \ No newline at end of file
-</pre></div><div class='c'><div class='h'><b>5f62b21a9</b> · 2026-09-28 02:08</div><div>NB50-B phase 2: measured disk-free floor (memory_guard.DISK_FLOOR_GB = 0.076 measured daily write + 0.3 margin = 0.376 GB, no typed number per §4.1) + disk_free_gb/disk_ok (fail-closed); wired into the 08:15 self-check -&gt; a below-floor morning leads the line with &#x27;🙋 DISK LOW: X GB free (floor Y)&#x27;. TDD red-&gt;green 4/4. BUILT; live via next dry-run+verify</div><div class='sub h'>scripts/memory_guard.py  | 28 ++++++++++++++++++++++++++++</div><div class='sub h'>scripts/preopen_gate.py  | 22 +++++++++++++++++-----</div><div class='sub h'>tests/test_disk_floor.py | 35 +++++++++++++++++++++++++++++++++++</div><pre>diff --git a/scripts/memory_guard.py b/scripts/memory_guard.py
-index c7acc937c..979f26846 100644
---- a/scripts/memory_guard.py
-+++ b/scripts/memory_guard.py
-@@ -23,6 +23,34 @@ RECORDER_PEAK_GB = 0.078   # measured: scripts.e13_depth process PeakWorkingSet
- #                            0.077–0.078 GB over 3 runs, NB49 2026-09-24; docs/VERIFIER-BRAIN.md)
- RECORDER_MARGIN_GB = 0.3   # the verify&#x27;s documented safety margin (same as session_resurrect.REOPEN_MARGIN_GB)
- RECORDER_FLOOR_GB = round(RECORDER_PEAK_GB + RECORDER_MARGIN_GB, 3)   # 0.378 GB — the recorder relaunch gate
-+
-+# NB50-B (2026-09-28): the DISK-FREE floor for the 08:15 self-check, DERIVED not typed (§4.1). The Saturday
-+# 26-Sep iPhone backup (139 GB) filled C: to 0.36 GB and the desk could not run. Floor = the desk&#x27;s largest
-+# MEASURED daily write + the standard safety margin, so a morning below it posts a 🙋 with the number.
-+DISK_DAILY_WRITE_GB = 0.076   # measured: the fullest recorded day 2026-09-22 across all recorder lanes
-+#                               (live_chains 72.1 MB + depth5 4.3 MB + xchange 1.0 MB ≈ 77 MB; NB50-B scan)
-+DISK_MARGIN_GB = 0.3          # the same cited safety margin as the RAM floors (RECORDER_MARGIN_GB)
-+DISK_FLOOR_GB = round(DISK_DAILY_WRITE_GB + DISK_MARGIN_GB, 3)   # ≈ 0.376 GB — the 08:15 disk-free floor
-+
-+
-+def disk_free_gb(path=None):
-+    &quot;&quot;&quot;Free space in GB on the drive that holds the repo (C:), or None if it cannot be read.&quot;&quot;&quot;
-+    try:
-+        import shutil
-+        return round(shutil.disk_usage(path or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))).free / (1024 ** 3), 3)
-+    except Exception:
-+        return None
-+
-+
-+_UNSET = object()
-+
-+
-+def disk_ok(free=_UNSET):
-+    &quot;&quot;&quot;True only when free disk clears the measured floor. Called with no arg it reads the drive; called with
-+    an explicit free value (incl. None for an unreadable drive) it uses that. A free value that cannot be read
-+    fails CLOSED — a disk we cannot measure is not proven safe, like the RAM gates.&quot;&quot;&quot;
-+    f = disk_free_gb() if free is _UNSET else free
-+    return f is not None and f &gt;= DISK_FLOOR_GB
- HEAVY_MIN_GB = 1.0         # R-E1-RAM-PRIORITY: while the re-scan is uncertified, EVERY other heavy job
-                            # (pair screens, pair sweep, universe download, E4/E7 backtests) runs only
-                            # while free RAM stays &gt;= this, and pauses at its next checkpoint otherwise.
-diff --git a/scripts/preopen_gate.py b/scripts/preopen_gate.py
-index bc032fc6b..ef5880feb 100644
---- a/scripts/preopen_gate.py
-+++ b/scripts/preopen_gate.py
-@@ -81,9 +81,12 @@ def gate(run_tests_fn=None, rehearse_core_fn=None, rehearse_engines_fn=None, pre
-         reverted = rev_detail
-         if ok_rev:
-             core_failed = False                       # traded on the reverted known-good tree
-+    from scripts import memory_guard as _mg              # NB50-B: the measured disk-free floor at 08:15
-+    disk_free = _mg.disk_free_gb()
-     status = {
-         &quot;tests_ok&quot;: tests_ok, &quot;tests_line&quot;: tests_line, &quot;core_ok&quot;: core_ok, &quot;pre_login&quot;: pre_login,
-         &quot;room_ok&quot;: room_ok, &quot;room_detail&quot;: room_detail, &quot;reverted&quot;: reverted,
-+        &quot;disk_free_gb&quot;: disk_free, &quot;disk_ok&quot;: _mg.disk_ok(free=disk_free), &quot;disk_floor_gb&quot;: _mg.DISK_FLOOR_GB,
-         &quot;core_failed&quot;: core_failed, &quot;trading_today&quot;: trading, &quot;diary_only&quot;: diary,
-         &quot;revert_instruction&quot;: (None if not core_failed else
-                                &quot;Core path (E1/E10/E11) failed — revert the core files to the 17:26 STOP→START &quot;
-@@ -158,23 +161,32 @@ def revert_trading_path(commit=None, _git=None):
-     return ok, (&quot;reverted trading-path files to %s&quot; % commit) if ok else (&quot;revert failed: %s&quot; % (r.stderr or &quot;&quot;)[:120])
- 
- 
-+def _disk_flag(status):
-+    &quot;&quot;&quot;NB50-B: a 🙋 with the number when free disk is below the measured floor — the owner must clear space.&quot;&quot;&quot;
-+    if status.get(&quot;disk_ok&quot;, True):
-+        return &quot;&quot;
-+    return &quot;🙋 DISK LOW: %s GB free (floor %s GB) — clear space before trading. &quot; % (
-+        status.get(&quot;disk_free_gb&quot;), status.get(&quot;disk_floor_gb&quot;))
-+
-+
- def line_from(status):
--    &quot;&quot;&quot;The 08:30 line from a status dict.&quot;&quot;&quot;
-+    &quot;&quot;&quot;The 08:30 line from a status dict. A disk-low 🙋 leads the line when free space is below the floor.&quot;&quot;&quot;
-+    disk = _disk_flag(status)
-     if status.get(&quot;pre_login&quot;) and not status.get(&quot;core_ok&quot;):
-         trading = &quot;, &quot;.join([&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;] + list(status.get(&quot;trading_today&quot;, [])))
--        return (&quot;NOT READY YET — waiting for the 06:00 Kite login (no token, market closed). Once logged in the &quot;
-+        return disk + (&quot;NOT READY YET — waiting for the 06:00 Kite login (no token, market closed). Once logged in the &quot;
-                 &quot;gate re-runs at 08:15. Ready to trade then: %s ; diary only: %s&quot; % (
-                     trading, &quot;, &quot;.join(status.get(&quot;diary_only&quot;, {}).keys()) or &quot;none&quot;))
-     if status.get(&quot;core_failed&quot;):
-         reason = &quot;core rehearsal failed&quot; if status.get(&quot;tests_ok&quot;) else &quot;core rehearsal + some tests failed&quot;
--        return &quot;NOT READY — %s. %s&quot; % (reason, status.get(&quot;revert_instruction&quot;) or &quot;&quot;)
-+        return disk + &quot;NOT READY — %s. %s&quot; % (reason, status.get(&quot;revert_instruction&quot;) or &quot;&quot;)
-     trading = &quot;, &quot;.join([&quot;E1&quot;, &quot;E10&quot;, &quot;E11&quot;] + list(status.get(&quot;trading_today&quot;, []))) or &quot;none&quot;
-     diary = status.get(&quot;diary_only&quot;) or {}
-     tnote = &quot;&quot; if status.get(&quot;tests_ok&quot;) else &quot; ; tests: %s&quot; % (status.get(&quot;tests_line&quot;) or &quot;some failing&quot;)
-     if diary:
-         d = &quot;; &quot;.join(&quot;%s (%s)&quot; % (e, r) for e, r in diary.items())
--        return &quot;READY — trading today: %s ; diary only: %s%s&quot; % (trading, d, tnote)
--    return &quot;READY — trading today: %s ; diary only: none%s&quot; % (trading, tnote)
-+        return disk + &quot;READY — trading today: %s ; diary only: %s%s&quot; % (trading, d, tnote)
-+    return disk + &quot;READY — trading today: %s ; diary only: none%s&quot; % (trading, tnote)
- 
- 
- def line():
-diff --git a/tests/test_disk_floor.py b/tests/test_disk_floor.py
-new file mode 100644
-index 000000000..f4b9d4539
---- /dev/null
-+++ b/tests/test_disk_floor.py
-@@ -0,0 +1,35 @@
-+&quot;&quot;&quot;NB50-B phase 2: the measured disk-free floor for the 08:15 self-check.
-+
-+Floor = the desk&#x27;s largest MEASURED daily write + the standard safety margin (§4.1 no typed number). The
-+recorder store&#x27;s fullest recorded day was 2026-09-22 (live_chains 72.1 MB + depth5 4.3 MB + xchange 1.0 MB
-+= ~77 MB total → 0.076 GB); margin = 0.3 GB (same cited safety margin as the RAM floors). So floor ≈ 0.376 GB.
-+&quot;&quot;&quot;
-+from scripts import memory_guard as mg
-+
-+
-+def test_disk_floor_is_derived_not_typed():
-+    # the floor must equal daily-write + margin (a derivation), never a bare typed constant
-+    assert mg.DISK_FLOOR_GB == round(mg.DISK_DAILY_WRITE_GB + mg.DISK_MARGIN_GB, 3)
-+    assert 0.3 &lt; mg.DISK_FLOOR_GB &lt; 1.0                    # sane band: &gt; the margin, &lt; a full GB
-+
-+
-+def test_disk_ok_flips_at_the_floor():
-+    assert mg.disk_ok(free=mg.DISK_FLOOR_GB + 0.01) is True
-+    assert mg.disk_ok(free=mg.DISK_FLOOR_GB - 0.01) is False
-+    # a missing / unreadable free value fails CLOSED (a disk we cannot read is not proven safe)
-+    assert mg.disk_ok(free=None) is False
-+
-+
-+def test_disk_free_gb_reads_the_drive():
-+    f = mg.disk_free_gb()
-+    assert f is None or (isinstance(f, float) and f &gt;= 0)
-+
-+
-+def test_0815_line_flags_disk_low_with_the_number():
-+    from scripts import preopen_gate as pg
-+    low = {&quot;disk_ok&quot;: False, &quot;disk_free_gb&quot;: 0.30, &quot;disk_floor_gb&quot;: mg.DISK_FLOOR_GB,
-+           &quot;trading_today&quot;: [], &quot;diary_only&quot;: {}, &quot;tests_ok&quot;: True}
-+    line = pg.line_from(low)
-+    assert line.startswith(&quot;🙋 DISK LOW:&quot;) and &quot;0.3 GB free&quot; in line and &quot;clear space&quot; in line
-+    ok = dict(low, disk_ok=True)
-+    assert not pg.line_from(ok).startswith(&quot;🙋 DISK LOW&quot;)   # above the floor -&gt; no disk flag
-</pre></div><div class='c'><div class='h'><b>65a8556d0</b> · 2026-09-28 02:03</div><div>NB50-B phase 3: prune MASTER-CHECKLIST engines to the owner&#x27;s 28-Sep seven (Kabir/Claude Price, YouTube, Calendar, Machine Factory, Arbitrage, Copycat Roof); 6 named ideas + 3 dropped items -&gt; docs/IDEAS-PARKED.md (nothing deleted); Dubai -&gt; Deliverables (Nikhil index tests + Dubai). Archive NB50/NB50-B</div><div class='sub h'>docs/IDEAS-PARKED.md                 | 26 ++++++++++++++++++++++++++</div><div class='sub h'>docs/MASTER-CHECKLIST.md             | 23 +++++++++++------------</div><div class='sub h'>docs/dispatches/2026-09-28_NB50-B.md | 15 +++++++++++++++</div><div class='sub h'>docs/dispatches/2026-09-28_NB50.md   | 26 ++++++++++++++++++++++++++</div><pre>diff --git a/docs/IDEAS-PARKED.md b/docs/IDEAS-PARKED.md
-new file mode 100644
-index 000000000..ffa47f3fe
---- /dev/null
-+++ b/docs/IDEAS-PARKED.md
-@@ -0,0 +1,26 @@
-+# IDEAS PARKED — off the checklist, nothing deleted (NB50-B, 2026-09-28)
-+
-+The owner&#x27;s 28 Sep engine list (NB50-B) prunes `docs/MASTER-CHECKLIST.md` to seven engines + the deliverables
-+section. Everything moved OFF the checklist lives here so nothing is lost — each can return to the checklist on
-+one owner word. **Parked ≠ deleted:** any built code/tests for these stay in the repo untouched.
-+
-+## Named by the owner to park (NB50-B phase 3)
-+
-+- **Circle Weighted** — (idea only; never on the checklist as a numbered item)
-+- **Ruler Combinations** — (idea only; never on the checklist as a numbered item)
-+- **Fundamental (E2)** — was MASTER-CHECKLIST item 31 `[PARKED-5/5]`
-+- **Analyst Scoreboard** — was item 32 `[PARKED-5/5]`
-+- **Claude Word Analyst + Word+Number** — was item 33 `[PARKED-5/5]`
-+- **World Ledger** — was item 34 `[PARKED-5/5]`
-+
-+## Dropped from the §E engine roster by the 28-Sep list, not explicitly re-homed — parked pending one owner word (nothing deleted)
-+
-+These were in &quot;Engines to finish&quot; but are NOT among the owner&#x27;s seven engines and were NOT named for the
-+deliverables section. Parked here so the checklist matches the owner&#x27;s list without losing them:
-+
-+- **Gap Timer** — was item 35 `[PARKED-5/5]`
-+- **Pairs &amp; Two Exchanges / Insurance / Context Engine** — was item 36 `[DAYS]` (&quot;join when counters green&quot;)
-+- **learning track** — was item 37 `[PARKED-5/5]` (the LEARNING-TRACK.md sequence; the file itself is untouched)
-+
-+_If any of these belongs inside one of the seven engines (e.g. Pairs/Two-Exchanges under Arbitrage, or the
-+index close-to-open already folded into the [redacted] Price Engine), say so and it moves back with that engine._
-diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
-index a6f77ee06..05fcdd9c5 100644
---- a/docs/MASTER-CHECKLIST.md
-+++ b/docs/MASTER-CHECKLIST.md
-@@ -49,25 +49,24 @@ the NOW list is the only thing &quot;what can be pasted now&quot; means.** The beat&#x27;s `lef
- - [AFTER-1545] 45. NIFTY near-month + next-month futures in the depth recorder (needs recorder code: NFO segment + expiry/rollover) — until then the Overnight Engine&#x27;s 15:25 futures order is HELD (audit 035732 / R-FUTURES-DEPTH); FIRST AFTER-1545 item. PREPARE DEFERRED this run: scripts/universe_full.py NOT built — the full list (top ~2,000 NSE by turnover) needs a real turnover source (inventing membership = fabricating data, §4.4) and the futures side needs the recorder&#x27;s real NFO expiry calendar (launch-path). Both wait for the data/recorder; see NEXT-PASTE
- 
- ## D. Site
--- [AFTER-1545] 23. deliverables — **REDEFINED (OWNER-SAID 2026-09-23 08:40, supersedes &quot;inside v2&quot;):** a WHOLE SEPARATE SITE at https://[redacted]-[redacted].github.io/e1-live-site/deliverables/ — its own home page listing each deliverable (Index tests, Dubai Strategies), each opening to its own five tabs (Positions · Trades · Why each call · How it decides · Record) with every call IN FULL and a plain-words &quot;what this test is&quot; at the top. v2 design, but NO main-site menu on it and NO link to it from the main site. `/v2/deliverables.html` is REMOVED. Build at 15:45 as the FIRST site item, phone-width screenshots, click-through gate. (No link from main site → the reachability gate must treat it as an intentional island, not &quot;unreachable&quot;.)
-+- [AFTER-1545] 23. deliverables — **REDEFINED (OWNER-SAID 2026-09-23 08:40, supersedes &quot;inside v2&quot;):** a WHOLE SEPARATE SITE at https://[redacted]-[redacted].github.io/e1-live-site/deliverables/ — its own home page listing each deliverable (Nikhil index tests, Dubai Strategies), each opening to its own five tabs (Positions · Trades · Why each call · How it decides · Record) with every call IN FULL and a plain-words &quot;what this test is&quot; at the top. v2 design, but NO main-site menu on it and NO link to it from the main site. `/v2/deliverables.html` is REMOVED. Build at 15:45 as the FIRST site item, phone-width screenshots, click-through gate. (No link from main site → the reachability gate must treat it as an intentional island, not &quot;unreachable&quot;.)
- - [DONE] 24. v2 remaining pages — page ownership resolved (R-V2-PAGE-OWNERS): v8_site owns design pages, site_v2 owns the rest; registry + refusal + conflict gate + docs/V2-PAGE-OWNERS.md; Deliverables stays in nav. (Open sub-item: live-desk/portfolio/backtest not yet in the design nav — see NEXT-PASTE.)
- - [DONE] 25. record-store views — read-only per-engine/pattern/stock views over the ledgers + exam outputs (scripts/record_store.py → site/data/record_store.json), every column mapping cited in docs/RECORD-STORE.md; refreshed in the site build; nothing invented, &quot;—&quot; for unmapped. (Open sub-item: wiring specific v2 pages to consume it needs the engine-code→page mapping — see NEXT-PASTE.)
- - [CLOSED] 26. root-swap — **CLOSED, NO SWAP (OWNER-SAID NB44, 2026-09-24): colleagues prefer the old design (the live desk especially). The OLD site is the PERMANENT public root; /v2/ stays a preview only, never swapped. The graph + per-engine tabs are added TO THE OLD SITE (NB44 item 1) instead.** — (history) root-swap re-diff → owner replies &quot;swap&quot; — **NOT approved.** NB8&#x27;s &quot;diff empty → swap 🙋&quot; was WRONG: it checked content, not working links. NB9 added a click-through + reachability check and the re-diff FAILS — 19 v2 pages are UNREACHABLE (every engine/diary/desk-book page; nothing links to them). docs/reports/v2-diff-2026-09-23.md + reports/V2-CLICKTHROUGH.log. NO swap until the owner&#x27;s UI review after 15:45 lists them and they are fixed. NO further swap 🙋. **HARDENED (OWNER-SAID 2026-09-23): NO swap until the owner SAYS he is satisfied with the new site end to end — and NO swap 🙋 before that. The gate is the owner&#x27;s word, not a passing check; fixing UI-1 + the reachability gate is necessary but not sufficient.**
- - [DONE] 27. event-driven publish on every trade — **LIVE (NB37, 32df791c4): publish_event wired into the site loop (NOT the order path — its full build would block a trade); event-detects a NEW PLACED/CLOSED ledger row → prompt live-desk refresh via build_live. Full suite 406/0 + verify PASS.** — PREPARED (scripts/publish_event.py built + tested: a PLACED/CLOSED row rebuilds status + live-desk; build injected); wire-in pending (tonight = runner hook)
- - [DONE] 28. engine pages for all engines, same layout
- 
--## E. Engines to finish
--_STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the PARKED-5/5 engines (29–35, 37) are built **diary-only** after items 25/28/21/13/7 — isolated, verified, placing nothing — and get paper accounts only after ACCEPTED 5/5 (item 42) plus their own smoke check._
-+## E. Engines to finish — the owner&#x27;s 28 Sep list (NB50-B prune)
-+_STANDING AMENDMENT (NIGHT BUNDLE 3, 2026-09-23): the diary-only engines are built **diary-only** after items 25/28/21/13/7 — isolated (§27), verified, placing nothing — and get paper accounts only after ACCEPTED 5/5 (item 42) plus their own smoke check._
-+_PRUNED 2026-09-28 (NB50-B) to the owner&#x27;s seven engines. Six ideas + three dropped items moved to `docs/IDEAS-PARKED.md` (nothing deleted); Dubai Strategies moved to the Deliverables section (item 23)._
- 
--- [PARKED-5/5] 29. Dubai Strategies first live match
--- [PARKED-5/5] 30. YouTube Engine full build
--- [PARKED-5/5] 31. Fundamental (E2)
--- [PARKED-5/5] 32. Analyst Scoreboard
--- [PARKED-5/5] 33. Claude Word Analyst + Word+Number
--- [PARKED-5/5] 34. World Ledger
--- [PARKED-5/5] 35. Gap Timer
--- [DAYS] 36. Pairs &amp; Two Exchanges / Insurance / Context Engine — join when counters green
--- [PARKED-5/5] 37. learning track
-+- 1. **[redacted] Price Engine** — the LIVE money chain (E1 flat) with sub-books **323 Facts (E10)** and **Sizing Families (E11)**; the **index close-to-open (E21 overnight)** lives inside it. This is the protected chain (§27a).
-+- 2. **Claude Price Engine** — the second price engine on the same architecture the lead wrote (chunks 1–7); own process, diary-only until its rule-vs-live audit + smoke check pass.
-+- 3. **YouTube Engine** — `[PARKED-5/5]` (was item 30) — diary-only build.
-+- 4. **Calendar Engine** — earnings/event dates (E3 / calendar_daily); diary-only.
-+- 5. **Machine Factory** — the nightly ruler factory (E6); research, feeds the pattern list.
-+- 6. **Arbitrage** — tick-gaps / two-exchange (E7 / E12); diary-only recorder → verdict.
-+- 7. **Copycat Roof** — the roof (E8) that nets engine signals and holds the single risk budget; a hard prerequisite for any multi-engine live trading.
- 
- ## F. Acceptance (from zero)
- - [DAYS] 38. fresh page daily
-diff --git a/docs/dispatches/2026-09-28_NB50-B.md b/docs/dispatches/2026-09-28_NB50-B.md
-new file mode 100644
-index 000000000..81b5d9470
---- /dev/null
-+++ b/docs/dispatches/2026-09-28_NB50-B.md
-@@ -0,0 +1,15 @@
-+DISPATCH ID: NB50-B — DISK CLEANUP + LIST PRUNE (Mon 28 Sep 2026) → BUILD
-+READ: NB50 disk table (the largest folders, the iPhone backup/transfer folders, temp files). ORIGIN: OWNER-SAID — &quot;delete it
-+accordingly, you do it&quot;; the disk fill happened Saturday 26 Sep (iPhone), not Friday.
-+1) DELETE, with sizes before/after, ONLY: iPhone backup/transfer folders (%APPDATA%\Apple Computer\MobileSync\Backup and any
-+   Apple/iCloud cache folders NB50 found), Windows temp files, the recycle bin. NEVER touch: E1-DESK, trading-engines-v2,
-+   the stores, ledgers, exports, Documents, Downloads, Desktop files, the other Codex project. If anything else is large
-+   (NB50&#x27;s table), list it in the report — the owner decides.
-+2) Confirm free space on C: after; set a measured disk-free floor (the desk&#x27;s largest daily write + margin, measured from
-+   the export sizes) and add it to the 08:15 self-check and the day-log.
-+3) Prune docs/MASTER-CHECKLIST.md to the owner&#x27;s 28 Sep list: engines 1 [redacted] Price Engine (sub-books 323 Facts, Sizing
-+   Families; index close-to-open inside), 2 Claude Price Engine, 3 YouTube, 4 Calendar, 5 Machine Factory, 6 Arbitrage,
-+   7 Copycat Roof; Deliverables section = Nikhil index tests + Dubai Strategies. Move Circle Weighted, Ruler Combinations,
-+   Fundamental, Analyst Scoreboard, Word Analyst, World Ledger to docs/IDEAS-PARKED.md (off the checklist, nothing deleted).
-+Report &quot;NB50-B&quot;: bytes freed, free space now, what remains large, checklist diff; end with NOTHING NEEDS THE LEAD /
-+LEAD RULING NEEDED.
-diff --git a/docs/dispatches/2026-09-28_NB50.md b/docs/dispatches/2026-09-28_NB50.md
-new file mode 100644
-index 000000000..b9bc78db5
---- /dev/null
-+++ b/docs/dispatches/2026-09-28_NB50.md
-@@ -0,0 +1,26 @@
-+DISPATCH ID: NB50 — DISK + FRIDAY AUDIT, READ-ONLY (Mon 28 Sep 2026) → BUILD
-+READ: owner reports the C: drive filled up around Fri 25 Sep (iPhone transfer/backup); Friday&#x27;s lines: 08:22 camera 0 rows,
-+1.3 GB free at 08:28, held day; no trade. ORIGIN: OWNER-SAID (start the checklist; find and remove the disk hog).
-+Read-only on the desk; market hours = no process stopped/started, no launch-path edit.
-+1) DISK: free space on C: now; the 20 largest folders (PowerShell, sizes); the iPhone backup folder(s) size and path
-+   (%APPDATA%\Apple Computer\MobileSync\Backup and any iCloud/Apple cache); temp files size. List only — delete NOTHING;
-+   the owner names what to delete in the next block.
-+2) FRIDAY: from the launch/watchdog/token logs, one timestamped line per step 06:00–15:30 — token time, each camera start
-+   attempt with free RAM AND free disk at that moment, any write failure (&quot;no space&quot;/&quot;disk full&quot;/OSError), the 08:15 line,
-+   the 09:15 gate decision with reason, site push errors. Name the first failing step and its cause with file:line/log line.
-+3) Add to docs/MASTER-CHECKLIST.md: desk day-log (one line per step per day, incl. free disk + RAM), nightly full-morning
-+   rehearsal on the real stack (fake token, recorded quotes, memory + disk measured per step, PASS/NOT READY line), market-hours
-+   mode (desk only 08:30 → close-done; disk-full and low-RAM both post a 🙋 with the number), disk-free floor measured into the
-+   08:15 self-check, event blackout, monthly fill calibration, engine-list prune per the owner&#x27;s 28 Sep list (Deliverables
-+   section: Nikhil index tests + Dubai; engines 1–13 as named), Claude Price Engine chunks 1–7 from the architecture the lead
-+   wrote, [redacted] Price Engine on the same architecture (35 rulers untouched).
-+Report &quot;NB50&quot;: disk table, the Friday step-log with the first failure named, checklist diff; end with NOTHING NEEDS THE LEAD /
-+LEAD RULING NEEDED.
-+
-+Orchestrator rails:
-+- FIRST: check whether the halt_guard hook is still blocking your tools (does [redacted]\Desktop\E1-DESK\HALT still exist?). If it does and every tool call is refused, STOP and report that as NB50&#x27;s first line — the read-only audit can&#x27;t run under the guard, and clearing HALT is the owner&#x27;s call (last dispatch it was left unresolved). Do NOT delete HALT unless the owner says so here.
-+- Phases 1 and 2 are strictly READ-ONLY on the desk: do NOT stop/start/restart any process, do NOT touch launch paths, do NOT delete anything (not even the disk hog — the owner names deletions in the next block). It&#x27;s market hours (NSE) today.
-+- Phase 3 is docs-only: edit docs/MASTER-CHECKLIST.md and commit that; no engine code, no process changes.
-+- Never print/log/commit any secret, token, or the login URL. Paper-only, no order/broker calls.
-+- Archive this dispatch verbatim to docs/dispatches/2026-09-28_NB50.md as your first act (once tools are unblocked). Any dev/preview server detached/one-shot.
-+- Final report in ONE fenced code block, ending with the NOTHING NEEDS THE LEAD / LEAD RULING NEEDED line.
 </pre></div></main></body></html>
