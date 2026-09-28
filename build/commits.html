@@ -1,4 +1,484 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>bc56bb06f</b> · 2026-09-28 12:35</div><div>V2-ALL-1 Part A (docs): overwrite PRICE-ENGINE-V2.md with §2.1-2.19 verbatim (floor+rooms 2.16, Rain engine 9 2.17, yardstick 2.18, formulas 2.19); CLAUDE.md top line -&gt; &#x27;...every idea judge and every room...&#x27;; MASTER-CHECKLIST V2 STRUCTURE section (one FLOOR + nine ROOMS, each with its 3 status lines; nothing deleted, no duplication); NEXT-PASTE.md new 2-line header (history preserved). Supersedes V2-DOC-1/2 + LEAD-HANDOFF-V2-ADD-1</div><div class='sub h'>CLAUDE.md                              |  2 +-</div><div class='sub h'>docs/MASTER-CHECKLIST.md               | 24 ++++++++++++++++++++++++</div><div class='sub h'>docs/NEXT-PASTE.md                     |  6 ++++++</div><div class='sub h'>docs/architecture/PRICE-ENGINE-V2.md   | 34 ++++++++++++++++++++--------------</div><div class='sub h'>docs/dispatches/2026-09-28_V2-ALL-1.md | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>3cfeb0762</b> · 2026-09-28 12:44</div><div>V2-ALL-1 chunk 2 (the judge on fake data): pricev2/judge.py — trust score T*(1+r_t), bar B=N_A/α (α=0.05 declared convention + sensitivity), lifetime+recent-window promotion, near-copy union-find merge, Ville-bound Monte Carlo. Measured: worthless streams promoted_frac 0.0000 (&lt;=α, Ville 1/B guarantee); real-edge 0.6%/day promoted 1.00, median 1162 days to cross B=1000 at N_A=50,α=0.05. 5 GREEN</div><div class='sub h'>pricev2/judge.py            | 96 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_pricev2_judge.py | 39 ++++++++++++++++++</div><pre>diff --git a/pricev2/judge.py b/pricev2/judge.py
+new file mode 100644
+index 000000000..c2d2771c6
+--- /dev/null
++++ b/pricev2/judge.py
+@@ -0,0 +1,96 @@
++&quot;&quot;&quot;PRICE ENGINE V2 — FLOOR chunk 2: the judge (§2.6 / §2.19).
++
++Trust score T: T0 = 1; each trading day after close T &lt;- T * (1 + r_t), where r_t is the day&#x27;s net rupee result of
++the pattern&#x27;s combined paper bet / rupees deployed (all that day&#x27;s fills = one bet, one move; no trade -&gt; r_t = 0).
++Promotion bar B = N_A / α (N_A = admitted Door-A patterns, near-copies merged; α the shared luck allowance). A
++pattern is promoted when T &gt;= B AND the product of (1 + r_t) over the last W days &gt;= 1 (lifetime AND recent
++window, §2.8/§2.19).
++
++Why it is safe to check nightly (Ville&#x27;s inequality): for a pattern with no edge after costs, {T_t} is a
++non-negative super-martingale with T0 = 1, so P(sup_t T_t &gt;= B) &lt;= 1/B, however often it is checked. Per pattern
++1/B = α/N_A; summed over N_A patterns the expected false promotions &lt;= α.
++
++α is a DECLARED CONVENTION, never a bare typed number (§2.19 / §4.1):
++  ALPHA = 0.05 — the standard family-wise false-promotion allowance: across ALL admitted patterns the expected
++  number of worthless ones ever promoted is &lt;= 0.05. Sensitivity: halving α to 0.025 doubles B and roughly
++  doubles the days a real edge needs to cross it; the owner may tighten α (never loosen it without a decision).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import numpy as np
++
++ALPHA = 0.05                 # declared convention (see module docstring) — the shared luck allowance
++
++
++def trust_update(T, r_t):
++    return T * (1.0 + r_t)
++
++
++def promotion_bar(n_admitted, alpha=ALPHA):
++    &quot;&quot;&quot;B = N_A / α (§2.19). n_admitted counts admitted patterns with near-copies merged, not the whole family.&quot;&quot;&quot;
++    return float(n_admitted) / float(alpha)
++
++
++def is_promoted(T, B, recent_returns):
++    &quot;&quot;&quot;Lifetime AND recent-window both positive: T &gt;= B AND product(1 + r_t over the last W) &gt;= 1 (§2.8).&quot;&quot;&quot;
++    if T &lt; B:
++        return False
++    prod = 1.0
++    for r in recent_returns:
++        prod *= (1.0 + r)
++    return prod &gt;= 1.0
++
++
++def monte_carlo(n_streams, days, daily_edge, g, n_admitted, alpha=ALPHA, seed=0):
++    &quot;&quot;&quot;Fake-data test. Each stream: r_t = daily_edge ± g fair coin (worthless =&gt; daily_edge 0 =&gt; E[r]=0 martingale;
++    real edge =&gt; positive drift). Tracks whether T EVER crosses B over the stream&#x27;s life, and the first crossing
++    day. Returns promoted_frac (fraction of streams that cross B) and median_days_to_cross (over the crossers).&quot;&quot;&quot;
++    rng = np.random.default_rng(seed)
++    B = promotion_bar(n_admitted, alpha)
++    signs = rng.integers(0, 2, size=(n_streams, days)) * 2 - 1        # ±1
++    r = daily_edge + g * signs                                        # daily returns
++    logT = np.cumsum(np.log1p(r), axis=1)                             # log trust path
++    crossed_mask = logT &gt;= np.log(B)
++    ever = crossed_mask.any(axis=1)
++    promoted_frac = float(ever.mean())
++    first = np.argmax(crossed_mask, axis=1)                           # first True per row (0 if none, filtered by ever)
++    cross_days = first[ever]
++    median_days = int(np.median(cross_days)) + 1 if len(cross_days) else 0   # +1: day index -&gt; day count
++    return {&quot;promoted_frac&quot;: promoted_frac, &quot;median_days_to_cross&quot;: median_days, &quot;bar&quot;: B, &quot;alpha&quot;: alpha}
++
++
++def merge_near_copies(names, corr, threshold):
++    &quot;&quot;&quot;Union-find grouping: patterns with |corr| &gt;= threshold are near-copies and count as ONE. Returns the number
++    of merged groups (= N_A contribution). corr is a symmetric matrix aligned to names.&quot;&quot;&quot;
++    n = len(names)
++    parent = list(range(n))
++
++    def find(x):
++        while parent[x] != x:
++            parent[x] = parent[parent[x]]; x = parent[x]
++        return x
++
++    for i in range(n):
++        for j in range(i + 1, n):
++            if abs(corr[i][j]) &gt;= threshold:
++                parent[find(i)] = find(j)
++    return len({find(i) for i in range(n)})
++
++
++def _demo():
++    assert trust_update(1.0, 0.1) == 1.1 and promotion_bar(100, 0.05) == 2000.0
++    B = promotion_bar(50, 0.05)
++    assert is_promoted(B + 1, B, [0.01, 0.02]) and not is_promoted(B - 1, B, [0.01])
++    w = monte_carlo(2000, 1200, 0.0, 0.01, 50, 0.05, seed=1)
++    assert w[&quot;promoted_frac&quot;] &lt;= 0.05
++    e = monte_carlo(800, 2000, 0.006, 0.01, 50, 0.05, seed=2)
++    assert e[&quot;promoted_frac&quot;] &gt;= 0.5 and e[&quot;median_days_to_cross&quot;] &gt; 0
++    assert merge_near_copies([&quot;a&quot;, &quot;b&quot;, &quot;c&quot;], [[1, .98, .1], [.98, 1, .1], [.1, .1, 1]], 0.9) == 2
++    print(&quot;judge (chunk 2) demo OK: worthless promoted_frac %.4f (&lt;=alpha), real-edge %.2f, median days %d, &quot;
++          &quot;near-copies merged.&quot; % (w[&quot;promoted_frac&quot;], e[&quot;promoted_frac&quot;], e[&quot;median_days_to_cross&quot;]))
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_pricev2_judge.py b/tests/test_pricev2_judge.py
+new file mode 100644
+index 000000000..4692f07f4
+--- /dev/null
++++ b/tests/test_pricev2_judge.py
+@@ -0,0 +1,39 @@
++&quot;&quot;&quot;V2-ALL-1 chunk 2 — the judge on fake data (§2.19). Trust score T (T0=1, T*(1+r_t), one move/idea/day), the bar
++B=N_A/α (α a declared convention), near-copy merging, lifetime + recent-window rule. Worthless streams must almost
++never cross B (Ville&#x27;s inequality: P(ever cross B) ≤ 1/B); real-edge streams must, and we measure median days.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from pricev2 import judge as J
++
++
++def test_trust_update_and_bar():
++    assert J.trust_update(1.0, 0.1) == 1.1
++    assert J.trust_update(2.0, -0.5) == 1.0
++    assert J.promotion_bar(n_admitted=100, alpha=0.05) == 2000.0     # N_A / α
++
++
++def test_is_promoted_needs_lifetime_and_recent_window():
++    B = J.promotion_bar(50, 0.05)          # 1000
++    assert J.is_promoted(T=B + 1, B=B, recent_returns=[0.01, 0.0, 0.02]) is True
++    assert J.is_promoted(T=B - 1, B=B, recent_returns=[0.01]) is False           # below the bar
++    assert J.is_promoted(T=B + 1, B=B, recent_returns=[-0.5, 0.1]) is False       # recent window negative
++
++
++def test_worthless_streams_almost_never_promoted():
++    r = J.monte_carlo(n_streams=3000, days=1500, daily_edge=0.0, g=0.01,
++                      n_admitted=50, alpha=0.05, seed=1)
++    assert r[&quot;promoted_frac&quot;] &lt;= 0.05                    # ≤ the family allowance; Ville bound is far tighter (1/B)
++    assert r[&quot;promoted_frac&quot;] &lt;= 0.02                    # in practice tiny
++
++
++def test_real_edge_streams_get_promoted_and_report_median_days():
++    r = J.monte_carlo(n_streams=1000, days=2000, daily_edge=0.006, g=0.01,
++                      n_admitted=50, alpha=0.05, seed=2)
++    assert r[&quot;promoted_frac&quot;] &gt;= 0.5
++    assert isinstance(r[&quot;median_days_to_cross&quot;], int) and r[&quot;median_days_to_cross&quot;] &gt; 0
++
++
++def test_near_copies_merge_to_one():
++    # three patterns, first two are near-copies (corr 0.98) -&gt; merged; count = 2 groups
++    corr = [[1.0, 0.98, 0.1], [0.98, 1.0, 0.1], [0.1, 0.1, 1.0]]
++    assert J.merge_near_copies([&quot;a&quot;, &quot;b&quot;, &quot;c&quot;], corr, threshold=0.9) == 2
+</pre></div><div class='c'><div class='h'><b>4d3e9956f</b> · 2026-09-28 12:41</div><div>V2-ALL-1 chunk 1 (cost model + paper broker): pricev2/broker.py — Zerodha equity charges delivery vs intraday (STT both sides + DP charge on delivery sells; Rs20 brokerage cap intraday), worse-than-mid fills, gap-through-stop at the real open, halt blocks exit, cash-only + shorts-intraday-only guard. Published rates cited (§4.1); paper only, no broker call. 5 GREEN. Recorded the §2.10 futures-STT 0.05% vs money.py 0.02% clash in LEAD-MISTAKES (§24.6 cited code wins; futures data-only)</div><div class='sub h'>docs/LEAD-MISTAKES.md        |   1 +</div><div class='sub h'>pricev2/broker.py            | 108 +++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_pricev2_broker.py |  39 ++++++++++++++++</div><pre>diff --git a/docs/LEAD-MISTAKES.md b/docs/LEAD-MISTAKES.md
+index 60994d773..f97936250 100644
+--- a/docs/LEAD-MISTAKES.md
++++ b/docs/LEAD-MISTAKES.md
+@@ -24,3 +24,4 @@ when a required order was not placed. Shown as a page in the build room. The dai
+ | 2026-09-24 08:02–08:29 | NB45-A fault 2 — a build session was working during market hours (BUILD beats 08:02–08:29, after the 08:30 pause) because auto-continue had no market-hours gate (session_resurrect.should_resurrect). FIX: reopen is now refused inside the 08:30–15:45 IST build pause (desk_clock.paused, fail-closed to paused on a clock error). Tests: test_session_resurrect_markethours 3/3. |
+ | 2026-09-24 08:45 | NB45-A fault 3 — a false &quot;🙋 Tap on the laptop to log in&quot; fired at 08:45 though the token was present since 06:03. Cause: kite_catcher._auto_wait resent at RESEND_IST=08:45 whenever THIS process&#x27;s `done` was unset, and `done` is set only by this process&#x27;s own port-80 landing — a token obtained by any other path left it unset. FIX: every tick now re-checks token_gate.token_needed(); a present token ends the wait &#x27;landed&#x27; with NO resend, so a login 🙋 fires only when the token is genuinely absent. Tests: test_auto_login_link 5/5 (incl. token-present → no resend). |
+ | 2026-09-24 | NB46: &#x27;desk not started after the held-day batch; START_E1_STACK.bat once&#x27; | the thin stack was ALREADY UP one-each at 12:17 IST (token_ping/watchdog/site_loop/supervisor + book20_runner + kite_catcher, live process list); and START_E1_STACK.bat launches via bare &#x27;start&#x27; (not the single-instance launch_e1.start), so re-running it would DOUBLE the stack. Followed the evidence: confirmed one-each, did NOT re-run, posted the 👀 line. |
++| 2026-09-28 | V2-ALL-1 §2.10 &#x27;STT on futures 0.05% since 1 Apr 2026&#x27; | clashes with cited code money.py:30 STT_FUT_SELL=0.0002 (0.02%, &#x27;Zerodha published F&amp;O charges&#x27;). Per CLAUDE.md §24.6 the cited file:line WINS; pricev2 follows 0.02% (futures are DATA-only under §2.10, so this affects only the futures diaries). Lead must overrule only with its OWN cited 2026 primary source. |
+diff --git a/pricev2/broker.py b/pricev2/broker.py
+new file mode 100644
+index 000000000..c4ea7018d
+--- /dev/null
++++ b/pricev2/broker.py
+@@ -0,0 +1,108 @@
++&quot;&quot;&quot;PRICE ENGINE V2 — FLOOR chunk 1: cost model + paper broker (§2.10 / §2.12).
++
++Zerodha EQUITY charges (delivery vs intraday, DP charge on delivery sells), worse-than-mid fills, gap-through-stop
++at the real open, a halted stock cannot be exited, cash only + shorts intraday only. PAPER ONLY — no broker call
++anywhere. Every rate is a PUBLISHED statutory/broker rate, cited (§4.1), not tuned. The F&amp;O side reuses
++engine1_rebuild.money (futures are DATA under §2.10, not traded); money.py:30 STT_FUT_SELL = 0.02% is the cited
++code and WINS over the dispatch&#x27;s &quot;futures STT 0.05%&quot; per CLAUDE.md §24.6 — the clash is recorded in
++docs/LEAD-MISTAKES.md and flagged; correcting it needs the lead&#x27;s own cited 2026 primary source.
++
++Zerodha equity rates (published; cited in-line):
++  delivery:  brokerage 0 · STT 0.10% BUY+SELL · exchange txn 0.00297% · SEBI Rs10/cr · stamp 0.015% BUY ·
++             GST 18% on (brokerage+txn+SEBI) · DP charge Rs13.5 + 18% GST per SELL per scrip per day
++  intraday:  brokerage min(Rs20, 0.03%) per executed order · STT 0.025% SELL · exchange txn 0.00297% ·
++             SEBI Rs10/cr · stamp 0.003% BUY · GST 18% on (brokerage+txn+SEBI) · no DP charge
++&quot;matched to the rupee&quot; = it implements the SAME published formula Zerodha&#x27;s calculator uses; a live calculator
++cross-check is an owner/online step (no web in the build; §4.5).
++&quot;&quot;&quot;
++from __future__ import annotations
++
++# --- published equity rates (facts, cited above) ---------------------------------------------------------------
++STT_DELIVERY = 0.001        # 0.10% on BUY and SELL (delivery)
++STT_INTRADAY_SELL = 0.00025  # 0.025% on the SELL side (intraday)
++TXN_NSE = 0.0000297          # 0.00297% exchange transaction charge per side
++SEBI = 0.000001              # Rs 10 per crore
++STAMP_DELIVERY_BUY = 0.00015  # 0.015% on the BUY side (delivery)
++STAMP_INTRADAY_BUY = 0.00003  # 0.003% on the BUY side (intraday)
++GST = 0.18                   # 18% on (brokerage + txn + SEBI)
++BROKERAGE_CAP = 20.0         # Rs 20 per executed order (intraday/F&amp;O), or 0.03%, whichever is lower
++BROKERAGE_PCT = 0.0003
++DP_CHARGE = 13.5             # Rs 13.5 + 18% GST per delivery SELL per scrip per day (CDSL + broker)
++
++
++def equity_charges(buy_turnover, sell_turnover, product):
++    &quot;&quot;&quot;Itemised Zerodha equity charges for a round trip (buy leg + sell leg). product in {delivery, intraday}.&quot;&quot;&quot;
++    b, s = float(buy_turnover), float(sell_turnover)
++    if product == &quot;delivery&quot;:
++        brokerage = 0.0
++        stt = STT_DELIVERY * (b + s)
++        stamp = STAMP_DELIVERY_BUY * b
++        dp = round(DP_CHARGE * (1 + GST), 2) if s &gt; 0 else 0.0
++    elif product == &quot;intraday&quot;:
++        brokerage = min(BROKERAGE_CAP, BROKERAGE_PCT * b) + min(BROKERAGE_CAP, BROKERAGE_PCT * s)
++        stt = STT_INTRADAY_SELL * s
++        stamp = STAMP_INTRADAY_BUY * b
++        dp = 0.0
++    else:
++        raise ValueError(&quot;product must be &#x27;delivery&#x27; or &#x27;intraday&#x27; (cash only, §2.10)&quot;)
++    txn = TXN_NSE * (b + s)
++    sebi = SEBI * (b + s)
++    gst = GST * (brokerage + txn + sebi)
++    total = round(brokerage + stt + txn + sebi + stamp + gst + dp, 2)
++    return {&quot;brokerage&quot;: round(brokerage, 2), &quot;stt&quot;: round(stt, 2), &quot;txn&quot;: round(txn, 2), &quot;sebi&quot;: round(sebi, 4),
++            &quot;stamp&quot;: round(stamp, 2), &quot;gst&quot;: round(gst, 2), &quot;dp&quot;: dp, &quot;total&quot;: total}
++
++
++def fill_price(mid, side, half_spread_frac=None):
++    &quot;&quot;&quot;Worse-than-mid fill: a buyer pays mid×(1+half_spread), a seller receives mid×(1−half_spread). half_spread
++    defaults to the cited conservative HALF_SPREAD (engine1_rebuild.money).&quot;&quot;&quot;
++    if half_spread_frac is None:
++        try:
++            from engine1_rebuild import money
++            half_spread_frac = money.HALF_SPREAD
++        except Exception:
++            half_spread_frac = 0.0005
++    m = float(mid)
++    return m * (1 + half_spread_frac) if side == &quot;buy&quot; else m * (1 - half_spread_frac)
++
++
++def stop_exit_fill(stop, next_open, side):
++    &quot;&quot;&quot;A stop crossed by an overnight gap fills at the REAL open, never the stop (§2.10). long: if the open is
++    below the stop, the gap blew through it -&gt; fill at the open; else fill at the stop. Mirror for short.&quot;&quot;&quot;
++    stop, nxt = float(stop), float(next_open)
++    if side == &quot;long&quot;:
++        return nxt if nxt &lt; stop else stop
++    return nxt if nxt &gt; stop else stop           # short: a gap up through the stop fills worse (higher)
++
++
++def can_exit(halted):
++    &quot;&quot;&quot;A halted stock cannot be exited until it trades (§2.10).&quot;&quot;&quot;
++    return not bool(halted)
++
++
++def allowed(side, product, opening):
++    &quot;&quot;&quot;Cash only; shorts intraday only (§2.10). A delivery SELL that OPENS a position is a short on delivery -&gt;
++    refused. (A delivery sell that CLOSES a long is fine; the caller passes opening=False for that.)&quot;&quot;&quot;
++    if product not in (&quot;delivery&quot;, &quot;intraday&quot;):
++        return False
++    if side == &quot;sell&quot; and product == &quot;delivery&quot; and opening:
++        return False                              # cannot short on delivery
++    return True
++
++
++def _demo():
++    d = equity_charges(100000, 100000, &quot;delivery&quot;)
++    i = equity_charges(100000, 100000, &quot;intraday&quot;)
++    assert abs(d[&quot;stt&quot;] - 200.0) &lt; 0.01 and d[&quot;dp&quot;] &gt; 0 and d[&quot;brokerage&quot;] == 0.0
++    assert abs(i[&quot;stt&quot;] - 25.0) &lt; 0.01 and abs(i[&quot;brokerage&quot;] - 40.0) &lt; 0.01 and i[&quot;dp&quot;] == 0.0
++    assert fill_price(100, &quot;buy&quot;) &gt; 100 &gt; fill_price(100, &quot;sell&quot;)
++    assert stop_exit_fill(95, 92, &quot;long&quot;) == 92.0 and stop_exit_fill(95, 97, &quot;long&quot;) == 95.0
++    assert can_exit(True) is False and allowed(&quot;sell&quot;, &quot;delivery&quot;, True) is False
++    print(&quot;broker (chunk 1) demo OK: delivery vs intraday charges (STT both sides + DP on delivery; Rs20 cap &quot;
++          &quot;intraday); worse-than-mid; gap-through-stop at real open; halt blocks exit; short-delivery refused.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_pricev2_broker.py b/tests/test_pricev2_broker.py
+new file mode 100644
+index 000000000..d7c22b91a
+--- /dev/null
++++ b/tests/test_pricev2_broker.py
+@@ -0,0 +1,39 @@
++&quot;&quot;&quot;V2-ALL-1 chunk 1 — cost model + paper broker (§2.10/§2.12). Zerodha equity charges (delivery vs intraday, DP
++charge on delivery sells), worse-than-mid fills, gap-through-stop at the real open, a halted stock cannot exit,
++cash only + shorts intraday only. Published statutory rates cited (§4.1). No broker call — paper only.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from pricev2 import broker as bk
++
++
++def test_delivery_has_stt_both_sides_and_a_dp_charge_intraday_does_not():
++    d = bk.equity_charges(buy_turnover=100000, sell_turnover=100000, product=&quot;delivery&quot;)
++    i = bk.equity_charges(buy_turnover=100000, sell_turnover=100000, product=&quot;intraday&quot;)
++    assert abs(d[&quot;stt&quot;] - 200.0) &lt; 0.01          # 0.1% both sides = 100 + 100
++    assert d[&quot;dp&quot;] &gt; 0 and i[&quot;dp&quot;] == 0.0         # DP charge on delivery sells only
++    assert d[&quot;brokerage&quot;] == 0.0                  # delivery brokerage is zero
++    assert abs(i[&quot;stt&quot;] - 25.0) &lt; 0.01            # intraday 0.025% on the sell side only
++    assert abs(i[&quot;brokerage&quot;] - 40.0) &lt; 0.01      # min(Rs20, 0.03%) per leg x 2 legs
++    assert d[&quot;total&quot;] != i[&quot;total&quot;]
++
++
++def test_worse_than_mid_fill():
++    assert bk.fill_price(mid=100.0, side=&quot;buy&quot;) &gt; 100.0     # buyer pays up
++    assert bk.fill_price(mid=100.0, side=&quot;sell&quot;) &lt; 100.0    # seller receives less
++
++
++def test_gap_through_stop_fills_at_the_real_open():
++    # long stop at 95; next open gapped to 92 -&gt; fill at 92 (worse), never the stop price
++    assert bk.stop_exit_fill(stop=95.0, next_open=92.0, side=&quot;long&quot;) == 92.0
++    # open above the stop -&gt; fill at the stop
++    assert bk.stop_exit_fill(stop=95.0, next_open=97.0, side=&quot;long&quot;) == 95.0
++
++
++def test_halted_stock_cannot_be_exited():
++    assert bk.can_exit(halted=True) is False and bk.can_exit(halted=False) is True
++
++
++def test_short_delivery_refused_shorts_are_intraday_only():
++    assert bk.allowed(side=&quot;sell&quot;, product=&quot;delivery&quot;, opening=True) is False   # can&#x27;t SHORT on delivery
++    assert bk.allowed(side=&quot;sell&quot;, product=&quot;intraday&quot;, opening=True) is True
++    assert bk.allowed(side=&quot;buy&quot;, product=&quot;delivery&quot;, opening=True) is True
+</pre></div><div class='c'><div class='h'><b>e728d4902</b> · 2026-09-28 12:38</div><div>V2-ALL-1 chunk 0 (data check): pricev2/data_check.py — bar stats, missing minutes vs the 375-min session, bad ticks, zero-volume, corp-action break candidates, as-of stamp, coverage_report + scan_store (READ-ONLY store reader). Stock list status honest — point-in-time F&amp;O membership is owner O1, NOT fabricated (§4.4). 4 tests GREEN. Light sample (3/210 tokens): 1,866,142 rows, 0 bad ticks, 10,791 zero-vol minutes, as-of stamped</div><div class='sub h'>pricev2/__init__.py              |   0</div><div class='sub h'>pricev2/data_check.py            | 107 +++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_pricev2_data_check.py |  43 ++++++++++++++++</div><pre>diff --git a/pricev2/__init__.py b/pricev2/__init__.py
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/pricev2/data_check.py b/pricev2/data_check.py
+new file mode 100644
+index 000000000..eb54b8947
+--- /dev/null
++++ b/pricev2/data_check.py
+@@ -0,0 +1,107 @@
++&quot;&quot;&quot;PRICE ENGINE V2 — FLOOR chunk 0: the data check (§2.2 / §2.12).
++
++Pure, checkable logic over a bar frame — bar count, missing minutes vs the 375-minute NSE session (09:15–15:30),
++bad ticks (high&lt;low, non-positive price), zero-volume bars, corporate-action break candidates, and the as-of
++(knowable-at) stamp (a time-indexed frame carries it by construction). `coverage_report` aggregates across tokens;
++`scan_store` wires the shared store reader READ-ONLY for the real run (heavy — the full 210×6yr scan is deferred on
++the 0.6 GB box; run light or on a bigger box). The point-in-time (&quot;as-it-was&quot;) F&amp;O list is owner item O1 and is
++NOT fabricated here (§4.4) — its status is reported honestly.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import pandas as pd
++
++SESSION_MINUTES = 375        # NSE 09:15–15:30 = 375 one-minute bars (a full trading day). Convention, not tuned.
++
++
++def bar_stats(df):
++    &quot;&quot;&quot;Per-frame counts. bad_ticks = high&lt;low OR any non-positive OHLC; zero_volume = volume==0 rows.&quot;&quot;&quot;
++    if df is None or not len(df):
++        return {&quot;rows&quot;: 0, &quot;bad_ticks&quot;: 0, &quot;zero_volume&quot;: 0, &quot;first&quot;: None, &quot;last&quot;: None}
++    hi, lo = df[&quot;high&quot;].astype(float), df[&quot;low&quot;].astype(float)
++    bad = (hi &lt; lo)
++    for c in (&quot;open&quot;, &quot;high&quot;, &quot;low&quot;, &quot;close&quot;):
++        if c in df:
++            bad = bad | (df[c].astype(float) &lt;= 0)
++    zero = (df[&quot;volume&quot;].astype(float) == 0) if &quot;volume&quot; in df else pd.Series(False, index=df.index)
++    return {&quot;rows&quot;: int(len(df)), &quot;bad_ticks&quot;: int(bad.sum()), &quot;zero_volume&quot;: int(zero.sum()),
++            &quot;first&quot;: str(df.index.min()), &quot;last&quot;: str(df.index.max())}
++
++
++def missing_minutes(minute_df, session=SESSION_MINUTES):
++    &quot;&quot;&quot;Minutes short of a full session for the frame&#x27;s single day (max 0). For a multi-day frame, pass one day.&quot;&quot;&quot;
++    return max(0, int(session) - int(len(minute_df)))
++
++
++def corp_action_breaks(daily_close, ratio=1.5):
++    &quot;&quot;&quot;Days where |close/prev_close - 1| implies a jump larger than `ratio`x (a split/bonus not yet adjusted) —
++    CANDIDATES only (the adjustment factors, kept separately per §2.2, confirm or clear each). ratio is a
++    convention (a 1.5x overnight move in a liquid F&amp;O name is almost always corporate, not a real return).&quot;&quot;&quot;
++    c = pd.Series(daily_close).astype(float)
++    rel = (c / c.shift(1)).dropna()
++    hits = rel[(rel &gt;= ratio) | (rel &lt;= 1.0 / ratio)]
++    return list(hits.index)
++
++
++def as_of_stamped(df):
++    &quot;&quot;&quot;True if the frame is time-indexed — a completed bar&#x27;s timestamp IS its knowable-at (§2.2). A frame with no
++    DatetimeIndex has no as-of stamp (fail-closed: report it).&quot;&quot;&quot;
++    return isinstance(df.index, pd.DatetimeIndex) and len(df) &gt; 0
++
++
++def coverage_report(bars_by_token):
++    &quot;&quot;&quot;Aggregate the check across tokens. Returns tokens, total_rows, bad_ticks, zero_volume, as_of_stamped.&quot;&quot;&quot;
++    tokens = 0
++    total = bad = zero = 0
++    as_of = True
++    for _tok, df in bars_by_token.items():
++        tokens += 1
++        s = bar_stats(df)
++        total += s[&quot;rows&quot;]; bad += s[&quot;bad_ticks&quot;]; zero += s[&quot;zero_volume&quot;]
++        as_of = as_of and as_of_stamped(df)
++    return {&quot;tokens&quot;: tokens, &quot;total_rows&quot;: total, &quot;bad_ticks&quot;: bad, &quot;zero_volume&quot;: zero, &quot;as_of_stamped&quot;: as_of}
++
++
++def stock_list_status():
++    &quot;&quot;&quot;The as-it-was (point-in-time F&amp;O membership) list status — honest, never fabricated (§4.4). It is owner
++    item O1 (human-fetched circulars); until those land, the only list on disk is the frozen 2026-07-14 snapshot,
++    which carries the survivorship bias badge (CLAUDE.md §19 G13).&quot;&quot;&quot;
++    return (&quot;not yet reconstructable — point-in-time F&amp;O membership is owner item O1 (human-fetched circulars, &quot;
++            &quot;not on disk); the current list is the frozen 2026-07-14 snapshot, survivorship-badged (§19 G13). &quot;
++            &quot;No membership fabricated (§4.4).&quot;)
++
++
++def scan_store(reader=None, tokens=None, per_token_cap=None):
++    &quot;&quot;&quot;Real run: iterate the shared minute store READ-ONLY through `reader(token)` and aggregate the check. Heavy;
++    the full 210×6yr scan is deferred on this box (0.6 GB) — pass a token subset / cap to run light. Returns the
++    coverage_report plus the stock-list status.&quot;&quot;&quot;
++    if reader is None:
++        from engine1_rebuild import datastore
++        reader = lambda t: datastore.read(t, &quot;raw&quot;)
++        tokens = tokens or datastore.frozen_tokens()
++    bars = {}
++    for t in (tokens or [])[: (per_token_cap or len(tokens or []))]:
++        try:
++            bars[str(t)] = reader(t)
++        except Exception:
++            bars[str(t)] = None
++    rep = coverage_report({k: v for k, v in bars.items() if v is not None})
++    rep[&quot;stock_list&quot;] = stock_list_status()
++    rep[&quot;tokens_requested&quot;] = len(tokens or [])
++    return rep
++
++
++def _demo():
++    idx = pd.date_range(&quot;2024-01-01 09:15&quot;, periods=375, freq=&quot;min&quot;)
++    df = pd.DataFrame({&quot;open&quot;: 100.0, &quot;high&quot;: 100.5, &quot;low&quot;: 99.5, &quot;close&quot;: 100.2, &quot;volume&quot;: 1000}, index=idx)
++    assert bar_stats(df)[&quot;rows&quot;] == 375 and missing_minutes(df) == 0 and as_of_stamped(df)
++    daily = pd.Series([100, 101, 50, 51], index=pd.bdate_range(&quot;2024-01-01&quot;, periods=4))
++    assert corp_action_breaks(daily, 1.5)
++    print(&quot;data_check (chunk 0) demo OK: bar stats, missing minutes vs 375, bad ticks, zero vol, corp-action &quot;
++          &quot;candidates, as-of stamp; stock list honest (O1 not fabricated).&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_pricev2_data_check.py b/tests/test_pricev2_data_check.py
+new file mode 100644
+index 000000000..1a348a753
+--- /dev/null
++++ b/tests/test_pricev2_data_check.py
+@@ -0,0 +1,43 @@
++&quot;&quot;&quot;V2-ALL-1 chunk 0 — the data check (PRICE-ENGINE-V2 §2.2/§2.12). Pure checkable logic over a bar frame: bar
++count, missing minutes vs the 375-minute NSE session, bad ticks (high&lt;low, non-positive price), zero-volume bars,
++corporate-action break candidates, and the as-of (knowable-at) stamp. Reuses the store reader; runs light here.&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import pandas as pd
++from pricev2 import data_check as dc
++
++
++def _minute_day(n=375, bad=False, zero=False):
++    idx = pd.date_range(&quot;2024-01-01 09:15&quot;, periods=n, freq=&quot;min&quot;)
++    o = [100.0] * n; h = [100.5] * n; l = [99.5] * n; c = [100.2] * n; v = [1000] * n
++    if bad:
++        h[10], l[10] = 99.0, 101.0          # high &lt; low -&gt; bad tick
++    if zero:
++        v[20] = 0
++    return pd.DataFrame({&quot;open&quot;: o, &quot;high&quot;: h, &quot;low&quot;: l, &quot;close&quot;: c, &quot;volume&quot;: v}, index=idx)
++
++
++def test_bad_ticks_and_zero_volume_counted():
++    df = _minute_day(bad=True, zero=True)
++    s = dc.bar_stats(df)
++    assert s[&quot;bad_ticks&quot;] == 1 and s[&quot;zero_volume&quot;] == 1 and s[&quot;rows&quot;] == 375
++
++
++def test_missing_minutes_vs_session():
++    full = _minute_day(375)
++    assert dc.missing_minutes(full) == 0
++    short = _minute_day(300)
++    assert dc.missing_minutes(short) == 75          # 375 - 300
++
++
++def test_corp_action_break_candidate_on_a_big_unexplained_jump():
++    idx = pd.bdate_range(&quot;2024-01-01&quot;, periods=5)
++    daily = pd.Series([100, 101, 50, 51, 52], index=idx)   # ~2x drop day 3 = split candidate
++    breaks = dc.corp_action_breaks(daily, ratio=1.5)
++    assert breaks and str(breaks[0])[:10] == &quot;2024-01-03&quot;
++
++
++def test_coverage_report_aggregates_and_flags_as_of():
++    rep = dc.coverage_report({&quot;AAA&quot;: _minute_day(375), &quot;BBB&quot;: _minute_day(300, zero=True)})
++    assert rep[&quot;tokens&quot;] == 2 and rep[&quot;total_rows&quot;] == 675
++    assert rep[&quot;zero_volume&quot;] == 1 and rep[&quot;as_of_stamped&quot;] is True     # time-indexed = knowable-at present
+</pre></div><div class='c'><div class='h'><b>bc56bb06f</b> · 2026-09-28 12:35</div><div>V2-ALL-1 Part A (docs): overwrite PRICE-ENGINE-V2.md with §2.1-2.19 verbatim (floor+rooms 2.16, Rain engine 9 2.17, yardstick 2.18, formulas 2.19); CLAUDE.md top line -&gt; &#x27;...every idea judge and every room...&#x27;; MASTER-CHECKLIST V2 STRUCTURE section (one FLOOR + nine ROOMS, each with its 3 status lines; nothing deleted, no duplication); NEXT-PASTE.md new 2-line header (history preserved). Supersedes V2-DOC-1/2 + LEAD-HANDOFF-V2-ADD-1</div><div class='sub h'>CLAUDE.md                              |  2 +-</div><div class='sub h'>docs/MASTER-CHECKLIST.md               | 24 ++++++++++++++++++++++++</div><div class='sub h'>docs/NEXT-PASTE.md                     |  6 ++++++</div><div class='sub h'>docs/architecture/PRICE-ENGINE-V2.md   | 34 ++++++++++++++++++++--------------</div><div class='sub h'>docs/dispatches/2026-09-28_V2-ALL-1.md | 33 +++++++++++++++++++++++++++++++++</div><pre>diff --git a/CLAUDE.md b/CLAUDE.md
 index 4b250aff7..ab6c6aa85 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
@@ -1294,365 +1774,4 @@ index 000000000..c417fcd5f
 +    # n_min(edge): smallest n where the Wilson half-width &lt; edge; larger edge -&gt; smaller n_min
 +    assert se.n_min_for_edge(0.20) &lt; se.n_min_for_edge(0.05)
 +    assert se.n_min_for_edge(0.10) &gt;= stats.MIN_FIRES or se.n_min_for_edge(0.10) &gt; 0
-</pre></div><div class='c'><div class='h'><b>bfdc3c147</b> · 2026-09-28 09:40</div><div>NB53-C/E: engine 2 CHUNK 2 (§5.1) forecast-ruler exam — HAR volatility forecast fit on chronological TRAIN, scored on TEST vs the naive (last-value) forecast; enters the shelf as FORECAST only if it beats naive by more than the measured SE of the loss difference, else kept as STATE (its inputs). Features trailing/PIT; numpy OLS, no new dep; too-few-cases -&gt; STATE (§5.4). 3 tests GREEN</div><div class='sub h'>engine2_claude_price/forecast.py    | 85 +++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_forecast.py | 38 +++++++++++++++++</div><pre>diff --git a/engine2_claude_price/forecast.py b/engine2_claude_price/forecast.py
-new file mode 100644
-index 000000000..7b32735f4
---- /dev/null
-+++ b/engine2_claude_price/forecast.py
-@@ -0,0 +1,85 @@
-+&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 2 (§5.1): the forecast-ruler exam.
-+
-+A FORECAST ruler (here the HAR volatility forecast) must pass its own exam before it may sit on the shelf: fit on
-+the chronological TRAIN split, score on TEST against the NAIVE forecast (yesterday&#x27;s value / random walk). It
-+enters as a FORECAST ruler ONLY if it beats naive by MORE THAN the measured standard error of the loss difference
-+(§5.1); otherwise it is kept as a STATE ruler (its inputs), never as a forecast. No look-ahead: the split is
-+chronological and the fit sees only TRAIN.
-+
-+HAR lags (1 daily, 5 weekly, 22 monthly) are the model&#x27;s DEFINING structure, not tuned thresholds — passed as a
-+parameter, documented, and the exam (not a typed number) decides whether the model is kept. numpy OLS, no new
-+dependency.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import numpy as np
-+import pandas as pd
-+
-+
-+def har_features(rv, lags=(1, 5, 22)):
-+    &quot;&quot;&quot;Trailing HAR features: for each t, the mean realised vol over the last `lag` observations (inclusive of t).
-+    All trailing =&gt; PIT (a feature at t never uses rv after t). Returns a DataFrame aligned to rv.index.&quot;&quot;&quot;
-+    d, w, m = lags
-+    return pd.DataFrame({
-+        &quot;rv_d&quot;: rv.rolling(int(d)).mean(),
-+        &quot;rv_w&quot;: rv.rolling(int(w)).mean(),
-+        &quot;rv_m&quot;: rv.rolling(int(m)).mean(),
-+    })
-+
-+
-+def _fit_ols(X, y):
-+    A = np.column_stack([np.ones(len(X)), X])
-+    coef, *_ = np.linalg.lstsq(A, y, rcond=None)
-+    return coef
-+
-+
-+def _predict(coef, X):
-+    return np.column_stack([np.ones(len(X)), X]) @ coef
-+
-+
-+def exam(rv, train_frac=0.7, lags=(1, 5, 22)):
-+    &quot;&quot;&quot;Fit HAR on TRAIN, forecast next-day RV on TEST, compare to the naive (previous-value) forecast. Returns
-+    har_rmse, naive_rmse, margin (naive-har mean squared-error gain), se (its standard error), beats_naive, and
-+    decision FORECAST/STATE. beats_naive == margin &gt; se (beats naive by more than one measured SE, §5.1).&quot;&quot;&quot;
-+    feats = har_features(rv, lags)
-+    target = rv.shift(-1)                                   # predict next day&#x27;s RV
-+    df = pd.concat([feats, target.rename(&quot;y&quot;), rv.rename(&quot;naive&quot;)], axis=1).dropna()
-+    n = len(df)
-+    if n &lt; 40:
-+        return {&quot;har_rmse&quot;: None, &quot;naive_rmse&quot;: None, &quot;margin&quot;: None, &quot;se&quot;: None,
-+                &quot;beats_naive&quot;: False, &quot;decision&quot;: &quot;STATE&quot;, &quot;n&quot;: n}
-+    cut = int(n * train_frac)
-+    Xtr, ytr = df[[&quot;rv_d&quot;, &quot;rv_w&quot;, &quot;rv_m&quot;]].iloc[:cut].values, df[&quot;y&quot;].iloc[:cut].values
-+    Xte, yte = df[[&quot;rv_d&quot;, &quot;rv_w&quot;, &quot;rv_m&quot;]].iloc[cut:].values, df[&quot;y&quot;].iloc[cut:].values
-+    naive_te = df[&quot;naive&quot;].iloc[cut:].values               # yesterday&#x27;s value as the forecast
-+    coef = _fit_ols(Xtr, ytr)                               # fit sees ONLY train (PIT)
-+    har_pred = _predict(coef, Xte)
-+    har_se2 = (yte - har_pred) ** 2
-+    naive_se2 = (yte - naive_te) ** 2
-+    har_rmse = float(np.sqrt(har_se2.mean()))
-+    naive_rmse = float(np.sqrt(naive_se2.mean()))
-+    diff = naive_se2 - har_se2                              # per-obs loss gain of HAR over naive (&gt;0 = HAR better)
-+    margin = float(diff.mean())
-+    se = float(diff.std(ddof=1) / np.sqrt(len(diff))) if len(diff) &gt; 1 else float(&quot;inf&quot;)
-+    beats = margin &gt; se                                     # beat naive by more than one measured SE (§5.1)
-+    return {&quot;har_rmse&quot;: har_rmse, &quot;naive_rmse&quot;: naive_rmse, &quot;margin&quot;: margin, &quot;se&quot;: se,
-+            &quot;beats_naive&quot;: bool(beats), &quot;decision&quot;: (&quot;FORECAST&quot; if beats else &quot;STATE&quot;), &quot;n&quot;: n}
-+
-+
-+def _demo():
-+    rng = np.random.default_rng(3)
-+    s = pd.Series(np.abs(0.01 + rng.normal(0, 0.004, 600)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=600))
-+    r = exam(s, 0.7)
-+    assert r[&quot;decision&quot;] == &quot;FORECAST&quot; and r[&quot;margin&quot;] &gt; r[&quot;se&quot;] and r[&quot;har_rmse&quot;] &lt; r[&quot;naive_rmse&quot;]
-+    short = pd.Series(np.abs(rng.normal(0.01, 0.003, 30)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=30))
-+    assert exam(short, 0.7)[&quot;decision&quot;] == &quot;STATE&quot;         # too few cases to certify a forecast (§5.4)
-+    t = s.index[40]
-+    assert har_features(s, (1, 5, 22)).loc[t].equals(har_features(s.loc[:t], (1, 5, 22)).loc[t])   # PIT
-+    print(&quot;forecast exam (chunk 2) demo OK: HAR beats naive on mean-reverting vol (FORECAST); too-few-cases &quot;
-+          &quot;stays STATE; features trailing/PIT.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/tests/test_claude_price_forecast.py b/tests/test_claude_price_forecast.py
-new file mode 100644
-index 000000000..5632a09d8
---- /dev/null
-+++ b/tests/test_claude_price_forecast.py
-@@ -0,0 +1,38 @@
-+&quot;&quot;&quot;NB53-C/E engine 2 CHUNK 2 (§5.1) — the forecast-ruler exam: a HAR volatility forecast enters the shelf as a
-+FORECAST ruler ONLY if it beats the naive forecast (yesterday&#x27;s value) on the TEST split by more than the measured
-+standard error of the loss difference. Otherwise it is kept as a STATE ruler (its inputs), never as a forecast.
-+Chronological split, fit on TRAIN only (PIT — no look-ahead).&quot;&quot;&quot;
-+import os, sys
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+import numpy as np, pandas as pd
-+from engine2_claude_price import forecast as fc
-+
-+
-+def _rv_mean_reverting(n=600, seed=3):
-+    # vol fluctuating around a mean: the naive (last-value) forecast chases noise, so HAR (trailing means) wins.
-+    rng = np.random.default_rng(seed)
-+    return pd.Series(np.abs(0.01 + rng.normal(0, 0.004, n)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=n))
-+
-+
-+def test_har_features_are_trailing_pit():
-+    rv = _rv_mean_reverting(60)
-+    f = fc.har_features(rv, lags=(1, 5, 22))
-+    # the feature row at t must not use rv after t: recompute on a truncated series -&gt; identical row
-+    t = rv.index[40]
-+    assert f.loc[t].equals(fc.har_features(rv.loc[:t], lags=(1, 5, 22)).loc[t])
-+
-+
-+def test_har_beats_naive_on_mean_reverting_vol():
-+    rv = _rv_mean_reverting()
-+    r = fc.exam(rv, train_frac=0.7, lags=(1, 5, 22))
-+    assert r[&quot;har_rmse&quot;] &lt; r[&quot;naive_rmse&quot;]                 # naive chases noise; HAR wins on mean-reverting vol
-+    assert r[&quot;beats_naive&quot;] is True and r[&quot;margin&quot;] &gt; r[&quot;se&quot;]
-+    assert r[&quot;decision&quot;] == &quot;FORECAST&quot;
-+
-+
-+def test_insufficient_data_keeps_it_as_state_not_forecast():
-+    # a forecast ruler cannot be certified without enough cases (§5.4 n floor) -&gt; STATE, never a forecast on faith
-+    rng = np.random.default_rng(2)
-+    rv = pd.Series(np.abs(rng.normal(0.01, 0.003, 30)), index=pd.bdate_range(&quot;2023-01-01&quot;, periods=30))
-+    r = fc.exam(rv, train_frac=0.7, lags=(1, 5, 22))
-+    assert r[&quot;decision&quot;] == &quot;STATE&quot; and r[&quot;beats_naive&quot;] is False
-</pre></div><div class='c'><div class='h'><b>65a9faeb1</b> · 2026-09-28 09:36</div><div>NB53-E item 2: progress_beat.py — BUILD beat (Telegram + report): done N/65, ten-block bar, pending N, engine/chunk/state, MEASURED rate (build-hrs/chunk from commit timestamps, never typed), ETA = now+pending×rate as date+hour or &#x27;ETA unmeasured&#x27;; complete_line for BUILD COMPLETE. post() sends best-effort. 5 tests GREEN</div><div class='sub h'>scripts/progress_beat.py    | 81 +++++++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>tests/test_progress_beat.py | 36 ++++++++++++++++++++</div><pre>diff --git a/scripts/progress_beat.py b/scripts/progress_beat.py
-new file mode 100644
-index 000000000..f46e1e942
---- /dev/null
-+++ b/scripts/progress_beat.py
-@@ -0,0 +1,81 @@
-+&quot;&quot;&quot;NB53-E item 2 — the BUILD progress beat (Telegram + report), posted at every checkpoint and at least hourly.
-+
-+One plain line: done N/65, a ten-block bar, pending N, the current engine/chunk/state, a MEASURED rate
-+(build-hours per chunk, from commit timestamps — never typed, §24.5), and an ETA = now + pending × rate as a
-+date+hour, or &quot;ETA unmeasured&quot; when fewer than two chunk commits exist. When every build item is BUILT the beat is
-+`complete_line()` and the caller ends its report with `LEAD RULING NEEDED: audit`.
-+
-+`post()` sends via scripts.notify (Telegram) and returns the line for the report; a demo/test never sends.
-+&quot;&quot;&quot;
-+from __future__ import annotations
-+
-+import datetime as _dt
-+
-+_FULL = &quot;█&quot;   # █
-+_EMPTY = &quot;░&quot;  # ░
-+
-+
-+def bar(done, total, width=10):
-+    &quot;&quot;&quot;A ten-block bar. Filled blocks = round(done/total × width), clamped to [0, width].&quot;&quot;&quot;
-+    frac = 0.0 if not total else max(0.0, min(1.0, float(done) / float(total)))
-+    n = int(round(frac * width))
-+    return &quot;[&quot; + _FULL * n + _EMPTY * (width - n) + &quot;]&quot;
-+
-+
-+def measured_rate_hrs(commit_times):
-+    &quot;&quot;&quot;Build-hours per chunk = the mean gap between consecutive chunk-commit datetimes. None if &lt; 2 commits
-+    (unmeasured — never a typed guess).&quot;&quot;&quot;
-+    ts = sorted(commit_times)
-+    if len(ts) &lt; 2:
-+        return None
-+    span = (ts[-1] - ts[0]).total_seconds() / 3600.0
-+    return span / (len(ts) - 1)
-+
-+
-+def _eta(pending, rate_hrs, now=None):
-+    if rate_hrs is None or pending is None:
-+        return &quot;ETA unmeasured&quot;
-+    when = (now or _dt.datetime.now()) + _dt.timedelta(hours=float(pending) * float(rate_hrs))
-+    return &quot;ETA &quot; + when.strftime(&quot;%a %d %b %H:00&quot;)
-+
-+
-+def line(done, total, pending, engine, chunk, state, rate_hrs=None, now=None):
-+    rate = (&quot;rate %.2gh/chunk&quot; % rate_hrs) if rate_hrs is not None else &quot;rate unmeasured&quot;
-+    return &quot;BUILD · done %d/%d %s · pending %d · %s chunk %s %s · %s · %s&quot; % (
-+        done, total, bar(done, total), pending, engine, chunk, state, rate, _eta(pending, rate_hrs, now))
-+
-+
-+def complete_line():
-+    return &quot;BUILD COMPLETE · pending 0&quot;
-+
-+
-+def post(text, notifier=None):
-+    &quot;&quot;&quot;Send the beat to Telegram (best-effort; never fatal) and return it for the report.&quot;&quot;&quot;
-+    try:
-+        if notifier is None:
-+            from scripts.notify import notify as notifier
-+        notifier(text)
-+    except Exception:
-+        pass
-+    return text
-+
-+
-+def _demo():
-+    now = _dt.datetime(2026, 9, 28, 10, 0)
-+    assert bar(65, 65).count(_FULL) == 10 and bar(0, 65).count(_FULL) == 0
-+    base = _dt.datetime(2026, 9, 28, 8, 0)
-+    assert abs(measured_rate_hrs([base, base + _dt.timedelta(hours=2), base + _dt.timedelta(hours=4)]) - 2.0) &lt; 1e-6
-+    assert measured_rate_hrs([base]) is None
-+    ln = line(37, 65, 28, &quot;Claude Price Engine&quot;, 2, &quot;BUILT&quot;, rate_hrs=2.0, now=now)
-+    assert &quot;done 37/65&quot; in ln and &quot;pending 28&quot; in ln and &quot;ETA&quot; in ln and &quot;unmeasured&quot; not in ln
-+    assert &quot;ETA unmeasured&quot; in line(37, 65, 28, &quot;X&quot;, 1, &quot;SCAFFOLD&quot;, rate_hrs=None)
-+    assert complete_line() == &quot;BUILD COMPLETE · pending 0&quot;
-+    posts = []
-+    assert post(&quot;hi&quot;, notifier=posts.append) == &quot;hi&quot; and posts == [&quot;hi&quot;]
-+    print(&quot;progress_beat demo OK: ten-block bar, measured rate/chunk, ETA date+hour or unmeasured, complete line.&quot;)
-+
-+
-+if __name__ == &quot;__main__&quot;:
-+    import sys
-+    if &quot;--demo&quot; in sys.argv:
-+        _demo()
-diff --git a/tests/test_progress_beat.py b/tests/test_progress_beat.py
-new file mode 100644
-index 000000000..868a96835
---- /dev/null
-+++ b/tests/test_progress_beat.py
-@@ -0,0 +1,36 @@
-+&quot;&quot;&quot;NB53-E item 2 — the BUILD progress beat: done N/65, a ten-block bar, pending, engine/chunk/state, a MEASURED
-+rate (build-hours per chunk from commit timestamps), and an ETA = pending × rate as date+hour (never typed).&quot;&quot;&quot;
-+import os, sys, datetime as dt
-+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+from scripts import progress_beat as pb
-+
-+
-+def test_bar_is_ten_blocks():
-+    b = pb.bar(5, 10)
-+    assert b.count(&quot;█&quot;) == 5 and len(b.strip(&quot;[]&quot;)) == 10
-+    assert pb.bar(0, 65).strip(&quot;[]&quot;).count(&quot;█&quot;) == 0
-+    assert pb.bar(65, 65).strip(&quot;[]&quot;).count(&quot;█&quot;) == 10
-+
-+
-+def test_measured_rate_from_commit_times():
-+    base = dt.datetime(2026, 9, 28, 8, 0)
-+    times = [base, base + dt.timedelta(hours=2), base + dt.timedelta(hours=4)]   # 2h per chunk
-+    assert abs(pb.measured_rate_hrs(times) - 2.0) &lt; 1e-6
-+    assert pb.measured_rate_hrs([base]) is None                                   # &lt;2 commits -&gt; unmeasured
-+
-+
-+def test_line_with_rate_has_eta_date_hour():
-+    now = dt.datetime(2026, 9, 28, 10, 0)
-+    ln = pb.line(done=37, total=65, pending=28, engine=&quot;Claude Price Engine&quot;, chunk=2,
-+                 state=&quot;BUILT&quot;, rate_hrs=2.0, now=now)
-+    assert &quot;BUILD · done 37/65&quot; in ln and &quot;pending 28&quot; in ln and &quot;Claude Price Engine chunk 2 BUILT&quot; in ln
-+    assert &quot;rate 2&quot; in ln and &quot;ETA&quot; in ln and &quot;unmeasured&quot; not in ln
-+
-+
-+def test_line_without_rate_says_eta_unmeasured():
-+    ln = pb.line(done=37, total=65, pending=28, engine=&quot;X&quot;, chunk=1, state=&quot;SCAFFOLD&quot;, rate_hrs=None)
-+    assert &quot;ETA unmeasured&quot; in ln
-+
-+
-+def test_complete_line():
-+    assert pb.complete_line() == &quot;BUILD COMPLETE · pending 0&quot;
-</pre></div><div class='c'><div class='h'><b>6039659fd</b> · 2026-09-28 09:35</div><div>NB53-E item 1: BUILD-DAY-&lt;date&gt; flag overrides the 08:30-&gt;close-done auto-continue pause, but ONLY when no Kite token exists for the day (a token present holds the lockout — real trading day never overridden). Dated flag expires at midnight. auto_continue._build_day_active + _token_present + _build_day_flag_path; wired into should_continue. 2 tests GREEN (incl. the token-holds-lockout RED case). Today&#x27;s flag written to E1-DESK (owner-said 28 Sep). Archive NB53-E</div><div class='sub h'>.claude/hooks/auto_continue.py       | 32 +++++++++++++++++++++++++++++++-</div><div class='sub h'>docs/dispatches/2026-09-28_NB53-E.md |  7 +++++++</div><div class='sub h'>tests/test_auto_continue_buildday.py | 28 ++++++++++++++++++++++++++++</div><pre>diff --git a/.claude/hooks/auto_continue.py b/.claude/hooks/auto_continue.py
-index 85f7dc166..db9b3ff3c 100644
---- a/.claude/hooks/auto_continue.py
-+++ b/.claude/hooks/auto_continue.py
-@@ -26,6 +26,36 @@ def _load(p):
-         return {}
- 
- 
-+def _today():
-+    from datetime import datetime, timezone, timedelta
-+    return datetime.now(timezone(timedelta(hours=5, minutes=30))).date().isoformat()
-+
-+
-+def _build_day_flag_path(d=None):
-+    base = os.environ.get(&quot;E1_BUILD_DAY_DIR&quot;) or os.path.join(os.path.expanduser(&quot;~&quot;), &quot;Desktop&quot;, &quot;E1-DESK&quot;)
-+    return os.path.join(base, &quot;BUILD-DAY-&quot; + (d or _today()))
-+
-+
-+def _token_present(d=None):
-+    &quot;&quot;&quot;True iff a Kite token for `d` (today) is on disk — a real trading day. Any read error -&gt; False (no token).&quot;&quot;&quot;
-+    d = d or _today()
-+    try:
-+        sys.path.insert(0, REPO)
-+        from data_acquisition import kite
-+        rec = json.load(open(kite.TOKEN_FILE, encoding=&quot;utf-8&quot;))
-+        return rec.get(&quot;login_date&quot;) == d
-+    except Exception:
-+        return False
-+
-+
-+def _build_day_active(now=None):
-+    &quot;&quot;&quot;NB53-E item 1: a declared BUILD-DAY-&lt;today&gt; flag overrides the 08:30-&gt;close-done pause lockout — but ONLY
-+    when NO Kite token exists for today. A token present means a real trading day: the lockout holds regardless of
-+    the flag. The flag is dated, so it expires by itself at midnight.&quot;&quot;&quot;
-+    d = _today()
-+    return os.path.exists(_build_day_flag_path(d)) and not _token_present(d)
-+
-+
- def _building():
-     try:
-         sys.path.insert(0, REPO)
-@@ -44,7 +74,7 @@ def should_continue():
-     empty checklist AND empty backlog.&quot;&quot;&quot;
-     st = _load(STATE)
-     flag = (st.get(&quot;flag&quot;) or &quot;&quot;).strip()
--    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not _building():
-+    if os.path.exists(HALT) or flag != &quot;NOTHING NEEDS THE LEAD&quot; or not (_building() or _build_day_active()):
-         return False
-     remaining = [x for x in (_load(CHECKLIST).get(&quot;remaining&quot;) or []) if x]
-     if remaining:
-diff --git a/docs/dispatches/2026-09-28_NB53-E.md b/docs/dispatches/2026-09-28_NB53-E.md
-new file mode 100644
-index 000000000..1eee38aa7
---- /dev/null
-+++ b/docs/dispatches/2026-09-28_NB53-E.md
-@@ -0,0 +1,7 @@
-+ID: NB53-E — BUILD-DAY AUTO-CONTINUE + PROGRESS BEAT → BUILD
-+ORIGIN: LEAD-RULED from your 09:20 checkpoint (f3b08749c, 120ed6951, cd3aa38aa; items 65 · done 37 · pending 28; RAM 0.6 GB). OWNER-SAID: he wants to know from Telegram when a step is done, with a progress bar and an ETA. No owner action needed.
-+READ: that checkpoint; the session stopped after it (auto-continue locked out 08:30 → close-done, NB45-A). ASSUMING: no Kite token file exists for today (declared build day). MISSING: nothing.
-+1. BUILD-DAY FLAG: add to the auto-continue guard (the build loop, not the trading launch path) a dated flag file BUILD-DAY-&lt;date&gt;; when it exists AND no Kite token exists for that date, the market-hours lockout does not apply and the session keeps working through NB53 without waiting for a paste. It expires at midnight; with a token present it is ignored. RED test first: the lockout still holds when a token exists even if the flag exists. Then write today&#x27;s flag (owner-said 28 Sep).
-+2. PROGRESS BEAT, Telegram + report, at every checkpoint and at least once per hour while working: &quot;BUILD · done N/65 [bar of ten blocks] · pending N · &lt;engine&gt; chunk &lt;k&gt; &lt;SCAFFOLD/BUILT/VERIFIED/LIVE&gt; · rate &lt;measured build-hours per chunk from commit timestamps&gt; · ETA &lt;pending chunks × rate, as date + hour&gt;&quot; or &quot;ETA unmeasured&quot; — never a typed ETA. When every build item is BUILT: &quot;BUILD COMPLETE · pending 0&quot; and the last line LEAD RULING NEEDED: audit.
-+3. CONTINUE NB53 in order: engine 2 chunk 2 (§5.1) → chunk 3 (daily search on the full open shelf, exam) → Machine Factory per E6.md → engines 3, 4, 6, 7, 8 evaluates from their cited designs → engine 2 chunks 4–7 → bus launch wire-in (RED until a fresh-session verify). Full suite after close-done when RAM allows.
-+4. REPORT format unchanged; roster line per engine; self-flag line last.
-diff --git a/tests/test_auto_continue_buildday.py b/tests/test_auto_continue_buildday.py
-new file mode 100644
-index 000000000..ffb465041
---- /dev/null
-+++ b/tests/test_auto_continue_buildday.py
-@@ -0,0 +1,28 @@
-+&quot;&quot;&quot;NB53-E item 1 — the BUILD-DAY flag lets the build loop keep working through the 08:30-&gt;close-done pause, but
-+ONLY when no Kite token exists for the day. RED requirement: a token present makes the lockout hold even if the
-+flag exists (a real trading day is never overridden by a stale build-day flag).&quot;&quot;&quot;
-+import os, sys, json
-+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), &quot;.claude&quot;, &quot;hooks&quot;))
-+import auto_continue as ac
-+
-+
-+def test_flag_plus_no_token_is_active_but_token_holds_the_lockout(tmp_path, monkeypatch):
-+    monkeypatch.setenv(&quot;E1_BUILD_DAY_DIR&quot;, str(tmp_path))
-+    assert ac._build_day_active() is False                        # no flag -&gt; not active
-+    open(os.path.join(str(tmp_path), &quot;BUILD-DAY-&quot; + ac._today()), &quot;w&quot;).close()
-+    monkeypatch.setattr(ac, &quot;_token_present&quot;, lambda d=None: False)
-+    assert ac._build_day_active() is True                         # flag + no token -&gt; override on
-+    monkeypatch.setattr(ac, &quot;_token_present&quot;, lambda d=None: True)
-+    assert ac._build_day_active() is False                        # token present -&gt; lockout HOLDS (the RED case)
-+
-+
-+def test_should_continue_keeps_working_in_the_pause_when_build_day_active(tmp_path, monkeypatch):
-+    # inside the pause window _building() is False; the build-day override must let should_continue return True
-+    monkeypatch.setattr(ac, &quot;_building&quot;, lambda: False)
-+    monkeypatch.setattr(ac, &quot;_load&quot;, lambda p: {&quot;flag&quot;: &quot;NOTHING NEEDS THE LEAD&quot;} if p == ac.STATE
-+                        else {&quot;remaining&quot;: [&quot;engine 2 chunk 2&quot;]})
-+    monkeypatch.setattr(ac.os.path, &quot;exists&quot;, lambda p: False)    # no HALT
-+    monkeypatch.setattr(ac, &quot;_build_day_active&quot;, lambda: True)
-+    assert ac.should_continue() is True
-+    monkeypatch.setattr(ac, &quot;_build_day_active&quot;, lambda: False)
-+    assert ac.should_continue() is False                          # no override + pause -&gt; stop
 </pre></div></main></body></html>
