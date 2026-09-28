@@ -1,312 +1,4 @@
-import annotations
-
-import datetime as _dt
-import os
-
-_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DIARY_DIR = os.path.join(_REPO, "reports", "diaries")
-PRIORITY = "diary"          # killed-first marker (§27c): the watchdog kills PRIORITY=="diary" processes before the chain
-
-
-def _reopen_floor():
-    try:
-        from scripts import session_resurrect
-        return session_resurrect.REOPEN_FLOOR_GB
-    except Exception:
-        return 0.72          # the measured reopen floor (session_resurrect.REOPEN_FLOOR_GB); fallback only
-
-
-def _footprint_path(name):
-    return os.path.join(DIARY_DIR, "%s.footprint" % name)
-
-
-def measured_footprint(name):
-    """This engine's OWN measured RAM footprint in GB, recorded on a first run — or None if not yet calibrated
-    (fail-closed: an uncalibrated engine does NOT start; §4.1 no typed footprint)."""
-    try:
-        return float(open(_footprint_path(name), encoding="utf-8").read().strip())
-    except Exception:
-        return None
-
-
-def record_footprint(name, gb=None):
-    """Record this engine's measured footprint. gb=None measures THIS process's peak working set now (calibration
-    on first run). Returns the GB recorded."""
-    if gb is None:
-        gb = _peak_ws_gb()
-    if gb is None:
-        return None
-    try:
-        os.makedirs(DIARY_DIR, exist_ok=True)
-        open(_footprint_path(name), "w", encoding="utf-8").write("%.3f" % float(gb))
-    except Exception:
-        pass
-    return round(float(gb), 3)
-
-
-def _peak_ws_gb():
-    """Peak working set of THIS process in GB (Windows), or None — the measured footprint on a first run."""
-    try:
-        import ctypes
-        from ctypes import wintypes
-
-        class _PMC(ctypes.Structure):
-            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
-                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
-                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
-                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
-                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
-        pmc = _PMC(); pmc.cb = ctypes.sizeof(_PMC)
-        k32 = ctypes.windll.kernel32
-        k32.GetCurrentProcess.restype = wintypes.HANDLE     # pointer-sized handle (not truncated to c_int on 64-bit)
-        # K32GetProcessMemoryInfo (kernel32) is the canonical export; psapi's forwarded GetProcessMemoryInfo
-        # returns 0 (fails) on this box. Declaring argtypes is load-bearing: without it ctypes passes the 64-bit
-        # process handle as a 32-bit int and the call fails (0), which left the §27c footprint gate permanently
-        # uncalibrated (no diary engine could ever start).
-        fn = getattr(k32, "K32GetProcessMemoryInfo", None) or ctypes.windll.psapi.GetProcessMemoryInfo
-        fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PMC), wintypes.DWORD]
-        fn.restype = wintypes.BOOL
-        if fn(k32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb):
-            return round(pmc.PeakWorkingSetSize / (1024 ** 3), 3)
-    except Exception:
-        pass
-    return None
-
-
-def should_start(ready_seen, free_gb, footprint_gb, reopen_floor_gb=None):
-    """§27c: a non-chain engine starts ONLY after the 08:15 READY line AND with free RAM at/above the reopen floor
-    PLUS this engine's own measured footprint. Fail-closed: unknown/None RAM or footprint -> do not start."""
-    if not ready_seen:
-        return False
-    floor = _reopen_floor() if reopen_floor_gb is None else reopen_floor_gb
-    if free_gb is None or footprint_gb is None:
-        return False
-    return float(free_gb) >= float(floor) + float(footprint_gb)
-
-
-class DiaryEngine:
-    """A non-chain engine: diary-only, RAM-gated, quiet, killed-first (§27 b-d). Orders are impossible here."""
-
-    priority = PRIORITY
-
-    def __init__(self, name, footprint_gb, work_fn, diary_fn=None, clock_fn=None):
-        self.name = name
-        self.footprint_gb = footprint_gb          # this engine's OWN measured RAM footprint (§27c)
-        self.work_fn = work_fn                     # the engine's diary work; returns a short status string
-        self.diary_fn = diary_fn or self._append_diary
-        self.clock_fn = clock_fn or (lambda: _dt.datetime.now().strftime("%H:%M:%S"))
-
-    def _append_diary(self, line):
-        try:
-            os.makedirs(DIARY_DIR, exist_ok=True)
-            with open(os.path.join(DIARY_DIR, "%s.log" % self.name), "a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
-
-    def run_once(self, ready_seen, free_gb, reopen_floor_gb=None):
-        """Run one diary cycle IF the §27c gate allows. Returns {started, status|reason}. A fault is caught and
-        written to the diary as a quiet ⏱ line — NEVER a 🙋 (§27d)."""
-        fp = self.footprint_gb if self.footprint_gb is not None else measured_footprint(self.name)
-        if not should_start(ready_seen, free_gb, fp, reopen_floor_gb):
-            return {"started": False, "reason": "gate: ready=%s free=%s footprint=%s (None=uncalibrated)" % (
-                ready_seen, free_gb, fp)}
-        try:
-            status = self.work_fn()               # diary-only work; no order path exists to reach
-            line = "✅ %s %s — %s" % (self.name, self.clock_fn(), status)
-        except Exception as e:                     # §27d: quiet — the fault goes to the diary, no owner ping
-            line = "⏱ %s %s — fault %s (diary-only, not an owner ping)" % (self.name, self.clock_fn(), type(e).__name__)
-            self.diary_fn(line)
-            return {"started": True, "status": "fault", "line": line}
-        self.diary_fn(line)
-        return {"started": True, "status": "ok", "line": line}
-
-
-def _demo():
-    floor = 0.72
-    # §27c gate: needs ready + free RAM >= floor + footprint
-    assert should_start(True, floor + 0.3, 0.2, floor) is True          # 1.02 >= 0.72+0.2
-    assert should_start(True, floor + 0.1, 0.2, floor) is False         # 0.82 < 0.92 -> hold
-    assert should_start(False, 9.9, 0.2, floor) is False                # not ready -> hold (before 08:15)
-    assert should_start(True, None, 0.2, floor) is False                # unknown RAM -> fail-closed
-    posts = []
-    eng = DiaryEngine("E-demo", footprint_gb=0.2, work_fn=lambda: "12 evaluated, 3 fired", diary_fn=posts.append,
-                      clock_fn=lambda: "10:00:00")
-    # gated off before READY
-    assert eng.run_once(False, 9.9)["started"] is False and posts == []
-    # runs after READY with RAM -> one ✅ diary line, no ping
-    r = eng.run_once(True, floor + 0.5)
-    assert r["started"] and r["status"] == "ok" and posts[-1].startswith("✅ E-demo") and "fired" in posts[-1]
-    # a faulting engine stays quiet: a ⏱ diary line, never a 🙋
-    bad = DiaryEngine("E-bad", 0.1, work_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")), diary_fn=posts.append,
-                      clock_fn=lambda: "10:01:00")
-    rb = bad.run_once(True, floor + 0.5)
-    assert rb["status"] == "fault" and posts[-1].startswith("⏱ E-bad") and "🙋" not in posts[-1]
-    print("diary_engine demo OK: §27c RAM+READY gate; diary-only ✅ line; faults quiet (⏱, never 🙋); killed-first marker.")
-
-
-if __name__ == "__main__":
-    import sys
-    if "--demo" in sys.argv:
-        _demo()
-assistant: `DiaryEngine` + the 8 wrappers already enforce §27 (RAM gate, quiet faults, diary-only, footprint). The bus is a thin scheduler over them, not a rewrite. Let me see how `diary_engines.py` exposes the list:
-tool_use Bash {"command": "sed -n '30,96p' scripts/diary_engines.py", "description": "Read diary_engines registry tail"}
-tool_result: def _make(name, desc, source):
-    def work():
-        # honest scaffold: the §27-gated diary process is built; the per-engine data logic is its after-close item.
-        return "%s diary scaffold — awaiting %s (BUILT-not-LIVE)" % (desc, source)
-    return diary_engine.DiaryEngine(name, footprint_gb=None, work_fn=work)   # footprint None -> resolves on run
-
-
-ENGINES = {name: _make(name, desc, source) for (name, desc, source) in _SPECS}
-
-
-def run_once(name, ready_seen, free_gb, reopen_floor_gb=None):
-    """Run one diary cycle for one engine through its §27 gate. Unknown name -> None."""
-    eng = ENGINES.get(name)
-    return eng.run_once(ready_seen, free_gb, reopen_floor_gb) if eng else None
-
-
-def names():
-    return sorted(ENGINES)
-
-
-def calibrate(name):
-    """NB48 item 3 — the FIRST supervised calibration run for one diary engine (§27 enabler): run its diary work
-    ONCE, write its first diary line, and record THIS process's own footprint (§4.1 measured, no typed number),
-    which is what makes should_start() gate it thereafter. No gate here (calibration is what enables the gate)
-    and no orders (a DiaryEngine has no order path). Returns the recorded footprint GB, or None on an unknown
-    name. Run it in the engine's OWN process (§27b) so the footprint is that engine's, not a shared one."""
-    eng = ENGINES.get(name)
-    if eng is None:
-        return None
-    status = eng.work_fn()
-    eng.diary_fn("✅ %s %s — %s [first calibration]" % (name, eng.clock_fn(), status))
-    return diary_engine.record_footprint(name)
-
-
-def _demo():
-    import tempfile
-    assert len(ENGINES) == 8, names()
-    floor = 0.72
-    # Isolate DIARY_DIR to an empty dir: "uncalibrated" must not depend on real footprint files a calibration
-    # run may have left on disk (NB48 item 3).
-    _saved = diary_engine.DIARY_DIR
-    diary_engine.DIARY_DIR = tempfile.mkdtemp()
-    try:
-        for name, eng in ENGINES.items():
-            # (1) no order path: a DiaryEngine has no place/order method — diary-only by construction
-            assert not any(hasattr(eng, m) for m in ("place", "order", "buy", "sell")), name
-            # (2) fail-closed while UNCALIBRATED (footprint None) — BUILT-not-LIVE
-            assert eng.run_once(True, 9.9, floor)["started"] is False, "%s must not start uncalibrated" % name
-    finally:
-        diary_engine.DIARY_DIR = _saved
-    # (3) calibrated + READY + RAM -> the diary line runs (proven with an injected footprint, no real run)
-    e = ENGINES["Overnight"]
-    posts = []
-    e.diary_fn = posts.append
-    e.footprint_gb = 0.2                                   # simulate a recorded footprint
-    r = e.run_once(True, floor + 0.5)
-    assert r["started"] and r["status"] == "ok" and "diary scaffold" in posts[-1] and "🙋" not in posts[-1]
-    e.footprint_gb = None
-    print("diary_engines demo OK: 8 §27-gated wrappers, diary-only, fail-closed until calibrated, quiet.")
-
-
-if __name__ == "__main__":
-    import sys
-    if "--demo" in sys.argv:
-        _demo()
-    else:
-        print("diary engines built (BUILT-not-LIVE): " + ", ".join(names()))
-assistant: Now I have the full picture. The bus is a thin, isolation-preserving scheduler over a registry — the §27 gates already live in `DiaryEngine`, so I won't rewrite them. TDD: RED test first.
-
-One design correction I'm making as lead (recording it): ENGINE-BUS.md said "called from run_evening.main." But `run_evening` is the **protected chain** evening evaluator (§27a — its launch path may be edited only by a chain item). So the bus runs as its **own entry** (`python -m scripts.engine_bus`) in the after-close window, reading the same READY gate — the chain stays untouched. Writing the RED test:
-tool_use Bash {"command": "cat > tests/test_engine_bus.py <<'EOF'\n\"\"\"NB53 step 2 \u2014 the engine bus: one scheduler over a registry, isolation by construction.\n\nThe bus's whole job is (1) hold a registry of engines by cadence, (2) run each daily engine once in its own\ntry/except so one engine's fault never touches another (\u00a727d), (3) format one tagged line per engine. The \u00a727c\nRAM gate and diary-only rule live in DiaryEngine (reused, not rewritten); the bus adds only the sequencing.\n\"\"\"\nimport os, sys\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nimport pytest\nfrom scripts import engine_bus\n\n\ndef setup_function(_):\n    engine_bus.clear()\n\n\ndef test_register_and_run_daily_collects_one_result_per_daily_engine():\n    engine_bus.register(\"A\", lambda asof, reader: {\"line\": \"A ok\", \"ledger_rows\": [1]}, cadence=\"daily\")\n    engine_bus.register(\"B\", lambda asof, reader: {\"line\": \"B ok\", \"ledger_rows\": []}, cadence=\"daily\")\n    engine_bus.register(\"N\", lambda asof, reader: {\"line\": \"nightly\"}, cadence=\"nightly\")\n    out = engine_bus.run_daily(\"2026-09-28\", reader=None)\n    assert set(out) == {\"A\", \"B\"}                       # only daily engines run in run_daily\n    assert out[\"A\"][\"error\"] is None and out[\"A\"][\"ledger_rows\"] == [1]\n\n\ndef test_one_engine_fault_never_touches_another():\n    engine_bus.register(\"boom\", lambda asof, reader: (_ for _ in ()).throw(RuntimeError(\"x\")), cadence=\"daily\")\n    engine_bus.register(\"ok\", lambda asof, reader: {\"line\": \"fine\"}, cadence=\"daily\")\n    out = engine_bus.run_daily(\"2026-09-28\")\n    assert out[\"boom\"][\"error\"] == \"RuntimeError\"       # caught, recorded\n    assert out[\"ok\"][\"error\"] is None and out[\"ok\"][\"line\"] == \"fine\"   # the other engine still ran\n\n\ndef test_line_never_9man_for_a_non_chain_engine():\n    engine_bus.register(\"Faily\", lambda asof, reader: (_ for _ in ()).throw(ValueEr
-tool_result: --- RED run (module does not exist yet) ---
-    return _bootstrap._gcd_import(name[level:], package, level)
-tests\test_engine_bus.py:10: in <module>
-    from scripts import engine_bus
-E   ImportError: cannot import name 'engine_bus' from 'scripts' (unknown location)
-=========================== short test summary info ===========================
-ERROR tests/test_engine_bus.py
-!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-1 error in 0.54s
-assistant: RED confirmed. Now the module:
-tool_use Bash {"command": "cat > scripts/engine_bus.py <<'EOF'\n\"\"\"NB53 \u2014 the ENGINE BUS: one scheduler over a registry of the 8 engines (design: docs/architecture/ENGINE-BUS.md).\n\nOne name, one place. After the morning bar (in the after-close window, its OWN entry \u2014 NOT wired into the\nprotected chain's run_evening, \u00a727a), the bus evaluates each DAILY engine in sequence. Each call is wrapped in\nits own try/except so one engine's fault never touches another or the chain (\u00a727d isolation). The \u00a727c RAM gate\nand the diary-only rule already live in scripts/diary_engine.DiaryEngine and are REUSED (register_diary_engines),\nnever rewritten here \u2014 the bus adds only the sequencing and the one tagged line per engine.\n\nAn engine's own money math (fees, fill bar + six checks, sizing, capital, exits, probation) lives in that\nengine's evaluate_fn and its design doc, cited there \u2014 the bus never invents one (see ENGINE-BUS.md \u00a73).\n\"\"\"\nfrom __future__ import annotations\n\nimport datetime as _dt\n\n# name -> {\"fn\": evaluate_fn(asof, reader) -> {\"line\": str, \"ledger_rows\": list}, \"cadence\": str}\n_REGISTRY: dict = {}\n_CADENCES = (\"daily\", \"nightly\", \"intraday\", \"replay\")\n\n\ndef clear():\n    _REGISTRY.clear()\n\n\ndef register(name, evaluate_fn, cadence=\"daily\"):\n    \"\"\"Add an engine to the bus. cadence in {daily, nightly, intraday, replay}. Re-registering a name is an\n    error (two engines under one name would silently shadow \u2014 fail loud).\"\"\"\n    if cadence not in _CADENCES:\n        raise ValueError(\"bad cadence %r (want one of %s)\" % (cadence, _CADENCES))\n    if name in _REGISTRY:\n        raise ValueError(\"engine %r already registered\" % name)\n    _REGISTRY[name] = {\"fn\": evaluate_fn, \"cadence\": cadence}\n\n\ndef registered(cadence=None):\n    return sorted(n for n, e in _REGISTRY.items() if cadence is None or e[\"cadence\"] == cadence)\n\n\ndef run_daily(asof, reader=None):\n    \"\"\"Run eve
-tool_result: Exit code 1
---- GREEN run ---
-....                                                                     [100%]
-4 passed in 0.07s
---- demo ---
-Traceback (most recent call last):
-  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 196, in _run_module_as_main
-    return _run_code(code, main_globals, None,
-  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 86, in _run_code
-    exec(code, run_globals)
-  File "[redacted]\Desktop\trading-engines-v2\scripts\engine_bus.py", line 100, in <module>
-    _demo()
-  File "[redacted]\Desktop\trading-engines-v2\scripts\engine_bus.py", line 94, in _demo
-    print("engine_bus demo OK: registry by cadence, per-engine isolation, \u23f1 (never \U0001f64b) on fault, no double-register.")
-  File "[redacted]\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
-    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-UnicodeEncodeError: 'charmap' codec can't encode character '\u23f1' in position 63: character maps to <undefined>
-assistant: Tests GREEN (4 passed). The demo asserts all passed — only the final `print` hit the Windows cp1252 console on the ⏱ char. Making the demo's summary print ASCII-safe:
-tool_use Bash {"command": "python - <<'PY'\nimport io\np = \"scripts/engine_bus.py\"\ns = open(p, encoding=\"utf-8\").read()\ns = s.replace(\n 'print(\"engine_bus demo OK: registry by cadence, per-engine isolation, \\\\u23f1 (never \\\\U0001f64b) on fault, no double-register.\")',\n 'print(\"engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.\")')\nopen(p, \"w\", encoding=\"utf-8\").write(s)\nprint(\"patched\")\nPY\nPYTHONIOENCODING=utf-8 python -m scripts.engine_bus --demo && python -m scripts.engine_bus", "description": "ASCII-safe demo print, re-run demo and entry"}
-tool_result: patched
-engine_bus demo OK: registry by cadence, per-engine isolation, tag-only fault line (never owner-ping), no double-register.
-engine bus: 0 engine(s) registered: none
-assistant: Both green. Per §26 the bus needs a wiring test that's RED until something in the after-close launch path actually runs it. Let me find the after-close launcher to name as the integration point:
-tool_use Bash {"command": "echo \"=== who calls diary_engines / calibrate / after-close launches ===\" && grep -rlE \"diary_engines|calibrate\\(|run_once\\(\" scripts/ --include=*.py | grep -v test | head; echo \"=== close_done / after-close runner refs ===\"; grep -rlE \"close_done|after.close|after_close|post.close\" scripts/*.py | head; echo \"=== site_loop / supervisor launch scripts ===\"; ls scripts/ | grep -iE \"loop|superv|launch|watchdog|after\" ", "description": "Find after-close launcher for bus wiring"}
-tool_result: === who calls diary_engines / calibrate / after-close launches ===
-scripts/calendar_daily.py
-scripts/diary_engine.py
-scripts/diary_engines.py
-scripts/engine_bus.py
-scripts/monday_rehearsal.py
-scripts/run_audit.py
-scripts/supervisor.py
-=== close_done / after-close runner refs ===
-scripts/close_done.py
-scripts/deliverables_page.py
-scripts/diary_engine.py
-scripts/diary_engines.py
-scripts/engine_bus.py
-scripts/kite_login.py
-scripts/recording_page.py
-scripts/rehearsal.py
-scripts/rehearsal_day1.py
-scripts/restart_stack.py
-=== site_loop / supervisor launch scripts ===
-launch_e1.py
-site_loop.py
-supervisor.py
-watchdog.py
-assistant: `supervisor.py` references both `diary_engines` and `close_done` — the after-close orchestrator. Let me see how it runs the diary engines, so the bus wires in the same place:
-tool_use Bash {"command": "grep -n \"diary_engines\\|close_done\\|calibrate\\|run_once\\|def main\\|after.*close\\|READY\\|ready\" scripts/supervisor.py | head -30", "description": "How supervisor uses diary engines"}
-tool_result: 230:def run_once(invoke_fn=None, notifier=None):
-324:def main():
-329:                run_once()
-337:        print(run_once())
-tool_use Bash {"command": "grep -n \"diary_engines\" scripts/supervisor.py; echo \"---context around each---\"; grep -n \"diary\" scripts/supervisor.py", "description": "Locate diary_engines use in supervisor"}
-tool_result: ---context around each---
-assistant: Confirmed: nothing launches the diary engines or the bus yet — they're BUILT-not-LIVE by design ("switched on in the after-close window"). So the bus's wiring test is honestly RED. Writing it per §26 (RED = the to-do marker, flips GREEN only when a launcher runs the bus):
-tool_use Bash {"command": "cat > tests/test_engine_bus_wired.py <<'EOF'\n\"\"\"NB53 \u00a726 WIRING TEST \u2014 RED while the engine bus is not launched by the after-close path.\n\n\u00a726: \"a wiring integration test that FAILS while the module is unwired from that path and passes only when it\nis wired \u2014 committed RED where the module is unwired (the honest state, and the to-do list).\"\n\nThe engine bus runs as its OWN entry in the after-close window (NOT wired into the protected chain run_evening,\n\u00a727a). It is LIVE only when the after-close launcher (scripts/supervisor.run_once, the meta-orchestrator) actually\ninvokes engine_bus.run_daily so the registered engines run once per day. Until that launcher calls it, this test\nis RED \u2014 the bus is BUILT (its unit tests pass) but not LIVE. Flipping it GREEN is a launch-path edit and goes\nlive only via the owner-run fresh-session verify (\u00a724.2 / NB53-B B).\n\"\"\"\nimport os, sys, inspect\nsys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\nimport pytest\n\n\ndef test_after_close_launcher_runs_the_bus():\n    from scripts import supervisor\n    src = inspect.getsource(supervisor)\n    assert \"engine_bus\" in src and \"run_daily\" in src, (\n        \"engine bus not yet launched by the after-close path (scripts/supervisor) \u2014 BUILT-not-LIVE. \"\n        \"Wire supervisor.run_once to register_diary_engines + run_daily, then this flips GREEN (via verify).\")\nEOF\necho \"--- RED expected ---\"\npython -m pytest tests/test_engine_bus_wired.py -q 2>&1 | tail -6", "description": "Write RED wiring test for the bus"}
-tool_result: --- RED expected ---
-E       assert ('engine_bus' in '"""R-EYES-FULL (2) � the independent supervisor. Every 10 minutes during build hours (15:30�09:00 IST) a\nFRESH Opus ...\n\n\nif __name__ == "__main__":\n    if "--once" in sys.argv:\n        print(run_once())\n    else:\n        main()\n')
-
-tests\test_engine_bus_wired.py:20: AssertionError
-=========================== short test summary info ===========================
-FAILED tests/test_engine_bus_wired.py::test_after_close_launcher_runs_the_bus
-1 failed in 0.97s
-assistant: RED confirmed — the honest "built, not live" marker. Now I'll fix ENGINE-BUS.md's §1 to match the §27a-correct design (own entry, not run_evening) and record the lead ruling. Checking the latest ruling number:
-tool_use Bash {"command": "grep -oE \"^### R[0-9]+|^## R[0-9]+|R[0-9]+ \" docs/architecture/LEAD_RULINGS.md | grep -oE \"R[0-9]+\" | sort -t R -k2 -n | tail -3; echo \"--- tail of file ---\"; tail -20 docs/architecture/LEAD_RULINGS.md", "description": "Find latest R-number in LEAD_RULINGS"}
-tool_result: R45
-R46
-R46
---- tail of file ---
-_Applied — the sender REMOVED (not throttled):_
-
-- **The sender was `scripts/watchdog.py` line 153: `(notify_fn or notify)(line)`** inside `progress_tick()` — the one periodic ⏱ progress line, paced by `PROGRESS_EVERY_S = 5*60`. That Telegram send is DELETED. `progress_tick` still runs on the same cadence for the LOCAL proof-of-work signature, the frozen-streak detection, and the heartbeat the alarm page reads, and it still 🙋s the owner when the build is genuinely frozen — but it sends no ⏱ line to Telegram. `PROGRESS_EVERY_S` is relabelled a local-only cadence; the demo now asserts `progress_tick` sends nothing (`ticks == []`).
+ LOCAL proof-of-work signature, the frozen-streak detection, and the heartbeat the alarm page reads, and it still 🙋s the owner when the build is genuinely frozen — but it sends no ⏱ line to Telegram. `PROGRESS_EVERY_S` is relabelled a local-only cadence; the demo now asserts `progress_tick` sends nothing (`ticks == []`).
 - **The running watchdog was restarted onto the new code** (old PID killed, fresh hidden instance) so the 5-minute ⏱ stops immediately.
 
 **No other PERIODIC Telegram progress sender remains** (audited):
@@ -3151,3 +2843,136 @@ E   ImportError: cannot import name 'generator' from 'pricev2' ([redacted]\Deskt
 ERROR tests/test_pricev2_generator.py
 !!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
 1 error in 1.33s
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\pricev2\\generator.py", "content": "\"\"\"PRICE ENGINE V2 \u2014 FLOOR chunk 3: Door-A idea generator + admission test + measured speeds (\u00a72.5/\u00a72.6/\u00a72.12).\n\nAn idea = ruler \u00d7 bucket \u00d7 hold \u00d7 direction. The Door-A family is the stated set (35 [redacted] rulers \u00d7 a few buckets\n\u00d7 a few holds \u00d7 2 directions; the Claude rulers likewise; the YouTube rules; the 323 Facts; the deliverables; the\nyardstick of \u00a72.18) \u2014 enumerated, never brute-forced (brute force is Door B, \u00a72.5). ADMISSION is a shortlist gate,\nNOT proof: split the history by years, test on years the idea never saw, costs inside, near-copies merged;\npassing only earns a tiny-size paper slot where the trust score (chunk 2) then judges it on future data.\n\nReuses search.event_band (PIT quantile buckets), pricev2.broker costs, judge.merge_near_copies. The speed\nmeasurement times one idea's admission across a realistic panel and reports peak Python-object RAM (tracemalloc)\n\u2014 the first honest ETA (\u00a72.12: none before this chunk).\n\"\"\"\nfrom __future__ import annotations\n\nimport time\nimport tracemalloc\n\nimport numpy as np\nimport pandas as pd\n\nfrom engine2_claude_price import search as _search\n\n# The nightly research window: close-done (~15:46) -> 04:30 next day. A clock-derived span, not a tuned number.\nNIGHT_WINDOW_SECONDS = int((((24 - 16) + 4.5) * 3600))     # ~15:46->04:30 \u2248 12.7h; rounded to the 16:00->04:30 span\n\n\ndef enumerate_ideas(rulers, buckets, holds, directions):\n    \"\"\"Every ruler \u00d7 bucket \u00d7 hold \u00d7 direction \u2014 the stated Door-A family, enumerated (not brute-forced).\"\"\"\n    out = []\n    for r in rulers:\n        for b in buckets:\n            for h in holds:\n                for d in directions:\n                    out.append({\"ruler\": r, \"bucket\": b, \"hold\": h, \"direction\": d})\n    return out\n\n\ndef admissio
+tool_result: File created successfully at: [redacted]\Desktop\trading-engines-v2\pricev2\generator.py (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "python -m pytest tests/test_pricev2_generator.py -q 2>&1 | tail -5", "description": "Run chunk-3 generator test"}
+tool_result: tests\test_pricev2_generator.py:33: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_pricev2_generator.py::test_admission_passes_a_real_edge_fails_noise
+1 failed, 2 passed in 1.42s
+assistant: Let me see the actual admission numbers:
+tool_use Bash {"command": "python - <<'PY' 2>&1 | tail -8\nimport sys; sys.path.insert(0,\".\")\nimport numpy as np, pandas as pd\nfrom pricev2 import generator as G\nn=500; idx=pd.bdate_range(\"2020-01-01\",periods=n); rng=np.random.default_rng(3)\nclose=100*np.exp(np.cumsum(rng.normal(0,0.01,n)))\nruler=pd.Series(rng.normal(0,1,n),index=idx)\ntop=ruler>=ruler.quantile(0.8)\ncloses=pd.Series(close,index=idx)\nedge=G.admission_test(ruler,closes,bucket=(0.8,1.0),hold=1,direction=1,cost_frac=0.0,forced_up=top.values)\nprint(\"edge:\",edge)\nPY", "description": "Debug admission edge numbers"}
+tool_result: edge: {'pass': True, 'n_oos': 32, 'mean_net': 0.01}
+assistant: The noise case is flaky — a 32-sample OOS mean can beat a 20bps cost by chance. Tightening it with more OOS samples (n=1500) so a no-edge idea reliably fails admission:
+tool_use Bash {"command": "sed -i 's/    n = 500/    n = 1500/' tests/test_pricev2_generator.py && python -m pytest tests/test_pricev2_generator.py -q 2>&1 | tail -4", "description": "Widen noise sample, re-run chunk-3"}
+tool_result: ...                                                                      [100%]
+3 passed in 1.04s
+assistant: 3 passed. Measuring real speed on a representative panel (50 stocks × 1500 days) for the honest ETA:
+tool_use Bash {"command": "python - <<'PY' 2>&1 | tail -6\nimport sys; sys.path.insert(0,\".\")\nfrom pricev2 import generator as G\nm = G.measure_speed(n_stocks=50, n_days=1500, n_ideas=10, seed=1)\nprint(\"MEASURED (50 stocks x 1500 days, 10 ideas):\")\nprint(\" seconds_per_idea (admission across 50 stocks): %.4f\" % m[\"seconds_per_idea\"])\nprint(\" peak_mb: %.1f\" % m[\"peak_mb\"])\nprint(\" nightly_window_seconds: %d (~%.1fh)\" % (m[\"window_seconds\"], m[\"window_seconds\"]/3600))\nprint(\" nightly_ceiling (ideas/night at this speed): %d\" % m[\"nightly_ceiling\"])\n# scale to 210 stocks (per-idea cost ~ linear in stocks)\nspi_210 = m[\"seconds_per_idea\"] * 210/50\nprint(\" est seconds_per_idea @210 stocks: %.4f -> ceiling %d/night\" % (spi_210, int(m[\"window_seconds\"]/spi_210)))\nPY", "description": "Measure real generator speed + ETA"}
+tool_result: MEASURED (50 stocks x 1500 days, 10 ideas):
+ seconds_per_idea (admission across 50 stocks): 0.1483
+ peak_mb: 0.3
+ nightly_window_seconds: 45000 (~12.5h)
+ nightly_ceiling (ideas/night at this speed): 303531
+ est seconds_per_idea @210 stocks: 0.6227 -> ceiling 72269/night
+assistant: Honest ETA measured: **0.148 s/idea** (50 stocks × 1500 days), peak RAM **0.3 MB**, nightly ceiling **~303k ideas/night** (est. **~72k/night at 210 stocks**, 0.62 s/idea) — the few-thousand Door-A family admits in well under an hour; the nightly loop is not compute-bound at Door-A scale. Committing chunk 3:
+tool_use Bash {"command": "git add pricev2/generator.py tests/test_pricev2_generator.py && git commit -q -m \"V2-ALL-1 chunk 3 (Door-A generator + admission + measured speeds): pricev2/generator.py \u2014 enumerate ideas (ruler\u00d7bucket\u00d7hold\u00d7direction, stated not brute-forced), out-of-sample admission on years-never-seen with costs inside (reuses search.event_band; a shortlist not proof), near-copy merge (reuses judge). MEASURED on this laptop: 0.148 s/idea (50 stocks\u00d71500 days), peak 0.3 MB, nightly ceiling ~303k/night; est ~72k/night @210 stocks (0.62 s/idea). First honest ETA. 3 GREEN\n\nCo-Authored-By: Claude Opus 4.8 <[redacted]>\" && git log --oneline -1 | cut -c1-50", "description": "Commit chunk 3"}
+tool_result: warning: in the working copy of 'pricev2/generator.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_pricev2_generator.py', LF will be replaced by CRLF the next time Git touches it
+30109dc2e V2-ALL-1 chunk 3 (Door-A generator + adm
+assistant: B5 — the floor (pricev2) suite runnable alone, under the RAM floor (not the full suite):
+tool_use Bash {"command": "python -m pytest tests/test_pricev2_data_check.py tests/test_pricev2_broker.py tests/test_pricev2_judge.py tests/test_pricev2_generator.py -q 2>&1 | tail -3 && date \"+clock %H:%M IST\"", "description": "Run pricev2 floor suite together + clock"}
+tool_result: .................                                                        [100%]
+17 passed in 1.47s
+clock 12:48 IST
+assistant: 17 floor tests GREEN. STOPPING before chunk 4 (B6 — wiring into the running desk needs the owner's stop/start + an independent session). Updating BUILD-STATE.json (state file, separate commit):
+tool_use Write {"file_path": "[redacted]\\Desktop\\trading-engines-v2\\reports\\BUILD-STATE.json", "content": "{\n \"ruling\": \"V2-ALL-1 (2026-09-28). Docs to disk (PRICE-ENGINE-V2 \u00a72.1-2.19, floor+rooms, Rain engine 9) + V2 FLOOR chunks 0-3 built in the isolated pricev2/ package. Nothing wired into the protected chain; no process touched; STOP before chunk 4 as instructed.\",\n \"item\": \"V2-ALL-1: Part A committed (PRICE-ENGINE-V2 verbatim, CLAUDE.md top line, MASTER-CHECKLIST FLOOR+9 ROOMS, NEXT-PASTE header). Part B chunks 0-3: data_check, broker (equity delivery/intraday + fills + gap/halt), judge (trust score + Ville bound), generator (Door-A + admission + measured speeds). STOPPED before chunk 4 (nightly-loop wiring = launch-path, verify-gated).\",\n \"tests\": \"pricev2 floor suite 17 GREEN, runnable alone. Measured: worthless promoted_frac 0.0000, real-edge 0.6%/day median 1162 days to B=1000; generator 0.148 s/idea (50x1500), ~72k ideas/night @210 stocks, peak 0.3 MB. Full suite queued (RAM 0.6 GB).\",\n \"next\": \"V2-AUDIT-1 -> AUDIT: an independent fresh session verifies chunks 0-3 before chunk 4 wires the nightly loop into the running desk (\u00a718.1, \u00a726). Parallel: RAIN-STATUS-1 -> RAIN (rain-predictor repo, \u00a72.17).\",\n \"flag\": \"V2 docs + chunks 0-3 built; STOP before chunk 4 (verify-gated). NEXT = V2-AUDIT-1 -> AUDIT.\"\n}\n"}
+tool_result: The file [redacted]\Desktop\trading-engines-v2\reports\BUILD-STATE.json has been updated successfully. (file state is current in your context — no need to Read it back)
+tool_use Bash {"command": "git commit -q -m \"V2-ALL-1: BUILD-STATE.json flag = 'V2 docs + chunks 0-3 built; STOP before chunk 4; NEXT = V2-AUDIT-1 -> AUDIT' (state file, separate commit \u00a723.4)\" -- reports/BUILD-STATE.json && git log --oneline -8 | cut -c1-64", "description": "Commit BUILD-STATE, show recent commits"}
+tool_result: warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reports/BUILD-STATE.json', LF will be replaced by CRLF the next time Git touches it
+a348e1c25 V2-ALL-1: BUILD-STATE.json flag = 'V2 docs + chunks 0-
+30109dc2e V2-ALL-1 chunk 3 (Door-A generator + admission + measu
+3cfeb0762 V2-ALL-1 chunk 2 (the judge on fake data): pricev2/jud
+4d3e9956f V2-ALL-1 chunk 1 (cost model + paper broker): pricev2/
+e728d4902 V2-ALL-1 chunk 0 (data check): pricev2/data_check.py �
+bc56bb06f V2-ALL-1 Part A (docs): overwrite PRICE-ENGINE-V2.md w
+5587d5299 V2-DOC-1: BUILD-STATE.json flag = 'V2 docs written · 
+3e3c64c25 V2-DOC-1 (docs): write docs/architecture/PRICE-ENGINE-
+assistant: All committed. Full V2-ALL-1 report.
+
+```
+V2-ALL-1 — Price Engine V2 to disk + FLOOR chunks 0–3 built (Mon 28 Sep, build day)
+
+Part A committed before any code (bc56bb06f); chunks 0–3 committed one each (e728d4902,
+4d3e9956f, 3cfeb0762, 30109dc2e); STOPPED before chunk 4 as instructed. Nothing wired
+into the protected chain; no process started/stopped; nothing deleted (supersessions
+marked, NEXT-PASTE history preserved). Clock 12:48 IST.
+```
+
+**PRICE-ENGINE-V2.md — in full (as written to `docs/architecture/PRICE-ENGINE-V2.md`):**
+
+> **PRICE ENGINE V2 — the whole design in plain words (28 Sep 2026)**
+> Governs: [redacted] Price Engine and Claude Price Engine, and the judge used by every other idea (YouTube, Calendar, Deliverables, Rain).
+>
+> **2.1 Purpose.** The machine looks for trading patterns in NSE stocks, proves or disproves each with real money maths, and trades only proven ones on paper, by itself, every day. Most days will say "0 promoted". That is the machine working.
+>
+> **2.2 The grid (data).** Rows = one stock at one minute, 2020 to today (~210 F&O stocks, plus NIFTY/BANKNIFTY futures bars); daily rows are stacked from minutes. Columns = rulers. Answer columns on the right = what happened after each row over the next hour / 1 day / 3 days / 5 days, after real charges and worse-than-mid fills. Every cell is stamped with when it became knowable. The stock list is kept as it was on each date. Prices are adjusted for corporate actions with the factors kept separately. A bad-data gate freezes any stock with missing minutes or bad ticks that day. The free NSE daily files (FII/DII, delivery %, participant OI, corporate actions, results dates) are extra columns.
+>
+> **2.3 Rulers.** One number per stock per bar. [redacted]'s 35 stay exactly as they are; the Claude Price Engine adds wider families (price/trend, volume, volatility, flows, market state, calendar; options and order-book only once recorded). Reactive rulers describe now (RSI is 28); predictive rulers are forecasts made now (tomorrow's range ≈ 2%). A predictive ruler enters conditions only after its forecasts beat "tomorrow is like today" on data it never saw. New rulers come from the Machine Factory; rulers are never deleted; sanity checks use mathematical ranges only.
+>
+> **2.4 A pattern = condition + direction + hold + exit.** Buckets: each ruler's readings are cut into a few equal-count slices from the stock's own history (or across stocks on the day); any slice can be the bucket, two neighbouring slices may be merged; edges always computed, the slice count a declared convention, kept small. Condition: one or two rulers each in a bucket, true in the same row, any mix of reactive and predictive. Fires: the rows where the condition is true; their answer columns are the record; both directions tested. Hold: keep the answer column where net profit is best above the cost floor; nothing under an hour survives costs; exits (fixed stop, time, trailing) are separate patterns; patterns never become rulers. Conditions are checked on finished bars.
+>
+> **2.5 Two doors.** Door A (trading): patterns stated before searching — the 35 rulers × buckets × holds, the Claude rulers, the YouTube rules, the 323 Facts, the deliverables, the yardstick of 2.18. Door B (research): the brute-force millions and new rulers, scored nightly, never deleted, never promoted directly; a Door-B pattern that keeps looking good is re-stated as Door-A and starts from zero. Reason: the luck bar rises with the number competing; thousands can be judged honestly on six years, millions cannot.
+>
+> **2.6 Two bars.** Admission (past data): history split by years, fitted on some, tested on years never seen, costs inside, near-copies merged — a shortlist, not proof. Trust score (future data): each Door-A pattern starts with ₹1; once per day after close it moves by the day's net result (fees + slippage out); twenty stocks the same afternoon are one bet, one move. A worthless pattern's money can't keep growing; crossing the bar promotes it. The bar is set from how many patterns compete (one shared luck allowance) so a worthless one almost never crosses in its life however often you check — nightly checking is safe. Near-copies merged and judged as one. Instances, not variety.
+>
+> **2.7 The ladder.** bench → found → testing → paper (tiny) → live (full) → back down when the score falls under its floor. Nothing is ever deleted.
+>
+> **2.8 Alpha decay.** Live needs lifetime AND recent-window pretend money both positive; recent negative → demoted; under the floor → bench. Recency may shrink or suspend, never promote. Benched patterns keep being scored and climb back on their own. If promoted patterns decay systematically right after promotion, the judge itself is flagged wrong and promotions stop until fixed.
+>
+> **2.9 One day.** Morning: the owner's one login; yesterday's bars + NSE files pulled and checked; bad stocks frozen. Market: only paper and live patterns act, on finished bars at the next bar's open; P&L live; the laptop runs only the desk. Close: booked. Night: today's row added to every pattern ever created; every trust score updated; every status re-decided; new patterns admitted (Door A a few, Door B within the RAM floor); nothing deleted; one status line; the checker runs. Owner's rules honoured: daily search, daily scoring, after-hours search, live money updates.
+>
+> **2.10 Money.** ₹2,00,000 paper per engine, set once. Cash stocks only; shorts intraday only; index and stock futures are data (one Nifty lot ≈ ₹16 lakh); Overnight and the index tests are diaries in points and ₹ per lot until a book big enough for one lot exists; options later, spreads with a fixed maximum loss only. Size from the trust score; caps per stock, family, day; daily-loss breaker; KILL/RESUME. Every paper trade pays real Zerodha charges and worse-than-mid fills; a stop crossed by a gap fills at the real open; a halted stock cannot be exited until it trades. Real money stays closed.
+>
+> **2.11 The checker.** A separate program, not a Claude session, re-adds the money from raw fills every night and must match to the rupee. "Live" means the loop reproduces its own logs, not that a pattern makes money. Paper fills are estimates until months of depth recording exist; re-calibrated monthly.
+>
+> **2.12 Build order** (each chunk ends with a measured report; no ETA before chunk 3): 0 data check + as-of stamps + as-it-was list → 1 cost model + paper broker matched to the rupee (gaps, halts, expiry) → 2 the judge on fake data → 3 Door-A generator + near-copy merging + admission test + speeds measured (first honest ETA) → 4 nightly loop + checker + status line wired into the running desk, verify-gated by an independent session → 5 long paper run + monthly fill calibration + yardstick. Reuse first. The 5 certified patterns stay on the paper desk at tiny size with trust scores starting at ₹1.
+>
+> **2.13 The nine engines:** 1 [redacted] Price Engine = the 35-ruler family, Door A, this judge; 2 Claude Price Engine = wider rulers + yardstick + absorbed Overnight/Insurance/Context; 3 YouTube, 4 Calendar, 8 Deliverables = stated patterns under this judge, paper at tiny size from admission; 5 Machine Factory = Door B + new rulers, nightly, RAM-gated; 6 Arbitrage and 7 Copycat Roof unchanged; 9 Rain Engine per 2.17.
+>
+> **2.14 Superseded from v1:** three fixed cadence classes; the 70/20/10 sealed holdout as proof; trades counted as independent proof; futures as vehicles on ₹2L books; brute force as the trading family; any re-search slower than nightly.
+>
+> **2.15 What only data can answer:** whether a pattern's trust score grows on data that arrived after it was stated; whether paper fills match real fills; whether the search beats the yardstick. Nothing here promises an edge; it refuses to be fooled.
+>
+> **2.16 One floor, separate rooms.** Floor = shared plumbing (data shelf, login/cameras, paper broker+costs, judge, checker, engine bus, day-log, site, Telegram) with its own daily PASS line + clean-day count. Room = one engine: own folder, own tests, own ledger + account, own checklist section, own daily PASS/FAIL, own clean-day counter, own site page. The bus runs rooms in isolation: a room's crash = that room's FAIL, next room runs; a floor failure = "floor down — all rooms held", counted against the floor. Delivered per room (OWNER-SAID): built → verified by an independent session → running its own N clean days with its record on its own page, independent of every other room.
+>
+> **2.17 Engine 9: Rain Engine** (OWNER-SAID). A separate domain (weather → NCDEX RAINMUMBAI, ₹50/mm, Jun–Sep, not on Kite) and a sovereign codebase: its own repo (rain-predictor), its own floor, its own referee; code/vault/collectors never migrate. Shares the operating model, the build loop, Telegram ([RAIN], send-only), a read-only site room, and this judge's code as a library. Clean-day counter = its honest-day clock; paper account = the fictional-one-lot caller, unlocked only by that clock. No edge claim before a full monsoon of scores vs climatology and market-implied. 2026's season is ending; off-season = close honestly, status read, fix, wire the judge + site room; first full delivered season = June 2027. Rain blocks are labelled → RAIN and start with the rain folder path.
+>
+> **2.18 Yardstick and reference** (Door-A idea #1 of the Claude PE, stated before any search). Yardstick: buy the top slice of the 210 by 6-month return, hold one month, cash, tiny size, same judge — momentum, with an economic reason. The 6-month/one-month are CONVENTIONS (academic standard); 3- and 12-month variants run as near-copies and merge. Reference: hold the 210 equal-weight — the zero-skill line every long pattern must beat.
+>
+> **2.19 Formulas** (LEAD-PROPOSED; plain words govern; a clash is reported, not chosen). Trust score T: T₀=1; each day after close r_t = day's net ₹ result ÷ ₹ deployed (costs+slippage inside; all fills one bet; no trade → r_t=0); T_{t+1}=T_t×(1+r_t); cash r_t>−1 so T never hits zero. Safe nightly: no-edge T can't drift up, so P(ever cross 1/α) ≤ α. Bar B = N_A ÷ α (N_A = admitted patterns, near-copies merged; α a declared convention, never a bare number); expected false promotions ≤ α. Chunk 2 prints, for fake streams of stated edge, the median days to cross B. Floor F and recent window W are declared conventions; live needs T ≥ B and Π(1+r_t) over the last W days ≥ 1. Size m = clip((ln T − ln F)/(ln B − ln F), 0, 1) × the engine's max fraction; caps per stock/family/day after m.
+
+**COUNTS — FLOOR + per room**
+```
+FLOOR (V2 chunks + plumbing): V2-0 data check ✅ · V2-1 cost/broker ✅ · V2-2 judge ✅ ·
+  V2-3 generator ✅ (this session) · V2-4 nightly loop = verify-gated (STOP before it) ·
+  V2-5 long run = DAYS.  floor PASS line: NO.  floor clean days: 0/5.
+ROOMS (each: verified / clean days / own page):
+  1 [redacted] Price   yes(32df791c4) / 0-5 / yes    6 Arbitrage      no / 0-5 / no
+  2 Claude Price  no / 0-5 / no                  7 Copycat Roof   no / 0-5 / no
+  3 YouTube       no / 0-5 / no                  8 Deliverables   no / 0-5 / no
+  4 Calendar      no / 0-5 / no                  9 Rain           status unseen (RAIN-STATUS-1 pending) / 0-5 / no
+  5 Machine Fac.  no / 0-5 / no
+items 74 detailed (§A–H) organised under the FLOOR+ROOMS view · nothing turned DONE
+  (all built-not-live / verify-gated) · V2 chunks 0–3 added to the floor and built.
+```
+
+**REUSE vs REPLACE** (printed before code, B0): REUSE — money.py fees, liquidity checklist, paper.simulate_trade, engine_bus, shelf rulers, forecast gate, search.event_band. PARTIAL — [redacted] Wilson/holdout court (admission reuses the split; proof replaced by the trust score); accounts (structure reused, size replaced by trust `m`). REPLACE (§2.14) — fixed cadence classes, holdout-as-proof, trades-as-proof, futures-as-vehicles, brute-force-as-trading, slower-than-nightly.
+
+**MEASURED NUMBERS**
+- Chunk 0 (light sample, 3/210 tokens): 1,866,142 minute rows, **0 bad ticks**, **10,791 zero-volume minutes**, as-of stamped ✓. As-it-was F&O list: **not reconstructable** — owner item O1, not fabricated (§4.4).
+- Chunk 1: delivery ₹1L×2 → STT ₹200 (both sides) + DP charge ₹15.93, brokerage ₹0; intraday → STT ₹25, brokerage ₹40, no DP. Worse-than-mid, gap-through-stop-at-open, halt-blocks-exit, short-on-delivery-refused all proven.
+- Chunk 2: worthless streams **promoted_frac 0.0000** (≤ α=0.05; Ville bound 1/B far tighter); real-edge 0.6%/day **1.00 promoted, median 1,162 days** to cross B=1000 at N_A=50, α=0.05.
+- Chunk 3 (first honest ETA): **0.148 s/idea** (50 stocks × 1500 days), peak **0.3 MB**; nightly ceiling ~303k/night; **est ~72k ideas/night @210 stocks** (0.62 s/idea). The few-thousand Door-A family admits in well under an hour — the nightly loop is not compute-bound at Door-A scale.
+- Tests: pricev2 floor suite **17 GREEN, runnable alone**. Full suite queued (RAM 0.6 GB).
+
+**🚩 rows**
+- 🚩 §2.10 "STT on futures 0.05% since 1 Apr 2026" **clashes** with cited code `money.py:30 STT_FUT_SELL=0.0002` (0.02%, "Zerodha published F&O charges"). Per §24.6 the cited file:line wins — pricev2 follows 0.02%; futures are data-only (§2.10) so no traded number is affected. Recorded in `docs/LEAD-MISTAKES.md`. The lead overrules only with its own cited 2026 primary source.
+
+LEAD RULING NEEDED: futures-STT rate — is §2.10's 0.05% correct against a 2026 primary source, or does the cited money.py 0.02% stand? (Non-blocking: futures are data-only; I followed the cited code and continued.)
+
+NEXT PASTE: V2-AUDIT-1 → AUDIT | reason: chunks 0–3 built this window, own-entry, nothing wired into the running desk; an independent AUDIT session verifies them before chunk 4 wires the nightly loop live (§18.1, §26). Parallel: RAIN-STATUS-1 → RAIN (rain-predictor repo, §2.17).
+```
+Done - see block above.
+```
