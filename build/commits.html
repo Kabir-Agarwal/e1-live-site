@@ -1,4 +1,231 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>97c7a249b</b> · 2026-09-28 08:31</div><div>NB53-B step 2: §H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB 🙋 guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated</div><div class='sub h'>docs/MASTER-CHECKLIST.md        |  8 ++--</div><div class='sub h'>scripts/desk_day_log.py         | 84 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/event_blackout.py       | 55 +++++++++++++++++++++++++++</div><div class='sub h'>scripts/market_hours_mode.py    | 66 ++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/monday_rehearsal.py     | 18 ++++++++-</div><div class='sub h'>tests/test_desk_day_log.py      | 30 +++++++++++++++</div><div class='sub h'>tests/test_event_blackout.py    | 27 +++++++++++++</div><div class='sub h'>tests/test_market_hours_mode.py | 37 ++++++++++++++++++</div><div class='sub h'>tests/test_rehearsal_measure.py | 21 +++++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='120'><title>Commits tonight</title><style>body{margin:0;background:#0f1115;color:#e8e6e1;font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:22px 18px}a{color:#7db4ff}h1{font-size:20px}pre{white-space:pre-wrap;word-break:break-word;background:#15181d;border:1px solid #23262d;border-radius:8px;padding:12px;font:12px/1.5 ui-monospace,monospace;overflow-x:auto}.sub{color:#9a9a93}.c{border-bottom:1px solid #23262d;padding:10px 0}.h{font-family:ui-monospace,monospace}table{border-collapse:collapse}td,th{padding:2px 10px 2px 0;text-align:left}</style></head><body><main><h1>Commits tonight</h1><p class='sub'>Newest first, full diff, scrubbed of secrets. <a href='index.html'>build room</a></p><div class='c'><div class='h'><b>b0eba4e86</b> · 2026-09-28 08:33</div><div>NB53-B step 3: engine 2 (Claude Price) architecture (section C verbatim, LEAD RULING resolved) + CHUNK 1 data/context layer. engine2_claude_price/context.py: PIT context row (realised vol, breadth, index return) from the shared daily-close panel READ-ONLY; leakage test proves no row uses future data (§4.3); vol_window a param, no typed number (C2). 3 tests GREEN. Design sheet superseded</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-ARCHITECTURE.md            | 72 ++++++++++++++++++++</div><div class='sub h'>.../CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md            |  2 +</div><div class='sub h'>engine2_claude_price/__init__.py                   |  0</div><div class='sub h'>engine2_claude_price/context.py                    | 78 ++++++++++++++++++++++</div><div class='sub h'>tests/test_claude_price_context.py                 | 46 +++++++++++++</div><pre>diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md b/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md
+new file mode 100644
+index 000000000..5ebbcaacd
+--- /dev/null
++++ b/docs/architecture/CLAUDE-PRICE-ENGINE-ARCHITECTURE.md
+@@ -0,0 +1,72 @@
++# Claude Price Engine — ARCHITECTURE (engine 2 of 8)
++
++**Status: LEAD-RULED, fixed (NB53-B, 2026-09-28).** The 28 Sep architecture file never reached the repo; the lead
++re-issued section C in dispatch `docs/dispatches/2026-09-28_NB53-B.md` and it is written here verbatim. Contents
++(every threshold) come from backtests, never typed (§4.1, C2). This supersedes the DESIGN SHEET
++(`CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md`), whose 7 questions are now answered by the chunks below.
++
++## C0 — Identity
++
++Engine 2 of 8; **own folder** under the engine bus (`engine2_claude_price/`), **own state**, **own paper ledger**,
++**own Telegram line &quot;Claude Price Engine&quot;**. Same pipeline as the [redacted] Price Engine — bars → rulers → patterns →
++measured record → sizing → queue → paper ledger — **only the ruler shelf differs**. Reads shared stores
++**READ-ONLY**; **never touches the [redacted] Price Engine&#x27;s rulers, queue or ledger** (§27a). Absorbs **Insurance**
++(portfolio protection) and **Context** (regime) as **chunks 5 and 6** — they are not separate engines.
++
++## C1 — Money math (same functions as the Price Engine; cited, not re-implemented)
++
++| Concern | Function (cited) |
++|---|---|
++| Fees | `engine1_rebuild/money.py` — `COST_STATUTORY_RT` (money.py:17) + `cost_readout()` (money.py:189) |
++| Fill bar + six checks | `scripts/liquidity_backtest.checklist` (liquidity_backtest.py:185) + `engine1_rebuild/paper.simulate_trade` |
++| Sizing | `engine1_rebuild/engine_book.weight` (Sizing Families) × **adaptive multiplier 0→1 on Kelly** computed from the pattern&#x27;s measured record — **never a fixed fraction** |
++| Cold start | a pattern trades **flat until `n_min`** (the existing constant — cite in code, do not type a new one) |
++| Starting capital | `engine1_rebuild/money.NOTIONAL_CAPITAL` (money.py:13 = ₹2,00,000) |
++| Caps + exits | from the ruler&#x27;s measured profile (chunk 3) |
++| Failed rulers | → probation via `scripts/diary_engines` |
++
++## C2 — No typed numbers
++
++**Every threshold is a percentile of a measured distribution on the training window, chosen by walk-forward
++backtest.** The doc records **percentile + window**; the **code reads them from the ruler&#x27;s record file, never
++from a literal** (§4.1).
++
++## The seven chunks
++
++**CHUNK 1 — Data + context layer.** Point-in-time universe (build item 8 here, shared read-only), daily bars,
++index bars, realised-volatility and breadth series from those bars, and the expiry/holiday/event calendar (the
++Calendar engine&#x27;s file). **Output:** one context row per trading day, with a **leakage test** proving no row uses
++data after its own date. **DONE** = tests GREEN + the context file regenerates from the stores.
++
++**CHUNK 2 — Direction rulers (the shelf).** Candidate families, each must earn its place in walk-forward with
++`cost_readout` applied — trend continuation (close vs rolling reference), mean reversion (distance from reference
++in ATR units), range breakout, gap continuation vs gap fade at the open, volume expansion, relative strength vs
++the index. **Index close-to-open is NOT here** (it lives in the [redacted] Price Engine). A family enters the shelf
++only if its out-of-sample record clears the six checks with **positive expectancy after costs at n ≥ n_min**; else
++probation. **Output:** the ruler record file (family, percentile parameters, window, n, expectancy, fill bar).
++
++**CHUNK 3 — Horizon rulers.** Per shelf ruler, the holding horizon (to close, next open, or N sessions) with the
++**best measured post-signal profile** in the training window, capped by the existing exit rules; **N read from the
++record, never typed.**
++
++**CHUNK 4 — Vehicle rulers.** Cash equity by default; futures where the store has them (item 45&#x27;s lane when it
++exists); defined-risk options (**debit spreads only, paper**) ONLY when the measured expected move exceeds the
++measured premium. **EXECUTION GAP stated now:** no option quotes are recorded today → the option vehicle is
++designed, tested on synthetic chains, and **DORMANT until a quote lane exists**; the ledger never carries an option
++trade without recorded quotes.
++
++**CHUNK 5 — Insurance (absorbed).** When the context row&#x27;s realised-vol or drawdown state is in its measured
++high-risk percentile, the Kelly multiplier scales down and, once chunk 4&#x27;s lane exists, a defined-risk hedge is
++bought on paper; hedge cost flows through `cost_readout` into the ledger. **Output:** a per-day protection state
++and its effect on size, tested.
++
++**CHUNK 6 — Context gating (absorbed).** Every shelf ruler&#x27;s record measured **per context state** (trend/vol/
++breadth buckets from chunk 1, bucket edges = percentiles); a ruler trades only in states where its own record
++clears the bar. **Output:** the ruler × state table in the record file.
++
++**CHUNK 7 — Live wiring.** Queue → engine bus → own ledger, Telegram line, probation, day-log entry, **twin
++comparison versus the [redacted] Price Engine** on the same days (same bar, same costs), and the nightly rehearsal path.
++**&quot;Live&quot; only after a fresh-session verify.**
++
++**DONE for engine 2** = all seven chunks GREEN, record files regenerate from the stores, one full paper day runs in
++**REPLAY on recorded bars end to end**.
+diff --git a/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
+index 6891f7fbe..b8045e575 100644
+--- a/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
++++ b/docs/architecture/CLAUDE-PRICE-ENGINE-DESIGN-SHEET.md
+@@ -1,3 +1,5 @@
++&gt; **SUPERSEDED 2026-09-28 (NB53-B):** the lead re-issued the architecture; see `CLAUDE-PRICE-ENGINE-ARCHITECTURE.md`. The 7 questions below are now answered there. Kept as history.
++
+ # Claude Price Engine — DESIGN SHEET (engine 2, NB53) — LEAD RULING NEEDED
+ 
+ **Status: MISSING.** `CLAUDE-PRICE-ENGINE-ARCHITECTURE.md` is nowhere in the repo (searched
+diff --git a/engine2_claude_price/__init__.py b/engine2_claude_price/__init__.py
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/engine2_claude_price/context.py b/engine2_claude_price/context.py
+new file mode 100644
+index 000000000..63018cb6a
+--- /dev/null
++++ b/engine2_claude_price/context.py
+@@ -0,0 +1,78 @@
++&quot;&quot;&quot;Claude Price Engine (engine 2) — CHUNK 1: the data + context layer (docs/architecture/CLAUDE-PRICE-ENGINE-
++ARCHITECTURE.md, C1).
++
++One context row per trading day — realised volatility, breadth, index return — computed from the SHARED daily-close
++panel READ-ONLY (§27a). Point-in-time by construction (§4.3): every quantity for date t is derived from
++`panel.loc[:t]` only, so a future bar can never change a past row. `vol_window` is a PARAMETER (no typed number,
++C2) chosen by walk-forward and recorded in the ruler record; this layer only computes given it.
++
++The panel is passed in (injectable) so the logic is unit-tested without loading the whole store; `build_from_store`
++wires the real datastore reader for the &quot;regenerates from the stores&quot; DONE criterion.
++&quot;&quot;&quot;
++from __future__ import annotations
++
++import numpy as np
++import pandas as pd
++
++
++def context_row(asof, panel, vol_window, index_col=&quot;INDEX&quot;):
++    &quot;&quot;&quot;One context row for `asof`, using ONLY panel rows at or before asof (PIT). Returns a plain dict so equality
++    is exact for the leakage test. `panel`: daily closes, columns = symbols (one is the index), index = dates.&quot;&quot;&quot;
++    hist = panel.loc[:asof]                                  # PIT slice: nothing after asof is visible
++    idx = hist[index_col].astype(float)
++    logret = np.log(idx).diff()
++    # realised vol = std of the last vol_window index log-returns ending at asof (trailing window = PIT)
++    tail = logret.dropna().tail(int(vol_window))
++    rv = float(tail.std(ddof=0)) if len(tail) else 0.0
++    index_ret = float(logret.iloc[-1]) if len(logret) &gt;= 1 and pd.notna(logret.iloc[-1]) else 0.0
++    # breadth = fraction of NON-index symbols with a positive daily return on asof
++    syms = [c for c in hist.columns if c != index_col]
++    if len(hist) &gt;= 2 and syms:
++        prev, cur = hist[syms].iloc[-2], hist[syms].iloc[-1]
++        up = (cur.astype(float) &gt; prev.astype(float))
++        breadth = float(up.sum()) / float(len(syms))
++    else:
++        breadth = 0.0
++    return {&quot;date&quot;: pd.Timestamp(asof).date().isoformat(),
++            &quot;realized_vol&quot;: round(rv, 8), &quot;breadth&quot;: round(breadth, 8), &quot;index_ret&quot;: round(index_ret, 8)}
++
++
++def build(panel, dates, vol_window, index_col=&quot;INDEX&quot;):
++    &quot;&quot;&quot;One context row per date in `dates`. DONE-criterion output — the context file the engine regenerates.&quot;&quot;&quot;
++    return pd.DataFrame([context_row(d, panel, vol_window, index_col) for d in dates])
++
++
++def daily_close_panel(reader, tokens, index_token):
++    &quot;&quot;&quot;Assemble the daily-close panel from the SHARED minute-bar store, READ-ONLY. `reader(token)` returns a
++    minute-bar frame (engine1_rebuild.datastore.read); we take the last close of each day. Heavy — used by
++    build_from_store, not in unit tests.&quot;&quot;&quot;
++    cols = {}
++    for tok in list(tokens) + [index_token]:
++        df = reader(tok)
++        if df is None or not len(df):
++            continue
++        daily = df[&quot;close&quot;].resample(&quot;1D&quot;).last().dropna()
++        cols[&quot;INDEX&quot; if tok == index_token else str(tok)] = daily
++    return pd.DataFrame(cols).sort_index()
++
++
++def _demo():
++    dates = pd.bdate_range(&quot;2026-01-01&quot;, periods=30)
++    rng = np.random.default_rng(1)
++    panel = pd.DataFrame({s: 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(dates))))
++                          for s in [&quot;INDEX&quot;, &quot;A&quot;, &quot;B&quot;]}, index=dates)
++    t = dates[20]
++    full = context_row(t, panel, vol_window=10)
++    assert full == context_row(t, panel.loc[:t], vol_window=10), &quot;leakage&quot;
++    pois = panel.copy(); pois.loc[panel.index &gt; t] = np.nan
++    assert context_row(t, pois, vol_window=10) == full, &quot;future bars changed a past row (leakage)&quot;
++    assert 0.0 &lt;= full[&quot;breadth&quot;] &lt;= 1.0 and full[&quot;realized_vol&quot;] &gt;= 0.0
++    assert len(build(panel, list(dates[15:18]), vol_window=10)) == 3
++    print(&quot;claude_price context (chunk 1) demo OK: PIT context row (vol/breadth/index_ret); NO LEAKAGE &quot;
++          &quot;(future bars never change a past row); one row per date.&quot;)
++
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    if &quot;--demo&quot; in sys.argv:
++        _demo()
+diff --git a/tests/test_claude_price_context.py b/tests/test_claude_price_context.py
+new file mode 100644
+index 000000000..aac6a8784
+--- /dev/null
++++ b/tests/test_claude_price_context.py
+@@ -0,0 +1,46 @@
++&quot;&quot;&quot;NB53-B engine 2 (Claude Price) CHUNK 1 — data + context layer, PIT by construction.
++
++The chunk&#x27;s crucial invariant (§4.3, §8.1): the context row for date t uses ONLY data knowable at or before t.
++The leakage test proves it — context_row(t, full panel) must equal context_row(t, panel truncated at t); if a
++future bar changes the row, the row leaked. vol_window is a PARAMETER (no typed number, C2) chosen by walk-forward
++and recorded later.
++&quot;&quot;&quot;
++import os, sys
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import numpy as np, pandas as pd
++from engine2_claude_price import context as ctx
++
++
++def _panel():
++    dates = pd.bdate_range(&quot;2026-01-01&quot;, periods=40)
++    rng = np.random.default_rng(7)
++    cols = {}
++    for s in [&quot;INDEX&quot;, &quot;A&quot;, &quot;B&quot;, &quot;C&quot;]:
++        cols[s] = 100 * np.exp(np.cumsum(rng.normal(0.0, 0.01, len(dates))))
++    return pd.DataFrame(cols, index=dates)
++
++
++def test_context_row_has_vol_breadth_and_index_return():
++    p = _panel(); t = p.index[30]
++    row = ctx.context_row(t, p, vol_window=20, index_col=&quot;INDEX&quot;)
++    assert set(row) &gt;= {&quot;date&quot;, &quot;realized_vol&quot;, &quot;breadth&quot;, &quot;index_ret&quot;}
++    assert 0.0 &lt;= row[&quot;breadth&quot;] &lt;= 1.0
++    assert row[&quot;realized_vol&quot;] &gt;= 0.0
++
++
++def test_NO_LEAKAGE_future_bars_never_change_a_row():
++    p = _panel(); t = p.index[25]
++    full = ctx.context_row(t, p, vol_window=20, index_col=&quot;INDEX&quot;)
++    truncated = ctx.context_row(t, p.loc[:t], vol_window=20, index_col=&quot;INDEX&quot;)
++    assert full == truncated, &quot;LEAKAGE: row for t changed when future bars were present&quot;
++    # poison every bar AFTER t and confirm the row is byte-identical
++    poisoned = p.copy(); poisoned.loc[p.index &gt; t] = np.nan
++    assert ctx.context_row(t, poisoned, vol_window=20, index_col=&quot;INDEX&quot;) == full
++
++
++def test_build_makes_one_row_per_date():
++    p = _panel()
++    dates = list(p.index[22:26])
++    df = ctx.build(p, dates, vol_window=20, index_col=&quot;INDEX&quot;)
++    assert list(df[&quot;date&quot;]) == [d.date().isoformat() for d in dates]
++    assert len(df) == 4
+</pre></div><div class='c'><div class='h'><b>97c7a249b</b> · 2026-09-28 08:31</div><div>NB53-B step 2: §H items 70-73 BUILT-not-LIVE (engine 1 desk ops, TDD). 70 desk_day_log (line/step, measured disk+RAM); 71 rehearsal per-step disk+RAM + READY/NOT-READY; 72 market_hours_mode (desk-only window + measured-GB 🙋 guards, reverted disk floor kept out of chain); 73 event_blackout (named-day block, DORMANT until engine 4 events). 11 tests GREEN; live wire-ins verify-gated</div><div class='sub h'>docs/MASTER-CHECKLIST.md        |  8 ++--</div><div class='sub h'>scripts/desk_day_log.py         | 84 +++++++++++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/event_blackout.py       | 55 +++++++++++++++++++++++++++</div><div class='sub h'>scripts/market_hours_mode.py    | 66 ++++++++++++++++++++++++++++++++</div><div class='sub h'>scripts/monday_rehearsal.py     | 18 ++++++++-</div><div class='sub h'>tests/test_desk_day_log.py      | 30 +++++++++++++++</div><div class='sub h'>tests/test_event_blackout.py    | 27 +++++++++++++</div><div class='sub h'>tests/test_market_hours_mode.py | 37 ++++++++++++++++++</div><div class='sub h'>tests/test_rehearsal_measure.py | 21 +++++++++++</div><pre>diff --git a/docs/MASTER-CHECKLIST.md b/docs/MASTER-CHECKLIST.md
 index 4e74e4efc..d45b4787a 100644
 --- a/docs/MASTER-CHECKLIST.md
 +++ b/docs/MASTER-CHECKLIST.md
